@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: mercenary-ai
+  data:
+    mongodb:
+      uri: mongodb+srv://Jreinhal:Mercenary2025@cluster0.peocz7g.mongodb.net/mercenary
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  ai:
+    openai:
+      api-key: "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"
+      embedding:
+        options:
+          model: text-embedding-3-small
+    vectorstore:
+      mongodb:
+        collection-name: vector_store
+        initialize-schema: false
+        path-name: embedding
+        index-name: vector_index
