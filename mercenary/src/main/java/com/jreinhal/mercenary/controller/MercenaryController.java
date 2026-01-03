@@ -2,50 +2,68 @@ package com.jreinhal.mercenary.controller;
 
 import com.jreinhal.mercenary.service.AuditService;
 import com.jreinhal.mercenary.service.IngestionService;
-import org.apache.tika.Tika; // NEW IMPORT
-import org.springframework.http.MediaType;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
 public class MercenaryController {
 
-    private final IngestionService ingestion;
-    private final AuditService audit;
+    // 1. Declare the fields as final
+    private final IngestionService ingestionService;
+    private final AuditService auditService;
+    private final VectorStore vectorStore;
 
-    // NEW: The Tika parser instance
-    private final Tika tika = new Tika();
-
-    public MercenaryController(IngestionService ingestion, AuditService audit) {
-        this.ingestion = ingestion;
-        this.audit = audit;
+    // 2. THE CONSTRUCTOR (This fixes your error)
+    // This connects the "final" fields above to the actual Spring beans.
+    public MercenaryController(IngestionService ingestionService, AuditService auditService, VectorStore vectorStore) {
+        this.ingestionService = ingestionService;
+        this.auditService = auditService;
+        this.vectorStore = vectorStore;
     }
 
-    // --- 1. JSON Ingest ---
-    public record IngestRequest(String text, String dept) {}
-
-    @PostMapping("/ingest")
-    public void ingest(@RequestBody IngestRequest request) {
-        // We pass "Manual Input" as the source for raw JSON requests
-        ingestion.ingest(request.text(), request.dept(), "Manual Input");
+    @PostMapping(value = "/ingest/file", consumes = "multipart/form-data")
+    public String ingestFile(@RequestParam("file") MultipartFile file, @RequestParam("dept") String dept) {
+        try {
+            ingestionService.ingestFile(file.getInputStream(), dept, file.getOriginalFilename());
+            return "Ingested " + file.getOriginalFilename();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    // --- 2. NEW: File Ingest (Now with Tika Power) ---
-    @PostMapping(value = "/ingest/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public void ingestFile(@RequestPart("file") MultipartFile file,
-                           @RequestParam("dept") String dept) throws Exception {
-
-        // 1. USE TIKA: This automatically detects PDF/Docx/etc and extracts text
-        String content = tika.parseToString(file.getInputStream());
-
-        // 2. Pass the content AND the filename to the service
-        ingestion.ingest(content, dept, file.getOriginalFilename());
-    }
-
-    // --- 3. Ask ---
     @GetMapping("/ask")
     public String ask(@RequestParam String q, @RequestParam String dept) {
-        return audit.askQuestion(q, dept);
+        return auditService.askQuestion(q, dept);
+    }
+
+    @GetMapping("/inspect")
+    public String inspectDocument(@RequestParam String fileName) {
+        var filter = new FilterExpressionBuilder()
+                .eq("source", fileName)
+                .build();
+
+        List<Document> docs = vectorStore.similaritySearch(
+                SearchRequest.builder()
+                        .query(fileName) // We search for the filename to satisfy OpenAI
+                        .topK(100)
+                        .filterExpression(filter)
+                        .build()
+        );
+
+        if (docs.isEmpty()) {
+            return "CLASSIFIED // NO DATA FOUND FOR: " + fileName;
+        }
+
+        return docs.stream()
+                .map(Document::getText)
+                .collect(Collectors.joining("\n\n--- [SECTION BREAK] ---\n\n"));
     }
 }
