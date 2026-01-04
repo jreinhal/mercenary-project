@@ -1,6 +1,12 @@
 package com.jreinhal.mercenary.service;
 
+import com.jreinhal.mercenary.model.ChatLog;
+import com.jreinhal.mercenary.repository.ChatLogRepository;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -15,23 +21,40 @@ public class AuditService {
 
         private final VectorStore vectorStore;
         private final ChatClient chatClient;
+        private final ChatLogRepository chatLogRepository; // <--- The Database Connection
 
-        public AuditService(VectorStore vectorStore, ChatClient.Builder builder) {
+        public AuditService(VectorStore vectorStore, ChatClient.Builder builder, ChatLogRepository chatLogRepository) {
                 this.vectorStore = vectorStore;
                 this.chatClient = builder.build();
+                this.chatLogRepository = chatLogRepository;
         }
 
         public String askQuestion(String question, String userDepartment) {
-                // 1. Build Security Filter
+                // 1. REPLAY HISTORY from MongoDB (The "Immortal" Memory)
+                List<ChatLog> dbLogs = chatLogRepository.findByDepartmentOrderByTimestampAsc(userDepartment);
+
+                // Convert DB objects back to AI Message objects
+                List<Message> history = new ArrayList<>();
+                // Only keep the last 10 messages to save context/money
+                int start = Math.max(0, dbLogs.size() - 10);
+                for (int i = start; i < dbLogs.size(); i++) {
+                        ChatLog log = dbLogs.get(i);
+                        if ("user".equals(log.getRole())) {
+                                history.add(new UserMessage(log.getContent()));
+                        } else {
+                                history.add(new AssistantMessage(log.getContent()));
+                        }
+                }
+
+                // 2. Build Security Filter
                 var filterBuilder = new FilterExpressionBuilder();
                 var securityFilter = filterBuilder.eq("dept", userDepartment).build();
 
-                // 2. Retrieve BROAD Context (Hybrid Step A: Semantic Search)
-                // STRATEGY: We fetch 10 docs (instead of 3) to cast a wider net.
+                // 3. Retrieve BROAD Context (Hybrid Step A)
                 List<Document> broadResults = vectorStore.similaritySearch(
                         SearchRequest.builder()
                                 .query(question)
-                                .topK(10) // Fetching more candidates
+                                .topK(10)
                                 .filterExpression(securityFilter)
                                 .build()
                 );
@@ -40,11 +63,9 @@ public class AuditService {
                         return "No relevant documents found in your department.";
                 }
 
-                // 3. Re-Rank by Keywords (Hybrid Step B: Exact Match Logic)
-                // STRATEGY: We filter the Top 10 down to the Top 3 based on exact keyword hits.
+                // 4. Re-Rank by Keywords (Hybrid Step B)
                 List<Document> topDocs = rankByKeywords(broadResults, question, 3);
 
-                // 4. Format Context with Citations
                 String context = topDocs.stream()
                         .map(doc -> {
                                 String sourceName = (String) doc.getMetadata().getOrDefault("source", "Unknown File");
@@ -52,54 +73,53 @@ public class AuditService {
                         })
                         .collect(Collectors.joining("\n\n"));
 
-                // Debugging logs to verify Hybrid Search is working
-                System.out.println("------------- HYBRID RAG CONTEXT -------------");
-                System.out.println(context);
-                System.out.println("----------------------------------------------");
+                // 5. Construct the Message Chain
+                List<Message> promptMessages = new ArrayList<>();
+                promptMessages.add(new SystemMessage("You are a corporate auditor. You value accuracy and traceability."));
+                promptMessages.addAll(history); // Inject persistent history
 
-                // 5. Generate Answer
                 String promptTemplate = """
                 Context information is below:
                 ---------------------
-                {context}
+                %s
                 ---------------------
                 
-                Answer the question: {question}
+                Answer the question: %s
                 
                 STRICT RULES:
                 1. Answer strictly based on the provided context.
                 2. You MUST cite the source file for every fact you mention. 
                    Format: "Fact... (Source: filename)".
                 """;
+                String augmentedUserPrompt = String.format(promptTemplate, context, question);
+                promptMessages.add(new UserMessage(augmentedUserPrompt));
 
-                return chatClient.prompt()
-                        .system("You are a corporate auditor. You value accuracy and traceability.")
-                        .user(u -> u.text(promptTemplate)
-                                .param("context", context)
-                                .param("question", question))
+                // 6. Call the AI
+                String aiResponse = chatClient.prompt()
+                        .messages(promptMessages)
                         .call()
                         .content();
+
+                // 7. SAVE TO DATABASE (Persistence)
+                // We save the inputs so they exist next time we restart the server.
+                chatLogRepository.save(new ChatLog(userDepartment, "user", question));
+                chatLogRepository.save(new ChatLog(userDepartment, "assistant", aiResponse));
+
+                return aiResponse;
         }
 
-        // --- THE HYBRID ENGINE ---
         private List<Document> rankByKeywords(List<Document> docs, String query, int topN) {
-                // 1. Extract keywords from query (Split by space, ignore punctuation)
-                // We ignore words with 3 letters or less (like "the", "is", "of") to focus on "Meat"
                 Set<String> keywords = Arrays.stream(query.toLowerCase().split("\\W+"))
                         .filter(word -> word.length() > 3)
                         .collect(Collectors.toSet());
 
-                // 2. Create a mutable list so we can sort it
                 List<Document> mutableDocs = new ArrayList<>(docs);
-
-                // 3. Sort: Documents with more keyword hits go to the TOP
                 mutableDocs.sort((d1, d2) -> {
                         long matches1 = countMatches(d1.getText().toLowerCase(), keywords);
                         long matches2 = countMatches(d2.getText().toLowerCase(), keywords);
-                        return Long.compare(matches2, matches1); // Descending order (High score first)
+                        return Long.compare(matches2, matches1);
                 });
 
-                // 4. Return only the Top N (Top 3)
                 return mutableDocs.stream().limit(topN).toList();
         }
 

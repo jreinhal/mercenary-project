@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.controller;
 
+import com.jreinhal.mercenary.model.Department;
 import com.jreinhal.mercenary.service.AuditService;
 import com.jreinhal.mercenary.service.IngestionService;
 import org.springframework.ai.document.Document;
@@ -16,13 +17,10 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class MercenaryController {
 
-    // 1. Declare the fields as final
     private final IngestionService ingestionService;
     private final AuditService auditService;
     private final VectorStore vectorStore;
 
-    // 2. THE CONSTRUCTOR (This fixes your error)
-    // This connects the "final" fields above to the actual Spring beans.
     public MercenaryController(IngestionService ingestionService, AuditService auditService, VectorStore vectorStore) {
         this.ingestionService = ingestionService;
         this.auditService = auditService;
@@ -30,18 +28,21 @@ public class MercenaryController {
     }
 
     @PostMapping(value = "/ingest/file", consumes = "multipart/form-data")
-    public String ingestFile(@RequestParam("file") MultipartFile file, @RequestParam("dept") String dept) {
+    // SECURITY UPGRADE: dept is now an Enum. Invalid values are rejected 400 Bad Request.
+    public String ingestFile(@RequestParam("file") MultipartFile file, @RequestParam("dept") Department dept) {
         try {
-            ingestionService.ingestFile(file.getInputStream(), dept, file.getOriginalFilename());
-            return "Ingested " + file.getOriginalFilename();
+            // We safely convert the validated Enum to a String for the service layer
+            ingestionService.ingestFile(file.getInputStream(), dept.name(), file.getOriginalFilename());
+            return "Ingested " + file.getOriginalFilename() + " into " + dept.name() + " Vault.";
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     @GetMapping("/ask")
-    public String ask(@RequestParam String q, @RequestParam String dept) {
-        return auditService.askQuestion(q, dept);
+    // SECURITY UPGRADE: dept is now an Enum.
+    public String ask(@RequestParam String q, @RequestParam Department dept) {
+        return auditService.askQuestion(q, dept.name());
     }
 
     @GetMapping("/inspect")
@@ -52,7 +53,7 @@ public class MercenaryController {
 
         List<Document> docs = vectorStore.similaritySearch(
                 SearchRequest.builder()
-                        .query(fileName) // We search for the filename to satisfy OpenAI
+                        .query(fileName)
                         .topK(100)
                         .filterExpression(filter)
                         .build()
