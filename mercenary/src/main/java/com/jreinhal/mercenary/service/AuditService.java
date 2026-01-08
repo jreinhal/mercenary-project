@@ -1,135 +1,80 @@
 package com.jreinhal.mercenary.service;
 
-import com.jreinhal.mercenary.model.ChatLog;
-import com.jreinhal.mercenary.repository.ChatLogRepository;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class AuditService {
 
-        private final VectorStore vectorStore;
         private final ChatClient chatClient;
-        private final ChatLogRepository chatLogRepository; // <--- The Database Connection
+        private final VectorStore vectorStore;
 
-        public AuditService(VectorStore vectorStore, ChatClient.Builder builder, ChatLogRepository chatLogRepository) {
+        public AuditService(ChatClient.Builder chatClientBuilder, VectorStore vectorStore) {
+                // We use the Builder to create a client bound to our default model (Ollama)
+                this.chatClient = chatClientBuilder.build();
                 this.vectorStore = vectorStore;
-                this.chatClient = builder.build();
-                this.chatLogRepository = chatLogRepository;
         }
 
-        public String askQuestion(String question, String userDepartment) {
-                // 1. REPLAY HISTORY from MongoDB (The "Immortal" Memory)
-                List<ChatLog> dbLogs = chatLogRepository.findByDepartmentOrderByTimestampAsc(userDepartment);
+        public String askQuestion(String question, String department) {
+                // 1. Create the Department Security Filter
+                var filter = new FilterExpressionBuilder()
+                        .eq("dept", department)
+                        .build();
 
-                // Convert DB objects back to AI Message objects
-                List<Message> history = new ArrayList<>();
-                // Only keep the last 10 messages to save context/money
-                int start = Math.max(0, dbLogs.size() - 10);
-                for (int i = start; i < dbLogs.size(); i++) {
-                        ChatLog log = dbLogs.get(i);
-                        if ("user".equals(log.getRole())) {
-                                history.add(new UserMessage(log.getContent()));
-                        } else {
-                                history.add(new AssistantMessage(log.getContent()));
-                        }
-                }
-
-                // 2. Build Security Filter
-                var filterBuilder = new FilterExpressionBuilder();
-                var securityFilter = filterBuilder.eq("dept", userDepartment).build();
-
-                // 3. Retrieve BROAD Context (Hybrid Step A)
-                List<Document> broadResults = vectorStore.similaritySearch(
-                        SearchRequest.builder()
-                                .query(question)
-                                .topK(10)
-                                .filterExpression(securityFilter)
-                                .build()
+                // 2. Perform Vector Search
+                List<Document> similarDocuments = vectorStore.similaritySearch(
+                        SearchRequest.query(question)
+                                .withTopK(4)
+                                .withFilterExpression(filter)
                 );
 
-                if (broadResults.isEmpty()) {
-                        return "No relevant documents found in your department.";
+                // 3. Fallback if empty
+                if (similarDocuments.isEmpty()) {
+                        return "CLASSIFIED // NO INTEL FOUND IN " + department + " SECTOR.";
                 }
 
-                // 4. Re-Rank by Keywords (Hybrid Step B)
-                List<Document> topDocs = rankByKeywords(broadResults, question, 3);
+                // 4. Re-Rank / Sort Results (THE FIX)
+                // The list returned above is "Immutable" (Read-Only).
+                // We must copy it into a new ArrayList to make it "Mutable" (Editable) so we can sort it.
+                List<Document> mutableDocs = new ArrayList<>(similarDocuments);
 
-                String context = topDocs.stream()
+                List<String> keywords = List.of(question.toLowerCase().split("\\s+"));
+                mutableDocs.sort((d1, d2) -> {
+                        long matches1 = countMatches(d1.getContent().toLowerCase(), keywords);
+                        long matches2 = countMatches(d2.getContent().toLowerCase(), keywords);
+                        return Long.compare(matches2, matches1); // Descending order
+                });
+
+                // 5. Build Context String
+                String context = mutableDocs.stream()
                         .map(doc -> {
-                                String sourceName = (String) doc.getMetadata().getOrDefault("source", "Unknown File");
-                                return "SOURCE: [" + sourceName + "]\nCONTENT: " + doc.getText();
+                                String source = (String) doc.getMetadata().getOrDefault("source", "UNKNOWN");
+                                return "SOURCE: [" + source + "]\nCONTENT: " + doc.getContent();
                         })
                         .collect(Collectors.joining("\n\n"));
 
-                // 5. Construct the Message Chain
-                List<Message> promptMessages = new ArrayList<>();
-                promptMessages.add(new SystemMessage("You are a corporate auditor. You value accuracy and traceability."));
-                promptMessages.addAll(history); // Inject persistent history
-
-                String promptTemplate = """
-                Context information is below:
-                ---------------------
-                %s
-                ---------------------
-                
-                Answer the question: %s
-                
-                STRICT RULES:
-                1. Answer strictly based on the provided context.
-                2. You MUST cite the source file for every fact you mention. 
-                   Format: "Fact... (Source: filename)".
-                """;
-                String augmentedUserPrompt = String.format(promptTemplate, context, question);
-                promptMessages.add(new UserMessage(augmentedUserPrompt));
-
-                // 6. Call the AI
-                String aiResponse = chatClient.prompt()
-                        .messages(promptMessages)
+                // 6. Send to AI (Llama 3)
+                return chatClient.prompt()
+                        .system(sp -> sp.text(
+                                "You are a Defense Intelligence Analyst. " +
+                                        "Answer based ONLY on the provided context. " +
+                                        "If the answer is not in the context, say 'DATA NOT AVAILABLE'."
+                        ))
+                        .user(u -> u.text("CONTEXT:\n" + context + "\n\nQUESTION: " + question))
                         .call()
                         .content();
-
-                // 7. SAVE TO DATABASE (Persistence)
-                // We save the inputs so they exist next time we restart the server.
-                chatLogRepository.save(new ChatLog(userDepartment, "user", question));
-                chatLogRepository.save(new ChatLog(userDepartment, "assistant", aiResponse));
-
-                return aiResponse;
         }
 
-        private List<Document> rankByKeywords(List<Document> docs, String query, int topN) {
-                Set<String> keywords = Arrays.stream(query.toLowerCase().split("\\W+"))
-                        .filter(word -> word.length() > 3)
-                        .collect(Collectors.toSet());
-
-                List<Document> mutableDocs = new ArrayList<>(docs);
-                mutableDocs.sort((d1, d2) -> {
-                        long matches1 = countMatches(d1.getText().toLowerCase(), keywords);
-                        long matches2 = countMatches(d2.getText().toLowerCase(), keywords);
-                        return Long.compare(matches2, matches1);
-                });
-
-                return mutableDocs.stream().limit(topN).toList();
-        }
-
-        private long countMatches(String text, Set<String> keywords) {
-                long count = 0;
-                for (String word : keywords) {
-                        if (text.contains(word)) {
-                                count++;
-                        }
-                }
-                return count;
+        // Helper to count keyword matches for re-ranking
+        private long countMatches(String text, List<String> keywords) {
+                return keywords.stream().filter(text::contains).count();
         }
 }

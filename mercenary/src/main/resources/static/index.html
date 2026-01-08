@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SENTINEL // INTELLIGENCE SYSTEM</title>
+    <style>
+        :root {
+            /* PALETTE: "Command Center" (Slate, Blue, White) */
+            --bg-color: #0f172a;       /* Deep Slate Blue */
+            --panel-bg: #1e293b;       /* Lighter Slate */
+            --border-color: #334155;   /* Border Grey */
+
+            --text-primary: #f8fafc;   /* Off-White (Readable) */
+            --text-secondary: #94a3b8; /* Dim Grey */
+
+            --accent-primary: #38bdf8; /* Tactical Blue */
+            --accent-active: #0ea5e9;  /* Bright Blue */
+            --alert: #ef4444;          /* Red */
+            --success: #10b981;        /* Green */
+
+            --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-ui);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: grid;
+            grid-template-rows: 50px 1fr;
+            overflow: hidden;
+        }
+
+        /* --- HEADER --- */
+        .header {
+            background: #020617;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+        .brand {
+            font-weight: 700;
+            letter-spacing: 1px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+        }
+        .status-indicator {
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-indicator::before {
+            content: '';
+            display: block;
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        /* --- LAYOUT --- */
+        .workspace {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .panel-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .drop-zone {
+            border: 1px dashed var(--border-color);
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+            padding: 30px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .drop-zone:hover {
+            border-color: var(--accent-primary);
+            background: rgba(56, 189, 248, 0.05);
+        }
+        .drop-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            background: #020617;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        #ingest-status {
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+        }
+
+        /* --- MAIN VIEW --- */
+        .main-view {
+            display: flex;
+            flex-direction: column;
+            background: #0b1120;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .log-container {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Chat Bubbles */
+        .message-row {
+            display: flex;
+            flex-direction: column;
+            max-width: 80%;
+            gap: 4px;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .message-row.user { align-self: flex-end; align-items: flex-end; }
+        .message-row.ai { align-self: flex-start; align-items: flex-start; }
+        .message-row.system { align-self: center; align-items: center; max-width: 100%; }
+
+        .bubble {
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.5;
+            position: relative;
+        }
+
+        .user .bubble {
+            background: var(--accent-primary);
+            color: #0f172a;
+            font-weight: 600;
+            border-bottom-right-radius: 0;
+        }
+
+        .ai .bubble {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-bottom-left-radius: 0;
+            white-space: pre-wrap;
+        }
+
+        .system .bubble {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+
+        .meta {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            margin-top: 2px;
+        }
+
+        /* --- INPUT BAR --- */
+        .input-bar {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            background: var(--panel-bg);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background: var(--accent-primary);
+            color: #0f172a;
+            border: none;
+            padding: 0 24px;
+            height: 38px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: 0.2s;
+        }
+        button:hover { background: var(--accent-active); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-primary);">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>SENTINEL</span> // INTELLIGENCE
+    </div>
+    <div class="status-indicator">SYSTEM SECURE</div>
+</div>
+
+<div class="workspace">
+
+    <div class="sidebar">
+        <div>
+            <div class="panel-label">Secure Ingestion</div>
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-secondary); margin-bottom:8px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <div class="drop-text">UPLOAD DOSSIER</div>
+                <div style="font-size:10px; color:#555; margin-top:4px;">RAGPart & HGMEM Active</div>
+            </div>
+            <input type="file" id="file-input" style="display:none;">
+        </div>
+
+        <div>
+            <div class="panel-label">Target Sector Protocol</div>
+            <div style="position: relative;">
+                <select id="dept-input" style="
+                        width: 100%;
+                        background: #020617;
+                        border: 1px solid var(--border-color);
+                        color: var(--accent-primary);
+                        padding: 10px;
+                        border-radius: 4px;
+                        font-family: var(--font-mono);
+                        font-size: 13px;
+                        appearance: none;
+                        cursor: pointer;
+                        font-weight: 700;
+                    ">
+                    <option value="DEFENSE">⚔️ DEFENSE / MILITARY</option>
+                    <option value="LEGAL">⚖️ LEGAL / CONTRACTS</option>
+                    <option value="MEDICAL">⚕️ MEDICAL / CLINICAL</option>
+                    <option value="FINANCE">📈 FINANCE / MARKETS</option>
+                    <option value="ENTERPRISE">🏢 ENTERPRISE (GENERAL)</option>
+                </select>
+                <div style="
+                        position: absolute;
+                        right: 12px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        pointer-events: none;
+                        color: var(--text-secondary);
+                        font-size: 10px;
+                    ">▼</div>
+            </div>
+        </div>
+
+        <div id="ingest-status">STATUS: STANDBY</div>
+    </div>
+
+    <div class="main-view">
+        <div class="log-container" id="output-log">
+            <div class="message-row system">
+                <div class="bubble">SYSTEM INITIALIZED // CONNECTED TO SENTINEL CORE</div>
+            </div>
+            <div class="message-row ai">
+                <div class="bubble"><strong>SENTINEL CORE:</strong><br>Analyst, the secure channel is open. I am ready to ingest intel or execute reasoning protocols.</div>
+                <div class="meta">NOW</div>
+            </div>
+        </div>
+
+        <div class="input-bar">
+            <input type="text" id="query-input" placeholder="Enter intelligence query..." autocomplete="off">
+            <button onclick="executeQuery()">EXECUTE</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- CONFIG ---
+    const API_BASE = 'http://localhost:8080/api';
+    const logWindow = document.getElementById('output-log');
+    const deptInput = document.getElementById('dept-input');
+    const ingestStatus = document.getElementById('ingest-status');
+
+    // --- CORE FUNCTIONS ---
+
+    function appendMessage(text, type) {
+        const div = document.createElement('div');
+        div.className = `message-row ${type}`;
+
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        let content = text;
+        if (type === 'ai') {
+            // Formatting for AI headers
+            content = `<strong>SENTINEL CORE:</strong><br>${text}`;
+        }
+
+        div.innerHTML = `
+            <div class="bubble">${content}</div>
+            <div class="meta">${time}</div>
+        `;
+
+        logWindow.appendChild(div);
+        logWindow.scrollTop = logWindow.scrollHeight;
+    }
+
+    // --- INGESTION LOGIC ---
+    const fileInput = document.getElementById('file-input');
+
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const dept = deptInput.value;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('dept', dept);
+
+        ingestStatus.innerText = `UPLOADING: ${file.name}...`;
+        ingestStatus.style.color = "var(--accent-primary)";
+        appendMessage(`Initializing Secure Ingestion for: ${file.name} [Sector: ${dept}]`, 'system');
+
+        try {
+            const response = await fetch(`${API_BASE}/ingest/file`, {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.text();
+
+            appendMessage(result, 'system');
+            ingestStatus.innerText = "STATUS: READY";
+            ingestStatus.style.color = "var(--success)";
+        } catch (error) {
+            appendMessage(`CRITICAL FAILURE: ${error}`, 'system');
+            ingestStatus.innerText = "STATUS: ERROR";
+            ingestStatus.style.color = "var(--alert)";
+        }
+    });
+
+    // --- QUERY LOGIC ---
+    const queryInput = document.getElementById('query-input');
+
+    queryInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') executeQuery();
+    });
+
+    async function executeQuery() {
+        const query = queryInput.value;
+        if (!query) return;
+
+        const dept = deptInput.value;
+
+        // 1. Show User Query
+        appendMessage(query, 'user');
+        queryInput.value = '';
+
+        // 2. Add temporary "Thinking" indicator
+        const thinkingId = 'thinking-' + Date.now();
+        const thinkingDiv = document.createElement('div');
+        thinkingDiv.className = 'message-row system';
+        thinkingDiv.id = thinkingId;
+        // Visual flair: Show which protocol is active in the "Thinking" log
+        thinkingDiv.innerHTML = `<div class="bubble" style="color:var(--accent-primary);">SENTINEL [${dept}] is Analyzing Hypergraph Nodes...</div>`;
+        logWindow.appendChild(thinkingDiv);
+        logWindow.scrollTop = logWindow.scrollHeight;
+
+        try {
+            // 3. Hit API
+            const response = await fetch(`${API_BASE}/ask?q=${encodeURIComponent(query)}&dept=${encodeURIComponent(dept)}`);
+            const answer = await response.text();
+
+            // 4. Remove Thinking & Show Result
+            document.getElementById(thinkingId).remove();
+            appendMessage(answer, 'ai');
+
+        } catch (error) {
+            document.getElementById(thinkingId).remove();
+            appendMessage("CONNECTION LOST: " + error, 'system');
+        }
+    }
+</script>
+</body>
+</html>

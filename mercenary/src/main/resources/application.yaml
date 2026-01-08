@@ -1,6 +1,12 @@
 spring:
   application:
     name: mercenary-ai
+
+  # --- THE BAN HAMMER ---
+  # This tells Spring: "Do NOT load your default MongoDB Vector Store logic. I have my own."
+  autoconfigure:
+    exclude: org.springframework.ai.autoconfigure.vectorstore.mongo.MongoDBAtlasVectorStoreAutoConfiguration
+
   data:
     mongodb:
       uri: mongodb+srv://Jreinhal:Mercenary2025@cluster0.peocz7g.mongodb.net/mercenary
@@ -9,14 +15,23 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
   ai:
-    openai:
-      api-key: "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"
-      embedding:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
         options:
-          model: text-embedding-3-small
+          model: llama3
+          temperature: 0.7
+      embedding:
+        model: nomic-embed-text
+    # We leave these settings here for reference, but your Java code now handles the connection
     vectorstore:
       mongodb:
-        collection-name: vector_store
-        initialize-schema: false
-        path-name: embedding
-        index-name: vector_index
+        atlas:
+          collection-name: vector_store
+          initialize-schema: false
+          path-name: embedding
+          index-name: vector_index
+
+# Custom App Config
+app:
+  db-init: true
