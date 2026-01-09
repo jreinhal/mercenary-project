@@ -64,15 +64,6 @@
             align-items: center;
             gap: 6px;
         }
-        .status-indicator::before {
-            content: '';
-            display: block;
-            width: 6px;
-            height: 6px;
-            background: var(--success);
-            border-radius: 50%;
-            box-shadow: 0 0 8px var(--success);
-        }
 
         /* --- LAYOUT --- */
         .workspace {
@@ -239,6 +230,32 @@
         }
         button:hover { background: var(--accent-active); }
 
+        /* Manual Button Style */
+        .manual-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px;
+            background: rgba(56, 189, 248, 0.05);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: var(--accent-primary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: 0.2s;
+            box-sizing: border-box;
+        }
+        .manual-btn:hover {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: var(--accent-primary);
+        }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -291,11 +308,11 @@
                         cursor: pointer;
                         font-weight: 700;
                     ">
-                    <option value="DEFENSE">⚔️ DEFENSE / MILITARY</option>
-                    <option value="LEGAL">⚖️ LEGAL / CONTRACTS</option>
-                    <option value="MEDICAL">⚕️ MEDICAL / CLINICAL</option>
-                    <option value="FINANCE">📈 FINANCE / MARKETS</option>
-                    <option value="ENTERPRISE">🏢 ENTERPRISE (GENERAL)</option>
+                    <option value="DEFENSE">DEFENSE / MILITARY</option>
+                    <option value="LEGAL">LEGAL / CONTRACTS</option>
+                    <option value="MEDICAL">MEDICAL / CLINICAL</option>
+                    <option value="FINANCE">FINANCE / MARKETS</option>
+                    <option value="ENTERPRISE">ENTERPRISE (GENERAL)</option>
                 </select>
                 <div style="
                         position: absolute;
@@ -310,6 +327,17 @@
         </div>
 
         <div id="ingest-status">STATUS: STANDBY</div>
+
+        <div style="margin-top: auto; padding-top: 20px;">
+            <a href="manual.html" class="manual-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                OPERATOR MANUAL
+            </a>
+        </div>
     </div>
 
     <div class="main-view">
@@ -337,7 +365,28 @@
     const deptInput = document.getElementById('dept-input');
     const ingestStatus = document.getElementById('ingest-status');
 
-    // --- CORE FUNCTIONS ---
+    // Header Status Badge
+    const systemBadge = document.querySelector('.status-indicator');
+
+    // --- VISUAL CONTROLS ---
+    function setSystemStatus(state) {
+        if (state === 'ONLINE') {
+            systemBadge.innerHTML = '● SYSTEM SECURE';
+            systemBadge.style.color = 'var(--success)';
+            systemBadge.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+            systemBadge.style.background = 'rgba(16, 185, 129, 0.1)';
+        } else if (state === 'BUSY') {
+            systemBadge.innerHTML = '● PROCESSING INTEL...';
+            systemBadge.style.color = 'var(--accent-primary)';
+            systemBadge.style.borderColor = 'rgba(56, 189, 248, 0.2)';
+            systemBadge.style.background = 'rgba(56, 189, 248, 0.1)';
+        } else if (state === 'OFFLINE') {
+            systemBadge.innerHTML = '● CONNECTION LOST';
+            systemBadge.style.color = 'var(--alert)';
+            systemBadge.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+            systemBadge.style.background = 'rgba(239, 68, 68, 0.1)';
+        }
+    }
 
     function appendMessage(text, type) {
         const div = document.createElement('div');
@@ -377,6 +426,9 @@
         appendMessage(`Initializing Secure Ingestion for: ${file.name} [Sector: ${dept}]`, 'system');
 
         try {
+            // UI Update for BUSY
+            setSystemStatus('BUSY');
+
             const response = await fetch(`${API_BASE}/ingest/file`, {
                 method: 'POST',
                 body: formData
@@ -386,10 +438,21 @@
             appendMessage(result, 'system');
             ingestStatus.innerText = "STATUS: READY";
             ingestStatus.style.color = "var(--success)";
+
+            // Return to ONLINE
+            setSystemStatus('ONLINE');
+
+            // Reset "Ready" to "Standby" after 5 seconds to look clean
+            setTimeout(() => {
+                ingestStatus.innerText = "STATUS: STANDBY";
+                ingestStatus.style.color = "var(--text-secondary)";
+            }, 5000);
+
         } catch (error) {
             appendMessage(`CRITICAL FAILURE: ${error}`, 'system');
             ingestStatus.innerText = "STATUS: ERROR";
             ingestStatus.style.color = "var(--alert)";
+            setSystemStatus('OFFLINE');
         }
     });
 
@@ -410,12 +473,17 @@
         appendMessage(query, 'user');
         queryInput.value = '';
 
-        // 2. Add temporary "Thinking" indicator
+        // 2. Add temporary "Thinking" indicator & Update Badge
+        setSystemStatus('BUSY');
+
+        // --- Update Sidebar to ANALYZING ---
+        ingestStatus.innerText = "STATUS: ANALYZING...";
+        ingestStatus.style.color = "var(--accent-primary)";
+
         const thinkingId = 'thinking-' + Date.now();
         const thinkingDiv = document.createElement('div');
         thinkingDiv.className = 'message-row system';
         thinkingDiv.id = thinkingId;
-        // Visual flair: Show which protocol is active in the "Thinking" log
         thinkingDiv.innerHTML = `<div class="bubble" style="color:var(--accent-primary);">SENTINEL [${dept}] is Analyzing Hypergraph Nodes...</div>`;
         logWindow.appendChild(thinkingDiv);
         logWindow.scrollTop = logWindow.scrollHeight;
@@ -428,10 +496,20 @@
             // 4. Remove Thinking & Show Result
             document.getElementById(thinkingId).remove();
             appendMessage(answer, 'ai');
+            setSystemStatus('ONLINE');
+
+            // --- Reset Sidebar to STANDBY ---
+            ingestStatus.innerText = "STATUS: STANDBY";
+            ingestStatus.style.color = "var(--text-secondary)";
 
         } catch (error) {
             document.getElementById(thinkingId).remove();
             appendMessage("CONNECTION LOST: " + error, 'system');
+            setSystemStatus('OFFLINE');
+
+            // --- Error State ---
+            ingestStatus.innerText = "STATUS: ERROR";
+            ingestStatus.style.color = "var(--alert)";
         }
     }
 </script>

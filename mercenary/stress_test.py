@@ -1,5 +1,6 @@
 import concurrent.futures
-import requests
+import urllib.request
+import urllib.parse
 import time
 import sys
 
@@ -8,10 +9,13 @@ URL = "http://localhost:8080/api/ask"
 def send_request(i):
     try:
         start = time.time()
-        # "ping" avoids the expensive AI calls
-        resp = requests.get(URL, params={"q": "ping", "dept": "general"}, timeout=5)
+        params = urllib.parse.urlencode({"q": "ping", "dept": "general"})
+        full_url = f"{URL}?{params}"
+        with urllib.request.urlopen(full_url, timeout=5) as response:
+            status = response.status
+            response.read() # Consume body
         duration = time.time() - start
-        return resp.status_code, duration
+        return status, duration
     except Exception as e:
         return str(e), 0
 
