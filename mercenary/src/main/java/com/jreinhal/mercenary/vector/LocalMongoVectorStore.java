@@ -95,7 +95,7 @@ public class LocalMongoVectorStore implements VectorStore {
 
         // 2. Fetch ALL candidates (Mapping to MongoDocument)
         List<MongoDocument> allDocs = mongoTemplate.findAll(MongoDocument.class, COLLECTION_NAME);
-        log.error("DEBUG DB DUMP: Total Docs Found: {}", allDocs.size());
+        log.debug("Similarity search: {} documents in store", allDocs.size());
 
         // 3. Score and Map back to Spring AI Document
         return allDocs.stream()

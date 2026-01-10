@@ -34,6 +34,13 @@ public class MercenaryController {
 
     private static final Logger log = LoggerFactory.getLogger(MercenaryController.class);
 
+    // Search configuration
+    private static final String VECTOR_STORE_COLLECTION = "vector_store";
+    private static final int SEARCH_TOP_K = 10;
+    private static final int INSPECT_TOP_K = 20;
+    private static final double SIMILARITY_THRESHOLD = 0.4;
+    private static final int RESULT_LIMIT = 5;
+
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final SecureIngestionService ingestionService;
@@ -61,7 +68,7 @@ public class MercenaryController {
 
         // Initialize doc count from DB
         try {
-            long count = mongoTemplate.getCollection("vector_store").countDocuments();
+            long count = mongoTemplate.getCollection(VECTOR_STORE_COLLECTION).countDocuments();
             docCount.set((int) count);
         } catch (Exception e) {
             log.error("Failed to initialize doc count", e);
@@ -98,7 +105,7 @@ public class MercenaryController {
         long liveDocCount = 0;
         try {
             // Fetch live count directly from DB to avoid drift
-            liveDocCount = mongoTemplate.getCollection("vector_store").countDocuments();
+            liveDocCount = mongoTemplate.getCollection(VECTOR_STORE_COLLECTION).countDocuments();
         } catch (Exception e) {
             dbOnline = false;
         }
@@ -124,7 +131,7 @@ public class MercenaryController {
                 // FALLBACK: Manual filtering if VectorStore doesn't support metadata filters
                 // 1. Retrieve a broader set of documents using the filename as context
                 List<Document> potentialDocs = vectorStore.similaritySearch(
-                        SearchRequest.query(fileName).withTopK(20));
+                        SearchRequest.query(fileName).withTopK(INSPECT_TOP_K));
 
                 log.info("INSPECT DEBUG: Searching for '{}'. Found {} potential candidates.", fileName,
                         potentialDocs.size());
@@ -228,9 +235,7 @@ public class MercenaryController {
             long duration = System.currentTimeMillis() - startTime;
 
             // Audit log successful ingestion
-            if (user != null) {
-                auditService.logIngestion(user, filename, department, request);
-            }
+            auditService.logIngestion(user, filename, department, request);
 
             return "SECURE INGESTION COMPLETE: " + filename + " (" + duration + "ms)";
         } catch (Exception e) {
@@ -275,9 +280,7 @@ public class MercenaryController {
 
             // 1. SECURITY - Prompt injection detection
             if (isPromptInjection(query)) {
-                if (user != null) {
-                    auditService.logPromptInjection(user, query, request);
-                }
+                auditService.logPromptInjection(user, query, request);
                 return "SECURITY ALERT: Indirect Prompt Injection Detected. Access Denied.";
             }
 
@@ -286,8 +289,8 @@ public class MercenaryController {
             // Filter removed temporarily to bypass MongoDB index error
             List<Document> rawDocs = vectorStore.similaritySearch(
                     SearchRequest.query(query)
-                            .withTopK(10)
-                            .withSimilarityThreshold(0.4)
+                            .withTopK(SEARCH_TOP_K)
+                            .withSimilarityThreshold(SIMILARITY_THRESHOLD)
                             .withFilterExpression("dept == '" + dept + "'"));
 
             log.info("Retrieved {} documents for query: {}", rawDocs.size(), query);
@@ -296,7 +299,7 @@ public class MercenaryController {
                     doc.getContent().substring(0, Math.min(50, doc.getContent().length()))));
 
             // Semantic vector search handles relevance better than naive reranking
-            List<Document> topDocs = rawDocs.stream().limit(5).toList();
+            List<Document> topDocs = rawDocs.stream().limit(RESULT_LIMIT).toList();
 
             String information = topDocs.stream()
                     .map(doc -> {
@@ -361,9 +364,7 @@ public class MercenaryController {
             queryCount.incrementAndGet();
 
             // Audit log successful query
-            if (user != null) {
-                auditService.logQuery(user, query, department, response, request);
-            }
+            auditService.logQuery(user, query, department, response, request);
 
             return response;
         } catch (Exception e) {

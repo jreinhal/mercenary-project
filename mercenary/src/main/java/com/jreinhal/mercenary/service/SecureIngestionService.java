@@ -87,7 +87,7 @@ public class SecureIngestionService {
             log.info("Securely ingested {} memory points.", finalDocuments.size());
 
         } catch (IOException e) {
-            throw new RuntimeException("Secure Ingestion Failed: " + e.getMessage());
+            throw new RuntimeException("Secure Ingestion Failed: " + e.getMessage(), e);
         }
     }
 
