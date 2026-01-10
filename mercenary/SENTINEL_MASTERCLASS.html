@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>SENTINEL: THE DEFINITIVE MASTERCLASS</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400&family=Roboto+Mono:wght@400;500&family=Inter:wght@400;600;800&display=swap');
+
+        :root {
+            --primary: #0f172a;
+            --accent: #2563eb;
+            --text: #334155;
+            --bg: #ffffff;
+            --code-bg: #1e293b;
+        }
+
+        body {
+            font-family: 'Merriweather', serif;
+            line-height: 1.7;
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            background: #f1f5f9;
+        }
+
+        /* PAGE STRUCTURE FOR PRINTING */
+        .page {
+            background: white;
+            width: 210mm;
+            /* A4 */
+            min-height: 297mm;
+            padding: 25mm;
+            margin: 20px auto;
+            box-sizing: border-box;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
+            page-break-after: always;
+        }
+
+        @media print {
+            body {
+                background: none;
+            }
+
+            .page {
+                width: 100%;
+                margin: 0;
+                padding: 20mm;
+                box-shadow: none;
+                page-break-after: always;
+            }
+        }
+
+        /* TYPOGRAPHY */
+        h1 {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 28pt;
+            color: var(--primary);
+            border-bottom: 4px solid var(--accent);
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            margin-top: 0;
+        }
+
+        h2 {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 18pt;
+            color: var(--accent);
+            margin-top: 30px;
+            border-left: 5px solid var(--primary);
+            padding-left: 15px;
+        }
+
+        h3 {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 14pt;
+            color: var(--primary);
+            margin-top: 25px;
+        }
+
+        p {
+            font-size: 11pt;
+            text-align: justify;
+            margin-bottom: 15px;
+        }
+
+        ul,
+        ol {
+            font-size: 11pt;
+            margin-bottom: 15px;
+        }
+
+        /* COMPONENTS */
+        .callout {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-size: 10pt;
+        }
+
+        .callout-title {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            color: var(--accent);
+            text-transform: uppercase;
+            font-size: 9pt;
+            margin-bottom: 5px;
+        }
+
+        code {
+            font-family: 'Roboto Mono', monospace;
+            background: #f1f5f9;
+            color: #b91c1c;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background: var(--code-bg);
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 9pt;
+            overflow-x: auto;
+            border-left: 5px solid var(--accent);
+            margin: 20px 0;
+        }
+
+        .img-box {
+            margin: 20px 0;
+            border: 1px solid #cbd5e1;
+            padding: 5px;
+        }
+
+        .img-box img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .caption {
+            text-align: center;
+            font-family: 'Inter', sans-serif;
+            font-size: 9pt;
+            color: #64748b;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        /* FOOTER */
+        .footer {
+            position: absolute;
+            bottom: 15mm;
+            left: 25mm;
+            right: 25mm;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Inter', sans-serif;
+            font-size: 8pt;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- PAGE 1: TITLE -->
+    <div class="page" style="display: flex; flex-direction: column; justify-content: center; text-align: center;">
+        <div
+            style="font-family: 'Inter'; font-weight: 900; font-size: 60pt; line-height: 1; margin-bottom: 20px; letter-spacing: -2px;">
+            SENTINEL</div>
+        <div
+            style="font-family: 'Inter'; font-weight: 300; font-size: 24pt; letter-spacing: 10px; color: var(--accent);">
+            MASTERCLASS</div>
+
+        <div
+            style="margin-top: 100px; border-top: 2px solid var(--primary); border-bottom: 2px solid var(--primary); padding: 40px 0;">
+            <p style="text-align: center; font-size: 14pt; font-style: italic;">
+                To understand the machine, one must disassemble the machine.
+            </p>
+        </div>
+
+        <div style="margin-top: auto;">
+            <p style="text-align: center; font-weight: bold;">Course Curriculum v2.0</p>
+            <p style="text-align: center;">Prepared for: Java Developers & Enterprise Architects</p>
+            <p style="text-align: center; color: var(--accent);">CLASSIFICATION: UNCLASSIFIED // TRAINING USE ONLY</p>
+        </div>
+    </div>
+
+    <!-- PAGE 2: TABLE OF CONTENTS -->
+    <div class="page">
+        <h1>Table of Contents</h1>
+        <ul style="list-style: none; padding: 0;">
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>1. Executive Introduction: The Problem Space</span> <span>Page 3</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>2. Core Technology: Java & The JVM</span> <span>Page 4</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>3. The Framework: Spring Boot Fundamentals</span> <span>Page 6</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>4. Spring Boot: Deep Dive into Annotations</span> <span>Page 8</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>5. Theory: Vector Mathematics & Embeddings</span> <span>Page 10</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>6. Theory: Retrieval Augmented Generation (RAG)</span> <span>Page 12</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>7. Architecture: The Sentinel Stack</span> <span>Page 14</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>8. Code Walkthrough: SecureIngestionService</span> <span>Page 16</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>9. Code Walkthrough: MercenaryController</span> <span>Page 18</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>10. Algorithm Deep Dive: Hybrid Search</span> <span>Page 20</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>11. Security: Defense in Depth (RBAC & PII)</span> <span>Page 22</span></li>
+            <li style="border-bottom: 1px dotted #ccc; padding: 10px 0; display: flex; justify-content: space-between;">
+                <span>12. Infrastructure: Docker & Deployment</span> <span>Page 24</span></li>
+        </ul>
+
+        <div class="footer">Sentinel Masterclass | Page 2</div>
+    </div>
+
+    <!-- PAGE 3: THE PROBLEM SPACE -->
+    <div class="page">
+        <h1>1. Executive Introduction</h1>
+
+        <h2>1.1 The "ChatGPT Paradox"</h2>
+        <p>We live in the age of Generated AI. Tools like ChatGPT, Claude, and Gemini have revolutionized productivity.
+            However, they present a catastrophic risk to regulated entities like Defense, Healthcare, and Finance.</p>
+
+        <div class="callout">
+            <div class="callout-title">The Data Sovereignty Risk</div>
+            <p>When a user types <em>"Summarize this top-secret mission report"</em> into a public LLM, that data
+                traverses the public internet, is decrypted on the provider's server (for processing), and may
+                potentially be used to train future models. For an entity like the Department of Defense, this
+                constitutes a <strong>Data Spill</strong>.</p>
+        </div>
+
+        <h2>1.2 The Solution: "Air-Gapped" Intelligence</h2>
+        <p>Sentinel is not just a chatbot. It is an <strong>Air-Gapped Intelligence Platform</strong>. This means it is
+            engineered to run without ANY connection to the outside world.</p>
+
+        <h3>Key Differentiators:</h3>
+        <ol>
+            <li><strong>Local Inference:</strong> We do not call OpenAI's API. We use a local model runner called
+                <strong>Ollama</strong> that spins up an open-source model (Llama 3) directly on the server's GPU/CPU.
+            </li>
+            <li><strong>Local Vector Store:</strong> We do not use Pinecone (Cloud). We use <strong>MongoDB</strong>
+                installed locally.</li>
+            <li><strong>Zero Egress:</strong> The application can run in a SCIF (Sensitive Compartmented Information
+                Facility) where internet cables are literally cut.</li>
+        </ol>
+
+        <h2>1.3 Why Java?</h2>
+        <p>In a world of Python AI scripts, why is Sentinel built in Java? <strong>Enterprise Stability.</strong></p>
+        <p>Python is excellent for experimentation. But for systems that must run for 5 years without crashing, handle
+            concurrent user load, and integrate with strict government security protocols (like PKI/CAC cards), Java is
+            the gold standard. Sentinel uses <strong>Spring Boot</strong>, used by 90% of the Fortune 500, ensuring it
+            fits into existing IT infrastructures.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 3</div>
+    </div>
+
+    <!-- PAGE 4: JAVA FUNDAMENTALS -->
+    <div class="page">
+        <h1>2. Core Technology: Java & The JVM</h1>
+        <p>To sell Sentinel, you must respect the engine that drives it. Java is not just a language; it is a platform.
+        </p>
+
+        <h2>2.1 The Java Virtual Machine (JVM)</h2>
+        <p>When we compile Sentinel, it doesn't turn into Windows machine code (<code>.exe</code>) or Linux code. It
+            turns into <strong>Bytecode</strong> (<code>.class</code> files).</p>
+        <p>This bytecode runs on the <strong>JVM</strong>. The JVM is a miraculous piece of software that sits between
+            our code and the hardware. It handles:</p>
+        <ul>
+            <li><strong>Memory Management:</strong> It allocates RAM for new objects.</li>
+            <li><strong>Garbage Collection (GC):</strong> It creates a background thread (the "Garbage Collector") that
+                looks for objects we aren't using anymore (like an old search result) and deletes them to free up RAM.
+            </li>
+            <li><strong>Portability:</strong> "Write Once, Run Anywhere." We build the Sentinel artifact once, and it
+                runs on a General's Windows Surface or a Linux Server rack.</li>
+        </ul>
+
+        <h2>2.2 Static vs. Strong Typing</h2>
+        <p>Java is <strong>Statically Typed</strong>. This means if a variable is defined as a <code>String</code>, you
+            cannot put a number in it. The compiler checks this <em>before</em> the program ever runs.</p>
+        <pre><code>// Java enforces discipline
+String soldierName = "Vasquez"; 
+soldierName = 42; // ERROR! Won't compile.</code></pre>
+        <p><strong>Why this matters for Sentinel:</strong> In a security-critical app, we want to catch errors at
+            <em>compile time</em> (when building), not at <em>runtime</em> (when the General is using it). Javascript
+            and Python catch errors at runtime. Java catches them early. This reduces bugs in production.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 4</div>
+    </div>
+
+    <!-- PAGE 5: JAVA FUNDAMENTALS (CONT) -->
+    <div class="page">
+        <h2>2.3 Multithreading & Concurrency</h2>
+        <p>Sentinel is designed to handle multiple analysts querying simultaneously. Java handles this via
+            <strong>Threads</strong>.</p>
+
+        <p>When User A asks "Who is Vasquez?" and User B asks "Report on Site Echo", Sentinel doesn't make User B wait.
+            The web server (Tomcat, embedded in Spring Boot) spins up a separate thread for each request.</p>
+
+        <div class="callout">
+            <div class="callout-title">The Thread Pool</div>
+            <p>Creating threads is expensive. Spring Boot maintains a "Pool" of ready-to-go threads (usually 200). When
+                a request comes in, a thread is borrowed, does the work, and is returned to the pool. This allows
+                Sentinel to handle high throughput with stable resource usage.</p>
+        </div>
+
+        <h2>2.4 The Build System: Gradle</h2>
+        <p>You will see a file called <code>build.gradle</code>. This is our recipe book.</p>
+        <p>In the old days, you had to manually download `.jar` files (libraries) and put them in a folder. It was
+            "Dependency Hell".</p>
+        <p><strong>Gradle</strong> solves this. We list the libraries we need (e.g., `spring-boot-starter-web`,
+            `spring-ai-core`), and Gradle automatically downloads them from a trusted central repository (Maven Central)
+            and bundles them into our final app.</p>
+
+        <pre><code>// Example build.gradle dependency
+implementation 'org.springframework.ai:spring-ai-ollama:0.8.0'</code></pre>
+        <p>This single line tells Gradle: "Go find the code that talks to Ollama, download it, verify its checksum, and
+            link it to our project."</p>
+
+        <div class="footer">Sentinel Masterclass | Page 5</div>
+    </div>
+
+    <!-- PAGE 6: SPRING BOOT -->
+    <div class="page">
+        <h1>3. The Framework: Spring Boot</h1>
+        <p>If Java is the language, Spring Boot is the chassis. It provides the structure so we don't have to reinvent
+            the wheel.</p>
+
+        <h2>3.1 Inversion of Control (IoC)</h2>
+        <p>This is the hardest concept for beginners, but the most important. In traditional programming,
+            <strong>you</strong> control the flow. You create objects:
+        <pre><code>// The Old Way (Bad)
+MercenaryController controller = new MercenaryController();
+controller.service = new SecureIngestionService();</code></pre>
+
+        <p>In Spring, we give control to the <strong>Spring Container</strong>. We say "I need a Controller" and "I need
+            a Service", and Spring creates them and wires them together. This is called <strong>Dependency Injection
+                (DI)</strong>.</p>
+
+        <div class="img-box">
+            <!-- Conceptual diagram of IoC Container wiring beans -->
+            <svg viewBox="0 0 800 300" style="width:100%; height:auto;">
+                <rect x="50" y="50" width="700" height="200" fill="#f8fafc" stroke="#333" stroke-dasharray="5,5" />
+                <text x="350" y="30" font-family="sans-serif" font-size="14" fill="#666">Spring IoC Container</text>
+
+                <rect x="100" y="100" width="150" height="100" fill="#bfdbfe" stroke="#2563eb" rx="5" />
+                <text x="125" y="155" font-family="sans-serif">Service Bean</text>
+
+                <rect x="550" y="100" width="150" height="100" fill="#bbf7d0" stroke="#16a34a" rx="5" />
+                <text x="575" y="155" font-family="sans-serif">Controller Bean</text>
+
+                <line x1="250" y1="150" x2="550" y2="150" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+                <circle cx="550" cy="150" r="4" fill="#333" />
+                <text x="350" y="140" font-family="sans-serif" font-size="12">Autowired Injection</text>
+            </svg>
+        </div>
+
+        <h2>3.2 The "Bean"</h2>
+        <p>In Spring terminology, any object managed by the container is called a <strong>Bean</strong>. Sentinel has
+            Beans for:</p>
+        <ul>
+            <li>The Vector Store Connection</li>
+            <li>The Chat Client</li>
+            <li>The Security Filter</li>
+        </ul>
+        <p>These beans are "Singletons" by default, meaning only one instance exists in memory, shared by all users.
+            This is efficient.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 6</div>
+    </div>
+
+    <!-- PAGE 7: SPRING BOOT (CONT) -->
+    <div class="page">
+        <h2>3.3 Configuration Management (YAML)</h2>
+        <p>We do not hardcode passwords or URLs in Java files. We use <code>application.yaml</code>.</p>
+        <p>This file allows us to change how the app behaves without recompiling the code. For example, changing the
+            port from 8080 to 9090 is just a text edit.</p>
+
+        <pre><code>server:
+  port: 8080
+
+spring:
+  application:
+    name: sentinel-core
+  ai:
+    ollama:
+      base-url: http://localhost:11434</code></pre>
+
+        <h2>3.4 Profiles</h2>
+        <p>Spring supports <strong>Profiles</strong>. Sentinel has three:</p>
+        <ul>
+            <li><code>dev</code>: No security, in-memory DB. For developers.</li>
+            <li><code>enterprise</code>: Authenticates against OIDC (Okta/Azure).</li>
+            <li><code>govcloud</code>: Authenticates against mTLS (Smart Cards).</li>
+        </ul>
+        <p>At startup, we tell Java: <code>-Dspring.profiles.active=govcloud</code>. Spring then loads only the
+            configuration for that environment.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 7</div>
+    </div>
+
+    <!-- PAGE 8: ANNOTATIONS -->
+    <div class="page">
+        <h1>4. Deep Dive into Annotations</h1>
+        <p>Annotations are the metadata (tags starting with <code>@</code>) that tell Spring what to do with a class.
+            They remove the need for thousands of lines of setup code.</p>
+
+        <h3>4.1 @RestController</h3>
+        <pre><code>@RestController
+@RequestMapping("/api")
+public class MercenaryController { ... }</code></pre>
+        <p>This tells Spring: "This class handles Web Traffic."</p>
+        <ul>
+            <li>It automatically converts Java objects into <strong>JSON</strong> (text data) for the browser.</li>
+            <li>It listens on the path <code>/api</code>.</li>
+        </ul>
+
+        <h3>4.2 @GetMapping / @PostMapping</h3>
+        <p>These map specific URLs to Java functions.</p>
+        <ul>
+            <li><code>@GetMapping("/ask")</code>: When a browser requests <code>GET /api/ask</code>, run this function.
+            </li>
+            <li><code>@PostMapping("/ingest")</code>: When a browser POSTs data (uploads a file) to
+                <code>/api/ingest</code>, run this function.</li>
+        </ul>
+
+        <h3>4.3 @Service</h3>
+        <p>This marks a class as "Business Logic". It tells Spring to create a Bean of this class so it can be injected
+            into Controllers. It also enables <strong>Transactional</strong> support (database rollbacks), though we use
+            that less in RAG.</p>
+
+        <h3>4.4 @Value</h3>
+        <pre><code>@Value("${app.security.level}")
+private String securityLevel;</code></pre>
+        <p>This does the magic of reading <code>application.yaml</code> and putting the value into the
+            <code>securityLevel</code> variable at startup.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 8</div>
+    </div>
+
+    <!-- PAGE 9: ANNOTATIONS (CONT) -->
+    <div class="page">
+        <h2>4.5 @Autowired vs Constructor Injection</h2>
+        <p>You used to see <code>@Autowired</code> above fields. Modern Spring prefers <strong>Constructor
+                Injection</strong>:</p>
+
+        <pre><code>// The Modern Way
+public MercenaryController(SecureIngestionService service) {
+    this.service = service;
+}</code></pre>
+
+        <p>Spring is smart enough to see this constructor, realize it needs a <code>SecureIngestionService</code>, go
+            find that Bean, and pass it in. This makes testing easier because we can pass in "Fake" services during unit
+            tests.</p>
+
+        <h2>4.6 @Component</h2>
+        <p>This is the generic version of <code>@Service</code>. We use it for utility classes, like a custom PII filter
+            or a specific data formatter that isn't strictly "business logic" but needs to be managed by Spring.</p>
+
+        <div class="callout">
+            <div class="callout-title">Review</div>
+            <p>Annotations are shortcuts. They save us from writing "boilerplate" code. They turn a plain Java class
+                into a web server, a database listener, or a security gatekeeper.</p>
+        </div>
+
+        <div class="footer">Sentinel Masterclass | Page 9</div>
+    </div>
+
+    <!-- PAGE 10: VECTOR THEORY -->
+    <div class="page">
+        <h1>5. Theory: Vector Mathematics</h1>
+        <p>Now we enter the realm of AI. How does a computer understand that "Cat" is related to "Dog"?</p>
+
+        <h2>5.1 Embeddings</h2>
+        <p>Computers only understand numbers. An <strong>Embedding Model</strong> (like `nomic-embed-text`) is a
+            translator. It takes text and turns it into a list of floating-point numbers called a
+            <strong>Vector</strong>.</p>
+
+        <p><code>"The King sat on the throne"</code> -> <code>[0.12, -0.45, 0.88, 0.23, ...]</code></p>
+
+        <p>In Sentinel, we use vectors with <strong>768 Dimensions</strong>. Imagine a graph with X, Y, and Z axes. Now
+            imagine it has 768 axes. That is where our text lives.</p>
+
+        <div class="img-box">
+            <img src="vector_space_concept_1768080784784.png" alt="Vector Space Diagram">
+            <div class="caption">Figure 5.1: Simplified 3D visualization of semantic proximity.</div>
+        </div>
+
+        <h2>5.2 Semantic Proximity</h2>
+        <p>The magic is that <strong>similar concepts end up close together</strong> in this multi-dimensional space.
+        </p>
+        <ul>
+            <li>The distance between "King" and "Man" is similar to the distance between "Queen" and "Woman".</li>
+            <li>"Apple" is mathematically far away from "Car".</li>
+        </ul>
+
+        <div class="footer">Sentinel Masterclass | Page 10</div>
+    </div>
+
+    <!-- PAGE 11: VECTOR THEORY (CONT) -->
+    <div class="page">
+        <h2>5.3 Cosine Similarity</h2>
+        <p>To find the most relevant documents for a user's question, we calculate the <strong>Cosine
+                Similarity</strong> between the <em>Question Vector</em> and all our <em>Document Vectors</em>.</p>
+
+        <p>It measures the cosine of the angle between two vectors.
+        <ul>
+            <li><strong>1.0:</strong> Vectors point in exactly the same direction (Perfect Match).</li>
+            <li><strong>0.0:</strong> Vectors are orthogonal (No relation).</li>
+            <li><strong>-1.0:</strong> Vectors are opposite.</li>
+        </ul>
+        </p>
+
+        <div class="theory-box">
+            <h3>Why Cosine?</h3>
+            <p>Why not just measure distance (Euclidean)? Because in text, the <em>magnitude</em> (length) of the vector
+                often represents the length of the document. We care about the <em>direction</em> (the topic), not how
+                long the text is. Cosine ignores magnitude and focuses on orientation.</p>
+        </div>
+
+        <h2>5.4 The Index (HNSW)</h2>
+        <p>Calculating Cosine Similarity against 1 million documents is slow. We use an algorithm called <strong>HNSW
+                (Hierarchical Navigable Small World)</strong>.</p>
+        <p>Think of it like a highway system for vectors. Instead of checking every house (document), we jump to the
+            right city, then the right neighborhood, then the right street. This allows Sentinel to search millions of
+            documents in milliseconds.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 11</div>
+    </div>
+
+    <!-- PAGE 12: RAG THEORY -->
+    <div class="page">
+        <h1>6. Theory: RAG</h1>
+        <p>Retrieval Augmented Generation (RAG) is the architecture Sentinel uses to combine your data with the AI's
+            language skills.</p>
+
+        <h2>6.1 The "Hallucination" Problem</h2>
+        <p>Large Language Models (LLMs) like Llama 3 are trained on the public internet. If you ask them about "Project
+            Obsidian" (a secret internal project), they will either:</p>
+        <ol>
+            <li>Say "I don't know."</li>
+            <li><strong>Hallucinate:</strong> Make up a plausible-sounding lie based on sci-fi books it read.</li>
+        </ol>
+        <p>This is unacceptable for intelligence work.</p>
+
+        <h2>6.2 The RAG Pipeline</h2>
+        <p>We solve this by "cheating". Before the AI answers, we:</p>
+        <ol>
+            <li><strong>Retrieve:</strong> Look up "Project Obsidian" in our Vector Database.</li>
+            <li><strong>Augment:</strong> Paste the text of the found documents into the prompt.</li>
+            <li><strong>Generate:</strong> Ask the AI: "Using ONLY the text below, answer the question."</li>
+        </ol>
+
+        <div class="img-box">
+            <img src="rag_flow_diagram_1768080771919.png" alt="RAG Pipeline Diagram">
+            <div class="caption">Figure 6.1: The information flow in Sentinel.</div>
+        </div>
+
+        <div class="footer">Sentinel Masterclass | Page 12</div>
+    </div>
+
+    <!-- PAGE 13: RAG THEORY (CONT) -->
+    <div class="page">
+        <h2>6.3 Chunking Strategy</h2>
+        <p>You cannot feed a 100-page PDF into an LLM. It's too much data (Context Window overflow). We must break
+            documents into <strong>Chunks</strong>.</p>
+
+        <p>Sentinel uses <strong>TokenTextSplitter</strong>. It splits documents into chunks of roughly 500 tokens
+            (words), with a small "overlap" between them.</p>
+        <p><strong>Why Overlap?</strong> If a sentence is cut in half ("The code is... [CUT] ...007"), the meaning is
+            lost in both chunks. Overlap ensures that complete thoughts are preserved in at least one chunk.</p>
+
+        <h2>6.4 Context Window Management</h2>
+        <p>The "Context Window" is the AI's short-term memory. For Llama 3, it's roughly 8,000 tokens.</p>
+        <p>Sentinel must carefully budget this space:</p>
+        <ul>
+            <li><strong>10%</strong> - The System Prompt ("You are a helpful AI...")</li>
+            <li><strong>70%</strong> - The Retrieved Documents (The Context)</li>
+            <li><strong>20%</strong> - The User's Question and the AI's Answer</li>
+        </ul>
+        <p>If we retrieve too many documents, we crash the system. This drives our decision to limit retrieval to the
+            top 15 most relevant chunks.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 13</div>
+    </div>
+
+    <!-- PAGE 14: ARCHITECTURE -->
+    <div class="page">
+        <h1>7. Architecture: The Sentinel Stack</h1>
+        <p>Let's map the theory to the actual Java architecture we built.</p>
+
+        <div class="img-box">
+            <img src="sentinel_architecture_v3_1768080742963.png" alt="Sentinel Architecture">
+            <div class="caption">Figure 7.1: Component Interaction Diagram.</div>
+        </div>
+
+        <h2>7.1 The Three Pillars</h2>
+        <p>Sentinel is composed of three primary blocks:</p>
+        <ol>
+            <li><strong>The Controller (API):</strong> The interface that accepts questions.</li>
+            <li><strong>The Ingestion Engine:</strong> The processor that devours documents.</li>
+            <li><strong>The Vector Store (State):</strong> The brain's long-term memory.</li>
+        </ol>
+
+        <h2>7.2 Spring AI</h2>
+        <p>We use a brand new library called <strong>Spring AI</strong>. This provides a standard interface for AI. It
+            allows us to swap <code>OllamaChatClient</code> (Local) with <code>OpenAIChatClient</code> (Cloud) by
+            changing just one line of configuration, future-proofing the application.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 14</div>
+    </div>
+
+    <!-- PAGE 15: ARCHITECTURE (CONT) -->
+    <div class="page">
+        <h2>7.3 The Data Flow</h2>
+        <p>Let's trace a packet of data through the system:</p>
+
+        <h3>Flow A: Ingestion (Writing)</h3>
+        <ol>
+            <li>User uploads <code>report.pdf</code> to <code>/api/ingest</code>.</li>
+            <li><code>MercenaryController</code> receives the bytes.</li>
+            <li><code>SecureIngestionService</code> strips PII and chunks text.</li>
+            <li><code>EmbeddingModel</code> calculates vectors.</li>
+            <li>Vectors are saved to MongoDB "vector_store" collection.</li>
+        </ol>
+
+        <h3>Flow B: Query (Reading)</h3>
+        <ol>
+            <li>User sends "What is the status?" to <code>/api/ask</code>.</li>
+            <li><code>MercenaryController</code> embeds the question.</li>
+            <li>Vector Search finds matching chunks from `report.pdf`.</li>
+            <li>Chunks + Question are wrapped in a Prompt Template.</li>
+            <li>Llama 3 generates the answer.</li>
+            <li>Audit Log records the transaction.</li>
+        </ol>
+
+        <div class="footer">Sentinel Masterclass | Page 15</div>
+    </div>
+
+    <!-- PAGE 16: CODE - INGESTION -->
+    <div class="page">
+        <h1>8. Code Walkthrough: SecureIngestionService</h1>
+        <p>This class is the gatekeeper. It ensures garbage (or sensitive leaks) doesn't enter the system.</p>
+
+        <h2>8.1 PII Redaction Logic</h2>
+        <pre><code>private static final Pattern SSN_PATTERN = 
+    Pattern.compile("\\d{3}-\\d{2}-\\d{4}");
+
+private String redactSensitiveInfo(String content) {
+    return SSN_PATTERN.matcher(content)
+           .replaceAll("[REDACTED-SSN]");
+}</code></pre>
+        <p>This uses <strong>Regular Expressions (Regex)</strong>. Before we even look at the meaning of the text, we
+            scan for the shape of a Social Security Number. If found, we destroy it. This happens comfortably inside the
+            Java memory space, ensuring the vector database never sees the private data.</p>
+
+        <h2>8.2 PDF Parsing</h2>
+        <p>We use <strong>Apache Tika</strong> (via Spring AI's PagePdfDocumentReader). PDF is a notoriously difficult
+            format because it's visual, not semantic. Tika extracts the raw text layer. If the PDF is an image (scan),
+            Tika can integrate with Tesseract OCR to "read" the image, though this is computationally expensive.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 16</div>
+    </div>
+
+    <!-- PAGE 17: CODE - INGESTION (CONT) -->
+    <div class="page">
+        <h2>8.3 Metadata tagging</h2>
+        <p>When we create a Document object, we attach Metadata:</p>
+        <pre><code>Map&lt;String, Object&gt; metadata = new HashMap&lt;&gt;();
+metadata.put("source", filename);
+metadata.put("dept", "DEFENSE");</code></pre>
+        <p>This metadata is stored alongside the vector in MongoDB. This is critical for <strong>Filtering</strong>.
+            When we search later, we can say "Search for vectors near X, BUT primarily filter to documents where
+            <code>dept == 'DEFENSE'</code>".</p>
+
+        <div class="callout">
+            <div class="callout-title">Why Metadata Matters</div>
+            <p>Without metadata, a "Medical" query might retrieve a "Legal" document just because they both use the word
+                "Procedure". Metadata creates hard walls between data sets.</p>
+        </div>
+
+        <div class="footer">Sentinel Masterclass | Page 17</div>
+    </div>
+
+    <!-- PAGE 18: CODE - CONTROLLER -->
+    <div class="page">
+        <h1>9. Code Walkthrough: MercenaryController</h1>
+        <p>This is the brain. Let's look at the <code>ask</code> method logic.</p>
+
+        <h2>9.1 The Constructor</h2>
+        <pre><code>public MercenaryController(ChatClient.Builder builder, 
+                           VectorStore vectorStore...) {
+    this.chatClient = builder.build();
+    this.vectorStore = vectorStore;
+}</code></pre>
+        <p>Here we see the injection. We don't create the database connection; we are handed one that is already open
+            and authenticated.</p>
+
+        <h2>9.2 The "Always-On" Hybrid Search</h2>
+        <p>In the <code>executeHybridSearch</code> method, we do something clever:</p>
+        <pre><code>// 1. Semantic Search (Math)
+List&lt;Document&gt; semantic = vectorStore.similaritySearch(query);
+
+// 2. Keyword Search (Text)
+List&lt;Document&gt; keyword = vectorStore.keywordSearch(query);
+
+// 3. Merge
+Set&lt;Document&gt; merged = new HashSet&lt;&gt;();
+merged.addAll(semantic);
+merged.addAll(keyword);</code></pre>
+        <p>We use a <code>Set</code> to merge. A Set in Java automatically removes duplicates. If a document is found by
+            both methods, it only appears once in the final list.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 18</div>
+    </div>
+
+    <!-- PAGE 19: CODE - CONTROLLER (CONT) -->
+    <div class="page">
+        <h2>9.3 Prompt Engineering in Code</h2>
+        <p>The "System Prompt" is defined as a Java String block:</p>
+        <pre><code>String systemText = """
+    You are SENTINEL.
+    PROTOCOL:
+    1. ANALYZE the provided CONTEXT.
+    2. CITE sources using [filename].
+    """;</code></pre>
+        <p>We pass this instruction to the LLM <em>every single time</em>. The LLM has no long-term memory of who it is.
+            We have to remind it "You are Sentinel" on every request. This ensures consistent behavior.</p>
+
+        <h2>9.4 The Response Object</h2>
+        <p>We return a simple String back to the frontend. Spring Boot automatically wraps this in an HTTP 200 OK
+            response. If something goes wrong (e.g., Database down), we catch the Exception and return an HTTP 500
+            Error, preventing the stack trace from leaking to the user.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 19</div>
+    </div>
+
+    <!-- PAGE 20: ALGORITHM DEEP DIVE -->
+    <div class="page">
+        <h1>10. Algorithm Deep Dive: Hybrid Search</h1>
+        <p>Let's address the specific logic of <strong>Multi-Query Decomposition</strong>.</p>
+
+        <h2>10.1 The Compound Query Problem</h2>
+        <p>User Question: <em>"Who is 'Hawk' Reynolds and what is the threat at Site Echo?"</em></p>
+        <p>A simple similarity search fails here. The embedding for this entire sentence is an "average" of people and
+            places. It matches neither the Person profile nor the Site report well.</p>
+
+        <h2>10.2 Decomposition Logic</h2>
+        <p>Our `QueryDecompositionService` detects the "and". It splits the string:</p>
+        <ol>
+            <li>Sub-Query A: <em>"Who is 'Hawk' Reynolds?"</em></li>
+            <li>Sub-Query B: <em>"What is the threat at Site Echo?"</em></li>
+        </ol>
+        <p>It then runs <strong>Parallel Searches</strong>. It fires two search threads at MongoDB simultaneously.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 20</div>
+    </div>
+
+    <!-- PAGE 21: ALGORITHM DEEP DIVE (CONT) -->
+    <div class="page">
+        <h2>10.3 Document Limit Enforcement</h2>
+        <p>This is where we enforce the "Context Budget" you asked about.</p>
+
+        <div class="callout">
+            <div class="callout-title">The Algorithm</div>
+            <ol>
+                <li><strong>Per Sub-Query Cap:</strong> We take the Top 5 results for "Hawk" and Top 5 for "Site Echo".
+                    (Total 10).</li>
+                <li><strong>Deduplication:</strong> If the same document appears in both, we merge it.</li>
+                <li><strong>Global Safety Cap:</strong> If the user asks a 10-part question, we might end up with 50
+                    docs. We enforce a hard limit of <strong>15 Documents</strong> max. If we have more, we prioritize
+                    the ones with the highest similarity scores.</li>
+            </ol>
+        </div>
+
+        <p>This ensures we fill the context window with high-density information without cutting off the answer
+            generation.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 21</div>
+    </div>
+
+    <!-- PAGE 22: SECURITY -->
+    <div class="page">
+        <h1>11. Security: Defense in Depth</h1>
+        <p>Sentinel assumes the network is hostile. We implement security at every layer.</p>
+
+        <div class="img-box">
+            <img src="security_layers_diagram_1768080799357.png" alt="Security Onion">
+            <div class="caption">Figure 11.1: Defense in Depth Model</div>
+        </div>
+
+        <h2>11.1 Layer 1: Mutual TLS (mTLS)</h2>
+        <p>In `govcloud` mode, we don't use passwords. Passwords can be stolen. We use <strong>Client
+                Certificates</strong>.</p>
+        <p>The user inserts their CAC (Common Access Card) into the reader. The browser sends the certificate from the
+            chip to Sentinel. Sentinel verifies the certificate against the DoD Root CA (Certificate Authority). If the
+            math doesn't check out, the connection is dropped at the TCP layer.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 22</div>
+    </div>
+
+    <!-- PAGE 23: SECURITY (CONT) -->
+    <div class="page">
+        <h2>11.2 Layer 2: Role Based Access Control (RBAC)</h2>
+        <p>Once authenticated, we check <strong>Roles</strong>. A user is loaded with roles like
+            <code>ROLE_ANALYST</code> or <code>ROLE_VIEWER</code>.</p>
+        <p>We use Spring Security Annotations:</p>
+        <pre><code>@PreAuthorize("hasRole('ANALYST')")
+public void ingest(...)</code></pre>
+        <p>This acts like a force field around the function. If a Viewer tries to call `ingest`, Spring throws an
+            `AccessDeniedException` before the code even executes.</p>
+
+        <h2>11.3 Layer 3: Audit Logging</h2>
+        <p>Every action is logged. But we don't just print to the console. We use structured logging.</p>
+        <p><code>[AUDIT] User:JDOE Action:QUERY Sector:DEFENSE Result:SUCCESS IP:192.168.1.5</code></p>
+        <p>These logs are written to disk in a format that can be ingested by Splunk or other SIEM tools for threat
+            analysis. If an analyst queries "Nuclear Launch Codes" at 3 AM, the Audit Log catches it.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 23</div>
+    </div>
+
+    <!-- PAGE 24: INFRASTRUCTURE -->
+    <div class="page">
+        <h1>12. Infrastructure: Docker & Deployment</h1>
+        <p>We ship Sentinel as a <strong>Docker Container</strong>.</p>
+
+        <h2>12.1 Containerization</h2>
+        <p>A Docker container is a lightweight Virtual Machine. Our `Dockerfile` looks like this:</p>
+        <pre><code>FROM eclipse-temurin:21-jdk-alpine
+COPY build/libs/sentinel.jar app.jar
+ENTRYPOINT ["java", "-jar", "/app.jar"]</code></pre>
+        <ul>
+            <li><code>FROM</code>: We start with a tiny, secure Linux designed for Java.</li>
+            <li><code>COPY</code>: We add our compiled application.</li>
+            <li><code>ENTRYPOINT</code>: We tell it how to start.</li>
+        </ul>
+
+        <h2>12.2 Docker Compose</h2>
+        <p>We need more than just Java. We need MongoDB and Ollama. <code>docker-compose.yml</code> allows us to define
+            the whole "System" in one file.</p>
+        <pre><code>services:
+  sentinel:
+    image: sentinel:latest
+    ports: ["8080:8080"]
+  mongo:
+    image: mongo:latest
+  ollama:
+    image: ollama/ollama:latest</code></pre>
+        <p>Running <code>docker-compose up</code> starts all three computers inside a virtual network where they can
+            talk to each other, but the outside internet cannot touch the database directly.</p>
+
+        <div class="footer">Sentinel Masterclass | Page 24</div>
+    </div>
+
+    <!-- PAGE 25: CONCLUSION -->
+    <div class="page">
+        <h1>Conclusion</h1>
+        <p>Sentinel represents the intersection of modern AI capability and rigid enterprise security standards. By
+            leveraging Java Spring Boot, we ensure reliability. By utilizing local Vector Stores and LLMs, we guarantee
+            data sovereignty.</p>
+
+        <p>You now understand the machine from the bottom up:</p>
+        <ul>
+            <li><strong>Bytecode:</strong> How it runs.</li>
+            <li><strong>Vectors:</strong> How it thinks.</li>
+            <li><strong>Spring Beans:</strong> How it is structured.</li>
+            <li><strong>Docker:</strong> How it is shipped.</li>
+        </ul>
+
+        <p>This architecture is future-proof. As LLMs get smarter (Llama 4, 5, etc.), we simply swap the model file in
+            Ollama. The Java architecture remains the solid foundation.</p>
+
+        <div style="margin-top: 100px; text-align: center; color: #94a3b8; font-family: 'Inter';">
+            <p><strong>END OF MASTERCLASS</strong></p>
+            <p>SENTINEL INTELLIGENCE SYSTEMS</p>
+        </div>
+
+        <div class="footer">Sentinel Masterclass | Page 25</div>
+    </div>
+
+</body>
+
+</html>
