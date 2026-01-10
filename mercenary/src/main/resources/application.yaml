@@ -31,7 +31,7 @@ spring:
       mongodb:
         atlas:
           collection-name: vector_store
-          initialize-schema: false
+          initialize-schema: true
           path-name: embedding
           index-name: vector_index
 

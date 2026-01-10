@@ -1547,7 +1547,7 @@
                     <div class="upload-zone-text">Upload Document</div>
                     <div class="upload-zone-hint">PDF, TXT, MD | Max 50MB</div>
                 </div>
-                <input type="file" id="file-input" accept=".pdf,.txt,.md" style="display:none">
+                <input type="file" id="file-input" accept=".pdf,.txt,.md" style="display:none" multiple>
                 <div id="upload-status"
                     style="margin-top:12px; font-size:11px; font-family:var(--font-mono); color:var(--text-secondary);">
                 </div>
@@ -1940,21 +1940,38 @@
                 uploadZone.style.background = 'transparent';
                 if (e.dataTransfer.files.length) {
                     fileInput.files = e.dataTransfer.files;
-                    handleFileUpload(e.dataTransfer.files[0]);
+                    handleBatchUpload(e.dataTransfer.files);
                 }
             });
 
             fileInput.addEventListener('change', (e) => {
-                if (e.target.files[0]) handleFileUpload(e.target.files[0]);
+                if (e.target.files.length) handleBatchUpload(e.target.files);
             });
         }
 
-        async function handleFileUpload(file) {
+        async function handleBatchUpload(files) {
             const statusEl = document.getElementById('upload-status');
+            const total = files.length;
+            let successCount = 0;
+
+            for (let i = 0; i < total; i++) {
+                const file = files[i];
+                statusEl.innerHTML = `<span style="color:var(--accent-primary)">Uploading ${i + 1}/${total}: ${file.name}...</span>`;
+
+                const success = await uploadSingleFile(file);
+                if (success) successCount++;
+            }
+
+            if (successCount === total) {
+                statusEl.innerHTML = `<span style="color:var(--success)">✓ All ${total} files ingested</span>`;
+            } else {
+                statusEl.innerHTML = `<span style="color:var(--warning)">⚠ ${successCount}/${total} ingested</span>`;
+            }
+            document.getElementById('file-input').value = '';
+        }
+
+        async function uploadSingleFile(file) {
             const sector = sectorSelect.value;
-
-            statusEl.innerHTML = `<span style="color:var(--accent-primary)">Uploading ${file.name}...</span>`;
-
             const formData = new FormData();
             formData.append('file', file);
             formData.append('dept', sector);
@@ -1966,17 +1983,14 @@
                 });
 
                 if (response.ok) {
-                    statusEl.innerHTML = `<span style="color:var(--success)">✓ ${file.name} ingested</span>`;
                     fetchTelemetry();
                     addToContext(file.name, sector);
-                } else {
-                    statusEl.innerHTML = `<span style="color:var(--error)">✕ Upload failed</span>`;
+                    return true;
                 }
             } catch (error) {
-                statusEl.innerHTML = `<span style="color:var(--error)">✕ ${error.message}</span>`;
+                console.error("Upload failed", error);
             }
-
-            document.getElementById('file-input').value = '';
+            return false;
         }
 
         // === CONTEXT MANAGEMENT ===

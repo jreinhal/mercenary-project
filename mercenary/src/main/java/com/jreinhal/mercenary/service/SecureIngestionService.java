@@ -63,7 +63,7 @@ public class SecureIngestionService {
             for (Document doc : rawDocuments) {
                 HashMap<String, Object> cleanMeta = new HashMap<>();
                 cleanMeta.put("source", filename);
-                cleanMeta.put("department", dept.name());
+                cleanMeta.put("dept", dept.name());
                 cleanDocs.add(new Document(doc.getContent(), cleanMeta));
             }
 

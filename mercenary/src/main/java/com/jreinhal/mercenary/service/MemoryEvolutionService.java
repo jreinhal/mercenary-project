@@ -35,36 +35,43 @@ public class MemoryEvolutionService {
     public Document evolve(Document newDoc) {
         try {
             // 1. Search for existing ACTIVE documents that are similar
-            FilterExpressionBuilder b = new FilterExpressionBuilder();
-            // We assume 'status' for active docs is either 'ACTIVE' or missing (legacy)
-            // Ideally we migrate all to have status, but for now we filter OUT 'ARCHIVED'
-            var filter = b.ne(MetadataConstants.STATUS_KEY, MetadataConstants.STATUS_ARCHIVED).build();
-
+            // NOTE: SimpleVectorStore does NOT support metadata filtering in this version.
+            // We must perform the search WITHOUT the filter, and then filter in memory (Java).
+            
             List<Document> similarDocs = vectorStore.similaritySearch(
                     SearchRequest.query(newDoc.getContent())
-                            .withTopK(1)
-                            .withSimilarityThreshold(similarityThreshold)
-                            .withFilterExpression(filter));
+                            .withTopK(5) // Fetch more to allow for post-filtering
+                            .withSimilarityThreshold(similarityThreshold));
 
-            if (similarDocs.isEmpty()) {
+            // 2. In-Memory Filtering (Manual Check for Status != ARCHIVED)
+            Document oldDoc = null;
+            for (Document doc : similarDocs) {
+                Object status = doc.getMetadata().get(MetadataConstants.STATUS_KEY);
+                // If status is NOT archived, we consider it a candidate
+                if (!MetadataConstants.STATUS_ARCHIVED.equals(status)) {
+                    oldDoc = doc;
+                    break; // Found the best match that is active
+                }
+            }
+
+            if (oldDoc == null) {
                 // No match found, returns new doc marked as ACTIVE
                 return tagAsActive(newDoc);
             }
 
-            Document oldDoc = similarDocs.get(0);
             log.info("MEMORY EVOLUTION: Found similar memory (ID: {}). Synthesizing...", oldDoc.getId());
 
-            // 2. Synthesize Evolved Content
+            // 3. Synthesize Evolved Content
             String mergedContent = chatClient.prompt()
                     .system("You are the memory core of an intelligence maven. Merge the old and new information into a single, dense, accurate fact. Do not lose details.")
                     .user("OLD MEMORY: " + oldDoc.getContent() + "\n\nNEW MEMORY: " + newDoc.getContent())
                     .call()
                     .content();
 
-            // 3. Archive the Old Document (Soft Delete)
+            // 4. Archive the Old Document (Soft Delete)
             archiveDocument(oldDoc);
 
-            // 4. Return the new Evolved Document
+            // 5. Return the new Evolved Document
             // We inherit metadata from the new doc, but we could mix in old metadata if
             // needed.
             // For now, new doc metadata takes precedence + ACTIVE status.

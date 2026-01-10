@@ -23,10 +23,12 @@ public class MercenaryApplication {
 	public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel,
 			@org.springframework.beans.factory.annotation.Value("${app.auth-mode:DEV}") String authMode) {
 
-		// If we are in CAC (GovCloud) or DEV mode locally, we use in-memory store.
-		// Use SimpleVectorStore (In-Memory) for the operational verification.
+		// If we are in CAC (GovCloud) or DEV mode locally, we use our custom OFF-GRID
+		// store.
+		// THIS ENSURES DATA PERSISTS to local Mongo, but searches run in Java (No Atlas
+		// needed).
 		if ("CAC".equalsIgnoreCase(authMode) || "DEV".equalsIgnoreCase(authMode)) {
-			return new org.springframework.ai.vectorstore.SimpleVectorStore(embeddingModel);
+			return new com.jreinhal.mercenary.vector.LocalMongoVectorStore(mongoTemplate, embeddingModel);
 		}
 
 		// Explicitly configure the store config
@@ -39,7 +41,6 @@ public class MercenaryApplication {
 				.build();
 
 		// The 'false' boolean at the end is the "initializeSchema" flag.
-		// passing 'false' here forces it to skip index creation.
 		return new MongoDBAtlasVectorStore(mongoTemplate, embeddingModel, config, false);
 	}
 }

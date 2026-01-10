@@ -95,14 +95,15 @@ public class MercenaryController {
             avgLat = totalLatencyMs.get() / qCount;
 
         boolean dbOnline = true;
+        long liveDocCount = 0;
         try {
-            // Lightweight check
-            mongoTemplate.getCollection("vector_store").countDocuments();
+            // Fetch live count directly from DB to avoid drift
+            liveDocCount = mongoTemplate.getCollection("vector_store").countDocuments();
         } catch (Exception e) {
             dbOnline = false;
         }
 
-        return new TelemetryResponse(docCount.get(), qCount, avgLat, dbOnline);
+        return new TelemetryResponse((int) liveDocCount, qCount, avgLat, dbOnline);
     }
 
     public record InspectResponse(String content, List<String> highlights) {
@@ -120,13 +121,23 @@ public class MercenaryController {
                     + secureDocCache.get(fileName);
         } else {
             try {
-                List<Document> recoveredDocs = vectorStore
-                        .similaritySearch(SearchRequest.defaults()
-                                .withQuery("file") // Placeholder query
-                                .withFilterExpression("source == '" + fileName + "'")
-                                .withTopK(1));
-                if (!recoveredDocs.isEmpty()) {
-                    String recoveredContent = recoveredDocs.get(0).getContent();
+                // FALLBACK: Manual filtering if VectorStore doesn't support metadata filters
+                // 1. Retrieve a broader set of documents using the filename as context
+                List<Document> potentialDocs = vectorStore.similaritySearch(
+                        SearchRequest.query(fileName).withTopK(20));
+
+                log.info("INSPECT DEBUG: Searching for '{}'. Found {} potential candidates.", fileName,
+                        potentialDocs.size());
+                potentialDocs.forEach(d -> log.info("  >> Candidate Meta: {}", d.getMetadata()));
+
+                // 2. Filter in memory for exact source match
+                Optional<Document> match = potentialDocs.stream()
+                        .filter(doc -> fileName.equals(doc.getMetadata().get("source")) ||
+                                apiKeyMatch(fileName, doc.getMetadata()))
+                        .findFirst();
+
+                if (match.isPresent()) {
+                    String recoveredContent = match.get().getContent();
                     secureDocCache.put(fileName, recoveredContent);
                     content = "--- SECURE DOCUMENT VIEWER (ARCHIVE) ---\nFILE: " + fileName
                             + "\nSTATUS: RECONSTRUCTED FROM VECTOR STORE\n----------------------------------\n\n"
@@ -138,7 +149,7 @@ public class MercenaryController {
                 }
             } catch (Exception e) {
                 log.error(">> RECOVERY FAILED: {}", e.getMessage());
-                return new InspectResponse("ERROR: Recovery failed.", List.of());
+                return new InspectResponse("ERROR: Recovery failed. " + e.getMessage(), List.of());
             }
         }
 
@@ -275,14 +286,17 @@ public class MercenaryController {
             // Filter removed temporarily to bypass MongoDB index error
             List<Document> rawDocs = vectorStore.similaritySearch(
                     SearchRequest.query(query)
-                            .withTopK(10));
+                            .withTopK(10)
+                            .withSimilarityThreshold(0.4)
+                            .withFilterExpression("dept == '" + dept + "'"));
+
             log.info("Retrieved {} documents for query: {}", rawDocs.size(), query);
             rawDocs.forEach(doc -> log.info("  - Source: {}, Content preview: {}",
                     doc.getMetadata().get("source"),
                     doc.getContent().substring(0, Math.min(50, doc.getContent().length()))));
 
             // Semantic vector search handles relevance better than naive reranking
-            List<Document> topDocs = rawDocs.stream().limit(3).toList();
+            List<Document> topDocs = rawDocs.stream().limit(5).toList();
 
             String information = topDocs.stream()
                     .map(doc -> {
@@ -310,27 +324,23 @@ public class MercenaryController {
                         2. SYNTHESIZE an answer based ONLY on that data.
                         3. CITE each source IMMEDIATELY after EACH fact from that source.
 
-                        === CRITICAL: PER-FACT CITATION RULE ===
+                        === CRITICAL: INDIVIDUAL CITATIONS REQUIRED ===
 
-                        EACH separate fact MUST have its OWN citation from the SPECIFIC document that contains it.
-                        DO NOT combine facts from different documents under a single citation.
-                        DO NOT cite a document for information it does not contain.
+                        You MUST include a citation [filename] for EVERY fact you state from the documents.
+                        Your response MUST contain at least one citation if you used the context.
 
                         === CITATION FORMAT ===
-
-                        ✓ CORRECT:   [filename.txt] or [filename.md] or [filename.pdf]
-                        ✗ WRONG:     `filename.txt` (NO backticks!)
-                        ✗ WRONG:     (filename.txt) (NO parentheses!)
+                        Use brackets with the full filename: [filename.ext]
 
                         === EXAMPLES ===
+                        "The asset was located in Sector 7 [mission_log.txt]."
 
-                        ✓ CORRECT (each fact cited to its actual source):
-                        "Agent 47 is a Reconnaissance operative with ALPHA-2 clearance [personnel_roster.txt]. His blood type is O- and he is FIT FOR DUTY [medical_records.md]."
+                        === IMPORTANT: ANTI-HALLUCINATION ===
+                        1. DO NOT fabricate filenames.
+                        2. ONLY cite files listed in "SOURCE:" sections below.
+                        3. If you do not know the answer, say "No records found."
 
-                        ✗ WRONG (misattribution - claiming clearance info from medical file):
-                        "Agent 47 has ALPHA-2 clearance [medical_records.md]."
-
-                        BEFORE citing a document, VERIFY the fact appears in that document's content below.
+                        DO NOT say "According to the context". Just state the fact and cite it.
 
                         CONTEXT DATA:
                         {information}
@@ -360,6 +370,18 @@ public class MercenaryController {
             log.error("Error in /ask endpoint", e);
             throw e;
         }
+    }
+
+    private boolean apiKeyMatch(String targetName, Map<String, Object> meta) {
+        if (targetName.equals(meta.get("source")))
+            return true;
+        if (targetName.equals(meta.get("filename")))
+            return true;
+        if (targetName.equals(meta.get("file_name")))
+            return true;
+        if (targetName.equals(meta.get("original_filename")))
+            return true;
+        return false;
     }
 
     private boolean isPromptInjection(String query) {
