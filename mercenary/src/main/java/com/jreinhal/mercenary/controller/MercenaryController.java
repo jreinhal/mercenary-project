@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.service.SecureIngestionService;
 import com.jreinhal.mercenary.service.AuditService;
 import com.jreinhal.mercenary.service.AuthenticationService;
+import com.jreinhal.mercenary.service.QueryDecompositionService;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -40,6 +41,7 @@ public class MercenaryController {
     private final MongoTemplate mongoTemplate;
     private final AuditService auditService;
     private final AuthenticationService authService;
+    private final QueryDecompositionService queryDecompositionService;
 
     // METRICS
     private final AtomicInteger docCount = new AtomicInteger(0);
@@ -51,13 +53,15 @@ public class MercenaryController {
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore,
             SecureIngestionService ingestionService, MongoTemplate mongoTemplate,
-            AuditService auditService, AuthenticationService authService) {
+            AuditService auditService, AuthenticationService authService,
+            QueryDecompositionService queryDecompositionService) {
         this.chatClient = builder.build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;
         this.mongoTemplate = mongoTemplate;
         this.auditService = auditService;
         this.authService = authService;
+        this.queryDecompositionService = queryDecompositionService;
 
         // Initialize doc count from DB
         try {
@@ -281,14 +285,22 @@ public class MercenaryController {
                 return "SECURITY ALERT: Indirect Prompt Injection Detected. Access Denied.";
             }
 
-            // 2. RETRIEVAL (Top 10 -> Rerank -> Top 3)
-            // Filter out ARCHIVED documents
-            // Filter removed temporarily to bypass MongoDB index error
-            List<Document> rawDocs = vectorStore.similaritySearch(
-                    SearchRequest.query(query)
-                            .withTopK(10)
-                            .withSimilarityThreshold(0.4)
-                            .withFilterExpression("dept == '" + dept + "'"));
+            // 1.5 MULTI-QUERY DECOMPOSITION (Enterprise Feature)
+            // Detect and handle compound queries like "What is X and what is Y"
+            List<String> subQueries = queryDecompositionService.decompose(query);
+            boolean isCompoundQuery = subQueries.size() > 1;
+            if (isCompoundQuery) {
+                log.info("Compound query detected. Decomposed into {} sub-queries.", subQueries.size());
+            }
+
+            // Collect documents from all sub-queries
+            Set<Document> allDocs = new LinkedHashSet<>();
+            for (String subQuery : subQueries) {
+                List<Document> subResults = executeHybridSearch(subQuery, dept);
+                // Limit contribution from each sub-query to prevent flooding
+                allDocs.addAll(subResults.stream().limit(5).toList());
+            }
+            List<Document> rawDocs = new ArrayList<>(allDocs);
 
             log.info("Retrieved {} documents for query: {}", rawDocs.size(), query);
             rawDocs.forEach(doc -> log.info("  - Source: {}, Content preview: {}",
@@ -296,7 +308,8 @@ public class MercenaryController {
                     doc.getContent().substring(0, Math.min(50, doc.getContent().length()))));
 
             // Semantic vector search handles relevance better than naive reranking
-            List<Document> topDocs = rawDocs.stream().limit(5).toList();
+            // Increased limit to 15 to support multi-query decomposition context
+            List<Document> topDocs = rawDocs.stream().limit(15).toList();
 
             String information = topDocs.stream()
                     .map(doc -> {
@@ -370,6 +383,69 @@ public class MercenaryController {
             log.error("Error in /ask endpoint", e);
             throw e;
         }
+    }
+
+    /**
+     * HYBRID SEARCH: Combines semantic vector search with keyword fallback.
+     * Enterprise-grade retrieval optimized for government, legal, finance, and
+     * medical.
+     * Prioritizes RECALL over precision - better to retrieve and filter than to
+     * miss.
+     */
+    private List<Document> executeHybridSearch(String query, String dept) {
+        // Step A: Semantic vector search with enterprise-tuned threshold
+        // 0.15 prioritizes RECALL for enterprise (gov, legal, finance) - captures more
+        // natural language variations
+        List<Document> semanticResults = vectorStore.similaritySearch(
+                SearchRequest.query(query)
+                        .withTopK(10)
+                        .withSimilarityThreshold(0.15)
+                        .withFilterExpression("dept == '" + dept + "'"));
+
+        log.info("Semantic search found {} results for '{}'", semanticResults.size(), query);
+
+        // Step B: Keyword fallback (ALWAYS RUN to ensure high recall)
+        // This acts as a safety net for terms that semantics might miss
+        String lowerQuery = query.toLowerCase();
+        List<Document> keywordResults = vectorStore.similaritySearch(
+                SearchRequest.query(query)
+                        .withTopK(50) // Increase candidate pool
+                        .withSimilarityThreshold(0.01) // Effectively ignore similarity, just get top matches
+                        .withFilterExpression("dept == '" + dept + "'"));
+
+        // Filter to documents where source name or content contains query terms
+        // Exclude common stop words to prevent noise (matches "the", "and", "tell",
+        // etc.)
+        Set<String> stopWords = Set.of(
+                "the", "and", "for", "was", "are", "is", "of", "to", "in",
+                "what", "where", "when", "who", "how", "why",
+                "tell", "me", "about", "describe", "find", "show", "give",
+                "also");
+
+        String[] queryTerms = lowerQuery.split("\\s+");
+        keywordResults = keywordResults.stream()
+                .filter(doc -> {
+                    String source = String.valueOf(doc.getMetadata().get("source")).toLowerCase();
+                    String content = doc.getContent().toLowerCase();
+                    for (String term : queryTerms) {
+                        // Check length AND stop words
+                        if (term.length() >= 3 && !stopWords.contains(term)) {
+                            if (source.contains(term) || content.contains(term)) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                })
+                .collect(Collectors.toList());
+
+        log.info("Keyword fallback found {} documents for '{}'", keywordResults.size(), query);
+
+        // Step C: Merge results (Semantics first, then keywords)
+        Set<Document> merged = new LinkedHashSet<>(semanticResults);
+        merged.addAll(keywordResults);
+
+        return new ArrayList<>(merged);
     }
 
     private boolean apiKeyMatch(String targetName, Map<String, Object> meta) {

@@ -24,15 +24,13 @@ public class SecureIngestionService {
     private static final Logger log = LoggerFactory.getLogger(SecureIngestionService.class);
 
     private final VectorStore vectorStore;
-    private final MemoryEvolutionService memoryEvolutionService;
 
     // PII PATTERNS
     private static final Pattern SSN_PATTERN = Pattern.compile("\\d{3}-\\d{2}-\\d{4}");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}");
 
-    public SecureIngestionService(VectorStore vectorStore, MemoryEvolutionService memoryEvolutionService) {
+    public SecureIngestionService(VectorStore vectorStore) {
         this.vectorStore = vectorStore;
-        this.memoryEvolutionService = memoryEvolutionService;
     }
 
     public void ingest(MultipartFile file, Department dept) {
@@ -47,7 +45,6 @@ public class SecureIngestionService {
             if (filename.toLowerCase().endsWith(".pdf")) {
                 log.info(">> DETECTED PDF: Engaging Optical Character Recognition / PDF Stream...");
                 // Requires 'spring-ai-pdf-document-reader' dependency.
-                // If this fails to compile, we fall back to Tika or simple text extraction.
                 PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource);
                 rawDocuments = pdfReader.get();
             } else {
@@ -56,9 +53,8 @@ public class SecureIngestionService {
                 rawDocuments = textReader.get();
             }
 
-            // 2. PRE-SPLIT SANITIZATION (Fixes the NPE Crash)
-            // We create new, clean documents to ensure no null metadata triggers the
-            // Splitter bug.
+            // 2. PRE-SPLIT SANITIZATION
+            // We create new, clean documents to ensure no null metadata triggers the Splitter bug.
             List<Document> cleanDocs = new ArrayList<>();
             for (Document doc : rawDocuments) {
                 HashMap<String, Object> cleanMeta = new HashMap<>();
@@ -77,10 +73,8 @@ public class SecureIngestionService {
                 String cleanContent = redactSensitiveInfo(doc.getContent());
                 Document redactedDoc = new Document(cleanContent, doc.getMetadata());
 
-                // MEMORY EVOLUTION (Hypergraph)
-                Document evolvedDoc = memoryEvolutionService.evolve(redactedDoc);
-
-                finalDocuments.add(evolvedDoc);
+                // Directly add the document without experimental evolution
+                finalDocuments.add(redactedDoc);
             }
 
             vectorStore.add(finalDocuments);

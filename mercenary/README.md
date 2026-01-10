@@ -19,6 +19,8 @@ Sentinel is a Retrieval-Augmented Generation (RAG) platform designed for sensiti
 | **Clearance-Based Access** | Four-tier classification model (UNCLASSIFIED → TOP SECRET) |
 | **Glass Box Reasoning** | Full retrieval chain visibility with ANALYZE → VERIFY → CITE protocol |
 | **Citation Enforcement** | Every AI response anchored to source documents with clickable verification |
+| **Multi-Query Decomposition** | Compound queries ("What is X and what is Y") split into sub-queries for comprehensive retrieval |
+| **Hybrid Search** | Semantic vector search with automatic keyword fallback for enterprise-grade recall |
 | **Deep Storage Recovery** | Reconstruct document content from vector memory if source files are purged |
 | **STIG-Aligned Audit Logging** | Every authentication, query, and access event persisted for compliance |
 

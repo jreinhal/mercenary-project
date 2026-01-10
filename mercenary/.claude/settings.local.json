@@ -4,7 +4,10 @@
       "Bash(git remote update:*)",
       "Bash(git status:*)",
       "Bash(git merge:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git stash pop:*)",
+      "Bash(git stash drop:*)",
+      "Bash(git push:*)"
     ]
   }
 }

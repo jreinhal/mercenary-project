@@ -1,0 +1,19 @@
+ASSET LIST - OPERATION BLACKOUT
+DATE: 2025-12-20
+
+TEAM LEADER:
+- Cpt. "Hawk" Reynolds (Demolitions Expert)
+  * Status: Active
+  * Location: Forward Operating Base Zulu
+
+SUPPORT:
+- Sgt. Miller (Sniper)
+- Pvt. "Doc" Holiday (Medic)
+
+EQUIPMENT:
+- 4x NVG Goggles
+- 2x C4 Charges
+- 1x Satellite Uplink (Damaged)
+
+NOTES:
+Hawk requesting resupply of 5.56mm ammo.

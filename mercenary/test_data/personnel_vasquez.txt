@@ -1,27 +1,22 @@
-PERSONNEL DOSSIER - CLASSIFIED
+CLASSIFICATION: SECRET
+SOURCE: NAVAL PERSONNEL DATABASE
+DATE: 2025-11-15
 
-SUBJECT: Captain Elena Vasquez
-SERVICE NUMBER: USN-7734-ALPHA
-CURRENT ASSIGNMENT: Naval Intelligence, Pacific Fleet
-CLEARANCE LEVEL: TOP SECRET / SCI
+Name: Captain Elena Vasquez
+Rank: O-6 (Navy)
+Current Assignment: Pacific Fleet Command, Special Operations Liaison
+Clearance: TS/SCI
 
-BACKGROUND:
-Captain Elena Vasquez graduated from the United States Naval Academy in 2010 with honors in Computer Science. She completed advanced training at the Defense Language Institute (Mandarin Chinese) and the National Cryptologic School.
+Background:
+Captain Vasquez is a 15-year veteran of Naval Intelligence. She served with distinction in Operation Deep Water and led the tactical analysis team for the Eurus Conflict.
 
-OPERATIONAL HISTORY:
-- Operation PACIFIC SHIELD (2018): Signals intelligence collection, South China Sea
-- Operation CRIMSON TIDE (2020): Cyber defense coordination, classified location
-- Operation IRON FORTRESS (2023): Joint intelligence fusion, NATO partners
+Skills:
+- Cryptography
+- Signal Intelligence (SIGINT)
+- Underwater Demolitions (BUDS qual)
 
-CURRENT PROJECT ASSIGNMENTS:
-1. Project NEXUS - Liaison Officer
-2. Project OBSIDIAN - Analyst Support
-3. INDOPACOM Intelligence Sharing Initiative - Lead Coordinator
+Notes:
+Captain Vasquez is currently coordinating with Project NEXUS regarding maritime security protocols. She has expressed concerns about the latency in the satellite uplink for the new drone fleet.
 
-MEDICAL STATUS: Fit for duty. Last physical: October 2025.
-SECURITY REVIEW: Passed polygraph - November 2025.
-
-SUPERVISOR NOTES:
-Captain Vasquez demonstrates exceptional analytical capabilities and leadership. Recommended for promotion to Flag rank within 18 months. She has established critical relationships with allied intelligence services in Japan, Australia, and South Korea.
-
-NEXT REVIEW DATE: April 2026
+Status: ACTIVE
+Location: USS Gerald R. Ford
