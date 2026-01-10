@@ -1,5 +1,7 @@
 package com.jreinhal.mercenary;
 
+import com.jreinhal.mercenary.vector.LocalMongoVectorStore;
+
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.MongoDBAtlasVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -23,12 +25,10 @@ public class MercenaryApplication {
 	public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel,
 			@org.springframework.beans.factory.annotation.Value("${app.auth-mode:DEV}") String authMode) {
 
-		// If we are in CAC (GovCloud) or DEV mode locally, we use our custom OFF-GRID
-		// store.
-		// THIS ENSURES DATA PERSISTS to local Mongo, but searches run in Java (No Atlas
-		// needed).
+		// If we are in CAC (GovCloud) or DEV mode locally, use LocalMongoVectorStore.
+		// This provides persistence without requiring MongoDB Atlas Search ($vectorSearch).
 		if ("CAC".equalsIgnoreCase(authMode) || "DEV".equalsIgnoreCase(authMode)) {
-			return new com.jreinhal.mercenary.vector.LocalMongoVectorStore(mongoTemplate, embeddingModel);
+			return new LocalMongoVectorStore(mongoTemplate, embeddingModel);
 		}
 
 		// Explicitly configure the store config

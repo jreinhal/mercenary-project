@@ -16,7 +16,7 @@ import org.springframework.data.annotation.Id;
 
 /**
  * A custom VectorStore implementation for LOCAL, AIR-GAPPED deployments.
- * 
+ *
  * DESIGN:
  * 1. PERSISTENCE: Stores documents in a local MongoDB collection
  * ("vector_store").
@@ -24,7 +24,7 @@ import org.springframework.data.annotation.Id;
  * - Fetches all docs from Mongo (or caches them).
  * - Calculates distance to query vector.
  * - Returns top K.
- * 
+ *
  * WHY?
  * - Avoids dependency on MongoDB Atlas Search (Cloud).
  * - Avoids "In-Memory" data loss on restart.
@@ -95,7 +95,7 @@ public class LocalMongoVectorStore implements VectorStore {
 
         // 2. Fetch ALL candidates (Mapping to MongoDocument)
         List<MongoDocument> allDocs = mongoTemplate.findAll(MongoDocument.class, COLLECTION_NAME);
-        log.error("DEBUG DB DUMP: Total Docs Found: {}", allDocs.size());
+        log.debug("Total documents found in vector store: {}", allDocs.size());
 
         // 3. Score and Map back to Spring AI Document
         return allDocs.stream()
@@ -122,10 +122,6 @@ public class LocalMongoVectorStore implements VectorStore {
                 })
                 .map(md -> {
                     Document doc = new Document(md.getId(), md.getContent(), md.getMetadata());
-                    // We don't necessarily need to set embedding back on the result doc for
-                    // display,
-                    // but it's good practice? Actually Document constructor doesn't take embedding.
-                    // But we calculate score using md.embedding.
                     return new ScoredDocument(doc, calculateCosineSimilarity(queryEmbedding, md.getEmbedding()));
                 })
                 .filter(scored -> scored.score >= threshold)

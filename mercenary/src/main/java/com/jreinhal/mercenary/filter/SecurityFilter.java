@@ -37,8 +37,7 @@ public class SecurityFilter implements Filter {
             "/js/",
             "/favicon.ico",
             "/api/health",
-            "/api/status",
-            "/api/telemetry"
+            "/api/status"
     };
 
     public SecurityFilter(AuthenticationService authService, AuditService auditService) {

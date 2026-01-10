@@ -35,3 +35,15 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Logs ###
+*.log
+error.log
+
+### Sensitive/Test Data ###
+intercepted_comms.txt
+*_comms.txt
+*.credentials
+*.secret
+.env
+.env.*
