@@ -21,7 +21,7 @@ Sentinel is a Retrieval-Augmented Generation (RAG) platform designed for sensiti
 | **Citation Enforcement** | Every AI response anchored to source documents with clickable verification |
 | **Multi-Query Decomposition** | Compound queries ("What is X and what is Y") split into sub-queries for comprehensive retrieval |
 | **Hybrid Search** | Semantic vector search with automatic keyword fallback for enterprise-grade recall |
-| **Deep Storage Recovery** | Reconstruct document content from vector memory if source files are purged |
+| **Secure Document Caching** | Encrypted in-memory caching for secure document inspection |
 | **STIG-Aligned Audit Logging** | Every authentication, query, and access event persisted for compliance |
 
 ---
@@ -92,10 +92,9 @@ Unlike black-box AI systems, Sentinel exposes its complete reasoning pipeline vi
 
 | Step | Action |
 |------|--------|
-| 1. Query Analysis | Parse natural language query |
-| 2. Vector Search | Search sector with similarity threshold |
-| 3. Document Retrieval | Retrieve relevant chunks via HiFi-RAG |
-| 4. Response Synthesis | Apply ANALYZE → VERIFY → CITE protocol |
+| 1. Query Analysis | Detect compound queries and decompose if necessary |
+| 2. Hybrid Retrieval | Execute Semantic + Keyword Search in parallel (Merging results) |
+| 3. Response Synthesis | Apply ANALYZE → VERIFY → CITE protocol |
 
 **ANALYZE → VERIFY → CITE Protocol:**
 1. **ANALYZE** — Parse retrieved chunks, identify relevant facts
@@ -259,9 +258,9 @@ src/main/java/com/jreinhal/mercenary/
 ├── repository/       # MongoDB repositories
 └── service/
     ├── AuditService.java           # Compliance logging
-    ├── CacAuthenticationService.java  # CAC/PIV X.509 auth
-    ├── MemoryEvolutionService.java # Document merging
-    ├── MercenaryService.java       # Core RAG pipeline
+    ├── AuthenticationService.java  # Auth Logic
+    ├── QueryDecompositionService.java # Multi-Query Logic
+    ├── MercenaryController.java    # Core RAG pipeline
     └── SecureIngestionService.java # PII redaction + vectorization
 
 src/main/resources/
@@ -320,4 +319,4 @@ For deployment assistance, integration support, or enterprise licensing:
 
 ---
 
-*SENTINEL INTELLIGENCE PLATFORM — Powered by RAGPart & HyperGraph Memory*
+*SENTINEL INTELLIGENCE PLATFORM — Powered by Spring AI & MongoDB Vector Store*
