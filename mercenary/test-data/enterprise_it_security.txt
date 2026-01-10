@@ -1,0 +1,80 @@
+ENTERPRISE IT SECURITY POLICY
+Classification: CUI
+Department: ENTERPRISE
+Version: 3.2
+Effective Date: 2025-01-01
+CISO: Michael Thompson
+
+SECTION 1: ACCESS CONTROL
+
+1.1 Authentication Requirements
+- Multi-factor authentication required for all systems
+- Password minimum: 16 characters, complexity required
+- Biometric authentication for classified systems
+- Smart card/CAC required for government systems
+
+1.2 Authorization Levels
+Level 1 (Public): General information access
+Level 2 (CUI): Controlled unclassified information
+Level 3 (SECRET): Classified defense information
+Level 4 (TOP SECRET): Highest classification
+
+1.3 Account Management
+- Accounts provisioned within 24 hours of approval
+- Quarterly access reviews mandatory
+- Accounts disabled after 90 days of inactivity
+- Immediate termination for separated personnel
+
+SECTION 2: NETWORK SECURITY
+
+2.1 Firewall Configuration
+- Default deny all inbound connections
+- Whitelist-only approach for external access
+- Intrusion detection/prevention enabled
+- Traffic analysis and anomaly detection active
+
+2.2 Encryption Standards
+- TLS 1.3 minimum for all communications
+- AES-256 for data at rest
+- Hardware security modules for key management
+- Certificate-based authentication for services
+
+2.3 Network Segmentation
+- Air-gapped networks for classified operations
+- VLAN separation by department
+- Zero-trust architecture implementation in progress
+- Microsegmentation for critical assets
+
+SECTION 3: INCIDENT RESPONSE
+
+3.1 Classification
+- SEV1: Active breach, data exfiltration
+- SEV2: Attempted breach, malware detected
+- SEV3: Policy violation, suspicious activity
+- SEV4: Minor incident, informational
+
+3.2 Response Times
+- SEV1: Immediate response, 15-minute notification
+- SEV2: 1-hour response
+- SEV3: 4-hour response
+- SEV4: Next business day
+
+3.3 Reporting Chain
+Security Operations Center (SOC) -> CISO -> Executive Team -> Legal (if required)
+
+SECTION 4: COMPLIANCE
+
+4.1 Frameworks
+- NIST 800-53 (Government contracts)
+- ISO 27001 (Enterprise operations)
+- CMMC Level 3 (Defense contracts)
+- SOC 2 Type II (Commercial services)
+
+4.2 Audit Schedule
+- Internal audits: Quarterly
+- External audits: Annual
+- Penetration testing: Semi-annual
+- Vulnerability scanning: Continuous
+
+CONTACT: security@sentinel.internal
+EMERGENCY: SOC Hotline (24/7)

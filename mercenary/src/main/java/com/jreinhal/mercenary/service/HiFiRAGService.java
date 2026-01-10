@@ -8,7 +8,6 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,27 +17,27 @@ import java.util.stream.Collectors;
 
 /**
  * HiFi-RAG Service - Hierarchical Content Filtering RAG
- * 
- * Implementation based on: "HiFi-RAG: Hierarchical Content Filtering and 
+ *
+ * Implementation based on: "HiFi-RAG: Hierarchical Content Filtering and
  * Two-Pass Generation for Open-Domain RAG" (arXiv:2512.22442v1)
- * 
+ *
  * Key Innovation: Multi-stage pipeline that prioritizes precision in the context window.
  * Uses LLM-as-a-Reranker instead of pure embedding similarity.
- * 
+ *
  * Pipeline Stages:
  * 1. Query Formulation - Optimize query for retrieval
  * 2. Retrieval - Initial document retrieval
  * 3. Hierarchical Filtering - LLM-based section filtering
  * 4. Two-Pass Generation - Draft then refine
  * 5. Citation Verification - Post-hoc attribution check
- * 
- * From paper: "We abandon standard vector-similarity search in favor of a hierarchical 
- * filtering approach... ensuring the deep reasoning model receives only the most 
+ *
+ * From paper: "We abandon standard vector-similarity search in favor of a hierarchical
+ * filtering approach... ensuring the deep reasoning model receives only the most
  * salient information."
- * 
+ *
  * @author Implementation based on Nuengsigkapian, 2025
  */
-@Service
+// Bean configured in AdvancedRAGConfig - do not add @Service
 public class HiFiRAGService {
 
     private static final Logger log = LoggerFactory.getLogger(HiFiRAGService.class);

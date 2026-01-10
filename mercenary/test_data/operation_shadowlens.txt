@@ -1,0 +1,26 @@
+INTELLIGENCE REPORT - OPERATION SHADOW LENS
+REPORT NUMBER: IR-2026-0147
+DATE: January 5, 2026
+CLASSIFICATION: TOP SECRET // ORCON
+
+EXECUTIVE SUMMARY:
+Human intelligence sources have confirmed that a foreign adversary is actively targeting members of Project NEXUS for recruitment. Three attempted approaches have been documented in the past 90 days.
+
+DETAILS:
+On December 12, 2025, Dr. Marcus Webb (Technical Lead, Project NEXUS) reported an unsolicited contact via LinkedIn from an individual claiming to represent a European technology consulting firm. Counterintelligence investigation revealed the firm is a known front for foreign intelligence services.
+
+On December 28, 2025, a suspicious vehicle was observed conducting surveillance near the residence of Captain Elena Vasquez. License plate traced to a rental agency; renter used fraudulent identification.
+
+On January 3, 2026, Director Sarah Chen received an encrypted email containing a phishing link. Analysis by Cyber Command confirmed the malware signature matches known APT-29 tooling.
+
+ASSESSMENT:
+Foreign intelligence services have likely obtained a partial roster of Project NEXUS personnel. The source of the leak is under investigation. All project members have been briefed on enhanced security protocols.
+
+RECOMMENDATIONS:
+1. Increase counterintelligence briefings to monthly
+2. Implement additional communications security measures
+3. Consider relocating key personnel to secure facilities
+4. Coordinate with FBI for domestic counterintelligence support
+
+PREPARED BY: Intelligence Analyst First Class Robert Kim
+APPROVED BY: Deputy Director, National Counterintelligence Center

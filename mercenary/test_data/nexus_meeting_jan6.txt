@@ -1,0 +1,46 @@
+MEETING MINUTES - PROJECT NEXUS WEEKLY SYNC
+DATE: January 6, 2026
+TIME: 1400-1500 EST
+LOCATION: Site ECHO, Conference Room B (SCIF)
+CLASSIFICATION: SECRET
+
+ATTENDEES:
+- Director Sarah Chen (Chair)
+- Dr. Marcus Webb
+- Captain Elena Vasquez  
+- Angela Foster (IT Security)
+- Robert Kim (Intelligence Analyst)
+- Thomas Reid (Facility Manager, partial)
+
+AGENDA:
+
+1. SECURITY BRIEFING (Robert Kim)
+   - Reviewed Operation SHADOW LENS findings
+   - All personnel reminded to report suspicious contacts immediately
+   - New encrypted communication protocols effective January 15
+
+2. PHASE 2 STATUS UPDATE (Dr. Marcus Webb)
+   - Algorithm integration 73% complete
+   - Raytheon contractor team fully onboarded as of January 2
+   - Testing environment validated; production deployment targeted for February
+
+3. LIAISON REPORT (Captain Vasquez)
+   - Australian partners confirmed data sharing agreement extension
+   - Japanese Maritime Self-Defense Force requesting expanded SIGINT access
+   - Meeting with South Korean NIS scheduled for January 20
+
+4. FACILITY ISSUES (Thomas Reid)
+   - Loading dock camera installation scheduled for January 12
+   - HVAC maintenance window: January 18-19 (overnight only)
+
+5. BUDGET UPDATE (Director Chen)
+   - Q4 underspend approved for carryover
+   - Additional $1.2M requested for enhanced cybersecurity measures
+
+ACTION ITEMS:
+- Dr. Webb: Provide Phase 2 risk assessment by January 10
+- Capt. Vasquez: Draft proposal for Japanese SIGINT access expansion
+- Angela Foster: Complete MFA implementation for contractors by January 20
+- All: Complete annual security training by January 31
+
+NEXT MEETING: January 13, 2026, 1400 EST

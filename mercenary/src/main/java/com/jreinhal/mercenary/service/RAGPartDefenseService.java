@@ -4,7 +4,6 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,23 +12,23 @@ import java.util.stream.Collectors;
 
 /**
  * RAGPart Defense Service
- * 
- * Implementation based on: "RAGPart & RAGMask: Retrieval-Stage Defenses Against 
+ *
+ * Implementation based on: "RAGPart & RAGMask: Retrieval-Stage Defenses Against
  * Corpus Poisoning in Retrieval-Augmented Generation" (arXiv:2512.24268v1)
- * 
+ *
  * RAGPart leverages the inherent training dynamics of dense retrievers, exploiting
  * document partitioning to mitigate the effect of poisoned content. By averaging
  * embeddings of different fragment combinations, poisoned fragments are diluted.
- * 
+ *
  * Key Algorithm:
  * 1. Partition each document into N fragments
  * 2. Embed each fragment separately
  * 3. Form combinations of k fragments and average their embeddings
  * 4. Retrieve from multiple combinations and aggregate via voting
- * 
+ *
  * @author Implementation based on Pathmanathan et al., 2025
  */
-@Service
+// Bean configured in AdvancedRAGConfig - do not add @Service
 public class RAGPartDefenseService {
 
     private static final Logger log = LoggerFactory.getLogger(RAGPartDefenseService.class);

@@ -5,7 +5,6 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
-import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,23 +15,23 @@ import java.util.stream.Collectors;
 
 /**
  * HGMem - Hypergraph-based Memory Service
- * 
- * Implementation based on: "Improving Multi-Step RAG with Hypergraph Based Memory 
+ *
+ * Implementation based on: "Improving Multi-Step RAG with Hypergraph Based Memory
  * for Long-Context Complex Relational Modeling" (arXiv:2512.23959v2)
- * 
- * Key Innovation: Memory is represented as a hypergraph where hyperedges correspond 
+ *
+ * Key Innovation: Memory is represented as a hypergraph where hyperedges correspond
  * to distinct memory units, enabling progressive formation of higher-order interactions.
  * Unlike regular graphs where edges connect 2 nodes, hyperedges can connect N nodes,
  * enabling n-ary relationship modeling.
- * 
+ *
  * Operations:
  * - UPDATE: Revise descriptions of existing memory points
  * - INSERT: Add new memory points (hyperedges)
  * - MERGE: Combine related memory points into higher-order correlations
- * 
+ *
  * @author Implementation based on Zhou et al., 2026
  */
-@Service
+// Bean configured in AdvancedRAGConfig - do not add @Service
 public class HyperGraphMemoryService {
 
     private static final Logger log = LoggerFactory.getLogger(HyperGraphMemoryService.class);

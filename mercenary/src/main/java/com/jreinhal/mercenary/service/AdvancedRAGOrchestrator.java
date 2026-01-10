@@ -5,7 +5,6 @@ import com.jreinhal.mercenary.model.User;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,28 +14,28 @@ import java.util.stream.Collectors;
 
 /**
  * Advanced RAG Orchestrator
- * 
+ *
  * Integrates three cutting-edge RAG research implementations:
- * 
+ *
  * 1. RAGPart Defense (arXiv:2512.24268v1)
  *    - Document partitioning for corpus poisoning defense
  *    - RAGMask suspicious token detection
- *    
+ *
  * 2. HGMem - HyperGraph Memory (arXiv:2512.23959v2)
  *    - Hypergraph-based working memory
  *    - Higher-order correlation modeling
  *    - Multi-step reasoning with memory evolution
- *    
+ *
  * 3. HiFi-RAG (arXiv:2512.22442v1)
  *    - Hierarchical content filtering
  *    - LLM-as-a-Reranker
  *    - Two-pass generation (draft + refine)
  *    - Citation verification
- * 
+ *
  * This orchestrator provides a unified interface that intelligently
  * selects and combines these techniques based on query complexity.
  */
-@Service
+// Bean configured in AdvancedRAGConfig - do not add @Service
 public class AdvancedRAGOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(AdvancedRAGOrchestrator.class);
