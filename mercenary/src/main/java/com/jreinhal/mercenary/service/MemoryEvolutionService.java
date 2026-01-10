@@ -37,7 +37,7 @@ public class MemoryEvolutionService {
             // 1. Search for existing ACTIVE documents that are similar
             // NOTE: SimpleVectorStore does NOT support metadata filtering in this version.
             // We must perform the search WITHOUT the filter, and then filter in memory (Java).
-            
+
             List<Document> similarDocs = vectorStore.similaritySearch(
                     SearchRequest.query(newDoc.getContent())
                             .withTopK(5) // Fetch more to allow for post-filtering
