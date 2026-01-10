@@ -44,6 +44,34 @@ app:
   auth-mode: ${AUTH_MODE:DEV}
 
 # ============================================
+# SENTINEL Advanced RAG Configuration
+# Based on cutting-edge research papers
+# ============================================
+sentinel:
+  # RAGPart Defense (arXiv:2512.24268v1)
+  # Corpus poisoning defense via document partitioning
+  ragpart:
+    enabled: ${RAGPART_ENABLED:true}
+    partitions: ${RAGPART_PARTITIONS:4}
+    combination-size: ${RAGPART_COMBINATION_SIZE:3}
+    suspicion-threshold: ${RAGPART_SUSPICION_THRESHOLD:0.4}
+
+  # HGMem - HyperGraph Memory (arXiv:2512.23959v2)
+  # Multi-step RAG with complex relational modeling
+  hgmem:
+    enabled: ${HGMEM_ENABLED:true}
+    max-memory-points: ${HGMEM_MAX_POINTS:50}
+    merge-similarity-threshold: ${HGMEM_MERGE_THRESHOLD:0.7}
+
+  # HiFi-RAG Pipeline (arXiv:2512.22442v1)
+  # Hierarchical filtering + two-pass generation
+  hifirag:
+    enabled: ${HIFIRAG_ENABLED:true}
+    initial-retrieval-k: ${HIFIRAG_INITIAL_K:20}
+    filtered-top-k: ${HIFIRAG_FILTERED_K:5}
+    relevance-threshold: ${HIFIRAG_RELEVANCE_THRESHOLD:0.5}
+
+# ============================================
 # Profile-specific configurations
 # ============================================
 
