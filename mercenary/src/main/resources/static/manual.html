@@ -1,21 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>SENTINEL // OPERATOR MANUAL</title>
     <style>
         :root {
             /* PALETTE: Matches Index.html */
-            --bg-color: #0f172a;       /* Deep Slate Blue */
-            --panel-bg: #1e293b;       /* Lighter Slate */
-            --border-color: #334155;   /* Border Grey */
+            --bg-color: #0f172a;
+            /* Deep Slate Blue */
+            --panel-bg: #1e293b;
+            /* Lighter Slate */
+            --border-color: #334155;
+            /* Border Grey */
 
-            --text-primary: #f8fafc;   /* Off-White */
-            --text-secondary: #94a3b8; /* Dim Grey */
+            --text-primary: #f8fafc;
+            /* Off-White */
+            --text-secondary: #94a3b8;
+            /* Dim Grey */
 
-            --accent-primary: #38bdf8; /* Tactical Blue */
-            --alert: #ef4444;          /* Red */
-            --success: #10b981;        /* Green */
+            --accent-primary: #38bdf8;
+            /* Tactical Blue */
+            --alert: #ef4444;
+            /* Red */
+            --success: #10b981;
+            /* Green */
 
             --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             --font-mono: 'JetBrains Mono', 'Consolas', monospace;
@@ -37,7 +46,12 @@
         }
 
         /* TYPOGRAPHY */
-        h1, h2, h3 { color: var(--text-primary); margin-top: 40px; }
+        h1,
+        h2,
+        h3 {
+            color: var(--text-primary);
+            margin-top: 40px;
+        }
 
         h1 {
             border-bottom: 2px solid var(--accent-primary);
@@ -61,8 +75,15 @@
             margin-bottom: 10px;
         }
 
-        p, li { font-size: 15px; color: #cbd5e1; }
-        strong { color: var(--text-primary); }
+        p,
+        li {
+            font-size: 15px;
+            color: #cbd5e1;
+        }
+
+        strong {
+            color: var(--text-primary);
+        }
 
         /* NAVIGATION */
         .nav-link {
@@ -81,6 +102,7 @@
             border: 1px solid rgba(56, 189, 248, 0.2);
             transition: 0.2s;
         }
+
         .nav-link:hover {
             background: rgba(56, 189, 248, 0.2);
         }
@@ -95,6 +117,7 @@
             text-align: center;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+
         .screenshot-box img {
             max-width: 100%;
             height: auto;
@@ -103,6 +126,7 @@
             margin: 0 auto;
             border: 1px solid #000;
         }
+
         .caption {
             font-family: var(--font-mono);
             font-size: 11px;
@@ -115,7 +139,7 @@
 
         /* CODE SNIPPETS */
         code {
-            background: rgba(0,0,0,0.3);
+            background: rgba(0, 0, 0, 0.3);
             padding: 2px 6px;
             border-radius: 4px;
             font-family: var(--font-mono);
@@ -125,62 +149,105 @@
         }
     </style>
 </head>
+
 <body>
 
-<div class="container">
-    <a href="index.html" class="nav-link">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-        RETURN TO DASHBOARD
-    </a>
+    <div class="container">
+        <a href="index.html" class="nav-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            RETURN TO DASHBOARD
+        </a>
 
-    <h1>SENTINEL // OPERATOR FIELD GUIDE</h1>
-    <p><strong>Version:</strong> 1.0.0 | <strong>Clearance Level:</strong> UNCLASSIFIED</p>
-    <p>This manual details the standard operating procedures for the Sentinel Intelligence Platform. Follow these protocols to ensure secure data ingestion and accurate intelligence retrieval.</p>
+        <h1>SENTINEL // OPERATOR FIELD GUIDE</h1>
+        <p><strong>Version:</strong> 1.0.0 | <strong>Clearance Level:</strong> UNCLASSIFIED</p>
+        <p>This manual details the standard operating procedures for the Sentinel Intelligence Platform. Follow these
+            protocols to ensure secure data ingestion and accurate intelligence retrieval.</p>
 
-    <h2>1. System Overview</h2>
-    <p>The Sentinel Dashboard allows for real-time interaction with the secure Hypergraph backend. The interface is divided into two primary zones: <strong>Ingestion (Left Panel)</strong> and <strong>Intelligence (Right Panel)</strong>.</p>
+        <h2>1. System Overview</h2>
+        <p>The Sentinel Dashboard allows for real-time interaction with the secure Hypergraph backend. The interface is
+            divided into two primary zones: <strong>Ingestion (Left Panel)</strong> and <strong>Intelligence (Right
+                Panel)</strong>.</p>
 
-    <div class="screenshot-box">
-        <img src="images/manual_overview.png" alt="Sentinel Dashboard Overview" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'padding:40px; color:#666; font-family:monospace\'>[IMAGE MISSING: src/main/resources/static/images/manual_overview.png]</div>'">
-        <span class="caption">Fig 1.0: The Sentinel Command Dashboard</span>
+        <div class="screenshot-box">
+            <img src="images/manual_overview.png" alt="Sentinel Dashboard Overview"
+                onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'padding:40px; color:#666; font-family:monospace\'>[IMAGE MISSING: src/main/resources/static/images/manual_overview.png]</div>'">
+            <span class="caption">Fig 1.0: The Sentinel Command Dashboard</span>
+        </div>
+
+        <h2>2. Secure Ingestion Protocol</h2>
+        <p>To analyze documents (PDF, TXT, MD), they must first be securely ingested into the vector vault.</p>
+        <ol>
+            <li>Select the <strong>Target Sector Protocol</strong> from the dropdown menu (e.g., <code>DEFENSE</code>,
+                <code>LEGAL</code>). This adjusts the AI's analytical persona.</li>
+            <li>Click the <strong>UPLOAD DOSSIER</strong> zone (or drag-and-drop a file).</li>
+            <li>Wait for the status indicator to switch from <span
+                    style="color:var(--accent-primary)">UPLOADING...</span> to <span
+                    style="color:var(--success)">READY</span>.</li>
+        </ol>
+
+        <div class="screenshot-box">
+            <img src="images/manual_upload.png" alt="Ingestion Sidebar" style="max-width: 300px;"
+                onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'padding:40px; color:#666; font-family:monospace\'>[IMAGE MISSING: src/main/resources/static/images/manual_upload.png]</div>'">
+            <span class="caption">Fig 2.0: Secure Ingestion Panel & Sector Selector</span>
+        </div>
+
+        <h2>3. Intelligence Gathering</h2>
+        <p>Once data is ingested, use the chat interface to query the system.</p>
+        <ul>
+            <li><strong>Context Aware:</strong> The AI will answer based <em>strictly</em> on the uploaded documents in
+                the Hypergraph.</li>
+            <li><strong>Live Status:</strong> The <span style="color:var(--success)">SYSTEM SECURE</span> badge will
+                turn <span style="color:var(--accent-primary)">BLUE</span> while the system is reasoning.</li>
+            <li><strong>Security Failsafe:</strong> Queries asking for sensitive credentials (e.g., passwords, keys)
+                will trigger the <code style="color:var(--alert)">UNAUTHORIZED</code> response protocol.</li>
+        </ul>
+
+        <h2>4. Evidence Verification</h2>
+        <p>Sentinel enforces strict auditability. Every fact generated by the AI is anchored to a specific source
+            document.</p>
+        <ul>
+            <li><strong>Citation Badges:</strong> Click any blue citation badge (e.g., <code>[project_alpha.pdf]</code>)
+                in the response stream.</li>
+            <li><strong>Evidence Viewer:</strong> This opens the source document in the right-hand panel.</li>
+            <li><strong>Contextual Highlighting:</strong> The system automatically <span
+                    style="background:rgba(59, 130, 246, 0.25); color:#38bdf8; padding:2px 4px; border-radius:4px;">highlights
+                    in blue</span> the specific passage used to generate the answer.</li>
+        </ul>
+
+        <div class="screenshot-box">
+            <div
+                style="padding:40px; border:2px dashed #334155; color:#94a3b8; font-family:var(--font-mono); font-size:12px;">
+                [EVIDENCE VIEWER SCREENSHOT PLACEHOLDER]
+            </div>
+            <span class="caption">Fig 3.0: Audit Trail & Source Highlighting</span>
+        </div>
+
+        <h2>5. Troubleshooting</h2>
+        <p>If the <strong style="color:var(--alert)">CONNECTION LOST</strong> alert appears in the log, the system has
+            lost contact with the Neural Core.</p>
+
+        <h3>Common Resolution Protocols</h3>
+        <ul>
+            <li><strong>Restart the Application:</strong> Close the Sentinel Dashboard window and relaunch the
+                executable. This re-initializes the background services.</li>
+            <li><strong>Check File Integrity:</strong> Ensure uploaded documents are standard text-based formats (PDF,
+                DOCX, TXT) and are not password-protected.</li>
+            <li><strong>System Resources:</strong> The AI requires significant memory. Close other heavy applications to
+                free up resources for the reasoning engine.</li>
+        </ul>
+
+        <div
+            style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 15px; border-radius: 6px; margin-top: 20px;">
+            <strong style="color:var(--alert); font-size: 12px; letter-spacing: 1px;">CRITICAL ERROR SUPPORT</strong>
+            <p style="margin: 5px 0 0 0; font-size: 13px;">If issues persist, generate a system log and contact your
+                Deployment Specialist or Enterprise Support.</p>
+        </div>
     </div>
-
-    <h2>2. Secure Ingestion Protocol</h2>
-    <p>To analyze documents (PDF, TXT, MD), they must first be securely ingested into the vector vault.</p>
-    <ol>
-        <li>Select the <strong>Target Sector Protocol</strong> from the dropdown menu (e.g., <code>DEFENSE</code>, <code>LEGAL</code>). This adjusts the AI's analytical persona.</li>
-        <li>Click the <strong>UPLOAD DOSSIER</strong> zone (or drag-and-drop a file).</li>
-        <li>Wait for the status indicator to switch from <span style="color:var(--accent-primary)">UPLOADING...</span> to <span style="color:var(--success)">READY</span>.</li>
-    </ol>
-
-    <div class="screenshot-box">
-        <img src="images/manual_upload.png" alt="Ingestion Sidebar" style="max-width: 300px;" onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\'padding:40px; color:#666; font-family:monospace\'>[IMAGE MISSING: src/main/resources/static/images/manual_upload.png]</div>'">
-        <span class="caption">Fig 2.0: Secure Ingestion Panel & Sector Selector</span>
-    </div>
-
-    <h2>3. Intelligence Gathering</h2>
-    <p>Once data is ingested, use the chat interface to query the system.</p>
-    <ul>
-        <li><strong>Context Aware:</strong> The AI will answer based <em>strictly</em> on the uploaded documents in the Hypergraph.</li>
-        <li><strong>Live Status:</strong> The <span style="color:var(--success)">SYSTEM SECURE</span> badge will turn <span style="color:var(--accent-primary)">BLUE</span> while the system is reasoning.</li>
-        <li><strong>Security Failsafe:</strong> Queries asking for sensitive credentials (e.g., passwords, keys) will trigger the <code style="color:var(--alert)">UNAUTHORIZED</code> response protocol.</li>
-    </ul>
-
-    <h2>4. Troubleshooting</h2>
-    <p>If the <strong style="color:var(--alert)">CONNECTION LOST</strong> alert appears in the log, the system has lost contact with the Neural Core.</p>
-
-    <h3>Common Resolution Protocols</h3>
-    <ul>
-        <li><strong>Restart the Application:</strong> Close the Sentinel Dashboard window and relaunch the executable. This re-initializes the background services.</li>
-        <li><strong>Check File Integrity:</strong> Ensure uploaded documents are standard text-based formats (PDF, DOCX, TXT) and are not password-protected.</li>
-        <li><strong>System Resources:</strong> The AI requires significant memory. Close other heavy applications to free up resources for the reasoning engine.</li>
-    </ul>
-
-    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 15px; border-radius: 6px; margin-top: 20px;">
-        <strong style="color:var(--alert); font-size: 12px; letter-spacing: 1px;">CRITICAL ERROR SUPPORT</strong>
-        <p style="margin: 5px 0 0 0; font-size: 13px;">If issues persist, generate a system log and contact your Deployment Specialist or Enterprise Support.</p>
-    </div>
-</div>
 
 </body>
+
 </html>

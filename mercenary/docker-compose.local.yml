@@ -1,0 +1,65 @@
+# Air-Gapped Deployment Configuration
+# For government/classified environments without internet access
+#
+# Usage:
+#   docker-compose -f docker-compose.local.yml up -d
+#
+# This configuration:
+#   - Runs MongoDB locally (no cloud dependency)
+#   - Uses local Ollama for AI inference
+#   - Enables CAC/PIV authentication mode
+#   - All data stays on-premises
+
+services:
+  # Local MongoDB for air-gapped environments
+  mongodb:
+    image: mongo:7
+    container_name: sentinel-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongo:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=mercenary
+    networks:
+      - sentinel-network
+    restart: unless-stopped
+
+  # Local Ollama for AI inference (no internet required)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sentinel-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama:/root/.ollama
+    networks:
+      - sentinel-network
+    restart: unless-stopped
+    # Pre-load models before going air-gapped:
+    # docker exec sentinel-ollama ollama pull llama3
+    # docker exec sentinel-ollama ollama pull nomic-embed-text
+
+  # SENTINEL Intelligence Platform
+  sentinel:
+    build: .
+    container_name: sentinel-app
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_PROFILE=govcloud
+      - AUTH_MODE=CAC
+      - MONGODB_URI=mongodb://mongodb:27017/mercenary
+      - OLLAMA_URL=http://ollama:11434
+      - LLM_MODEL=llama3
+      - EMBEDDING_MODEL=nomic-embed-text
+    depends_on:
+      - mongodb
+      - ollama
+    networks:
+      - sentinel-network
+    restart: unless-stopped
+
+networks:
+  sentinel-network:
+    driver: bridge

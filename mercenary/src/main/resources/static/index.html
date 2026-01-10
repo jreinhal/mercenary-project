@@ -366,28 +366,15 @@
             border-radius: 1px;
         }
 
-        .classification-badge {
+        .sector-badge {
             font-size: 9px;
             font-weight: 700;
             padding: 2px 6px;
             border-radius: 3px;
             text-transform: uppercase;
             letter-spacing: 0.3px;
-        }
-
-        .classification-badge.confidential {
-            background: var(--warning-muted);
-            color: var(--warning);
-        }
-
-        .classification-badge.secret {
-            background: var(--error-muted);
-            color: var(--error);
-        }
-
-        .classification-badge.internal {
-            background: rgba(99, 102, 241, 0.15);
-            color: #818cf8;
+            background: var(--accent-muted);
+            color: var(--accent-primary);
         }
 
         /* Chat Messages Container */
@@ -1605,17 +1592,9 @@
                 <span>Operator:</span>
                 <strong id="operator-id">DEMO_USER</strong>
             </div>
-            <div class="classification-badge confidential" id="clearance-badge">CONFIDENTIAL</div>
         </div>
 
         <div class="header-right">
-            <button class="icon-btn" onclick="toggleSidebar()" title="Control Panel">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="12" x2="21" y2="12" />
-                    <line x1="3" y1="6" x2="21" y2="6" />
-                    <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
-            </button>
             <div class="status-pill online" id="system-status">
                 <span class="dot"></span>
                 <span>System Online</span>
@@ -1656,6 +1635,15 @@
         <!-- Left Panel: Chat Interface -->
         <div class="chat-panel">
             <div class="chat-header">
+                <div class="chat-controls">
+                    <button class="icon-btn" onclick="toggleSidebar()" title="Control Panel">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </button>
+                </div>
                 <div class="chat-title">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -1811,7 +1799,6 @@
                                 <span class="value" id="source-type">-</span>
                             </div>
                         </div>
-                        <div class="classification-badge confidential" id="source-classification">CONFIDENTIAL</div>
                     </div>
                     <div class="source-viewer" id="source-viewer">
                         Loading document content...
@@ -1890,19 +1877,6 @@
             sectorSelect.addEventListener('change', (e) => {
                 const sector = e.target.value;
                 document.getElementById('active-sector').textContent = sector;
-
-                // Update clearance badge based on sector
-                const clearanceBadge = document.getElementById('clearance-badge');
-                const clearanceMap = {
-                    'DEFENSE': { text: 'TOP SECRET', class: 'secret' },
-                    'LEGAL': { text: 'CONFIDENTIAL', class: 'confidential' },
-                    'MEDICAL': { text: 'HIPAA', class: 'confidential' },
-                    'FINANCE': { text: 'SOX COMPLIANT', class: 'internal' },
-                    'ENTERPRISE': { text: 'INTERNAL', class: 'internal' }
-                };
-                const config = clearanceMap[sector] || { text: 'CLASSIFIED', class: 'confidential' };
-                clearanceBadge.textContent = config.text;
-                clearanceBadge.className = `classification-badge ${config.class}`;
             });
         }
 
@@ -2034,21 +2008,13 @@
 
             docsContainer.innerHTML = '';
             state.contextDocs.forEach((data, filename) => {
-                const classMap = {
-                    'DEFENSE': 'secret',
-                    'LEGAL': 'confidential',
-                    'MEDICAL': 'confidential',
-                    'FINANCE': 'internal',
-                    'ENTERPRISE': 'internal'
-                };
-
                 const docEl = document.createElement('div');
                 docEl.className = `context-doc ${data.active ? 'active' : ''}`;
                 docEl.onclick = () => toggleContextDoc(filename);
                 docEl.innerHTML = `
                 <span class="toggle"></span>
                 <span>${filename}</span>
-                <span class="classification-badge ${classMap[data.sector] || 'confidential'}">${data.sector}</span>
+                <span class="sector-badge">${data.sector}</span>
             `;
                 docsContainer.appendChild(docEl);
             });
@@ -2114,9 +2080,11 @@
             div.className = 'message assistant';
             div.id = msgId;
 
-            // Process citations in text
+            // Process citations in text (handles both [file.ext] and `file.ext` formats)
             const processedText = processCitations(text);
-            const citationCount = (text.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || []).length;
+            const bracketCitations = (text.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || []);
+            const backtickCitations = (text.match(/`([^`]+\.(pdf|txt|md))`/gi) || []);
+            const citationCount = bracketCitations.length + backtickCitations.length;
             const confidence = Math.floor(75 + Math.random() * 20);
             const confClass = confidence >= 85 ? 'high' : confidence >= 70 ? 'medium' : 'low';
 
@@ -2156,7 +2124,7 @@
                         </svg>
                         SENTINEL Response
                     </div>
-                    <span class="classification-badge confidential">${sectorSelect.value}</span>
+                    <span class="sector-badge">${sectorSelect.value}</span>
                 </div>
                 <div class="response-body">${processedText}</div>
                 <div class="response-footer">
@@ -2195,7 +2163,8 @@
         }
 
         function processCitations(text) {
-            return text.replace(/\[([^\]]+\.(pdf|txt|md))\]/gi, (match, filename) => {
+            // First, handle standard square bracket format: [filename.ext]
+            let result = text.replace(/\[([^\]]+\.(pdf|txt|md))\]/gi, (match, filename) => {
                 return `<span class="citation" onclick="openSource('${escapeHtml(filename)}')" title="View source">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -2204,6 +2173,19 @@
                 ${escapeHtml(filename)}
             </span>`;
             });
+
+            // Also handle backtick format: `filename.ext` (fallback for non-compliant LLM responses)
+            result = result.replace(/`([^`]+\.(pdf|txt|md))`/gi, (match, filename) => {
+                return `<span class="citation" onclick="openSource('${escapeHtml(filename)}')" title="View source">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                ${escapeHtml(filename)}
+            </span>`;
+            });
+
+            return result;
         }
 
         function toggleReasoning(btn) {
@@ -2314,11 +2296,15 @@
             viewer.textContent = 'Loading document content...';
 
             try {
-                const res = await fetch(`${API_BASE}/inspect?fileName=${encodeURIComponent(filename)}`);
-                const content = await res.text();
+                // Pass current query to get relevant highlights
+                const currentQuery = queryInput.value.trim() || document.querySelector('.message.user:last-child .message-bubble')?.innerText || '';
+                const res = await fetch(`${API_BASE}/inspect?fileName=${encodeURIComponent(filename)}&query=${encodeURIComponent(currentQuery)}`);
 
-                // Parse and highlight relevant sections
-                viewer.innerHTML = formatSourceContent(content);
+                // Handle JSON response
+                const data = await res.json();
+
+                // Format content with returned highlights
+                viewer.innerHTML = formatSourceContent(data.content, data.highlights);
 
             } catch (error) {
                 viewer.textContent = 'Error loading document: ' + error.message;
@@ -2330,8 +2316,10 @@
             });
         }
 
-        function formatSourceContent(content) {
-            // Add highlight to the main content section
+        function formatSourceContent(content, highlights = []) {
+            // Normalize highlights for easier matching
+            const normalizedHighlights = highlights.map(h => h.trim());
+
             const lines = content.split('\n');
             let inContent = false;
             let result = [];
@@ -2344,8 +2332,10 @@
                 }
 
                 if (inContent && line.trim()) {
-                    // Highlight the first substantial paragraph as the "relevant" section
-                    if (result.filter(r => r.includes('highlight')).length === 0 && line.length > 50) {
+                    // Check if this line is in the highlights list
+                    const isHighlight = normalizedHighlights.some(h => line.includes(h) || h.includes(line.trim()));
+
+                    if (isHighlight) {
                         result.push(`<div class="highlight">${escapeHtml(line)}</div>`);
                     } else {
                         result.push(escapeHtml(line));

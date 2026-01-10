@@ -1,6 +1,8 @@
 spring:
   application:
     name: mercenary-ai
+  profiles:
+    active: ${APP_PROFILE:dev}
 
   # --- THE BAN HAMMER ---
   # This tells Spring: "Do NOT load your default MongoDB Vector Store logic. I have my own."
@@ -9,21 +11,22 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb+srv://Jreinhal:Mercenary2025@cluster0.peocz7g.mongodb.net/mercenary
+      # SECURE DEFAULT: Localhost (No Auth)
+      # PRODUCTION GUIDANCE: Overwrite MONGODB_URI env var with secure connection string
+      uri: ${MONGODB_URI:mongodb://localhost:27017/mercenary}
   servlet:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
   ai:
     ollama:
-      base-url: http://localhost:11434
+      base-url: ${OLLAMA_URL:http://localhost:11434}
       chat:
         options:
-          model: llama3
+          model: ${LLM_MODEL:llama3}
           temperature: 0.7
       embedding:
-        model: nomic-embed-text
-    # We leave these settings here for reference, but your Java code now handles the connection
+        model: ${EMBEDDING_MODEL:nomic-embed-text}
     vectorstore:
       mongodb:
         atlas:
@@ -32,6 +35,50 @@ spring:
           path-name: embedding
           index-name: vector_index
 
+# ============================================
 # Custom App Config
+# ============================================
 app:
   db-init: true
+  # Authentication mode: DEV, OIDC, or CAC
+  auth-mode: ${AUTH_MODE:DEV}
+
+# ============================================
+# Profile-specific configurations
+# ============================================
+
+---
+# DEVELOPMENT PROFILE (default)
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+app:
+  auth-mode: DEV
+
+---
+# ENTERPRISE PROFILE (Azure AD / Okta)
+spring:
+  config:
+    activate:
+      on-profile: enterprise
+
+app:
+  auth-mode: OIDC
+  oidc:
+    issuer: ${OIDC_ISSUER}
+    client-id: ${OIDC_CLIENT_ID}
+
+---
+# GOVERNMENT/GOVCLOUD PROFILE (CAC/PIV)
+spring:
+  config:
+    activate:
+      on-profile: govcloud
+
+app:
+  auth-mode: CAC
+
+# For air-gapped deployments, override MongoDB URI:
+# MONGODB_URI=mongodb://localhost:27017/mercenary

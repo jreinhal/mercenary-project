@@ -15,43 +15,50 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class SecureIngestionService {
 
+    private static final Logger log = LoggerFactory.getLogger(SecureIngestionService.class);
+
     private final VectorStore vectorStore;
+    private final MemoryEvolutionService memoryEvolutionService;
 
     // PII PATTERNS
     private static final Pattern SSN_PATTERN = Pattern.compile("\\d{3}-\\d{2}-\\d{4}");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}");
 
-    public SecureIngestionService(VectorStore vectorStore) {
+    public SecureIngestionService(VectorStore vectorStore, MemoryEvolutionService memoryEvolutionService) {
         this.vectorStore = vectorStore;
+        this.memoryEvolutionService = memoryEvolutionService;
     }
 
     public void ingest(MultipartFile file, Department dept) {
         try {
             String filename = file.getOriginalFilename();
-            System.out.println("Initiating RAGPart Defense Protocol for: " + filename + " [Sector: " + dept + "]");
+            log.info("Initiating RAGPart Defense Protocol for: {} [Sector: {}]", filename, dept);
 
             InputStreamResource resource = new InputStreamResource(file.getInputStream());
             List<Document> rawDocuments;
 
             // 1. SELECT CORRECT READER (PDF vs TEXT)
             if (filename.toLowerCase().endsWith(".pdf")) {
-                System.out.println(">> DETECTED PDF: Engaging Optical Character Recognition / PDF Stream...");
+                log.info(">> DETECTED PDF: Engaging Optical Character Recognition / PDF Stream...");
                 // Requires 'spring-ai-pdf-document-reader' dependency.
                 // If this fails to compile, we fall back to Tika or simple text extraction.
                 PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource);
                 rawDocuments = pdfReader.get();
             } else {
-                System.out.println(">> DETECTED TEXT: Engaging Standard Text Stream...");
+                log.info(">> DETECTED TEXT: Engaging Standard Text Stream...");
                 TextReader textReader = new TextReader(resource);
                 rawDocuments = textReader.get();
             }
 
             // 2. PRE-SPLIT SANITIZATION (Fixes the NPE Crash)
-            // We create new, clean documents to ensure no null metadata triggers the Splitter bug.
+            // We create new, clean documents to ensure no null metadata triggers the
+            // Splitter bug.
             List<Document> cleanDocs = new ArrayList<>();
             for (Document doc : rawDocuments) {
                 HashMap<String, Object> cleanMeta = new HashMap<>();
@@ -64,16 +71,20 @@ public class SecureIngestionService {
             TokenTextSplitter splitter = new TokenTextSplitter();
             List<Document> splitDocuments = splitter.apply(cleanDocs);
 
+            List<Document> finalDocuments = new ArrayList<>();
             for (Document doc : splitDocuments) {
                 // PII REDACTION
                 String cleanContent = redactSensitiveInfo(doc.getContent());
+                Document redactedDoc = new Document(cleanContent, doc.getMetadata());
 
-                // Update content (conceptually - Spring AI docs are immutable so we rely on the split)
-                // In a full production system, we would recreate the document here if redaction occurred.
+                // MEMORY EVOLUTION (Hypergraph)
+                Document evolvedDoc = memoryEvolutionService.evolve(redactedDoc);
+
+                finalDocuments.add(evolvedDoc);
             }
 
-            vectorStore.add(splitDocuments);
-            System.out.println("Securely ingested " + splitDocuments.size() + " memory points.");
+            vectorStore.add(finalDocuments);
+            log.info("Securely ingested {} memory points.", finalDocuments.size());
 
         } catch (IOException e) {
             throw new RuntimeException("Secure Ingestion Failed: " + e.getMessage());

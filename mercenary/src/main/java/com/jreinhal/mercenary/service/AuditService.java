@@ -1,80 +1,149 @@
 package com.jreinhal.mercenary.service;
 
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import com.jreinhal.mercenary.model.AuditEvent;
+import com.jreinhal.mercenary.model.AuditEvent.EventType;
+import com.jreinhal.mercenary.model.AuditEvent.Outcome;
+import com.jreinhal.mercenary.model.User;
+import com.jreinhal.mercenary.Department;
+
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
-import java.util.stream.Collectors;
 
+/**
+ * Service for STIG-compliant audit logging.
+ * 
+ * All security-relevant events are persisted to MongoDB for compliance
+ * auditing.
+ * Supports both synchronous logging and async batch operations.
+ */
 @Service
 public class AuditService {
 
-        private final ChatClient chatClient;
-        private final VectorStore vectorStore;
+    private static final Logger log = LoggerFactory.getLogger(AuditService.class);
+    private final MongoTemplate mongoTemplate;
 
-        public AuditService(ChatClient.Builder chatClientBuilder, VectorStore vectorStore) {
-                // We use the Builder to create a client bound to our default model (Ollama)
-                this.chatClient = chatClientBuilder.build();
-                this.vectorStore = vectorStore;
+    public AuditService(MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
+    }
+
+    /**
+     * Log an audit event.
+     */
+    public void log(AuditEvent event) {
+        try {
+            mongoTemplate.save(event, "audit_log");
+            log.debug("Audit event logged: {} - {} - {}",
+                    event.getEventType(), event.getUserId(), event.getAction());
+        } catch (Exception e) {
+            // Audit logging failures should not break the application
+            // but MUST be logged for security review
+            log.error("CRITICAL: Failed to persist audit event: {} - {}",
+                    event.getEventType(), e.getMessage());
         }
+    }
 
-        public String askQuestion(String question, String department) {
-                // 1. Create the Department Security Filter
-                var filter = new FilterExpressionBuilder()
-                        .eq("dept", department)
-                        .build();
+    /**
+     * Log a successful authentication.
+     */
+    public void logAuthSuccess(User user, HttpServletRequest request) {
+        AuditEvent event = AuditEvent.create(EventType.AUTH_SUCCESS, user.getId(), "User authenticated")
+                .withUser(user)
+                .withRequest(getClientIp(request), request.getHeader("User-Agent"), request.getSession().getId())
+                .withMetadata("authProvider", user.getAuthProvider().name());
+        log(event);
+    }
 
-                // 2. Perform Vector Search
-                List<Document> similarDocuments = vectorStore.similaritySearch(
-                        SearchRequest.query(question)
-                                .withTopK(4)
-                                .withFilterExpression(filter)
-                );
+    /**
+     * Log a failed authentication attempt.
+     */
+    public void logAuthFailure(String attemptedUser, String reason, HttpServletRequest request) {
+        AuditEvent event = AuditEvent.create(EventType.AUTH_FAILURE, attemptedUser, "Authentication failed")
+                .withRequest(getClientIp(request), request.getHeader("User-Agent"), null)
+                .withOutcome(Outcome.FAILURE, reason);
+        log(event);
+    }
 
-                // 3. Fallback if empty
-                if (similarDocuments.isEmpty()) {
-                        return "CLASSIFIED // NO INTEL FOUND IN " + department + " SECTOR.";
-                }
+    /**
+     * Log a query execution.
+     */
+    public void logQuery(User user, String query, Department sector, String responseSummary,
+            HttpServletRequest request) {
+        AuditEvent event = AuditEvent.create(EventType.QUERY_EXECUTED, user.getId(), "Intelligence query executed")
+                .withUser(user)
+                .withRequest(getClientIp(request), request.getHeader("User-Agent"), request.getSession().getId())
+                .withResource("QUERY", null)
+                .withResponseSummary(responseSummary)
+                .withMetadata("sector", sector.name())
+                .withMetadata("queryLength", query.length());
+        log(event);
+    }
 
-                // 4. Re-Rank / Sort Results (THE FIX)
-                // The list returned above is "Immutable" (Read-Only).
-                // We must copy it into a new ArrayList to make it "Mutable" (Editable) so we can sort it.
-                List<Document> mutableDocs = new ArrayList<>(similarDocuments);
+    /**
+     * Log a document ingestion.
+     */
+    public void logIngestion(User user, String filename, Department sector, HttpServletRequest request) {
+        AuditEvent event = AuditEvent
+                .create(EventType.DOCUMENT_INGESTED, user.getId(), "Document ingested: " + filename)
+                .withUser(user)
+                .withRequest(getClientIp(request), request.getHeader("User-Agent"), request.getSession().getId())
+                .withResource("DOCUMENT", filename)
+                .withMetadata("sector", sector.name());
+        log(event);
+    }
 
-                List<String> keywords = List.of(question.toLowerCase().split("\\s+"));
-                mutableDocs.sort((d1, d2) -> {
-                        long matches1 = countMatches(d1.getContent().toLowerCase(), keywords);
-                        long matches2 = countMatches(d2.getContent().toLowerCase(), keywords);
-                        return Long.compare(matches2, matches1); // Descending order
-                });
+    /**
+     * Log an access denial.
+     */
+    public void logAccessDenied(User user, String resource, String reason, HttpServletRequest request) {
+        AuditEvent event = AuditEvent.create(EventType.ACCESS_DENIED,
+                user != null ? user.getId() : "ANONYMOUS",
+                "Access denied to: " + resource)
+                .withUser(user)
+                .withRequest(getClientIp(request), request.getHeader("User-Agent"),
+                        request.getSession() != null ? request.getSession().getId() : null)
+                .withResource("ENDPOINT", resource)
+                .withOutcome(Outcome.DENIED, reason);
+        log(event);
+    }
 
-                // 5. Build Context String
-                String context = mutableDocs.stream()
-                        .map(doc -> {
-                                String source = (String) doc.getMetadata().getOrDefault("source", "UNKNOWN");
-                                return "SOURCE: [" + source + "]\nCONTENT: " + doc.getContent();
-                        })
-                        .collect(Collectors.joining("\n\n"));
+    /**
+     * Log a prompt injection detection.
+     */
+    public void logPromptInjection(User user, String query, HttpServletRequest request) {
+        AuditEvent event = AuditEvent.create(EventType.PROMPT_INJECTION_DETECTED,
+                user != null ? user.getId() : "ANONYMOUS",
+                "Prompt injection attempt blocked")
+                .withUser(user)
+                .withRequest(getClientIp(request), request.getHeader("User-Agent"), request.getSession().getId())
+                .withOutcome(Outcome.DENIED, "Security filter triggered")
+                .withMetadata("queryPreview", query.substring(0, Math.min(50, query.length())));
+        log(event);
+    }
 
-                // 6. Send to AI (Llama 3)
-                return chatClient.prompt()
-                        .system(sp -> sp.text(
-                                "You are a Defense Intelligence Analyst. " +
-                                        "Answer based ONLY on the provided context. " +
-                                        "If the answer is not in the context, say 'DATA NOT AVAILABLE'."
-                        ))
-                        .user(u -> u.text("CONTEXT:\n" + context + "\n\nQUESTION: " + question))
-                        .call()
-                        .content();
+    /**
+     * Retrieve audit events for compliance review.
+     */
+    public List<AuditEvent> getRecentEvents(int limit) {
+        return mongoTemplate.findAll(AuditEvent.class, "audit_log")
+                .stream()
+                .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
+                .limit(limit)
+                .toList();
+    }
+
+    /**
+     * Extract client IP, handling proxies.
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
         }
-
-        // Helper to count keyword matches for re-ranking
-        private long countMatches(String text, List<String> keywords) {
-                return keywords.stream().filter(text::contains).count();
-        }
+        return request.getRemoteAddr();
+    }
 }

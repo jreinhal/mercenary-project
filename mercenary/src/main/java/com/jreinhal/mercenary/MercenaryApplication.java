@@ -17,11 +17,21 @@ public class MercenaryApplication {
 		SpringApplication.run(MercenaryApplication.class, args);
 	}
 
-	// MANUAL OVERRIDE: We define the VectorStore bean ourselves to force specific settings.
+	// MANUAL OVERRIDE: We define the VectorStore bean ourselves to force specific
+	// settings.
 	@Bean
-	public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel) {
+	public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel,
+			@org.springframework.beans.factory.annotation.Value("${app.auth-mode:DEV}") String authMode) {
+
+		// If we are in CAC (GovCloud) or DEV mode locally, we use in-memory store.
+		// Use SimpleVectorStore (In-Memory) for the operational verification.
+		if ("CAC".equalsIgnoreCase(authMode) || "DEV".equalsIgnoreCase(authMode)) {
+			return new org.springframework.ai.vectorstore.SimpleVectorStore(embeddingModel);
+		}
+
 		// Explicitly configure the store config
-		MongoDBAtlasVectorStore.MongoDBVectorStoreConfig config = MongoDBAtlasVectorStore.MongoDBVectorStoreConfig.builder()
+		MongoDBAtlasVectorStore.MongoDBVectorStoreConfig config = MongoDBAtlasVectorStore.MongoDBVectorStoreConfig
+				.builder()
 				.withCollectionName("vector_store")
 				.withVectorIndexName("vector_index")
 				.withPathName("embedding")

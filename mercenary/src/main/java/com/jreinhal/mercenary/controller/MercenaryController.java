@@ -1,7 +1,12 @@
 package com.jreinhal.mercenary.controller;
 
 import com.jreinhal.mercenary.Department;
+import com.jreinhal.mercenary.model.User;
+import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import com.jreinhal.mercenary.service.AuditService;
+import com.jreinhal.mercenary.service.AuthenticationService;
+import com.jreinhal.mercenary.filter.SecurityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
@@ -9,10 +14,13 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,152 +30,336 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin
 public class MercenaryController {
+
+    private static final Logger log = LoggerFactory.getLogger(MercenaryController.class);
 
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final SecureIngestionService ingestionService;
+    private final MongoTemplate mongoTemplate;
+    private final AuditService auditService;
+    private final AuthenticationService authService;
 
     // METRICS
-    private final AtomicInteger docCount = new AtomicInteger(1247);
-    private final AtomicInteger queryCount = new AtomicInteger(142);
+    private final AtomicInteger docCount = new AtomicInteger(0);
+    private final AtomicInteger queryCount = new AtomicInteger(0);
     private final AtomicLong totalLatencyMs = new AtomicLong(0);
 
     // FLASH CACHE
     private final Map<String, String> secureDocCache = new ConcurrentHashMap<>();
 
-    @Autowired
-    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService) {
+    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore,
+            SecureIngestionService ingestionService, MongoTemplate mongoTemplate,
+            AuditService auditService, AuthenticationService authService) {
         this.chatClient = builder.build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;
+        this.mongoTemplate = mongoTemplate;
+        this.auditService = auditService;
+        this.authService = authService;
+
+        // Initialize doc count from DB
+        try {
+            long count = mongoTemplate.getCollection("vector_store").countDocuments();
+            docCount.set((int) count);
+        } catch (Exception e) {
+            log.error("Failed to initialize doc count", e);
+        }
     }
 
     @GetMapping("/status")
     public Map<String, Object> getSystemStatus() {
         long avgLat = 0;
         int qCount = queryCount.get();
-        if (qCount > 0) avgLat = totalLatencyMs.get() / qCount;
+        if (qCount > 0)
+            avgLat = totalLatencyMs.get() / qCount;
         boolean dbOnline = true;
-        try { SearchRequest.query("ping"); } catch (Exception e) { dbOnline = false; }
-        return Map.of("vectorDb", dbOnline ? "ONLINE" : "OFFLINE", "docsIndexed", docCount.get(), "avgLatency", avgLat + "ms", "queriesToday", qCount, "systemStatus", "NOMINAL");
+        try {
+            SearchRequest.query("ping");
+        } catch (Exception e) {
+            dbOnline = false;
+        }
+        return Map.of("vectorDb", dbOnline ? "ONLINE" : "OFFLINE", "docsIndexed", docCount.get(), "avgLatency",
+                avgLat + "ms", "queriesToday", qCount, "systemStatus", "NOMINAL");
+    }
+
+    public record TelemetryResponse(int documentCount, int queryCount, long avgLatencyMs, boolean dbOnline) {
+    }
+
+    @GetMapping("/telemetry")
+    public TelemetryResponse getTelemetry() {
+        long avgLat = 0;
+        int qCount = queryCount.get();
+        if (qCount > 0)
+            avgLat = totalLatencyMs.get() / qCount;
+
+        boolean dbOnline = true;
+        try {
+            // Lightweight check
+            mongoTemplate.getCollection("vector_store").countDocuments();
+        } catch (Exception e) {
+            dbOnline = false;
+        }
+
+        return new TelemetryResponse(docCount.get(), qCount, avgLat, dbOnline);
+    }
+
+    public record InspectResponse(String content, List<String> highlights) {
     }
 
     @GetMapping("/inspect")
-    public String inspectDocument(@RequestParam("fileName") String fileName) {
+    public InspectResponse inspectDocument(@RequestParam("fileName") String fileName,
+            @RequestParam(value = "query", required = false) String query) {
+        String content = "";
+
+        // 1. Retrieve Content (Cache or Vector Store)
         if (secureDocCache.containsKey(fileName)) {
-            return "--- SECURE DOCUMENT VIEWER (CACHE) ---\nFILE: " + fileName + "\nSTATUS: DECRYPTED [RAM]\n----------------------------------\n\n" + secureDocCache.get(fileName);
-        }
-        try {
-            List<Document> recoveredDocs = vectorStore.similaritySearch(SearchRequest.query("source:" + fileName).withTopK(1));
-            if (!recoveredDocs.isEmpty()) {
-                String recoveredContent = recoveredDocs.get(0).getContent();
-                secureDocCache.put(fileName, recoveredContent);
-                return "--- SECURE DOCUMENT VIEWER (ARCHIVE) ---\nFILE: " + fileName + "\nSTATUS: RECONSTRUCTED FROM VECTOR STORE\n----------------------------------\n\n" + recoveredContent;
+            content = "--- SECURE DOCUMENT VIEWER (CACHE) ---\nFILE: " + fileName
+                    + "\nSTATUS: DECRYPTED [RAM]\n----------------------------------\n\n"
+                    + secureDocCache.get(fileName);
+        } else {
+            try {
+                List<Document> recoveredDocs = vectorStore
+                        .similaritySearch(SearchRequest.defaults()
+                                .withQuery("file") // Placeholder query
+                                .withFilterExpression("source == '" + fileName + "'")
+                                .withTopK(1));
+                if (!recoveredDocs.isEmpty()) {
+                    String recoveredContent = recoveredDocs.get(0).getContent();
+                    secureDocCache.put(fileName, recoveredContent);
+                    content = "--- SECURE DOCUMENT VIEWER (ARCHIVE) ---\nFILE: " + fileName
+                            + "\nSTATUS: RECONSTRUCTED FROM VECTOR STORE\n----------------------------------\n\n"
+                            + recoveredContent;
+                } else {
+                    return new InspectResponse(
+                            "ERROR: Document archived in Deep Storage.\nPlease re-ingest file to refresh active cache.",
+                            List.of());
+                }
+            } catch (Exception e) {
+                log.error(">> RECOVERY FAILED: {}", e.getMessage());
+                return new InspectResponse("ERROR: Recovery failed.", List.of());
             }
-        } catch (Exception e) { System.out.println(">> RECOVERY FAILED: " + e.getMessage()); }
-        return "ERROR: Document archived in Deep Storage.\nPlease re-ingest file to refresh active cache.";
+        }
+
+        // 2. Identify Highlights (Simulated Relevance)
+        List<String> highlights = new ArrayList<>();
+        if (query != null && !query.isEmpty() && !content.isEmpty()) {
+            String[] keywords = query.toLowerCase().split("\\s+");
+            // Simple heuristic directly in controller for demo purposes
+            // In production, this would use the vector store's relevance scores
+            String[] paragraphs = content.split("\n\n");
+            for (String p : paragraphs) {
+                if (p.startsWith("---"))
+                    continue; // Skip header
+                int matches = 0;
+                String lowerP = p.toLowerCase();
+                for (String k : keywords) {
+                    if (lowerP.contains(k) && k.length() > 3)
+                        matches++;
+                }
+                // If reasonably relevant, add to highlights
+                if (matches >= 1) {
+                    highlights.add(p.trim());
+                    // Limit to top 3 highlights to avoid visual clutter
+                    if (highlights.size() >= 3)
+                        break;
+                }
+            }
+        }
+
+        return new InspectResponse(content, highlights);
     }
 
-    @GetMapping("/health") public String health() { return "SYSTEMS NOMINAL"; }
+    @GetMapping("/health")
+    public String health() {
+        return "SYSTEMS NOMINAL";
+    }
 
     @PostMapping("/ingest/file")
-    public String ingestFile(@RequestParam("file") MultipartFile file, @RequestParam("dept") String dept) {
+    public String ingestFile(@RequestParam("file") MultipartFile file, @RequestParam("dept") String dept,
+            HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        Department department;
+
+        try {
+            department = Department.valueOf(dept.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return "INVALID SECTOR: " + dept;
+        }
+
+        // HARDENED SECURITY: Explicitly reject unauthenticated users
+        if (user == null) {
+            auditService.logAccessDenied(null, "/api/ingest/file", "Unauthenticated access attempt", request);
+            return "ACCESS DENIED: Authentication required.";
+        }
+
+        // RBAC Check: User must have INGEST permission
+        if (!user.hasPermission(UserRole.Permission.INGEST)) {
+            auditService.logAccessDenied(user, "/api/ingest/file", "Missing INGEST permission", request);
+            return "ACCESS DENIED: Insufficient permissions for document ingestion.";
+        }
+
+        // RBAC Check: User must have clearance for this sector
+        if (!user.canAccessClassification(department.getRequiredClearance())) {
+            auditService.logAccessDenied(user, "/api/ingest/file",
+                    "Insufficient clearance for " + department.name(), request);
+            return "ACCESS DENIED: Insufficient clearance for " + department.name() + " sector.";
+        }
+
         try {
             long startTime = System.currentTimeMillis();
             String filename = file.getOriginalFilename();
-            Department department = Department.valueOf(dept.toUpperCase());
             ingestionService.ingest(file, department);
             String rawContent = new String(file.getBytes(), StandardCharsets.UTF_8);
             secureDocCache.put(filename, rawContent);
             docCount.incrementAndGet();
             long duration = System.currentTimeMillis() - startTime;
+
+            // Audit log successful ingestion
+            if (user != null) {
+                auditService.logIngestion(user, filename, department, request);
+            }
+
             return "SECURE INGESTION COMPLETE: " + filename + " (" + duration + "ms)";
-        } catch (Exception e) { e.printStackTrace(); return "CRITICAL FAILURE: Ingestion Protocol Failed."; }
+        } catch (Exception e) {
+            log.error("CRITICAL FAILURE: Ingestion Protocol Failed.", e);
+            return "CRITICAL FAILURE: Ingestion Protocol Failed.";
+        }
     }
 
     @GetMapping("/ask")
-    public String ask(@RequestParam("q") String query, @RequestParam("dept") String dept) {
-        long start = System.currentTimeMillis();
+    public String ask(@RequestParam("q") String query, @RequestParam("dept") String dept,
+            HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        Department department;
 
-        // 1. SECURITY
-        if (isPromptInjection(query)) return "SECURITY ALERT: Indirect Prompt Injection Detected. Access Denied.";
-
-        // 2. RETRIEVAL (Top 10 -> Rerank -> Top 3)
-        List<Document> rawDocs = vectorStore.similaritySearch(SearchRequest.query(query).withTopK(10));
-        List<Document> rerankedDocs = performHybridRerank(rawDocs, query);
-        List<Document> topDocs = rerankedDocs.stream().limit(3).toList();
-
-        String information = topDocs.stream()
-                .map(doc -> {
-                    Map<String, Object> meta = doc.getMetadata();
-                    String filename = (String) meta.get("source");
-                    if (filename == null) filename = (String) meta.get("filename");
-                    if (filename == null) filename = "Unknown_Document.txt";
-                    return "SOURCE: " + filename + "\nCONTENT: " + doc.getContent();
-                })
-                .collect(Collectors.joining("\n\n---\n\n"));
-
-        // 3. GENERATION (Strict Formatting)
-        String systemText = "";
-        if (information.isEmpty()) {
-            systemText = "You are SENTINEL. Protocol: Answer based on general training. State 'No internal records found.'";
-        } else {
-            // STRICT CITATION PROMPT
-            systemText = """
-                You are SENTINEL, an advanced intelligence agent assigned to %s.
-                
-                PROTOCOL:
-                1. ANALYZE the provided CONTEXT DATA.
-                2. SYNTHESIZE an answer based ONLY on that data.
-                
-                CITATION RULE (CRITICAL):
-                You MUST cite the source filename for every fact using square brackets.
-                Correct Format: [filename.pdf]
-                Incorrect Format: (filename.pdf) or "Source: filename.pdf"
-                
-                Example Output:
-                "Project Omega was funded by shell companies [financials_2024.pdf]."
-                
-                CONTEXT DATA:
-                {information}
-                """.formatted(dept);
+        try {
+            department = Department.valueOf(dept.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return "INVALID SECTOR: " + dept;
         }
 
-        SystemPromptTemplate systemPrompt = new SystemPromptTemplate(systemText);
-        UserMessage userMessage = new UserMessage(query);
-        Prompt prompt = new Prompt(List.of(systemPrompt.createMessage(Map.of("information", information)), userMessage));
-
-        String response = chatClient.call(prompt).getResult().getOutput().getContent();
-
-        long timeTaken = System.currentTimeMillis() - start;
-        totalLatencyMs.addAndGet(timeTaken);
-        queryCount.incrementAndGet();
-
-        return response;
-    }
-
-    private List<Document> performHybridRerank(List<Document> docs, String query) {
-        if (docs == null || docs.isEmpty()) return new ArrayList<>();
-
-        List<Document> mutableDocs = new ArrayList<>(docs);
-        String[] keywords = query.toLowerCase().split("\\s+");
-
-        mutableDocs.sort((d1, d2) -> {
-            int score1 = countMatches(d1.getContent().toLowerCase(), keywords);
-            int score2 = countMatches(d2.getContent().toLowerCase(), keywords);
-            return Integer.compare(score2, score1);
-        });
-        return mutableDocs;
-    }
-
-    private int countMatches(String content, String[] keywords) {
-        int count = 0;
-        for (String k : keywords) {
-            if (content.contains(k)) count++;
+        // HARDENED SECURITY: Explicitly reject unauthenticated users
+        if (user == null) {
+            auditService.logAccessDenied(null, "/api/ask", "Unauthenticated access attempt", request);
+            return "ACCESS DENIED: Authentication required.";
         }
-        return count;
+
+        // RBAC Check: User must have QUERY permission
+        if (!user.hasPermission(UserRole.Permission.QUERY)) {
+            auditService.logAccessDenied(user, "/api/ask", "Missing QUERY permission", request);
+            return "ACCESS DENIED: Insufficient permissions for queries.";
+        }
+
+        // RBAC Check: User must have clearance for this sector
+        if (!user.canAccessClassification(department.getRequiredClearance())) {
+            auditService.logAccessDenied(user, "/api/ask",
+                    "Insufficient clearance for " + department.name(), request);
+            return "ACCESS DENIED: Insufficient clearance for " + department.name() + " sector.";
+        }
+
+        try {
+            long start = System.currentTimeMillis();
+
+            // 1. SECURITY - Prompt injection detection
+            if (isPromptInjection(query)) {
+                if (user != null) {
+                    auditService.logPromptInjection(user, query, request);
+                }
+                return "SECURITY ALERT: Indirect Prompt Injection Detected. Access Denied.";
+            }
+
+            // 2. RETRIEVAL (Top 10 -> Rerank -> Top 3)
+            // Filter out ARCHIVED documents
+            // Filter removed temporarily to bypass MongoDB index error
+            List<Document> rawDocs = vectorStore.similaritySearch(
+                    SearchRequest.query(query)
+                            .withTopK(10));
+            log.info("Retrieved {} documents for query: {}", rawDocs.size(), query);
+            rawDocs.forEach(doc -> log.info("  - Source: {}, Content preview: {}",
+                    doc.getMetadata().get("source"),
+                    doc.getContent().substring(0, Math.min(50, doc.getContent().length()))));
+
+            // Semantic vector search handles relevance better than naive reranking
+            List<Document> topDocs = rawDocs.stream().limit(3).toList();
+
+            String information = topDocs.stream()
+                    .map(doc -> {
+                        Map<String, Object> meta = doc.getMetadata();
+                        String filename = (String) meta.get("source");
+                        if (filename == null)
+                            filename = (String) meta.get("filename");
+                        if (filename == null)
+                            filename = "Unknown_Document.txt";
+                        return "SOURCE: " + filename + "\nCONTENT: " + doc.getContent();
+                    })
+                    .collect(Collectors.joining("\n\n---\n\n"));
+
+            // 3. GENERATION (Strict Formatting)
+            String systemText = "";
+            if (information.isEmpty()) {
+                systemText = "You are SENTINEL. Protocol: Answer based on general training. State 'No internal records found.'";
+            } else {
+                // STRICT CITATION PROMPT WITH PER-FACT ATTRIBUTION
+                systemText = """
+                        You are SENTINEL, an advanced intelligence agent assigned to %s.
+
+                        PROTOCOL:
+                        1. ANALYZE the provided CONTEXT DATA carefully.
+                        2. SYNTHESIZE an answer based ONLY on that data.
+                        3. CITE each source IMMEDIATELY after EACH fact from that source.
+
+                        === CRITICAL: PER-FACT CITATION RULE ===
+
+                        EACH separate fact MUST have its OWN citation from the SPECIFIC document that contains it.
+                        DO NOT combine facts from different documents under a single citation.
+                        DO NOT cite a document for information it does not contain.
+
+                        === CITATION FORMAT ===
+
+                        ✓ CORRECT:   [filename.txt] or [filename.md] or [filename.pdf]
+                        ✗ WRONG:     `filename.txt` (NO backticks!)
+                        ✗ WRONG:     (filename.txt) (NO parentheses!)
+
+                        === EXAMPLES ===
+
+                        ✓ CORRECT (each fact cited to its actual source):
+                        "Agent 47 is a Reconnaissance operative with ALPHA-2 clearance [personnel_roster.txt]. His blood type is O- and he is FIT FOR DUTY [medical_records.md]."
+
+                        ✗ WRONG (misattribution - claiming clearance info from medical file):
+                        "Agent 47 has ALPHA-2 clearance [medical_records.md]."
+
+                        BEFORE citing a document, VERIFY the fact appears in that document's content below.
+
+                        CONTEXT DATA:
+                        {information}
+                        """
+                        .formatted(dept);
+
+            }
+
+            SystemPromptTemplate systemPrompt = new SystemPromptTemplate(systemText);
+            UserMessage userMessage = new UserMessage(query);
+            Prompt prompt = new Prompt(
+                    List.of(systemPrompt.createMessage(Map.of("information", information)), userMessage));
+
+            String response = chatClient.call(prompt).getResult().getOutput().getContent();
+
+            long timeTaken = System.currentTimeMillis() - start;
+            totalLatencyMs.addAndGet(timeTaken);
+            queryCount.incrementAndGet();
+
+            // Audit log successful query
+            if (user != null) {
+                auditService.logQuery(user, query, department, response, request);
+            }
+
+            return response;
+        } catch (Exception e) {
+            log.error("Error in /ask endpoint", e);
+            throw e;
+        }
     }
 
     private boolean isPromptInjection(String query) {
