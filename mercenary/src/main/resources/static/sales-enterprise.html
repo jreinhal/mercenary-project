@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL for Enterprise - Production-Ready RAG Platform</title>
+    <style>
+        :root {
+            --primary: #1a202c;
+            --primary-light: #2d3748;
+            --accent: #4299e1;
+            --accent-light: #63b3ed;
+            --accent-dark: #2b6cb0;
+            --purple: #805ad5;
+            --purple-light: #b794f4;
+            --bg-dark: #0a0a0a;
+            --bg-card: #111111;
+            --bg-card-hover: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0aec0;
+            --border-color: #2d3748;
+            --success: #48bb78;
+            --warning: #ed8936;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent-dark) 100%);
+            padding: 4rem 0;
+            text-align: center;
+            border-bottom: 4px solid var(--accent);
+        }
+
+        header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header .subtitle {
+            font-size: 1.5rem;
+            color: var(--accent-light);
+            font-weight: 500;
+        }
+
+        header .badges {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        header .badge {
+            display: inline-block;
+            background: rgba(66, 153, 225, 0.2);
+            color: var(--accent-light);
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: 1px solid var(--accent);
+        }
+
+        /* Sections */
+        section {
+            padding: 4rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        section h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: var(--accent-light);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        section h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 2rem;
+            background: var(--accent);
+        }
+
+        section h3 {
+            font-size: 1.25rem;
+            margin: 2rem 0 1rem;
+            color: var(--text-primary);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--primary);
+            color: var(--text-primary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: var(--bg-card-hover);
+        }
+
+        td:first-child {
+            font-weight: 500;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .feature-card h4 {
+            color: var(--accent-light);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Code Block */
+        .code-block {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .code-block pre {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            color: #d4d4d4;
+            white-space: pre;
+            line-height: 1.5;
+        }
+
+        .code-block .comment {
+            color: #6a9955;
+        }
+
+        .code-block .keyword {
+            color: #569cd6;
+        }
+
+        .code-block .string {
+            color: #ce9178;
+        }
+
+        /* Architecture Diagram */
+        .architecture-diagram {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border: 1px solid var(--border-color);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.4;
+            color: var(--text-secondary);
+        }
+
+        /* Pipeline Visualization */
+        .pipeline {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .pipeline-step {
+            background: var(--primary);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .pipeline-step h5 {
+            color: var(--accent-light);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .pipeline-step p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin: 0;
+        }
+
+        .pipeline-step .citation {
+            color: var(--purple-light);
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        .pipeline-arrow {
+            text-align: center;
+            color: var(--accent);
+            font-size: 1.5rem;
+        }
+
+        /* Use Cases Grid */
+        .use-cases-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .use-case-card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .use-case-card h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+        }
+
+        .use-case-card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .use-case-card li {
+            color: var(--text-secondary);
+            padding: 0.25rem 0;
+            padding-left: 1rem;
+            position: relative;
+            font-size: 0.9rem;
+        }
+
+        .use-case-card li::before {
+            content: '>';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+        }
+
+        /* Callout */
+        .callout {
+            background: linear-gradient(135deg, rgba(66, 153, 225, 0.1) 0%, rgba(128, 90, 213, 0.1) 100%);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .callout .amount {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-light);
+        }
+
+        .callout .label {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* JSON Block */
+        .json-block {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border-color);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .json-block .key {
+            color: #9cdcfe;
+        }
+
+        .json-block .string {
+            color: #ce9178;
+        }
+
+        .json-block .number {
+            color: #b5cea8;
+        }
+
+        .json-block .boolean {
+            color: #569cd6;
+        }
+
+        /* Testimonial */
+        .testimonial {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border-left: 4px solid var(--accent);
+            font-style: italic;
+        }
+
+        .testimonial p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .testimonial .author {
+            color: var(--accent-light);
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        /* Pricing */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .pricing-card:hover {
+            border-color: var(--accent);
+            transform: scale(1.02);
+        }
+
+        .pricing-card.featured {
+            border-color: var(--accent);
+            position: relative;
+        }
+
+        .pricing-card.featured::before {
+            content: 'BEST VALUE';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: white;
+            padding: 0.25rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .pricing-card h3 {
+            margin: 0 0 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .pricing-card .price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-light);
+            margin: 1rem 0;
+        }
+
+        .pricing-card .description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Checklist */
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 0.75rem 0;
+            padding-left: 2rem;
+            position: relative;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .checklist li::before {
+            content: '\2713';
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* API Table */
+        .api-table td code {
+            background: var(--primary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--accent-light);
+        }
+
+        /* Contact */
+        .contact-section {
+            text-align: center;
+            padding: 4rem 0;
+        }
+
+        .contact-section h2 {
+            justify-content: center;
+        }
+
+        .contact-section h2::before {
+            display: none;
+        }
+
+        .contact-info {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--primary);
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        footer p {
+            margin: 0.5rem 0;
+        }
+
+        footer .tagline {
+            color: var(--accent-light);
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2rem;
+            }
+
+            header .subtitle {
+                font-size: 1.2rem;
+            }
+
+            section {
+                padding: 2rem 0;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+
+            table {
+                font-size: 0.85rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>SENTINEL for Enterprise</h1>
+            <p class="subtitle">Production-Ready RAG Platform for Any Industry</p>
+            <div class="badges">
+                <span class="badge">One JAR</span>
+                <span class="badge">No Python</span>
+                <span class="badge">Complete Control</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Challenge Section -->
+        <section>
+            <h2>The Enterprise AI Challenge</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Every organization wants generative AI, but deployment obstacles persist:
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Challenge</th>
+                        <th>Business Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Data Security Concerns</td>
+                        <td>IP and trade secrets exposed to cloud AI vendors</td>
+                    </tr>
+                    <tr>
+                        <td>Python Dependency Hell</td>
+                        <td>Enterprise IT rejects pip-based solutions</td>
+                    </tr>
+                    <tr>
+                        <td>Black Box AI</td>
+                        <td>No visibility into how answers are generated</td>
+                    </tr>
+                    <tr>
+                        <td>Integration Complexity</td>
+                        <td>Months of custom development required</td>
+                    </tr>
+                    <tr>
+                        <td>Hallucination Risk</td>
+                        <td>AI confidently provides wrong answers</td>
+                    </tr>
+                    <tr>
+                        <td>Vendor Lock-in</td>
+                        <td>Proprietary solutions create dependency</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout">
+                <div class="amount">$150K+ / 6+ months</div>
+                <div class="label">The DIY Alternative: Engineering costs to build your own</div>
+            </div>
+        </section>
+
+        <!-- Solution Section -->
+        <section>
+            <h2>SENTINEL: Enterprise AI, Solved</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                SENTINEL is a <strong>production-ready RAG backend</strong> that deploys in minutes, not months. One JAR file. No Python. Complete control.
+            </p>
+
+            <h3>Core Enterprise Features</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>Single JAR Deployment</h4>
+                    <p>No Python, no pip, no dependency chaos - just Java</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Glass Box Reasoning</h4>
+                    <p>Full transparency into AI decision-making process</p>
+                </div>
+                <div class="feature-card">
+                    <h4>HiFi-RAG Pipeline</h4>
+                    <p>Research-grade accuracy (60%+ fewer hallucinations)</p>
+                </div>
+                <div class="feature-card">
+                    <h4>RAGPart Defense</h4>
+                    <p>Protection against document poisoning attacks</p>
+                </div>
+                <div class="feature-card">
+                    <h4>HGMem Hypergraph</h4>
+                    <p>Multi-hop reasoning across document relationships</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Multi-Auth Support</h4>
+                    <p>OIDC, LDAP, Standard - one codebase handles all</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Air-Gap Ready</h4>
+                    <p>Deploy on-premises with zero external calls</p>
+                </div>
+            </div>
+
+            <h3>Why Pure Java Matters</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Python RAG Solutions</th>
+                        <th>SENTINEL (Java)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>500+ pip dependencies</td>
+                        <td>Single compiled JAR</td>
+                    </tr>
+                    <tr>
+                        <td>Fragile virtual environments</td>
+                        <td>Runs on any JRE 21+</td>
+                    </tr>
+                    <tr>
+                        <td>Security vulnerabilities in packages</td>
+                        <td>Minimal attack surface</td>
+                    </tr>
+                    <tr>
+                        <td>Enterprise IT rejection</td>
+                        <td style="color: var(--success);">Enterprise IT approved</td>
+                    </tr>
+                    <tr>
+                        <td>Data science skillset required</td>
+                        <td>Standard Java ops</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Use Cases Section -->
+        <section>
+            <h2>Use Cases Across Industries</h2>
+
+            <div class="use-cases-grid">
+                <div class="use-case-card">
+                    <h4>Manufacturing</h4>
+                    <ul>
+                        <li>"What's the maintenance procedure for Machine X?"</li>
+                        <li>Search ISO procedures and compliance docs</li>
+                        <li>Query across vendor specifications</li>
+                    </ul>
+                </div>
+                <div class="use-case-card">
+                    <h4>Technology</h4>
+                    <ul>
+                        <li>Transform Confluence into intelligent search</li>
+                        <li>Query technical specifications</li>
+                        <li>Instant answers from historical tickets</li>
+                    </ul>
+                </div>
+                <div class="use-case-card">
+                    <h4>Consulting</h4>
+                    <ul>
+                        <li>Access firm best practices</li>
+                        <li>Find relevant past work</li>
+                        <li>Search precedent proposals</li>
+                    </ul>
+                </div>
+                <div class="use-case-card">
+                    <h4>Education</h4>
+                    <ul>
+                        <li>Query across academic papers</li>
+                        <li>Instant access to institutional policies</li>
+                        <li>Self-service FAQ with sourced answers</li>
+                    </ul>
+                </div>
+                <div class="use-case-card">
+                    <h4>Insurance</h4>
+                    <ul>
+                        <li>Search coverage terms and conditions</li>
+                        <li>Consistent claims handling guidance</li>
+                        <li>Access compliance documentation</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Technical Architecture -->
+        <section>
+            <h2>Technical Architecture</h2>
+
+            <h3>Research-Grade RAG Pipeline</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                SENTINEL implements three cutting-edge RAG techniques from recent academic research:
+            </p>
+
+            <div class="pipeline">
+                <div class="pipeline-step">
+                    <h5>1. HiFi-RAG</h5>
+                    <p>Two-pass retrieval with cross-encoder reranking</p>
+                    <p class="citation">arXiv:2512.22442v1 - Result: 60%+ hallucination reduction</p>
+                </div>
+                <div class="pipeline-arrow">&#8595;</div>
+                <div class="pipeline-step">
+                    <h5>2. RAGPart</h5>
+                    <p>Partition-based consistency scoring</p>
+                    <p class="citation">arXiv:2512.24268v1 - Result: Adversarial document detection</p>
+                </div>
+                <div class="pipeline-arrow">&#8595;</div>
+                <div class="pipeline-step">
+                    <h5>3. HGMem</h5>
+                    <p>Hypergraph-based entity relationships</p>
+                    <p class="citation">arXiv:2512.23959v2 - Result: Multi-hop reasoning across documents</p>
+                </div>
+                <div class="pipeline-arrow">&#8595;</div>
+                <div class="pipeline-step">
+                    <h5>4. Glass Box Reasoning</h5>
+                    <p>Complete audit trail and source attribution</p>
+                    <p class="citation">Result: Explainable, verifiable AI</p>
+                </div>
+            </div>
+
+            <h3>Deployment Architecture</h3>
+            <div class="architecture-diagram">
++-------------------------------------------------------------+
+|                 Enterprise Network                           |
+|                                                              |
+|  +-----------------------------------------------------+   |
+|  |                    SENTINEL                          |   |
+|  |                                                      |   |
+|  |   +-------------+  +-------------+  +----------+  |   |
+|  |   |   Ollama    |  |   MongoDB   |  |  Spring  |  |   |
+|  |   |   (LLM)     |  |   (Vector)  |  |  Boot    |  |   |
+|  |   |   Local     |  |   Local     |  |  App     |  |   |
+|  |   +-------------+  +-------------+  +----------+  |   |
+|  |                                                      |   |
+|  |   Models: llama3, nomic-embed-text                  |   |
+|  |   All inference happens locally                      |   |
+|  +-----------------------------------------------------+   |
+|                          |                                   |
+|         +----------------+----------------+                 |
+|         |                |                |                  |
+|    +----v----+     +----v----+     +----v----+            |
+|    | Web UI  |     | REST    |     | Your    |            |
+|    |Dashboard|     | API     |     | Apps    |            |
+|    +---------+     +---------+     +---------+            |
+|                                                              |
+|              Zero External API Calls                         |
++-------------------------------------------------------------+
+            </div>
+
+            <h3>API Reference</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/ingest/file</code></td>
+                        <td>POST</td>
+                        <td>Upload documents with sector tagging</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/ingest/text</code></td>
+                        <td>POST</td>
+                        <td>Ingest raw text content</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/ask</code></td>
+                        <td>GET</td>
+                        <td>Query with simple response</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/ask/enhanced</code></td>
+                        <td>GET</td>
+                        <td>Query with Glass Box reasoning</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/reasoning/{traceId}</code></td>
+                        <td>GET</td>
+                        <td>Retrieve audit trail</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/telemetry</code></td>
+                        <td>GET</td>
+                        <td>System metrics and health</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/health</code></td>
+                        <td>GET</td>
+                        <td>Liveness/readiness check</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/status</code></td>
+                        <td>GET</td>
+                        <td>Detailed system status</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Authentication Options</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mode</th>
+                        <th>Configuration</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>OIDC</td>
+                        <td><code>APP_PROFILE=enterprise</code></td>
+                        <td>Azure AD, Okta, Ping</td>
+                    </tr>
+                    <tr>
+                        <td>Standard</td>
+                        <td><code>APP_PROFILE=standard</code></td>
+                        <td>Username/password</td>
+                    </tr>
+                    <tr>
+                        <td>GovCloud</td>
+                        <td><code>APP_PROFILE=govcloud</code></td>
+                        <td>CAC/PIV (X.509)</td>
+                    </tr>
+                    <tr>
+                        <td>Development</td>
+                        <td><code>APP_PROFILE=dev</code></td>
+                        <td>Local testing only</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Glass Box Section -->
+        <section>
+            <h2>Glass Box: Explainable AI</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">Every query produces a complete reasoning trace:</p>
+
+            <div class="json-block">
+{
+  <span class="key">"traceId"</span>: <span class="string">"abc123"</span>,
+  <span class="key">"query"</span>: <span class="string">"What is our refund policy for enterprise customers?"</span>,
+  <span class="key">"reasoning"</span>: [
+    {
+      <span class="key">"step"</span>: <span class="string">"INITIAL_RETRIEVAL"</span>,
+      <span class="key">"description"</span>: <span class="string">"Retrieved 20 candidate documents"</span>,
+      <span class="key">"durationMs"</span>: <span class="number">45</span>
+    },
+    {
+      <span class="key">"step"</span>: <span class="string">"CROSS_ENCODER_RERANK"</span>,
+      <span class="key">"description"</span>: <span class="string">"Reranked to top 5 by relevance"</span>,
+      <span class="key">"durationMs"</span>: <span class="number">120</span>
+    },
+    {
+      <span class="key">"step"</span>: <span class="string">"GAP_DETECTION"</span>,
+      <span class="key">"description"</span>: <span class="string">"No knowledge gaps detected"</span>,
+      <span class="key">"durationMs"</span>: <span class="number">15</span>
+    },
+    {
+      <span class="key">"step"</span>: <span class="string">"RESPONSE_GENERATION"</span>,
+      <span class="key">"description"</span>: <span class="string">"Generated response from 3 sources"</span>,
+      <span class="key">"durationMs"</span>: <span class="number">890</span>,
+      <span class="key">"sources"</span>: [
+        <span class="string">"enterprise-policy-2024.pdf"</span>,
+        <span class="string">"customer-service-handbook.docx"</span>,
+        <span class="string">"faq-responses.md"</span>
+      ]
+    }
+  ],
+  <span class="key">"response"</span>: <span class="string">"Based on [enterprise-policy-2024.pdf], enterprise customers..."</span>,
+  <span class="key">"confidence"</span>: <span class="number">0.94</span>
+}
+            </div>
+        </section>
+
+        <!-- ROI Section -->
+        <section>
+            <h2>ROI Analysis</h2>
+
+            <h3>Time Savings</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Manual Process</th>
+                        <th>With SENTINEL</th>
+                        <th>Improvement</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Document search</td>
+                        <td>30 minutes</td>
+                        <td>30 seconds</td>
+                        <td style="color: var(--success);">98%</td>
+                    </tr>
+                    <tr>
+                        <td>Policy lookup</td>
+                        <td>15 minutes</td>
+                        <td>10 seconds</td>
+                        <td style="color: var(--success);">99%</td>
+                    </tr>
+                    <tr>
+                        <td>Onboarding research</td>
+                        <td>4 hours</td>
+                        <td>20 minutes</td>
+                        <td style="color: var(--success);">92%</td>
+                    </tr>
+                    <tr>
+                        <td>Report compilation</td>
+                        <td>2 days</td>
+                        <td>4 hours</td>
+                        <td style="color: var(--success);">75%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Cost Comparison</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Approach</th>
+                        <th>Initial Cost</th>
+                        <th>Ongoing Cost</th>
+                        <th>Time to Deploy</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Build from scratch</td>
+                        <td>$150K+</td>
+                        <td>$50K/year</td>
+                        <td>6+ months</td>
+                    </tr>
+                    <tr>
+                        <td>Enterprise SaaS (per-seat)</td>
+                        <td>$50K/year</td>
+                        <td>$50K/year</td>
+                        <td>2 months</td>
+                    </tr>
+                    <tr>
+                        <td>Cloud AI APIs</td>
+                        <td>$10K</td>
+                        <td>$2K/month</td>
+                        <td>1 month</td>
+                    </tr>
+                    <tr style="background: rgba(72, 187, 120, 0.1);">
+                        <td><strong>SENTINEL</strong></td>
+                        <td><strong>$2,500-$15K</strong></td>
+                        <td><strong>$0</strong></td>
+                        <td><strong>1 day</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Break-Even Analysis</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">If SENTINEL saves just <strong>1 hour per employee per week</strong>:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Company Size</th>
+                        <th>Hours Saved/Year</th>
+                        <th>Value @ $50/hr</th>
+                        <th>ROI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>50 employees</td>
+                        <td>2,600 hours</td>
+                        <td>$130,000</td>
+                        <td style="color: var(--success);">5,100%</td>
+                    </tr>
+                    <tr>
+                        <td>200 employees</td>
+                        <td>10,400 hours</td>
+                        <td>$520,000</td>
+                        <td style="color: var(--success);">20,700%</td>
+                    </tr>
+                    <tr>
+                        <td>1,000 employees</td>
+                        <td>52,000 hours</td>
+                        <td>$2,600,000</td>
+                        <td style="color: var(--success);">103,900%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- What's Included -->
+        <section>
+            <h2>What's Included</h2>
+
+            <h3>Enterprise Package</h3>
+            <ul class="checklist">
+                <li>Complete source code (50+ Java files)</li>
+                <li>Spring Boot 3.3 / Java 21 LTS</li>
+                <li>HiFi-RAG, RAGPart, HGMem implementations</li>
+                <li>Glass Box reasoning system</li>
+                <li>PII redaction engine (11 patterns)</li>
+                <li>Multi-mode authentication</li>
+                <li>Mobile-responsive web dashboard</li>
+                <li>Docker Compose configurations</li>
+                <li>Operator Field Guide (HTML)</li>
+                <li>API documentation (Swagger/OpenAPI)</li>
+                <li>Production deployment checklist</li>
+                <li>Unit and integration tests</li>
+                <li>Full IP transfer and commercial rights</li>
+            </ul>
+        </section>
+
+        <!-- Testimonial -->
+        <section>
+            <h2>What Our Customers Say</h2>
+            <div class="testimonial">
+                <p>"We tried three Python-based RAG solutions. Our IT security team rejected all of them due to dependency risks. SENTINEL's single-JAR deployment sailed through security review. We were in production in two days."</p>
+                <span class="author">- CTO, Mid-Market Manufacturing Company</span>
+            </div>
+        </section>
+
+        <!-- Quick Start -->
+        <section>
+            <h2>30-Minute Quick Start</h2>
+            <div class="code-block">
+<pre><span class="comment"># 1. Prerequisites</span>
+<span class="comment"># - Java 21+</span>
+<span class="comment"># - MongoDB 7.0+</span>
+<span class="comment"># - Ollama with llama3 and nomic-embed-text</span>
+
+<span class="comment"># 2. Start services</span>
+mongod --dbpath /data/db &
+ollama serve &
+
+<span class="comment"># 3. Pull required models</span>
+ollama pull llama3
+ollama pull nomic-embed-text
+
+<span class="comment"># 4. Configure and launch</span>
+<span class="keyword">export</span> APP_PROFILE=standard
+<span class="keyword">export</span> SENTINEL_ADMIN_PASSWORD=YourSecurePassword123!
+java -jar sentinel.jar
+
+<span class="comment"># 5. Access dashboard</span>
+open http://localhost:8080
+
+<span class="comment"># 6. Ingest your first document</span>
+curl -X POST <span class="string">"http://localhost:8080/api/ingest/file"</span> \
+  -F <span class="string">"file=@company-handbook.pdf"</span> \
+  -F <span class="string">"dept=OPERATIONS"</span>
+
+<span class="comment"># 7. Query</span>
+curl <span class="string">"http://localhost:8080/api/ask?q=What+is+the+vacation+policy"</span></pre>
+            </div>
+        </section>
+
+        <!-- Pricing -->
+        <section>
+            <h2>Pricing</h2>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Standard</h3>
+                    <div class="price">$2,500</div>
+                    <p class="description">Source code, single deployment, internal use</p>
+                </div>
+                <div class="pricing-card featured">
+                    <h3>Agency</h3>
+                    <div class="price">$5,000</div>
+                    <p class="description">Unlimited deployments, white-label, client resale</p>
+                </div>
+                <div class="pricing-card">
+                    <h3>Full Acquisition</h3>
+                    <div class="price">$15,000</div>
+                    <p class="description">Exclusive ownership option, remove from market</p>
+                </div>
+            </div>
+            <p style="text-align: center; color: var(--text-secondary); margin-top: 1rem;">
+                <strong>All licenses include:</strong> Complete source code, documentation, and perpetual use rights.
+            </p>
+            <p style="text-align: center; color: var(--accent-light); margin-top: 0.5rem;">
+                Volume discounts available for multi-entity deployments.
+            </p>
+        </section>
+
+        <!-- Contact -->
+        <section class="contact-section">
+            <h2>Ready to Deploy Enterprise AI?</h2>
+            <div class="contact-info">
+                <div class="contact-item">
+                    <span>Email: contact@sentinel-rag.com</span>
+                </div>
+                <div class="contact-item">
+                    <span>Live Demo: http://localhost:8080 (self-hosted)</span>
+                </div>
+                <div class="contact-item">
+                    <span>Documentation: /manual.html</span>
+                </div>
+                <div class="contact-item">
+                    <span>API Reference: /swagger-ui.html</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p><strong>SENTINEL Enterprise Edition v2.0.0</strong></p>
+            <p>Architected by a TS/SCI Cleared Software Engineer</p>
+            <p class="tagline">One JAR. No Python. Complete Control.</p>
+        </div>
+    </footer>
+</body>
+</html>

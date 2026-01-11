@@ -6,6 +6,8 @@ import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.model.ClearanceLevel;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.repository.UserRepository;
+import com.jreinhal.mercenary.security.JwtValidator;
+import com.jreinhal.mercenary.security.JwtValidator.ValidationResult;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -19,14 +21,22 @@ import java.time.Instant;
 
 /**
  * OIDC/OAuth2 authentication for enterprise deployments.
- * 
- * Supports Azure AD, Okta, and other OIDC providers.
- * 
+ *
+ * Supports Azure AD, Okta, Auth0, and other OIDC providers.
+ *
  * Activated when: app.auth-mode=OIDC
- * 
+ *
  * Required configuration:
- * app.oidc.issuer: The OIDC issuer URL
- * app.oidc.client-id: The application's client ID
+ * - app.oidc.issuer: The OIDC issuer URL
+ * - app.oidc.client-id: The application's client ID
+ * - app.oidc.jwks-uri: (Optional) JWKS endpoint URL
+ * - app.oidc.local-jwks-path: (Optional) Path to local JWKS file for air-gap
+ *
+ * Security Features:
+ * - Full cryptographic signature verification via JWKS
+ * - Issuer and audience validation
+ * - Token expiration enforcement
+ * - Clock skew tolerance
  */
 @Service
 @ConditionalOnProperty(name = "app.auth-mode", havingValue = "OIDC")
@@ -35,6 +45,7 @@ public class OidcAuthenticationService implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(OidcAuthenticationService.class);
 
     private final UserRepository userRepository;
+    private final JwtValidator jwtValidator;
 
     @Value("${app.oidc.issuer:}")
     private String issuer;
@@ -42,9 +53,22 @@ public class OidcAuthenticationService implements AuthenticationService {
     @Value("${app.oidc.client-id:}")
     private String clientId;
 
-    public OidcAuthenticationService(UserRepository userRepository) {
+    @Value("${app.oidc.auto-provision:true}")
+    private boolean autoProvision;
+
+    @Value("${app.oidc.default-role:VIEWER}")
+    private String defaultRole;
+
+    @Value("${app.oidc.default-clearance:UNCLASSIFIED}")
+    private String defaultClearance;
+
+    public OidcAuthenticationService(UserRepository userRepository, JwtValidator jwtValidator) {
         this.userRepository = userRepository;
+        this.jwtValidator = jwtValidator;
+        log.info("==========================================================");
         log.info(">>> OIDC AUTHENTICATION MODE ACTIVE <<<");
+        log.info(">>> JWT signature validation: ENABLED                  <<<");
+        log.info("==========================================================");
     }
 
     @Override
@@ -58,34 +82,48 @@ public class OidcAuthenticationService implements AuthenticationService {
 
         String token = authHeader.substring(7);
 
-        // TODO: Implement full JWT validation with JWKS
-        // For now, decode the token payload and extract claims
-        // In production, use Spring Security OAuth2 Resource Server
+        // Validate JWT with full signature verification
+        ValidationResult result = jwtValidator.validate(token);
+
+        if (!result.isValid()) {
+            log.warn("JWT validation failed: {}", result.getError());
+            return null;
+        }
 
         try {
-            // Decode JWT (simplified - production should validate signature)
-            String[] parts = token.split("\\.");
-            if (parts.length != 3) {
-                log.warn("Invalid JWT format");
+            // Extract claims from validated token
+            String subject = result.getSubject();
+            String email = result.getStringClaim("email");
+            String name = result.getStringClaim("name");
+
+            // Fallback claim names (different providers use different claim names)
+            if (name == null) {
+                name = result.getStringClaim("preferred_username");
+            }
+            if (name == null) {
+                name = result.getStringClaim("given_name");
+                String familyName = result.getStringClaim("family_name");
+                if (familyName != null) {
+                    name = (name != null ? name + " " : "") + familyName;
+                }
+            }
+
+            if (subject == null || subject.isEmpty()) {
+                log.warn("No subject in validated JWT");
                 return null;
             }
 
-            // Decode payload (base64)
-            String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+            log.debug("JWT validated for subject: {}, email: {}", subject, email);
 
-            // Extract subject (simplified parsing)
-            String subject = extractClaim(payload, "sub");
-            String email = extractClaim(payload, "email");
-            String name = extractClaim(payload, "name");
-
-            if (subject == null) {
-                log.warn("No subject in JWT");
-                return null;
-            }
-
-            // Look up or create user
+            // Look up existing user by external ID (OIDC subject)
             User user = userRepository.findByExternalId(subject).orElse(null);
+
             if (user == null) {
+                if (!autoProvision) {
+                    log.warn("User '{}' not found and auto-provisioning disabled", subject);
+                    return null;
+                }
+
                 // Auto-provision new user with default permissions
                 user = new User();
                 user.setExternalId(subject);
@@ -93,36 +131,51 @@ public class OidcAuthenticationService implements AuthenticationService {
                 user.setDisplayName(name != null ? name : subject);
                 user.setEmail(email);
                 user.setAuthProvider(AuthProvider.OIDC);
-                user.setRoles(Set.of(UserRole.VIEWER)); // Default to read-only
-                user.setClearance(ClearanceLevel.UNCLASSIFIED);
+
+                // Apply default role
+                UserRole role;
+                try {
+                    role = UserRole.valueOf(defaultRole.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    role = UserRole.VIEWER;
+                }
+                user.setRoles(Set.of(role));
+
+                // Apply default clearance
+                ClearanceLevel clearance;
+                try {
+                    clearance = ClearanceLevel.valueOf(defaultClearance.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    clearance = ClearanceLevel.UNCLASSIFIED;
+                }
+                user.setClearance(clearance);
+
                 user.setAllowedSectors(Set.of(Department.OPERATIONS));
                 user.setCreatedAt(Instant.now());
                 user.setActive(true);
                 user = userRepository.save(user);
-                log.info("Auto-provisioned new OIDC user: {}", user.getUsername());
+
+                log.info("Auto-provisioned new OIDC user: {} (role: {}, clearance: {})",
+                        user.getUsername(), role, clearance);
             }
 
+            // Check if user is active
+            if (!user.isActive()) {
+                log.warn("OIDC user '{}' is deactivated", user.getUsername());
+                return null;
+            }
+
+            // Update last login
             user.setLastLoginAt(Instant.now());
             userRepository.save(user);
 
+            log.debug("OIDC user '{}' authenticated successfully", user.getUsername());
             return user;
+
         } catch (Exception e) {
-            log.error("OIDC authentication failed: {}", e.getMessage());
+            log.error("OIDC authentication failed: {}", e.getMessage(), e);
             return null;
         }
-    }
-
-    private String extractClaim(String payload, String claim) {
-        // Simplified JSON parsing - production should use proper JSON library
-        String search = "\"" + claim + "\":\"";
-        int start = payload.indexOf(search);
-        if (start == -1)
-            return null;
-        start += search.length();
-        int end = payload.indexOf("\"", start);
-        if (end == -1)
-            return null;
-        return payload.substring(start, end);
     }
 
     @Override

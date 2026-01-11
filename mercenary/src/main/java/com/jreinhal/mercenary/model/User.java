@@ -28,6 +28,7 @@ public class User {
 
     private AuthProvider authProvider = AuthProvider.LOCAL;
     private String externalId; // OIDC subject or CAC DN
+    private String passwordHash; // BCrypt hash for STANDARD auth mode
 
     private Instant createdAt;
     private Instant lastLoginAt;
@@ -123,6 +124,14 @@ public class User {
 
     public void setExternalId(String externalId) {
         this.externalId = externalId;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public Instant getCreatedAt() {

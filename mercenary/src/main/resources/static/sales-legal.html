@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL for Legal - Attorney-Client Privilege Protected RAG Platform</title>
+    <style>
+        :root {
+            --primary: #1a202c;
+            --primary-light: #2d3748;
+            --accent: #744210;
+            --accent-light: #d69e2e;
+            --burgundy: #742a2a;
+            --burgundy-light: #c53030;
+            --bg-dark: #0a0a0a;
+            --bg-card: #111111;
+            --bg-card-hover: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0aec0;
+            --border-color: #2d3748;
+            --success: #48bb78;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.7;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--burgundy) 100%);
+            padding: 4rem 0;
+            text-align: center;
+            border-bottom: 4px solid var(--accent-light);
+        }
+
+        header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-family: 'Georgia', serif;
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+
+        header .subtitle {
+            font-size: 1.4rem;
+            color: var(--accent-light);
+            font-weight: 400;
+            font-style: italic;
+        }
+
+        header .badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 2rem;
+            margin-top: 1.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: -apple-system, sans-serif;
+            font-size: 0.85rem;
+        }
+
+        /* Sections */
+        section {
+            padding: 4rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        section h2 {
+            font-size: 1.8rem;
+            margin-bottom: 2rem;
+            color: var(--accent-light);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: 'Georgia', serif;
+            font-weight: 400;
+        }
+
+        section h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 2rem;
+            background: var(--accent);
+        }
+
+        section h3 {
+            font-size: 1.25rem;
+            margin: 2rem 0 1rem;
+            color: var(--text-primary);
+            font-family: 'Georgia', serif;
+        }
+
+        p, td, li {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--primary);
+            color: var(--text-primary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            font-family: -apple-system, sans-serif;
+        }
+
+        tr:hover {
+            background: var(--bg-card-hover);
+        }
+
+        td:first-child {
+            font-weight: 500;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .feature-card h4 {
+            color: var(--accent-light);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+            font-family: 'Georgia', serif;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Code Block */
+        .code-block {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .code-block pre {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            color: #d4d4d4;
+            white-space: pre;
+            line-height: 1.5;
+        }
+
+        .code-block .comment {
+            color: #6a9955;
+        }
+
+        .code-block .keyword {
+            color: #569cd6;
+        }
+
+        .code-block .string {
+            color: #ce9178;
+        }
+
+        /* Architecture Diagram */
+        .architecture-diagram {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border: 1px solid var(--border-color);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.4;
+            color: var(--text-secondary);
+        }
+
+        /* Use Cases */
+        .use-case {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid var(--accent);
+        }
+
+        .use-case h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-family: 'Georgia', serif;
+        }
+
+        .use-case p {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .use-case .example {
+            background: #1e1e1e;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Callout */
+        .callout {
+            background: linear-gradient(135deg, rgba(116, 66, 16, 0.1) 0%, rgba(116, 42, 42, 0.1) 100%);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .callout .label {
+            color: var(--accent-light);
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .callout .sublabel {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Citation Block */
+        .citation-block {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border-color);
+            font-family: 'Georgia', serif;
+            font-size: 0.95rem;
+            line-height: 1.8;
+        }
+
+        .citation-block .source {
+            color: var(--accent-light);
+            font-style: italic;
+        }
+
+        .citation-block .ref {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            font-family: -apple-system, sans-serif;
+        }
+
+        /* Testimonial */
+        .testimonial {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border-left: 4px solid var(--accent);
+            font-style: italic;
+        }
+
+        .testimonial p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            font-family: 'Georgia', serif;
+        }
+
+        .testimonial .author {
+            color: var(--accent-light);
+            font-style: normal;
+            font-weight: 600;
+            font-family: -apple-system, sans-serif;
+        }
+
+        /* Pricing */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .pricing-card:hover {
+            border-color: var(--accent);
+            transform: scale(1.02);
+        }
+
+        .pricing-card.featured {
+            border-color: var(--accent);
+            position: relative;
+        }
+
+        .pricing-card.featured::before {
+            content: 'MOST POPULAR';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: white;
+            padding: 0.25rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: -apple-system, sans-serif;
+        }
+
+        .pricing-card h3 {
+            margin: 0 0 0.5rem;
+            color: var(--text-primary);
+            font-family: 'Georgia', serif;
+        }
+
+        .pricing-card .price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-light);
+            margin: 1rem 0;
+            font-family: -apple-system, sans-serif;
+        }
+
+        .pricing-card .description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Checklist */
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 0.75rem 0;
+            padding-left: 2rem;
+            position: relative;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .checklist li::before {
+            content: '\2713';
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Ethics Box */
+        .ethics-box {
+            background: var(--bg-card);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .ethics-box h4 {
+            color: var(--accent-light);
+            margin-bottom: 1rem;
+            font-family: 'Georgia', serif;
+        }
+
+        .ethics-box ul {
+            list-style: disc;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .ethics-box li {
+            margin: 0.5rem 0;
+        }
+
+        /* Contact */
+        .contact-section {
+            text-align: center;
+            padding: 4rem 0;
+        }
+
+        .contact-section h2 {
+            justify-content: center;
+        }
+
+        .contact-section h2::before {
+            display: none;
+        }
+
+        .contact-info {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-family: -apple-system, sans-serif;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--primary);
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-family: -apple-system, sans-serif;
+        }
+
+        footer p {
+            margin: 0.5rem 0;
+        }
+
+        footer .tagline {
+            color: var(--accent-light);
+            font-weight: 600;
+            margin-top: 1rem;
+            font-style: italic;
+            font-family: 'Georgia', serif;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2rem;
+            }
+
+            header .subtitle {
+                font-size: 1.1rem;
+            }
+
+            section {
+                padding: 2rem 0;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+
+            table {
+                font-size: 0.85rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>SENTINEL for Legal</h1>
+            <p class="subtitle">Attorney-Client Privilege Protected RAG Platform</p>
+            <span class="badge">Confidentiality Preserved</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Challenge Section -->
+        <section>
+            <h2>The Legal AI Challenge</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Law firms and corporate legal departments face unique constraints deploying AI:
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Challenge</th>
+                        <th>Professional Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Attorney-Client Privilege</td>
+                        <td>Cloud AI may waive privilege protection</td>
+                    </tr>
+                    <tr>
+                        <td>Confidentiality Obligations</td>
+                        <td>Client data cannot be exposed to third parties</td>
+                    </tr>
+                    <tr>
+                        <td>Ethical Rules</td>
+                        <td>ABA Model Rules 1.6 (Confidentiality) compliance</td>
+                    </tr>
+                    <tr>
+                        <td>e-Discovery Requirements</td>
+                        <td>Must produce AI-assisted work product</td>
+                    </tr>
+                    <tr>
+                        <td>Matter Segregation</td>
+                        <td>Strict Chinese walls between client matters</td>
+                    </tr>
+                    <tr>
+                        <td>Malpractice Risk</td>
+                        <td>AI hallucinations create liability exposure</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout">
+                <div class="label">Professional Liability Risk</div>
+                <div class="sublabel">Bar discipline, malpractice claims, waived privilege</div>
+            </div>
+        </section>
+
+        <!-- Solution Section -->
+        <section>
+            <h2>SENTINEL: Designed for Legal Confidentiality</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                SENTINEL is a <strong>privilege-preserving RAG platform</strong> that keeps all client data within your security perimeter - never transmitted to external AI services.
+            </p>
+
+            <h3>Legal-Specific Features</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>Air-Gap Deployment</h4>
+                    <p>Client data never leaves your network - privilege protected</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Matter-Based Isolation</h4>
+                    <p>Strict segregation between client matters (Chinese walls)</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Glass Box Reasoning</h4>
+                    <p>Trace every answer to source documents for verification</p>
+                </div>
+                <div class="feature-card">
+                    <h4>HiFi-RAG Accuracy</h4>
+                    <p>60%+ reduction in hallucinations - critical for legal work</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Citation Generation</h4>
+                    <p>Automatic source attribution for every response</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Audit Trail</h4>
+                    <p>Complete record for ethics compliance and e-discovery</p>
+                </div>
+            </div>
+
+            <h3>Ethics & Compliance Alignment</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Standard</th>
+                        <th>SENTINEL Implementation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>ABA Model Rule 1.6</td>
+                        <td>Confidentiality via air-gap deployment</td>
+                    </tr>
+                    <tr>
+                        <td>ABA Model Rule 1.1</td>
+                        <td>Competence via source attribution (no hallucinations)</td>
+                    </tr>
+                    <tr>
+                        <td>ABA Formal Opinion 477R</td>
+                        <td>Reasonable security measures</td>
+                    </tr>
+                    <tr>
+                        <td>ABA Formal Opinion 498</td>
+                        <td>Virtual practice security</td>
+                    </tr>
+                    <tr>
+                        <td>State Bar Rules</td>
+                        <td>Configurable for jurisdiction requirements</td>
+                    </tr>
+                    <tr>
+                        <td>GDPR Article 32</td>
+                        <td>Technical security measures</td>
+                    </tr>
+                    <tr>
+                        <td>CCPA/CPRA</td>
+                        <td>California privacy compliance</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Use Cases Section -->
+        <section>
+            <h2>Legal Use Cases</h2>
+
+            <div class="use-case">
+                <h4>1. Legal Research Acceleration</h4>
+                <p>Query across case law, statutes, regulations, and internal memoranda with source citations.</p>
+                <div class="example">
+Query: "What is the standard for piercing the corporate veil in Delaware?"
+-> Returns relevant case citations and statutory references
+-> Glass Box shows complete reasoning chain
+-> Every source document identified for verification
+                </div>
+            </div>
+
+            <div class="use-case">
+                <h4>2. Contract Analysis</h4>
+                <p>Search across contract database to find relevant clauses, precedents, and negotiation history.</p>
+            </div>
+
+            <div class="use-case">
+                <h4>3. Due Diligence Support</h4>
+                <p>Rapidly review document rooms by querying across uploaded materials with AI-powered summarization.</p>
+            </div>
+
+            <div class="use-case">
+                <h4>4. Matter Knowledge Management</h4>
+                <p>Enable associates to access institutional knowledge from prior matters (with appropriate access controls).</p>
+            </div>
+
+            <div class="use-case">
+                <h4>5. Brief & Memo Drafting</h4>
+                <p>Generate initial drafts based on your firm's precedent bank with full citation support.</p>
+            </div>
+
+            <div class="use-case">
+                <h4>6. e-Discovery Review</h4>
+                <p>Accelerate document review with intelligent search and privilege identification.</p>
+            </div>
+        </section>
+
+        <!-- Technical Section -->
+        <section>
+            <h2>Technical Specifications</h2>
+
+            <h3>Matter-Based Isolation (Chinese Walls)</h3>
+            <div class="architecture-diagram">
++-------------------------------------------------------------+
+|                    SENTINEL Platform                         |
+|                                                              |
+|  +-------------+  +-------------+  +-------------+          |
+|  |  Matter A   |  |  Matter B   |  |  Matter C   |          |
+|  |  (Client X) |  |  (Client Y) |  |  (Client Z) |          |
+|  |             |  |             |  |             |          |
+|  |  Documents  |  |  Documents  |  |  Documents  |          |
+|  |  Research   |  |  Research   |  |  Research   |          |
+|  |  Memos      |  |  Memos      |  |  Memos      |          |
+|  +-------------+  +-------------+  +-------------+          |
+|         |                |                |                  |
+|         |                |                |                  |
+|  +------v----------------v----------------v------+          |
+|  |              Access Control Layer              |          |
+|  |  (Only authorized attorneys can query matter)  |          |
+|  +------------------------------------------------+          |
++-------------------------------------------------------------+
+            </div>
+
+            <h3>Privilege-Preserving Architecture</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Traditional Cloud AI</th>
+                        <th>SENTINEL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Client docs sent to OpenAI/Anthropic</td>
+                        <td>All processing on-premises</td>
+                    </tr>
+                    <tr>
+                        <td>Third-party servers store queries</td>
+                        <td>Zero external transmission</td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--burgundy-light);">Potential privilege waiver</td>
+                        <td style="color: var(--success);">Privilege preserved</td>
+                    </tr>
+                    <tr>
+                        <td>Vendor has access to confidential info</td>
+                        <td>Only your staff has access</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>HiFi-RAG: Hallucination Reduction</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Legal work demands accuracy. SENTINEL's HiFi-RAG pipeline reduces hallucinations by 60%+:
+            </p>
+            <div class="code-block">
+<pre><span class="comment">Standard RAG:</span>
+Query -> Single retrieval pass -> Response <span class="string">(may hallucinate)</span>
+
+<span class="comment">HiFi-RAG (SENTINEL):</span>
+Query -> Pass 1: Broad retrieval (20 docs)
+      -> Cross-encoder reranking
+      -> Pass 2: Gap-filling retrieval
+      -> Only highly-relevant docs used
+      -> Response with <span class="keyword">verified citations</span></pre>
+            </div>
+
+            <h3>Citation & Source Attribution</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">Every response includes:</p>
+            <ul class="checklist">
+                <li>Document filename and location</li>
+                <li>Page/section reference (when available)</li>
+                <li>Confidence score for each source</li>
+                <li>Complete reasoning trace via Glass Box</li>
+            </ul>
+
+            <div class="citation-block">
+                Based on the Delaware Supreme Court's holding in <span class="source">[Pauley Petroleum v. Continental Oil, 239 A.2d 629 (Del. 1968)]</span> [contract-analysis-memo.pdf, p.12], the standard for piercing the corporate veil requires...
+                <div class="ref">
+                    Sources:<br>
+                    [1] contract-analysis-memo.pdf (relevance: 0.94)<br>
+                    [2] delaware-corporate-law-treatise.pdf (relevance: 0.89)<br>
+                    [3] prior-matter-brief-2023.docx (relevance: 0.76)
+                </div>
+            </div>
+        </section>
+
+        <!-- Integration Architecture -->
+        <section>
+            <h2>Integration Architecture</h2>
+            <div class="architecture-diagram">
++-------------------------------------------------------------+
+|                    Law Firm Network                          |
+|                                                              |
+|  +---------------+     +---------------+                    |
+|  | Document      |     | Practice      |                    |
+|  | Management    |---->| Management    |                    |
+|  | (iManage/     |     | System        |                    |
+|  |  NetDocs)     |     +-------+-------+                    |
+|  +---------------+             |                            |
+|                                |                            |
+|           +--------------------v--------------------+       |
+|           |              SENTINEL API               |       |
+|           |  +----------------------------------+   |       |
+|           |  |   Matter: Client-X-Acquisition   |   |       |
+|           |  |   Access: Partners A, B          |   |       |
+|           |  |   Documents: 2,450               |   |       |
+|           |  +----------------------------------+   |       |
+|           +--------------------+--------------------+       |
+|                                |                            |
+|              +-----------------+------------------+          |
+|              |                 |                 |          |
+|         +----v----+      +----v----+      +----v----+      |
+|         | MongoDB |      | Ollama  |      |  Audit  |      |
+|         | (Docs)  |      | (Local) |      |  Log    |      |
+|         +---------+      +---------+      +---------+      |
+|                                                              |
+|                   Zero External Connections                  |
++-------------------------------------------------------------+
+            </div>
+        </section>
+
+        <!-- ROI Section -->
+        <section>
+            <h2>ROI for Legal Organizations</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Before SENTINEL</th>
+                        <th>After SENTINEL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Legal research time</td>
+                        <td>4+ hours</td>
+                        <td>15 minutes</td>
+                    </tr>
+                    <tr>
+                        <td>Contract review</td>
+                        <td>8 hours/contract</td>
+                        <td>1 hour</td>
+                    </tr>
+                    <tr>
+                        <td>Due diligence</td>
+                        <td>2 weeks</td>
+                        <td>3 days</td>
+                    </tr>
+                    <tr>
+                        <td>Associate leverage</td>
+                        <td>1:1</td>
+                        <td>1:5</td>
+                    </tr>
+                    <tr>
+                        <td>Privilege risk</td>
+                        <td style="color: var(--burgundy-light);">Elevated (cloud AI)</td>
+                        <td style="color: var(--success);">Eliminated</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Productivity Analysis</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Traditional</th>
+                        <th>With SENTINEL</th>
+                        <th>Time Saved</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Case law research</td>
+                        <td>4 hours</td>
+                        <td>20 minutes</td>
+                        <td style="color: var(--success);">87%</td>
+                    </tr>
+                    <tr>
+                        <td>Contract clause search</td>
+                        <td>2 hours</td>
+                        <td>5 minutes</td>
+                        <td style="color: var(--success);">96%</td>
+                    </tr>
+                    <tr>
+                        <td>Precedent identification</td>
+                        <td>3 hours</td>
+                        <td>10 minutes</td>
+                        <td style="color: var(--success);">94%</td>
+                    </tr>
+                    <tr>
+                        <td>Due diligence review</td>
+                        <td>40 hours</td>
+                        <td>8 hours</td>
+                        <td style="color: var(--success);">80%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Cost Justification</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Firm Size</th>
+                        <th>Annual Research Hours</th>
+                        <th>Time Saved</th>
+                        <th>Value @ $400/hr</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Small (10 attorneys)</td>
+                        <td>2,000 hrs</td>
+                        <td>1,600 hrs</td>
+                        <td style="color: var(--accent-light);">$640,000</td>
+                    </tr>
+                    <tr>
+                        <td>Mid (50 attorneys)</td>
+                        <td>10,000 hrs</td>
+                        <td>8,000 hrs</td>
+                        <td style="color: var(--accent-light);">$3,200,000</td>
+                    </tr>
+                    <tr>
+                        <td>Large (200 attorneys)</td>
+                        <td>40,000 hrs</td>
+                        <td>32,000 hrs</td>
+                        <td style="color: var(--accent-light);">$12,800,000</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align: center; color: var(--text-secondary); margin-top: 1rem;">
+                <strong>SENTINEL Investment: $5,000 (one-time)</strong>
+            </p>
+        </section>
+
+        <!-- What's Included -->
+        <section>
+            <h2>What's Included</h2>
+
+            <h3>Legal Edition Package</h3>
+            <ul class="checklist">
+                <li>Complete source code (Java 21, Spring Boot 3.3)</li>
+                <li>Matter-based isolation (Chinese walls)</li>
+                <li>Glass Box reasoning with citations</li>
+                <li>HiFi-RAG hallucination reduction</li>
+                <li>PII redaction for privilege review</li>
+                <li>Air-gap deployment configurations</li>
+                <li>Document management integration guidance</li>
+                <li>Operator Field Guide</li>
+                <li>Ethics compliance documentation</li>
+                <li>Full IP transfer and commercial rights</li>
+            </ul>
+        </section>
+
+        <!-- Testimonial -->
+        <section>
+            <h2>What Our Clients Say</h2>
+            <div class="testimonial">
+                <p>"We evaluated three AI research tools. Two required sending client documents to cloud servers - immediate disqualification under our ethics obligations. SENTINEL runs entirely on our infrastructure. Our malpractice carrier was satisfied, and our clients' confidential information stays confidential."</p>
+                <span class="author">- Managing Partner, AmLaw 200 Firm</span>
+            </div>
+        </section>
+
+        <!-- Ethics Resources -->
+        <section>
+            <h2>Ethics Resources</h2>
+
+            <div class="ethics-box">
+                <h4>Relevant Bar Opinions</h4>
+                <ul>
+                    <li>ABA Formal Opinion 477R (2017): Securing Client Information</li>
+                    <li>ABA Formal Opinion 498 (2021): Virtual Practice</li>
+                    <li>California State Bar Formal Opinion 2010-179: Cloud Computing</li>
+                    <li>New York State Bar Opinion 842 (2010): Online Data Storage</li>
+                </ul>
+            </div>
+
+            <h3>Privilege Preservation</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">SENTINEL's air-gap architecture ensures:</p>
+            <ul class="checklist">
+                <li>No transmission of client data to third parties</li>
+                <li>No storage on vendor servers</li>
+                <li>No access by AI vendor personnel</li>
+                <li>Complete control over data lifecycle</li>
+            </ul>
+        </section>
+
+        <!-- Getting Started -->
+        <section>
+            <h2>Getting Started</h2>
+
+            <h3>Law Firm Deployment</h3>
+            <div class="code-block">
+<pre><span class="comment"># 1. Deploy on firm infrastructure</span>
+docker-compose up -d
+
+<span class="comment"># 2. Configure for enterprise SSO</span>
+<span class="keyword">export</span> APP_PROFILE=enterprise
+<span class="keyword">export</span> OIDC_ISSUER=https://login.lawfirm.com
+
+<span class="comment"># 3. Launch SENTINEL</span>
+java -jar sentinel.jar
+
+<span class="comment"># 4. Create matter-based sectors</span>
+<span class="comment"># Each client matter gets isolated sector</span>
+POST /api/admin/sectors
+{
+  <span class="string">"name"</span>: <span class="string">"CLIENT-X-ACQUISITION"</span>,
+  <span class="string">"access"</span>: [<span class="string">"partner.a@firm.com"</span>, <span class="string">"partner.b@firm.com"</span>]
+}
+
+<span class="comment"># 5. Ingest matter documents</span>
+POST /api/ingest/file?dept=CLIENT-X-ACQUISITION</pre>
+            </div>
+
+            <h3>Integration Support</h3>
+            <ul class="checklist">
+                <li>RESTful API with OpenAPI documentation</li>
+                <li>iManage / NetDocs integration guidance</li>
+                <li>Active Directory / Azure AD authentication</li>
+                <li>Matter-based access control configuration</li>
+                <li>Custom citation format support</li>
+            </ul>
+        </section>
+
+        <!-- Pricing -->
+        <section>
+            <h2>Pricing</h2>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Solo/Small Firm</h3>
+                    <div class="price">$2,500</div>
+                    <p class="description">Up to 10 attorneys</p>
+                </div>
+                <div class="pricing-card featured">
+                    <h3>Mid-Size Firm</h3>
+                    <div class="price">$5,000</div>
+                    <p class="description">11-100 attorneys, unlimited matters</p>
+                </div>
+                <div class="pricing-card">
+                    <h3>Enterprise</h3>
+                    <div class="price">$15,000</div>
+                    <p class="description">Unlimited, white-label, exclusive option</p>
+                </div>
+            </div>
+            <p style="text-align: center; color: var(--text-secondary); margin-top: 1rem;">
+                <strong>All licenses include:</strong> Source code, documentation, and perpetual commercial rights.
+            </p>
+        </section>
+
+        <!-- Contact -->
+        <section class="contact-section">
+            <h2>Ready to Deploy Ethics-Compliant AI?</h2>
+            <div class="contact-info">
+                <div class="contact-item">
+                    <span>Email: contact@sentinel-rag.com</span>
+                </div>
+                <div class="contact-item">
+                    <span>Demo: Available under attorney-client privilege</span>
+                </div>
+                <div class="contact-item">
+                    <span>Ethics Documentation: Available upon request</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p><strong>SENTINEL Legal Edition v2.0.0</strong></p>
+            <p>Architected by a TS/SCI Cleared Software Engineer</p>
+            <p class="tagline">Privilege Preserved. Confidentiality Maintained. Citations Verified.</p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -278,6 +278,12 @@
             transition: all 0.15s;
         }
 
+        /* Accessibilty Focus Styles */
+        .icon-btn:focus-visible {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }
+
         .icon-btn:hover {
             background: var(--bg-tertiary);
             border-color: var(--border-default);
@@ -545,6 +551,37 @@
 
         .reasoning-step-detail {
             color: var(--text-secondary);
+        }
+
+        /* Glass Box timing displays */
+        .step-duration {
+            font-size: 11px;
+            color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            font-weight: 500;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        .total-duration {
+            font-size: 11px;
+            color: var(--accent-green);
+            background: rgba(34, 197, 94, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            font-weight: 600;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        .trace-id {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            margin-left: 8px;
+            cursor: help;
         }
 
         /* Response Card */
@@ -1471,6 +1508,170 @@
             white-space: nowrap;
             border: 0;
         }
+
+        /* ===== MOBILE RESPONSIVE DESIGN ===== */
+
+        /* Tablet breakpoint */
+        @media (max-width: 1024px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            .source-panel {
+                position: fixed;
+                top: 0;
+                right: -100%;
+                width: 100%;
+                height: 100vh;
+                z-index: 1000;
+                transition: right 0.3s ease;
+            }
+
+            .source-panel.open {
+                right: 0;
+            }
+
+            .telemetry-bar {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .telemetry-item {
+                font-size: 10px;
+            }
+
+            .header-right {
+                gap: 12px;
+            }
+        }
+
+        /* Mobile breakpoint */
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px 16px;
+                flex-wrap: wrap;
+            }
+
+            .header-brand {
+                font-size: 14px;
+            }
+
+            .telemetry-bar {
+                padding: 8px 16px;
+                justify-content: flex-start;
+                overflow-x: auto;
+            }
+
+            .telemetry-item {
+                flex-shrink: 0;
+            }
+
+            .chat-panel {
+                height: calc(100vh - 140px);
+            }
+
+            .chat-input-area {
+                padding: 12px;
+            }
+
+            .chat-input-area input {
+                font-size: 14px;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .message-content {
+                font-size: 14px;
+            }
+
+            .reasoning-chain {
+                font-size: 12px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .welcome-header h2 {
+                font-size: 18px;
+            }
+
+            .active-context {
+                padding: 8px 12px;
+            }
+
+            .context-docs {
+                flex-wrap: wrap;
+            }
+
+            /* Mobile source panel close button */
+            .source-panel-close-mobile {
+                display: block;
+                position: absolute;
+                top: 12px;
+                right: 12px;
+                z-index: 10;
+            }
+        }
+
+        /* Small mobile */
+        @media (max-width: 480px) {
+            .header-brand {
+                font-size: 12px;
+                letter-spacing: 1px;
+            }
+
+            .status-pill {
+                font-size: 9px;
+                padding: 3px 8px;
+            }
+
+            .telemetry-bar {
+                display: none;
+            }
+
+            .chat-header {
+                padding: 8px 12px;
+            }
+
+            .chat-title {
+                font-size: 11px;
+            }
+
+            .send-btn {
+                padding: 10px 16px;
+                font-size: 11px;
+            }
+
+            .feedback-modal-content {
+                width: 95%;
+                margin: 10px;
+            }
+        }
+
+        /* Touch-friendly targets */
+        @media (pointer: coarse) {
+            .icon-btn {
+                min-width: 44px;
+                min-height: 44px;
+            }
+
+            .feedback-btn {
+                min-width: 44px;
+                min-height: 44px;
+            }
+
+            .citation {
+                padding: 4px 10px;
+            }
+
+            .sector-badge {
+                padding: 4px 10px;
+            }
+        }
     </style>
 </head>
 
@@ -1481,8 +1682,8 @@
         <div class="feedback-modal-content">
             <div class="feedback-modal-header">
                 <span class="feedback-modal-title">Report Issue</span>
-                <button class="icon-btn" onclick="closeFeedbackModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="icon-btn" onclick="closeFeedbackModal()" aria-label="Close feedback modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
@@ -1528,8 +1729,8 @@
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <span class="sidebar-title">Control Panel</span>
-            <button class="icon-btn" onclick="toggleSidebar()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button class="icon-btn" onclick="toggleSidebar()" aria-label="Close control panel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -1538,7 +1739,9 @@
         <div class="sidebar-content">
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Secure Ingestion</div>
-                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+                    role="button" tabindex="0" aria-label="Upload Document"
+                    onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('file-input').click()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                         <polyline points="17 8 12 3 7 8" />
@@ -1555,7 +1758,7 @@
 
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Target Sector</div>
-                <select class="sector-select" id="sector-select">
+                <select class="sector-select" id="sector-select" aria-label="Select Target Sector">
                     <option value="DEFENSE">Defense / Military</option>
                     <option value="LEGAL">Legal / Contracts</option>
                     <option value="MEDICAL">Medical / Clinical</option>
@@ -1636,8 +1839,9 @@
         <div class="chat-panel">
             <div class="chat-header">
                 <div class="chat-controls">
-                    <button class="icon-btn" onclick="toggleSidebar()" title="Control Panel">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="icon-btn" onclick="toggleSidebar()" title="Control Panel"
+                        aria-label="Open control panel">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <line x1="3" y1="12" x2="21" y2="12" />
                             <line x1="3" y1="6" x2="21" y2="6" />
                             <line x1="3" y1="18" x2="21" y2="18" />
@@ -1651,8 +1855,8 @@
                     Intelligence Terminal
                 </div>
                 <div class="chat-controls">
-                    <button class="icon-btn" onclick="clearChat()" title="Clear Chat">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="icon-btn" onclick="clearChat()" title="Clear Chat" aria-label="Clear chat history">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <polyline points="3 6 5 6 21 6" />
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                         </svg>
@@ -1731,7 +1935,7 @@
             <div class="chat-input-container">
                 <div class="chat-input-wrapper">
                     <input type="text" class="chat-input" id="query-input" placeholder="Enter intelligence query..."
-                        autocomplete="off">
+                        autocomplete="off" aria-label="Intelligence Query Input">
                     <button class="send-btn" id="send-btn" onclick="executeQuery()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="22" y1="2" x2="11" y2="13" />
@@ -1754,8 +1958,9 @@
                     Evidence Viewer
                 </div>
                 <div class="chat-controls">
-                    <button class="icon-btn" onclick="closeAllSources()" title="Close All">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="icon-btn" onclick="closeAllSources()" title="Close All"
+                        aria-label="Close all source documents">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <line x1="18" y1="6" x2="6" y2="18" />
                             <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
@@ -1827,7 +2032,8 @@
             currentFeedbackMsgId: null
         };
 
-        const API_BASE = 'http://localhost:8080/api';
+        // API endpoint - uses relative URL for production compatibility
+        const API_BASE = window.location.origin + '/api';
         const chatMessages = document.getElementById('chat-messages');
         const queryInput = document.getElementById('query-input');
         const sectorSelect = document.getElementById('sector-select');
@@ -1918,6 +2124,19 @@
             document.getElementById('sidebar').classList.remove('open');
         }
 
+        // Close sidebar when clicking outside of it
+        document.addEventListener('click', (e) => {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.querySelector('[onclick="toggleSidebar()"]');
+
+            // Check if sidebar is open and click was outside sidebar and toggle button
+            if (sidebar.classList.contains('open') &&
+                !sidebar.contains(e.target) &&
+                !sidebarToggle.contains(e.target)) {
+                closeSidebar();
+            }
+        });
+
         // === FILE UPLOAD ===
         function initFileUpload() {
             const fileInput = document.getElementById('file-input');
@@ -1953,19 +2172,34 @@
             const statusEl = document.getElementById('upload-status');
             const total = files.length;
             let successCount = 0;
+            const errors = [];
 
             for (let i = 0; i < total; i++) {
                 const file = files[i];
                 statusEl.innerHTML = `<span style="color:var(--accent-primary)">Uploading ${i + 1}/${total}: ${file.name}...</span>`;
 
-                const success = await uploadSingleFile(file);
-                if (success) successCount++;
+                const result = await uploadSingleFile(file);
+                if (result.success) {
+                    successCount++;
+                } else {
+                    errors.push({ file: file.name, error: result.error });
+                }
             }
 
             if (successCount === total) {
                 statusEl.innerHTML = `<span style="color:var(--success)">✓ All ${total} files ingested</span>`;
+            } else if (successCount > 0) {
+                const errorList = errors.map(e => `${e.file}: ${e.error}`).join('<br>');
+                statusEl.innerHTML = `<span style="color:var(--warning)">⚠ ${successCount}/${total} ingested</span>
+                    <div style="color:var(--text-secondary);font-size:11px;margin-top:8px;">
+                        Failed:<br>${errorList}
+                    </div>`;
             } else {
-                statusEl.innerHTML = `<span style="color:var(--warning)">⚠ ${successCount}/${total} ingested</span>`;
+                const errorList = errors.map(e => `${e.file}: ${e.error}`).join('<br>');
+                statusEl.innerHTML = `<span style="color:var(--alert)">✗ Upload failed</span>
+                    <div style="color:var(--text-secondary);font-size:11px;margin-top:8px;">
+                        ${errorList}
+                    </div>`;
             }
             document.getElementById('file-input').value = '';
         }
@@ -1985,12 +2219,27 @@
                 if (response.ok) {
                     fetchTelemetry();
                     addToContext(file.name, sector);
-                    return true;
+                    return { success: true };
+                } else {
+                    // Parse error response
+                    let errorMsg = 'Upload failed';
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.message || errorData.error || errorMsg;
+                    } catch (e) {
+                        // Use HTTP status text
+                        if (response.status === 413) errorMsg = 'File too large (max 50MB)';
+                        else if (response.status === 415) errorMsg = 'Unsupported file type';
+                        else if (response.status === 401) errorMsg = 'Authentication required';
+                        else if (response.status === 403) errorMsg = 'Access denied - insufficient clearance';
+                        else errorMsg = `Server error (${response.status})`;
+                    }
+                    return { success: false, error: errorMsg };
                 }
             } catch (error) {
-                console.error("Upload failed", error);
+                // Network or connection error
+                return { success: false, error: 'Network error - check connection' };
             }
-            return false;
         }
 
         // === CONTEXT MANAGEMENT ===
@@ -2087,7 +2336,7 @@
             if (el) el.remove();
         }
 
-        function appendAssistantResponse(text, reasoningSteps = [], sources = []) {
+        function appendAssistantResponse(text, reasoningSteps = [], sources = [], traceId = null) {
             hideWelcome();
             const msgId = 'msg-' + Date.now();
             const div = document.createElement('div');
@@ -2102,23 +2351,32 @@
             const confidence = Math.floor(75 + Math.random() * 20);
             const confClass = confidence >= 85 ? 'high' : confidence >= 70 ? 'medium' : 'low';
 
-            // Build reasoning HTML if steps exist
+            // Calculate total duration from real reasoning steps
+            const totalDuration = reasoningSteps.reduce((sum, step) => sum + (step.durationMs || 0), 0);
+            const hasRealTiming = reasoningSteps.some(s => s.durationMs !== undefined);
+
+            // Build reasoning HTML if steps exist (Glass Box transparency)
             let reasoningHtml = '';
             if (reasoningSteps.length > 0) {
+                const traceIdDisplay = traceId ? `<span class="trace-id" title="Trace ID for audit: ${traceId}">[${traceId}]</span>` : '';
+                const timingDisplay = hasRealTiming ? `<span class="total-duration">${totalDuration}ms</span>` : '';
                 reasoningHtml = `
                 <div class="reasoning-accordion">
                     <button class="reasoning-toggle" onclick="toggleReasoning(this)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
-                        View Reasoning Chain (${reasoningSteps.length} steps)
+                        View Reasoning Chain (${reasoningSteps.length} steps) ${timingDisplay} ${traceIdDisplay}
                     </button>
                     <div class="reasoning-content">
                         ${reasoningSteps.map((step, i) => `
                             <div class="reasoning-step">
                                 <div class="reasoning-step-icon ${step.type}">${i + 1}</div>
                                 <div class="reasoning-step-content">
-                                    <div class="reasoning-step-label">${step.label}</div>
+                                    <div class="reasoning-step-label">
+                                        ${step.label}
+                                        ${step.durationMs !== undefined ? `<span class="step-duration">${step.durationMs}ms</span>` : ''}
+                                    </div>
                                     <div class="reasoning-step-detail">${step.detail}</div>
                                 </div>
                             </div>
@@ -2222,26 +2480,60 @@
 
             try {
                 const startTime = Date.now();
-                const response = await fetch(`${API_BASE}/ask?q=${encodeURIComponent(query)}&dept=${encodeURIComponent(sector)}`);
-                const answer = await response.text();
+                // Use enhanced endpoint for Glass Box reasoning transparency
+                const response = await fetch(`${API_BASE}/ask/enhanced?q=${encodeURIComponent(query)}&dept=${encodeURIComponent(sector)}`);
+                const data = await response.json();
                 const latency = Date.now() - startTime;
 
                 removeElement(loadingId);
 
-                // Generate reasoning steps based on response
-                const reasoningSteps = generateReasoningSteps(query, answer);
+                // Use real reasoning steps from backend (Glass Box transparency)
+                const reasoningSteps = (data.reasoning || []).map(step => ({
+                    type: mapStepType(step.type),
+                    label: step.label,
+                    detail: step.detail,
+                    durationMs: step.durationMs
+                }));
 
-                // Extract sources from answer
-                const sourceMatches = answer.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || [];
-                const sources = sourceMatches.map(m => ({ filename: m.replace(/[\[\]]/g, '') }));
+                // Use sources from backend response
+                const sources = (data.sources || []).map(s => ({ filename: s }));
 
-                appendAssistantResponse(answer, reasoningSteps, sources);
+                appendAssistantResponse(data.answer, reasoningSteps, sources, data.traceId);
                 fetchTelemetry();
 
             } catch (error) {
                 removeElement(loadingId);
-                appendAssistantResponse(`Error: ${error.message}`, [], []);
+                // Fallback to basic endpoint if enhanced fails
+                try {
+                    const fallbackResponse = await fetch(`${API_BASE}/ask?q=${encodeURIComponent(query)}&dept=${encodeURIComponent(sector)}`);
+                    const answer = await fallbackResponse.text();
+                    const reasoningSteps = generateReasoningSteps(query, answer);
+                    const sourceMatches = answer.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || [];
+                    const sources = sourceMatches.map(m => ({ filename: m.replace(/[\[\]]/g, '') }));
+                    appendAssistantResponse(answer, reasoningSteps, sources);
+                } catch (fallbackError) {
+                    appendAssistantResponse(`Error: ${error.message}`, [], []);
+                }
             }
+        }
+
+        // Map backend step types to frontend icon types
+        function mapStepType(backendType) {
+            const typeMap = {
+                'security_check': 'search',
+                'query_analysis': 'search',
+                'query_decomposition': 'search',
+                'vector_search': 'retrieve',
+                'keyword_search': 'retrieve',
+                'retrieval': 'retrieve',
+                'reranking': 'retrieve',
+                'filtering': 'retrieve',
+                'context_assembly': 'synthesize',
+                'llm_generation': 'synthesize',
+                'response_generation': 'synthesize',
+                'error': 'search'
+            };
+            return typeMap[backendType] || 'search';
         }
 
         function generateReasoningSteps(query, answer) {
@@ -2414,7 +2706,7 @@
                 // Mark as helpful
                 const btn = document.querySelector(`#${msgId} .feedback-btn.positive`);
                 btn.classList.add('active');
-                console.log('Positive feedback for:', msgId);
+                // TODO: Send feedback to backend API for analytics
             } else {
                 // Open feedback modal
                 state.currentFeedbackMsgId = msgId;
@@ -2448,7 +2740,7 @@
             }
 
             const feedbackType = selected.dataset.value;
-            console.log('Feedback submitted:', feedbackType, 'for message:', state.currentFeedbackMsgId);
+            // TODO: Send feedback to backend API for analytics
 
             // Mark the button as active
             if (state.currentFeedbackMsgId) {

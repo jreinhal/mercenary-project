@@ -5,9 +5,11 @@ import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.service.SecureIngestionService;
 import com.jreinhal.mercenary.service.AuditService;
-import com.jreinhal.mercenary.service.AuthenticationService;
 import com.jreinhal.mercenary.service.QueryDecompositionService;
 import com.jreinhal.mercenary.filter.SecurityContext;
+import com.jreinhal.mercenary.reasoning.ReasoningTrace;
+import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.reasoning.ReasoningStep.StepType;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
@@ -40,8 +42,8 @@ public class MercenaryController {
     private final SecureIngestionService ingestionService;
     private final MongoTemplate mongoTemplate;
     private final AuditService auditService;
-    private final AuthenticationService authService;
     private final QueryDecompositionService queryDecompositionService;
+    private final ReasoningTracer reasoningTracer;
 
     // METRICS
     private final AtomicInteger docCount = new AtomicInteger(0);
@@ -53,15 +55,15 @@ public class MercenaryController {
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore,
             SecureIngestionService ingestionService, MongoTemplate mongoTemplate,
-            AuditService auditService, AuthenticationService authService,
-            QueryDecompositionService queryDecompositionService) {
+            AuditService auditService,
+            QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer) {
         this.chatClient = builder.build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;
         this.mongoTemplate = mongoTemplate;
         this.auditService = auditService;
-        this.authService = authService;
         this.queryDecompositionService = queryDecompositionService;
+        this.reasoningTracer = reasoningTracer;
 
         // Initialize doc count from DB
         try {
@@ -415,6 +417,284 @@ public class MercenaryController {
             log.error("Error in /ask endpoint", e);
             throw e;
         }
+    }
+
+    /**
+     * Enhanced ask response with Glass Box reasoning trace.
+     */
+    public record EnhancedAskResponse(
+            String answer,
+            List<Map<String, Object>> reasoning,
+            List<String> sources,
+            Map<String, Object> metrics,
+            String traceId
+    ) {}
+
+    /**
+     * Enhanced /ask endpoint with full Glass Box reasoning transparency.
+     * Returns the answer plus a detailed trace of each reasoning step.
+     */
+    @GetMapping("/ask/enhanced")
+    public EnhancedAskResponse askEnhanced(@RequestParam("q") String query, @RequestParam("dept") String dept,
+            HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        Department department;
+
+        try {
+            department = Department.valueOf(dept.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return new EnhancedAskResponse("INVALID SECTOR: " + dept, List.of(), List.of(), Map.of(), null);
+        }
+
+        // Security checks
+        if (user == null) {
+            auditService.logAccessDenied(null, "/api/ask/enhanced", "Unauthenticated access attempt", request);
+            return new EnhancedAskResponse("ACCESS DENIED: Authentication required.", List.of(), List.of(), Map.of(), null);
+        }
+
+        if (!user.hasPermission(UserRole.Permission.QUERY)) {
+            auditService.logAccessDenied(user, "/api/ask/enhanced", "Missing QUERY permission", request);
+            return new EnhancedAskResponse("ACCESS DENIED: Insufficient permissions.", List.of(), List.of(), Map.of(), null);
+        }
+
+        if (!user.canAccessClassification(department.getRequiredClearance())) {
+            auditService.logAccessDenied(user, "/api/ask/enhanced",
+                    "Insufficient clearance for " + department.name(), request);
+            return new EnhancedAskResponse("ACCESS DENIED: Insufficient clearance.", List.of(), List.of(), Map.of(), null);
+        }
+
+        // Start reasoning trace
+        ReasoningTrace trace = reasoningTracer.startTrace(query, dept);
+
+        try {
+            long start = System.currentTimeMillis();
+
+            // Step 1: Query Analysis & Injection Detection
+            long stepStart = System.currentTimeMillis();
+            if (isPromptInjection(query)) {
+                reasoningTracer.addStep(StepType.SECURITY_CHECK, "Security Scan",
+                        "BLOCKED: Prompt injection detected", System.currentTimeMillis() - stepStart,
+                        Map.of("blocked", true, "reason", "injection_detected"));
+                auditService.logPromptInjection(user, query, request);
+                ReasoningTrace completed = reasoningTracer.endTrace();
+                return new EnhancedAskResponse("SECURITY ALERT: Indirect Prompt Injection Detected.",
+                        completed != null ? completed.getStepsAsMaps() : List.of(), List.of(), Map.of(),
+                        completed != null ? completed.getTraceId() : null);
+            }
+            reasoningTracer.addStep(StepType.SECURITY_CHECK, "Security Scan",
+                    "Query passed injection detection", System.currentTimeMillis() - stepStart,
+                    Map.of("blocked", false));
+
+            // Step 2: Query Decomposition
+            stepStart = System.currentTimeMillis();
+            List<String> subQueries = queryDecompositionService.decompose(query);
+            boolean isCompoundQuery = subQueries.size() > 1;
+            reasoningTracer.addStep(StepType.QUERY_DECOMPOSITION, "Query Analysis",
+                    isCompoundQuery ? "Decomposed into " + subQueries.size() + " sub-queries" : "Single query detected",
+                    System.currentTimeMillis() - stepStart,
+                    Map.of("subQueries", subQueries, "isCompound", isCompoundQuery));
+
+            // Step 3: Document Retrieval (per sub-query)
+            Set<Document> allDocs = new LinkedHashSet<>();
+            for (int i = 0; i < subQueries.size(); i++) {
+                String subQuery = subQueries.get(i);
+                stepStart = System.currentTimeMillis();
+                List<Document> subResults = performHybridRerankingTracked(subQuery, dept);
+                List<Document> limited = subResults.stream().limit(5).toList();
+                allDocs.addAll(limited);
+
+                reasoningTracer.addStep(StepType.VECTOR_SEARCH, "Vector Search" + (isCompoundQuery ? " [" + (i+1) + "/" + subQueries.size() + "]" : ""),
+                        "Found " + subResults.size() + " candidates, kept " + limited.size(),
+                        System.currentTimeMillis() - stepStart,
+                        Map.of("query", subQuery, "candidateCount", subResults.size(), "keptCount", limited.size()));
+            }
+            List<Document> rawDocs = new ArrayList<>(allDocs);
+
+            // Step 4: Reranking/Filtering
+            stepStart = System.currentTimeMillis();
+            List<Document> topDocs = rawDocs.stream().limit(15).toList();
+            List<String> docSources = topDocs.stream()
+                    .map(doc -> {
+                        Object src = doc.getMetadata().get("source");
+                        return src != null ? src.toString() : "unknown";
+                    })
+                    .distinct()
+                    .toList();
+            reasoningTracer.addStep(StepType.RERANKING, "Document Filtering",
+                    "Selected top " + topDocs.size() + " documents from " + rawDocs.size() + " candidates",
+                    System.currentTimeMillis() - stepStart,
+                    Map.of("totalCandidates", rawDocs.size(), "selected", topDocs.size(), "sources", docSources));
+
+            // Step 5: Context Assembly
+            stepStart = System.currentTimeMillis();
+            String information = topDocs.stream()
+                    .map(doc -> {
+                        Map<String, Object> meta = doc.getMetadata();
+                        String filename = (String) meta.get("source");
+                        if (filename == null) filename = (String) meta.get("filename");
+                        if (filename == null) filename = "Unknown_Document.txt";
+                        return "SOURCE: " + filename + "\nCONTENT: " + doc.getContent();
+                    })
+                    .collect(Collectors.joining("\n\n---\n\n"));
+            int contextLength = information.length();
+            reasoningTracer.addStep(StepType.CONTEXT_ASSEMBLY, "Context Assembly",
+                    "Assembled " + contextLength + " characters from " + topDocs.size() + " documents",
+                    System.currentTimeMillis() - stepStart,
+                    Map.of("contextLength", contextLength, "documentCount", topDocs.size()));
+
+            // Step 6: LLM Generation
+            stepStart = System.currentTimeMillis();
+            String systemText;
+            if (information.isEmpty()) {
+                systemText = "You are SENTINEL. Protocol: Answer based on general training. State 'No internal records found.'";
+            } else {
+                systemText = """
+                        You are SENTINEL, an advanced intelligence agent assigned to %s.
+
+                        PROTOCOL:
+                        1. ANALYZE the provided CONTEXT DATA carefully.
+                        2. SYNTHESIZE an answer based ONLY on that data.
+                        3. CITE each source IMMEDIATELY after EACH fact from that source.
+
+                        === CRITICAL: INDIVIDUAL CITATIONS REQUIRED ===
+
+                        You MUST include a citation [filename] for EVERY fact you state from the documents.
+                        Your response MUST contain at least one citation if you used the context.
+
+                        === CITATION FORMAT ===
+                        Use brackets with the full filename: [filename.ext]
+
+                        === EXAMPLES ===
+                        "The asset was located in Sector 7 [mission_log.txt]."
+
+                        === IMPORTANT: ANTI-HALLUCINATION ===
+                        1. DO NOT fabricate filenames.
+                        2. ONLY cite files listed in "SOURCE:" sections below.
+                        3. If you do not know the answer, say "No records found."
+
+                        DO NOT say "According to the context". Just state the fact and cite it.
+
+                        CONTEXT DATA:
+                        {information}
+                        """
+                        .formatted(dept);
+            }
+
+            SystemPromptTemplate systemPrompt = new SystemPromptTemplate(systemText);
+            UserMessage userMessage = new UserMessage(query);
+            Prompt prompt = new Prompt(
+                    List.of(systemPrompt.createMessage(Map.of("information", information)), userMessage));
+
+            String response;
+            boolean llmSuccess = true;
+            try {
+                @SuppressWarnings("deprecation")
+                String rawResponse = chatClient.call(prompt).getResult().getOutput().getContent();
+                response = rawResponse;
+            } catch (Exception llmError) {
+                llmSuccess = false;
+                log.error("LLM Generation Failed", llmError);
+                StringBuilder sim = new StringBuilder("**System Offline Mode (LLM Unreachable)**\n\n");
+                sim.append("Based on the retrieved intelligence:\n\n");
+                for (Document d : topDocs) {
+                    String src = (String) d.getMetadata().getOrDefault("source", "Unknown");
+                    String preview = d.getContent().substring(0, Math.min(200, d.getContent().length())).replace("\n", " ");
+                    sim.append("- ").append(preview).append("... [").append(src).append("]\n");
+                }
+                if (topDocs.isEmpty()) {
+                    sim.append("No relevant records found in the active context.");
+                }
+                response = sim.toString();
+            }
+            reasoningTracer.addStep(StepType.LLM_GENERATION, "Response Synthesis",
+                    llmSuccess ? "Generated response (" + response.length() + " chars)" : "Fallback mode (LLM offline)",
+                    System.currentTimeMillis() - stepStart,
+                    Map.of("success", llmSuccess, "responseLength", response.length()));
+
+            // Complete trace
+            long timeTaken = System.currentTimeMillis() - start;
+            totalLatencyMs.addAndGet(timeTaken);
+            queryCount.incrementAndGet();
+
+            reasoningTracer.addMetric("totalLatencyMs", timeTaken);
+            reasoningTracer.addMetric("documentsRetrieved", topDocs.size());
+            reasoningTracer.addMetric("subQueriesProcessed", subQueries.size());
+
+            ReasoningTrace completedTrace = reasoningTracer.endTrace();
+
+            // Audit log
+            auditService.logQuery(user, query, department, response, request);
+
+            // Extract sources from response - support both [filename] and (filename) formats
+            List<String> sources = new ArrayList<>();
+            // Pattern 1: [filename.ext] - standard format
+            java.util.regex.Matcher matcher1 = java.util.regex.Pattern.compile("\\[([^\\]]+\\.(pdf|txt|md))\\]", java.util.regex.Pattern.CASE_INSENSITIVE)
+                    .matcher(response);
+            while (matcher1.find()) {
+                String source = matcher1.group(1);
+                if (!sources.contains(source)) {
+                    sources.add(source);
+                }
+            }
+            // Pattern 2: (filename.ext) - LLM sometimes uses parentheses
+            java.util.regex.Matcher matcher2 = java.util.regex.Pattern.compile("\\(([^)]+\\.(pdf|txt|md))\\)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                    .matcher(response);
+            while (matcher2.find()) {
+                String source = matcher2.group(1);
+                if (!sources.contains(source)) {
+                    sources.add(source);
+                }
+            }
+            // Pattern 3: "Citation: filename.ext" or "Source: filename.ext"
+            java.util.regex.Matcher matcher3 = java.util.regex.Pattern.compile("(?:Citation|Source|filename):\\s*([^\\s,]+\\.(pdf|txt|md))", java.util.regex.Pattern.CASE_INSENSITIVE)
+                    .matcher(response);
+            while (matcher3.find()) {
+                String source = matcher3.group(1);
+                if (!sources.contains(source)) {
+                    sources.add(source);
+                }
+            }
+
+            return new EnhancedAskResponse(
+                    response,
+                    completedTrace != null ? completedTrace.getStepsAsMaps() : List.of(),
+                    sources,
+                    Map.of(
+                            "latencyMs", timeTaken,
+                            "documentsRetrieved", topDocs.size(),
+                            "subQueries", subQueries.size(),
+                            "llmSuccess", llmSuccess
+                    ),
+                    completedTrace != null ? completedTrace.getTraceId() : null
+            );
+
+        } catch (Exception e) {
+            log.error("Error in /ask/enhanced endpoint", e);
+            ReasoningTrace errorTrace = reasoningTracer.endTrace();
+            return new EnhancedAskResponse("Error: " + e.getMessage(),
+                    errorTrace != null ? errorTrace.getStepsAsMaps() : List.of(), List.of(),
+                    Map.of("error", e.getMessage()),
+                    errorTrace != null ? errorTrace.getTraceId() : null);
+        }
+    }
+
+    /**
+     * Retrieve a reasoning trace by ID for debugging/audit.
+     */
+    @GetMapping("/reasoning/{traceId}")
+    public Map<String, Object> getReasoningTrace(@PathVariable String traceId) {
+        ReasoningTrace trace = reasoningTracer.getTrace(traceId);
+        if (trace == null) {
+            return Map.of("error", "Trace not found", "traceId", traceId);
+        }
+        return trace.toMap();
+    }
+
+    /**
+     * Hybrid retrieval with tracing support.
+     */
+    private List<Document> performHybridRerankingTracked(String query, String dept) {
+        return performHybridReranking(query, dept);
     }
 
     /**

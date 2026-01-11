@@ -154,6 +154,47 @@
             border-radius: 6px;
             border: 1px solid #000;
             display: block;
+            min-height: 300px;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            object-fit: cover;
+        }
+
+        /* Placeholder for missing images */
+        .screenshot-wrapper img[src$=".png"]:not([src^="data:"]) {
+            position: relative;
+        }
+
+        .screenshot-placeholder {
+            width: 100%;
+            min-height: 350px;
+            border-radius: 6px;
+            border: 2px dashed var(--border-color);
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .screenshot-placeholder::before {
+            content: '📸';
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .screenshot-placeholder-text {
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .screenshot-placeholder-hint {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            margin-top: 8px;
         }
 
         .callout {
@@ -438,7 +479,7 @@
         </a>
 
         <h1>SENTINEL // OPERATOR FIELD GUIDE</h1>
-        <p><strong>Version:</strong> 1.0.0 | <strong>Clearance Level:</strong> UNCLASSIFIED</p>
+        <p><strong>Version:</strong> 2.0.0 | <strong>Clearance Level:</strong> UNCLASSIFIED</p>
         <p>This manual details the standard operating procedures for the Sentinel Intelligence Platform. Follow these protocols to ensure secure data ingestion and accurate intelligence retrieval.</p>
 
         <!-- Table of Contents -->
@@ -451,8 +492,9 @@
                 <li><a href="#intelligence">4. Intelligence Gathering</a></li>
                 <li><a href="#evidence">5. Evidence Verification</a></li>
                 <li><a href="#sectors">6. Sector Reference</a></li>
-                <li><a href="#troubleshooting">7. Troubleshooting</a></li>
-                <li><a href="#airgap">8. Air-Gap Deployment</a></li>
+                <li><a href="#advanced-rag">7. Advanced RAG Features</a></li>
+                <li><a href="#troubleshooting">8. Troubleshooting</a></li>
+                <li><a href="#airgap">9. Air-Gap Deployment</a></li>
             </ul>
         </div>
 
@@ -465,30 +507,15 @@
         <!-- ANNOTATED SCREENSHOT: Dashboard Overview -->
         <div class="annotated-figure">
             <div class="screenshot-wrapper">
-                <img src="images/dashboard_full.png" alt="Sentinel Dashboard Overview">
-                
-                <!-- Header Row -->
-                <div class="callout" style="top: 2.5%; left: 7%;">1</div>
-                <div class="callout success" style="top: 2.5%; left: 95%;">2</div>
-                
-                <!-- Telemetry Bar -->
-                <div class="callout" style="top: 6.5%; left: 8%;">3</div>
-                <div class="callout" style="top: 6.5%; left: 95%;">4</div>
-                
-                <!-- Main Panels -->
-                <div class="callout" style="top: 11%; left: 4%;">5</div>
-                <div class="callout" style="top: 11%; left: 30%;">6</div>
-                <div class="callout" style="top: 11%; left: 67%;">7</div>
-                
-                <!-- Welcome Features -->
-                <div class="callout" style="top: 50%; left: 30%;">8</div>
-                
-                <!-- Evidence Viewer Empty State -->
-                <div class="callout" style="top: 52%; left: 77%;">9</div>
-                
-                <!-- Query Input -->
-                <div class="callout" style="top: 92%; left: 30%;">10</div>
-                <div class="callout" style="top: 92%; left: 48%;">11</div>
+                <div class="screenshot-placeholder">
+                    <div class="screenshot-placeholder-text">
+                        <strong>Dashboard Overview Screenshot</strong><br>
+                        Main workspace with Intelligence Terminal and Evidence Viewer
+                    </div>
+                    <div class="screenshot-placeholder-hint">
+                        See the live application at http://localhost:8080
+                    </div>
+                </div>
             </div>
 
             <div class="legend">
@@ -622,7 +649,12 @@
 
         <!-- ACCESS FLOW DIAGRAM -->
         <div class="diagram-figure">
-            <img src="images/access-flow-diagram.png" alt="Access Control Flow Diagram">
+            <div class="screenshot-placeholder" style="min-height:200px;">
+                <div class="screenshot-placeholder-text">
+                    <strong>Authentication Flow Diagram</strong><br>
+                    TLS → Certificate Validation → Identity Lookup → Authorization
+                </div>
+            </div>
             <div class="figure-caption">Fig 2.0: CAC/PIV Authentication & Authorization Flow</div>
         </div>
 
@@ -750,16 +782,15 @@
         <!-- ANNOTATED SCREENSHOT: Control Panel -->
         <div class="annotated-figure">
             <div class="screenshot-wrapper" style="max-width: 350px; margin: 0 auto;">
-                <img src="images/ingestion_panel.png" alt="Control Panel - Secure Ingestion">
-                
-                <div class="callout" style="top: 3%; left: 25%;">1</div>
-                <div class="callout" style="top: 3%; left: 93%;">2</div>
-                <div class="callout" style="top: 8%; left: 25%;">3</div>
-                <div class="callout" style="top: 18%; left: 50%;">4</div>
-                <div class="callout" style="top: 34%; left: 25%;">5</div>
-                <div class="callout" style="top: 41%; left: 50%;">6</div>
-                <div class="callout" style="top: 92%; left: 50%;">7</div>
-                <div class="callout" style="top: 97%; left: 50%;">8</div>
+                <div class="screenshot-placeholder">
+                    <div class="screenshot-placeholder-text">
+                        <strong>Control Panel Screenshot</strong><br>
+                        Document upload zone, sector selection, and settings
+                    </div>
+                    <div class="screenshot-placeholder-hint">
+                        Click ☰ in the dashboard to open
+                    </div>
+                </div>
             </div>
 
             <div class="legend">
@@ -849,40 +880,15 @@
         <!-- ANNOTATED SCREENSHOT: Chat Interface -->
         <div class="annotated-figure">
             <div class="screenshot-wrapper">
-                <img src="images/chat_interface.png" alt="Intelligence Terminal - Query Interface">
-                
-                <!-- Header -->
-                <div class="callout" style="top: 2.5%; left: 10%;">1</div>
-                
-                <!-- Telemetry -->
-                <div class="callout" style="top: 7%; left: 30%;">2</div>
-                
-                <!-- Active Context -->
-                <div class="callout" style="top: 16%; left: 10%;">3</div>
-                <div class="callout" style="top: 18%; left: 95%;">4</div>
-                
-                <!-- User Query -->
-                <div class="callout" style="top: 32%; left: 85%;">5</div>
-                
-                <!-- Reasoning Chain -->
-                <div class="callout" style="top: 40%; left: 18%;">6</div>
-                
-                <!-- Response Box -->
-                <div class="callout" style="top: 46%; left: 12%;">7</div>
-                <div class="callout" style="top: 46%; left: 90%;">8</div>
-                
-                <!-- Citation Badge -->
-                <div class="callout warning" style="top: 53%; left: 42%;">9</div>
-                
-                <!-- Confidence -->
-                <div class="callout" style="top: 59%; left: 15%;">10</div>
-                
-                <!-- Feedback -->
-                <div class="callout" style="top: 59%; left: 90%;">11</div>
-                
-                <!-- Query Input -->
-                <div class="callout" style="top: 96%; left: 45%;">12</div>
-                <div class="callout" style="top: 96%; left: 92%;">13</div>
+                <div class="screenshot-placeholder">
+                    <div class="screenshot-placeholder-text">
+                        <strong>Intelligence Terminal Screenshot</strong><br>
+                        Query input, AI responses with citations, reasoning chain
+                    </div>
+                    <div class="screenshot-placeholder-hint">
+                        Enter a query in the main dashboard to see this in action
+                    </div>
+                </div>
             </div>
 
             <div class="legend">
@@ -999,13 +1005,15 @@
         <!-- ANNOTATED SCREENSHOT: Reasoning Chain -->
         <div class="annotated-figure">
             <div class="screenshot-wrapper">
-                <img src="images/reasoning_chain.png" alt="Reasoning Chain - Glass Box Transparency">
-                
-                <div class="callout" style="top: 6%; left: 30%;">1</div>
-                <div class="callout" style="top: 26%; left: 5%;">2</div>
-                <div class="callout" style="top: 47%; left: 5%;">3</div>
-                <div class="callout success" style="top: 68%; left: 5%;">4</div>
-                <div class="callout" style="top: 88%; left: 5%;">5</div>
+                <div class="screenshot-placeholder">
+                    <div class="screenshot-placeholder-text">
+                        <strong>Glass Box Reasoning Chain Screenshot</strong><br>
+                        Step-by-step retrieval transparency with timing metrics
+                    </div>
+                    <div class="screenshot-placeholder-hint">
+                        Expand "VIEW REASONING CHAIN" on any response
+                    </div>
+                </div>
             </div>
 
             <div class="legend">
@@ -1113,30 +1121,15 @@
         <!-- ANNOTATED SCREENSHOT: Evidence Viewer -->
         <div class="annotated-figure">
             <div class="screenshot-wrapper">
-                <img src="images/evidence_viewer.png" alt="Evidence Viewer - Source Verification">
-                
-                <!-- Header -->
-                <div class="callout" style="top: 2.5%; left: 8%;">1</div>
-                <div class="callout success" style="top: 2.5%; left: 92%;">2</div>
-                
-                <!-- Active Sector -->
-                <div class="callout" style="top: 7%; left: 92%;">3</div>
-                
-                <!-- Evidence Viewer Header -->
-                <div class="callout" style="top: 11%; left: 12%;">4</div>
-                <div class="callout" style="top: 11%; left: 97%;">5</div>
-                
-                <!-- Tab -->
-                <div class="callout" style="top: 17%; left: 12%;">6</div>
-                
-                <!-- Metadata -->
-                <div class="callout" style="top: 21%; left: 35%;">7</div>
-                
-                <!-- Archive Banner -->
-                <div class="callout warning" style="top: 27%; left: 25%;">8</div>
-                
-                <!-- Document Content -->
-                <div class="callout" style="top: 50%; left: 30%;">9</div>
+                <div class="screenshot-placeholder">
+                    <div class="screenshot-placeholder-text">
+                        <strong>Evidence Viewer Screenshot</strong><br>
+                        Source document display with metadata and classification badges
+                    </div>
+                    <div class="screenshot-placeholder-hint">
+                        Click any [citation] badge to view source
+                    </div>
+                </div>
             </div>
 
             <div class="legend">
@@ -1275,11 +1268,106 @@
         </table>
 
         <!-- ============================================
-             SECTION 7: TROUBLESHOOTING
+             SECTION 7: ADVANCED RAG FEATURES
              ============================================ -->
-        <h2 id="troubleshooting">7. Troubleshooting</h2>
+        <h2 id="advanced-rag">7. Advanced RAG Features</h2>
+        <p>Sentinel implements three cutting-edge RAG techniques from recent research to improve retrieval accuracy, security, and reasoning capabilities.</p>
 
-        <h3>7.1 Connection Issues</h3>
+        <h3>7.1 HiFi-RAG (High-Fidelity Retrieval)</h3>
+        <p>Based on <a href="https://arxiv.org/abs/2512.22442" style="color: var(--accent-primary);">arXiv:2512.22442v1</a>, HiFi-RAG implements iterative two-pass retrieval with cross-encoder reranking:</p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h4>🔄 Two-Pass Retrieval</h4>
+                <p>Initial broad retrieval followed by focused refinement based on identified gaps.</p>
+            </div>
+            <div class="feature-card">
+                <h4>⚖️ Cross-Encoder Reranking</h4>
+                <p>LLM-as-judge semantic scoring via Ollama for precise relevance ranking.</p>
+            </div>
+            <div class="feature-card">
+                <h4>🔍 Gap Detection</h4>
+                <p>Identifies missing concepts and retrieves additional documents to fill knowledge gaps.</p>
+            </div>
+            <div class="feature-card">
+                <h4>✈️ Air-Gap Safe</h4>
+                <p>Falls back to keyword-based scoring when LLM is unavailable.</p>
+            </div>
+        </div>
+
+        <h3>7.2 RAGPart (Corpus Poisoning Defense)</h3>
+        <p>Based on <a href="https://arxiv.org/abs/2512.24268" style="color: var(--accent-primary);">arXiv:2512.24268v1</a>, RAGPart defends against corpus poisoning attacks:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Document Partitioning</strong></td>
+                    <td>SHA-256 based deterministic assignment to multiple partitions</td>
+                </tr>
+                <tr>
+                    <td><strong>Consistency Scoring</strong></td>
+                    <td>Detects anomalous documents via cross-partition agreement analysis</td>
+                </tr>
+                <tr>
+                    <td><strong>Suspicion Flagging</strong></td>
+                    <td>Documents with high variance scores are flagged for security review</td>
+                </tr>
+                <tr>
+                    <td><strong>Combinatorial Retrieval</strong></td>
+                    <td>Queries multiple partition combinations for robustness</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box security">
+            <div class="info-box-title">Corpus Poisoning Protection</div>
+            <p>RAGPart automatically detects when an adversary has injected malicious documents into the corpus. Documents that appear inconsistent across partition combinations are flagged with a suspicion score, alerting operators to potential security threats.</p>
+        </div>
+
+        <h3>7.3 HGMem (Hypergraph Memory)</h3>
+        <p>Based on <a href="https://arxiv.org/abs/2512.23959" style="color: var(--accent-primary);">arXiv:2512.23959v2</a>, HGMem enables multi-hop reasoning across documents:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th>Function</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Entity Extraction</strong></td>
+                    <td>Pattern-based NER identifies PERSON, ORG, LOCATION, DATE, TECHNICAL entities</td>
+                </tr>
+                <tr>
+                    <td><strong>Hypergraph Storage</strong></td>
+                    <td>MongoDB-backed node and hyperedge collections for relationship storage</td>
+                </tr>
+                <tr>
+                    <td><strong>Multi-hop Traversal</strong></td>
+                    <td>BFS graph exploration discovers relationships across multiple documents</td>
+                </tr>
+                <tr>
+                    <td><strong>Hybrid Query</strong></td>
+                    <td>Combines vector similarity with graph context for comprehensive retrieval</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>Example use case: "What is the relationship between Project X and Contractor Y?" — HGMem can traverse the hypergraph to find connections across multiple documents even if they don't directly mention each other.</p>
+
+        <!-- ============================================
+             SECTION 8: TROUBLESHOOTING
+             ============================================ -->
+        <h2 id="troubleshooting">8. Troubleshooting</h2>
+
+        <h3>8.1 Connection Issues</h3>
         <table>
             <thead>
                 <tr>
@@ -1317,7 +1405,7 @@
             </tbody>
         </table>
 
-        <h3>7.2 Document Issues</h3>
+        <h3>8.2 Document Issues</h3>
         <ul>
             <li><strong>Password-protected PDFs:</strong> Not supported. Remove protection before ingestion.</li>
             <li><strong>Scanned PDFs (image-only):</strong> Limited support. OCR quality varies.</li>
@@ -1330,9 +1418,9 @@
         </div>
 
         <!-- ============================================
-             SECTION 8: AIR-GAP DEPLOYMENT
+             SECTION 9: AIR-GAP DEPLOYMENT
              ============================================ -->
-        <h2 id="airgap">8. Air-Gap Deployment</h2>
+        <h2 id="airgap">9. Air-Gap Deployment</h2>
         <p>For disconnected or SCIF environments, Sentinel operates with zero external network dependencies:</p>
 
         <ul>
@@ -1341,7 +1429,7 @@
             <li><strong>Local Embeddings:</strong> Embedding model (nomic-embed-text) runs via Ollama.</li>
         </ul>
 
-        <h3>8.1 Required Environment Variables</h3>
+        <h3>9.1 Required Environment Variables</h3>
         <table>
             <thead>
                 <tr>
@@ -1369,7 +1457,7 @@
             </tbody>
         </table>
 
-        <h3>8.2 System Requirements</h3>
+        <h3>9.2 System Requirements</h3>
         <ul>
             <li><strong>Minimum RAM:</strong> 16 GB (32 GB recommended for large models)</li>
             <li><strong>Storage:</strong> 20 GB for application + model storage</li>
@@ -1380,8 +1468,8 @@
         <!-- Footer -->
         <hr style="border: none; border-top: 1px solid var(--border-color); margin: 50px 0 30px;">
         <p style="text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);">
-            SENTINEL INTELLIGENCE PLATFORM v1.0.0 | BUILD 2026.01<br>
-            Powered by RAGPart & HyperGraph Memory<br>
+            SENTINEL INTELLIGENCE PLATFORM v2.0.0 | BUILD 2026.01<br>
+            Powered by HiFi-RAG, RAGPart & HyperGraph Memory<br>
             © 2026 Project Mercenary — UNCLASSIFIED // FOUO
         </p>
 

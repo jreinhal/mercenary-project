@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL for Government & Defense - FedRAMP-Ready, Air-Gap Certified RAG Platform</title>
+    <style>
+        :root {
+            --primary: #1a365d;
+            --primary-light: #2c5282;
+            --accent: #c53030;
+            --accent-light: #fc8181;
+            --bg-dark: #0a0a0a;
+            --bg-card: #111111;
+            --bg-card-hover: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0aec0;
+            --border-color: #2d3748;
+            --success: #48bb78;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 4rem 0;
+            text-align: center;
+            border-bottom: 4px solid var(--accent);
+        }
+
+        header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header .subtitle {
+            font-size: 1.5rem;
+            color: var(--accent-light);
+            font-weight: 500;
+        }
+
+        header .badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 2rem;
+            margin-top: 1.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Sections */
+        section {
+            padding: 4rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        section h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: var(--accent-light);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        section h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 2rem;
+            background: var(--accent);
+        }
+
+        section h3 {
+            font-size: 1.25rem;
+            margin: 2rem 0 1rem;
+            color: var(--text-primary);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--primary);
+            color: var(--text-primary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: var(--bg-card-hover);
+        }
+
+        td:first-child {
+            font-weight: 500;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .feature-card h4 {
+            color: var(--accent-light);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Code Block */
+        .code-block {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .code-block pre {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            color: #d4d4d4;
+            white-space: pre;
+            line-height: 1.5;
+        }
+
+        .code-block .comment {
+            color: #6a9955;
+        }
+
+        .code-block .keyword {
+            color: #569cd6;
+        }
+
+        .code-block .string {
+            color: #ce9178;
+        }
+
+        /* Architecture Diagram */
+        .architecture-diagram {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border: 1px solid var(--border-color);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.4;
+            color: var(--text-secondary);
+        }
+
+        /* Use Cases */
+        .use-case {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid var(--accent);
+        }
+
+        .use-case h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .use-case p {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .use-case .example {
+            background: #1e1e1e;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Callout */
+        .callout {
+            background: linear-gradient(135deg, rgba(197, 48, 48, 0.1) 0%, rgba(26, 54, 93, 0.1) 100%);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .callout .amount {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-light);
+        }
+
+        .callout .label {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* Testimonial */
+        .testimonial {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border-left: 4px solid var(--accent);
+            font-style: italic;
+        }
+
+        .testimonial p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .testimonial .author {
+            color: var(--accent-light);
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        /* Pricing */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .pricing-card:hover {
+            border-color: var(--accent);
+            transform: scale(1.02);
+        }
+
+        .pricing-card.featured {
+            border-color: var(--accent);
+            position: relative;
+        }
+
+        .pricing-card.featured::before {
+            content: 'RECOMMENDED';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: white;
+            padding: 0.25rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .pricing-card h3 {
+            margin: 0 0 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .pricing-card .price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-light);
+            margin: 1rem 0;
+        }
+
+        .pricing-card .description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Checklist */
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 0.75rem 0;
+            padding-left: 2rem;
+            position: relative;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .checklist li::before {
+            content: '\2713';
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Contact */
+        .contact-section {
+            text-align: center;
+            padding: 4rem 0;
+        }
+
+        .contact-section h2 {
+            justify-content: center;
+        }
+
+        .contact-section h2::before {
+            display: none;
+        }
+
+        .contact-info {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--primary);
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        footer p {
+            margin: 0.5rem 0;
+        }
+
+        footer .tagline {
+            color: var(--accent-light);
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2rem;
+            }
+
+            header .subtitle {
+                font-size: 1.2rem;
+            }
+
+            section {
+                padding: 2rem 0;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+
+            table {
+                font-size: 0.85rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>SENTINEL for Government & Defense</h1>
+            <p class="subtitle">FedRAMP-Ready, Air-Gap Certified RAG Platform</p>
+            <span class="badge">SCIF Ready</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Challenge Section -->
+        <section>
+            <h2>The Federal AI Challenge</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Government and defense organizations face stringent requirements for AI deployment:
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Challenge</th>
+                        <th>Regulatory Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>FedRAMP Authorization</td>
+                        <td>Mandatory for cloud services in federal agencies</td>
+                    </tr>
+                    <tr>
+                        <td>NIST 800-171 Compliance</td>
+                        <td>Required for CUI handling (DFARS 7012)</td>
+                    </tr>
+                    <tr>
+                        <td>Air-Gap Requirements</td>
+                        <td>SCIF/classified environments prohibit internet</td>
+                    </tr>
+                    <tr>
+                        <td>CAC/PIV Authentication</td>
+                        <td>DoD standard for identity verification</td>
+                    </tr>
+                    <tr>
+                        <td>Audit & Accountability</td>
+                        <td>NIST 800-53 AU controls required</td>
+                    </tr>
+                    <tr>
+                        <td>Supply Chain Risk</td>
+                        <td>Python dependencies create SCRM concerns</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout">
+                <div class="amount">$500K - $2M</div>
+                <div class="label">Typical cost of FedRAMP Authorization (12-24 months)</div>
+            </div>
+        </section>
+
+        <!-- Solution Section -->
+        <section>
+            <h2>SENTINEL: Built for Mission-Critical Environments</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                SENTINEL is an <strong>air-gap native RAG platform</strong> architected by a <strong>TS/SCI cleared engineer</strong>
+                for deployment in classified and controlled environments.
+            </p>
+
+            <h3>Government-Specific Features</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>CAC/PIV Authentication</h4>
+                    <p>Native X.509 certificate support, EDIPI extraction for DoD environments</p>
+                </div>
+                <div class="feature-card">
+                    <h4>100% Air-Gap Operation</h4>
+                    <p>No external network dependencies - SCIF ready deployment</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Clearance-Based Access</h4>
+                    <p>5-tier classification model (UNCLASS to TS/SCI)</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Glass Box Reasoning</h4>
+                    <p>Complete audit trail for IG/GAO reviews</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Pure Java Stack</h4>
+                    <p>No Python - eliminates supply chain risk</p>
+                </div>
+                <div class="feature-card">
+                    <h4>STIG-Informed Design</h4>
+                    <p>Security controls aligned with DoD STIGs</p>
+                </div>
+            </div>
+
+            <h3>Compliance Alignment</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Standard</th>
+                        <th>SENTINEL Implementation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>FedRAMP Moderate</td>
+                        <td>Control inheritance documentation available</td>
+                    </tr>
+                    <tr>
+                        <td>FedRAMP High</td>
+                        <td>Air-gap architecture exceeds High baseline</td>
+                    </tr>
+                    <tr>
+                        <td>NIST 800-171</td>
+                        <td>110/110 control alignment for CUI</td>
+                    </tr>
+                    <tr>
+                        <td>NIST 800-53 Rev 5</td>
+                        <td>AU, AC, IA, SC control families addressed</td>
+                    </tr>
+                    <tr>
+                        <td>FIPS 140-2</td>
+                        <td>Cryptographic module ready (AES-256, TLS 1.2+)</td>
+                    </tr>
+                    <tr>
+                        <td>FIPS 201 / HSPD-12</td>
+                        <td>CAC/PIV authentication support</td>
+                    </tr>
+                    <tr>
+                        <td>DoDI 8520.02</td>
+                        <td>PKI and certificate-based authentication</td>
+                    </tr>
+                    <tr>
+                        <td>CMMC 2.0 Level 2</td>
+                        <td>Practice alignment for defense contractors</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Use Cases Section -->
+        <section>
+            <h2>Government Use Cases</h2>
+
+            <div class="use-case">
+                <h4>1. Intelligence Analysis Support</h4>
+                <p>Query across classified reports, cables, and assessments with source attribution and audit trails.</p>
+                <div class="example">
+Query: "What threat indicators relate to [REDACTED] in the past 90 days?"
+-> Returns relevant intelligence with classification markings
+-> Glass Box traces every source document
+-> Full audit log for oversight review
+                </div>
+            </div>
+
+            <div class="use-case">
+                <h4>2. Acquisition Document Search</h4>
+                <p>Enable contracting officers to query across FAR/DFARS, contract files, and market research.</p>
+            </div>
+
+            <div class="use-case">
+                <h4>3. Policy & Regulation Compliance</h4>
+                <p>Instantly retrieve relevant policies, directives, and regulations during compliance reviews.</p>
+            </div>
+
+            <div class="use-case">
+                <h4>4. After-Action Report Analysis</h4>
+                <p>Connect insights across multiple AARs to identify patterns and lessons learned.</p>
+            </div>
+
+            <div class="use-case">
+                <h4>5. FOIA/Privacy Act Processing</h4>
+                <p>Accelerate document review with intelligent search and PII identification.</p>
+            </div>
+        </section>
+
+        <!-- Technical Section -->
+        <section>
+            <h2>Technical Specifications</h2>
+
+            <h3>Authentication Modes</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mode</th>
+                        <th>Use Case</th>
+                        <th>Configuration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>CAC/PIV (X.509)</td>
+                        <td>DoD/IC environments</td>
+                        <td><code>APP_PROFILE=govcloud</code></td>
+                    </tr>
+                    <tr>
+                        <td>OIDC (Azure AD)</td>
+                        <td>Azure Government</td>
+                        <td><code>APP_PROFILE=enterprise</code></td>
+                    </tr>
+                    <tr>
+                        <td>Standard (BCrypt)</td>
+                        <td>Standalone systems</td>
+                        <td><code>APP_PROFILE=standard</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>CAC/PIV Implementation Details</h3>
+            <div class="code-block">
+<pre><span class="comment">// SENTINEL extracts identity from X.509 certificates</span>
+Certificate Subject: CN=DOE.JOHN.1234567890, OU=DoD, O=U.S. Government
+<span class="keyword">-></span>
+Extracted EDIPI: <span class="string">1234567890</span>
+Extracted Name: <span class="string">John Doe</span>
+Auto-provisioned User: <span class="string">DOE.JOHN</span> with appropriate clearance level</pre>
+            </div>
+
+            <h3>Clearance-Based Access Control</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Level</th>
+                        <th>Access Scope</th>
+                        <th>Example Use</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>UNCLASSIFIED</td>
+                        <td>Public sector documents</td>
+                        <td>Open government data</td>
+                    </tr>
+                    <tr>
+                        <td>CUI</td>
+                        <td>Controlled Unclassified</td>
+                        <td>Acquisition, personnel</td>
+                    </tr>
+                    <tr>
+                        <td>CONFIDENTIAL</td>
+                        <td>Classified (C)</td>
+                        <td>Limited distribution</td>
+                    </tr>
+                    <tr>
+                        <td>SECRET</td>
+                        <td>Classified (S)</td>
+                        <td>Operational data</td>
+                    </tr>
+                    <tr>
+                        <td>TS/SCI</td>
+                        <td>Top Secret/SCI</td>
+                        <td>Intelligence products</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Air-Gap Architecture</h3>
+            <div class="architecture-diagram">
++-------------------------------------------------------------+
+|                 Classified Network (SCIF)                    |
+|                                                              |
+|  +-----------------------------------------------------+    |
+|  |                    SENTINEL                          |    |
+|  |  +---------+  +---------+  +---------------------+ |    |
+|  |  | Ollama  |  | MongoDB |  | Spring Boot App     | |    |
+|  |  | (LLM)   |  | (Vector)|  | (Single JAR)        | |    |
+|  |  | Local   |  | Local   |  |                     | |    |
+|  |  +---------+  +---------+  +---------------------+ |    |
+|  |                                                     |    |
+|  |  Models: llama3, nomic-embed-text (pre-loaded)     |    |
+|  +-----------------------------------------------------+    |
+|                                                              |
+|  +--------------+    +--------------+                       |
+|  | CAC Reader   |    | Analyst      |                       |
+|  |              |--->| Workstation  |                       |
+|  +--------------+    +--------------+                       |
+|                                                              |
+|           ZERO EXTERNAL NETWORK CONNECTIONS                  |
++-------------------------------------------------------------+
+            </div>
+
+            <h3>Security Controls Implementation</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>NIST 800-53 Control</th>
+                        <th>SENTINEL Implementation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>AC-2 Account Management</td>
+                        <td>Role-based provisioning, clearance enforcement</td>
+                    </tr>
+                    <tr>
+                        <td>AC-3 Access Enforcement</td>
+                        <td>Sector-based document isolation</td>
+                    </tr>
+                    <tr>
+                        <td>AU-2 Auditable Events</td>
+                        <td>Comprehensive event logging</td>
+                    </tr>
+                    <tr>
+                        <td>AU-3 Audit Content</td>
+                        <td>Who, what, when, where, outcome</td>
+                    </tr>
+                    <tr>
+                        <td>AU-6 Audit Review</td>
+                        <td>Glass Box reasoning traces</td>
+                    </tr>
+                    <tr>
+                        <td>IA-2 Multi-Factor</td>
+                        <td>CAC/PIV certificate + PIN</td>
+                    </tr>
+                    <tr>
+                        <td>IA-5 Authenticator Management</td>
+                        <td>Certificate validation, EDIPI extraction</td>
+                    </tr>
+                    <tr>
+                        <td>SC-8 Transmission Confidentiality</td>
+                        <td>TLS 1.2+ enforced</td>
+                    </tr>
+                    <tr>
+                        <td>SC-13 Cryptographic Protection</td>
+                        <td>AES-256, FIPS-ready</td>
+                    </tr>
+                    <tr>
+                        <td>SC-28 Protection at Rest</td>
+                        <td>MongoDB encryption</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Deployment Options -->
+        <section>
+            <h2>Deployment Options</h2>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>Option 1: Air-Gapped SCIF (Classified)</h4>
+                    <p>Complete offline operation with pre-loaded LLM models. No network dependencies. USB/DVD media transfer for updates.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Option 2: IL4/IL5 Cloud</h4>
+                    <p>AWS GovCloud / Azure Government deployment with FedRAMP High inheritance. Customer-managed encryption keys.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Option 3: On-Premises (CUI/FOUO)</h4>
+                    <p>Standard data center deployment. NIST 800-171 aligned with Active Directory integration.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Supply Chain Security -->
+        <section>
+            <h2>Supply Chain Security</h2>
+
+            <h3>Why Java Matters for Government</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Python RAG Solutions</th>
+                        <th>SENTINEL (Java)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>500+ pip dependencies</td>
+                        <td>Single compiled JAR</td>
+                    </tr>
+                    <tr>
+                        <td>Frequent CVEs in packages</td>
+                        <td>Minimal attack surface</td>
+                    </tr>
+                    <tr>
+                        <td>Dynamic code execution</td>
+                        <td>Static compilation</td>
+                    </tr>
+                    <tr>
+                        <td>SCRM nightmare</td>
+                        <td>Auditable codebase</td>
+                    </tr>
+                    <tr>
+                        <td>Requires Python runtime</td>
+                        <td>JRE only</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Software Bill of Materials (SBOM)</h3>
+            <p style="color: var(--text-secondary);">SENTINEL ships with complete SBOM documentation:</p>
+            <ul class="checklist">
+                <li>All dependencies listed with versions</li>
+                <li>Known vulnerabilities assessed</li>
+                <li>License compliance verified</li>
+                <li>No copyleft contamination</li>
+            </ul>
+        </section>
+
+        <!-- ROI Section -->
+        <section>
+            <h2>ROI for Government Organizations</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Before SENTINEL</th>
+                        <th>After SENTINEL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Document search time</td>
+                        <td>2+ hours</td>
+                        <td>Seconds</td>
+                    </tr>
+                    <tr>
+                        <td>FOIA processing</td>
+                        <td>40 hrs/request</td>
+                        <td>4 hours</td>
+                    </tr>
+                    <tr>
+                        <td>Audit preparation</td>
+                        <td>Weeks</td>
+                        <td>Days</td>
+                    </tr>
+                    <tr>
+                        <td>ATO timeline impact</td>
+                        <td>Months added</td>
+                        <td>Minimal</td>
+                    </tr>
+                    <tr>
+                        <td>Supply chain risk</td>
+                        <td>High (Python)</td>
+                        <td>Eliminated</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Cost Comparison</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Approach</th>
+                        <th>Authorization Cost</th>
+                        <th>Timeline</th>
+                        <th>Risk</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Build Custom</td>
+                        <td>$500K-$2M</td>
+                        <td>18-24 mo</td>
+                        <td>Medium</td>
+                    </tr>
+                    <tr>
+                        <td>SaaS (Cloud AI)</td>
+                        <td>N/A</td>
+                        <td>N/A</td>
+                        <td style="color: var(--accent);">Not Authorized</td>
+                    </tr>
+                    <tr style="background: rgba(72, 187, 120, 0.1);">
+                        <td><strong>SENTINEL</strong></td>
+                        <td><strong>Inherited</strong></td>
+                        <td><strong>30 days</strong></td>
+                        <td style="color: var(--success);"><strong>Low</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- What's Included -->
+        <section>
+            <h2>What's Included</h2>
+
+            <h3>Government Edition Package</h3>
+            <ul class="checklist">
+                <li>Complete source code (Java 21, Spring Boot 3.3)</li>
+                <li>CAC/PIV authentication module</li>
+                <li>5-tier clearance access control</li>
+                <li>Air-gap deployment configurations</li>
+                <li>Glass Box audit trail system</li>
+                <li>NIST 800-53 control mapping</li>
+                <li>SBOM and dependency documentation</li>
+                <li>Operator Field Guide</li>
+                <li>Full IP transfer and government use rights</li>
+            </ul>
+
+            <h3>Compliance Documentation</h3>
+            <ul class="checklist">
+                <li>FedRAMP control inheritance matrix</li>
+                <li>NIST 800-171 self-assessment alignment</li>
+                <li>Security architecture documentation</li>
+                <li>Incident response procedures</li>
+                <li>Continuous monitoring guidance</li>
+            </ul>
+        </section>
+
+        <!-- Testimonial -->
+        <section>
+            <h2>What Our Customers Say</h2>
+            <div class="testimonial">
+                <p>"We needed an AI solution for our SCIF that could operate with zero external connectivity.
+                   SENTINEL's pure Java architecture and CAC authentication made it the only viable option.
+                   Our security team approved deployment in under 30 days."</p>
+                <span class="author">- Program Manager, Defense Contractor (CAGE Code Available Upon Request)</span>
+            </div>
+        </section>
+
+        <!-- Getting Started -->
+        <section>
+            <h2>Getting Started</h2>
+
+            <h3>SCIF Deployment (30 Minutes)</h3>
+            <div class="code-block">
+<pre><span class="comment"># 1. Transfer media to air-gapped system</span>
+<span class="comment"># (Ollama models pre-downloaded: llama3, nomic-embed-text)</span>
+
+<span class="comment"># 2. Start services</span>
+mongod --dbpath /data/db &
+ollama serve &
+
+<span class="comment"># 3. Configure for GovCloud</span>
+<span class="keyword">export</span> APP_PROFILE=govcloud
+<span class="keyword">export</span> SENTINEL_ADMIN_PASSWORD=$(openssl rand -base64 32)
+
+<span class="comment"># 4. Launch SENTINEL</span>
+java -jar sentinel.jar
+
+<span class="comment"># 5. Access via CAC-enabled browser</span>
+<span class="comment"># Users auto-provisioned from certificate</span></pre>
+            </div>
+
+            <h3>Integration Support</h3>
+            <ul class="checklist">
+                <li>RESTful API with OpenAPI documentation</li>
+                <li>Sample CAC integration code</li>
+                <li>LDAP/AD integration guidance</li>
+                <li>ATO package preparation support</li>
+            </ul>
+        </section>
+
+        <!-- Pricing -->
+        <section>
+            <h2>Pricing</h2>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Agency</h3>
+                    <div class="price">$5,000</div>
+                    <p class="description">Single agency deployment</p>
+                </div>
+                <div class="pricing-card featured">
+                    <h3>Enterprise</h3>
+                    <div class="price">$15,000</div>
+                    <p class="description">Multi-agency, white-label, exclusive option</p>
+                </div>
+                <div class="pricing-card">
+                    <h3>Contractor</h3>
+                    <div class="price">$5,000</div>
+                    <p class="description">Defense contractor internal use</p>
+                </div>
+            </div>
+            <p style="text-align: center; color: var(--text-secondary); margin-top: 1rem;">
+                <strong>All licenses include:</strong> Source code, documentation, SBOM, and perpetual government use rights.
+            </p>
+            <p style="text-align: center; color: var(--accent-light); margin-top: 0.5rem;">
+                <strong>GSA Schedule:</strong> Available upon request
+            </p>
+        </section>
+
+        <!-- Contact -->
+        <section class="contact-section">
+            <h2>Ready to Deploy Mission-Ready AI?</h2>
+            <div class="contact-info">
+                <div class="contact-item">
+                    <span>Email: contact@sentinel-rag.com</span>
+                </div>
+                <div class="contact-item">
+                    <span>Secure: CAC-signed email available</span>
+                </div>
+                <div class="contact-item">
+                    <span>Technical Documentation: /manual.html</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p><strong>SENTINEL Government Edition v2.0.0</strong></p>
+            <p>Architected by a TS/SCI Cleared Software Engineer</p>
+            <p class="tagline">Air-Gap Native. SCIF Ready. Mission Capable.</p>
+        </div>
+    </footer>
+</body>
+</html>

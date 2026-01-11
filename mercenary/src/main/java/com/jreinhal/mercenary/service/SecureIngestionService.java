@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,13 +23,11 @@ public class SecureIngestionService {
     private static final Logger log = LoggerFactory.getLogger(SecureIngestionService.class);
 
     private final VectorStore vectorStore;
+    private final PiiRedactionService piiRedactionService;
 
-    // PII PATTERNS
-    private static final Pattern SSN_PATTERN = Pattern.compile("\\d{3}-\\d{2}-\\d{4}");
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}");
-
-    public SecureIngestionService(VectorStore vectorStore) {
+    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService) {
         this.vectorStore = vectorStore;
+        this.piiRedactionService = piiRedactionService;
     }
 
     public void ingest(MultipartFile file, Department dept) {
@@ -68,26 +65,26 @@ public class SecureIngestionService {
             List<Document> splitDocuments = splitter.apply(cleanDocs);
 
             List<Document> finalDocuments = new ArrayList<>();
+            int totalRedactions = 0;
+
             for (Document doc : splitDocuments) {
-                // PII REDACTION
-                String cleanContent = redactSensitiveInfo(doc.getContent());
-                Document redactedDoc = new Document(cleanContent, doc.getMetadata());
+                // PII REDACTION using industry-standard service
+                PiiRedactionService.RedactionResult result = piiRedactionService.redact(doc.getContent());
+                Document redactedDoc = new Document(result.getRedactedContent(), doc.getMetadata());
+
+                // Track redaction statistics
+                totalRedactions += result.getTotalRedactions();
 
                 // Directly add the document without experimental evolution
                 finalDocuments.add(redactedDoc);
             }
 
             vectorStore.add(finalDocuments);
-            log.info("Securely ingested {} memory points.", finalDocuments.size());
+            log.info("Securely ingested {} memory points. Total PII redactions: {}",
+                    finalDocuments.size(), totalRedactions);
 
         } catch (IOException e) {
             throw new RuntimeException("Secure Ingestion Failed: " + e.getMessage());
         }
-    }
-
-    private String redactSensitiveInfo(String content) {
-        String safe = SSN_PATTERN.matcher(content).replaceAll("[REDACTED-SSN]");
-        safe = EMAIL_PATTERN.matcher(safe).replaceAll("[REDACTED-EMAIL]");
-        return safe;
     }
 }

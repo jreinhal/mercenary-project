@@ -82,6 +82,53 @@ sentinel:
     initial-retrieval-k: ${HIFIRAG_INITIAL_K:20}
     filtered-top-k: ${HIFIRAG_FILTERED_K:5}
     relevance-threshold: ${HIFIRAG_RELEVANCE_THRESHOLD:0.5}
+    max-iterations: ${HIFIRAG_MAX_ITERATIONS:2}
+    reranker:
+      batch-size: ${HIFIRAG_RERANKER_BATCH:5}
+      timeout-seconds: ${HIFIRAG_RERANKER_TIMEOUT:30}
+      use-llm: ${HIFIRAG_USE_LLM:true}
+
+  # PII Redaction Engine
+  # Industry-standard compliance: NIST 800-122, GDPR, HIPAA Safe Harbor, PCI-DSS
+  pii:
+    enabled: ${PII_ENABLED:true}
+    mode: ${PII_MODE:MASK}  # MASK, TOKENIZE, or REMOVE
+    audit-redactions: ${PII_AUDIT:true}
+    patterns:
+      ssn: ${PII_SSN:true}
+      email: ${PII_EMAIL:true}
+      phone: ${PII_PHONE:true}
+      credit-card: ${PII_CREDIT_CARD:true}
+      dob: ${PII_DOB:true}
+      ip-address: ${PII_IP:true}
+      passport: ${PII_PASSPORT:true}
+      drivers-license: ${PII_DL:true}
+      names: ${PII_NAMES:true}
+      address: ${PII_ADDRESS:true}
+      medical-id: ${PII_MEDICAL:true}
+
+  # Glass Box Reasoning Engine
+  # Real-time pipeline transparency
+  reasoning:
+    enabled: ${REASONING_ENABLED:true}
+    detailed-traces: ${REASONING_DETAILED:false}
+    trace-retention-hours: ${REASONING_RETENTION:24}
+
+# ============================================
+# Swagger/OpenAPI Configuration
+# ============================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:true}
+    operationsSorter: method
+    tagsSorter: alpha
+    filter: true
+    showExtensions: true
+    showCommonExtensions: true
+  show-actuator: false
 
 # ============================================
 # Profile-specific configurations
@@ -109,6 +156,16 @@ app:
   oidc:
     issuer: ${OIDC_ISSUER}
     client-id: ${OIDC_CLIENT_ID}
+    jwks-uri: ${OIDC_JWKS_URI:}
+    local-jwks-path: ${OIDC_LOCAL_JWKS:}
+    jwks-cache-ttl: ${OIDC_JWKS_CACHE_TTL:3600}
+    allowed-algorithms: ${OIDC_ALGORITHMS:RS256,RS384,RS512,ES256}
+    clock-skew-seconds: ${OIDC_CLOCK_SKEW:60}
+    validate-issuer: ${OIDC_VALIDATE_ISSUER:true}
+    validate-audience: ${OIDC_VALIDATE_AUDIENCE:true}
+    auto-provision: ${OIDC_AUTO_PROVISION:true}
+    default-role: ${OIDC_DEFAULT_ROLE:VIEWER}
+    default-clearance: ${OIDC_DEFAULT_CLEARANCE:UNCLASSIFIED}
 
 ---
 # GOVERNMENT/GOVCLOUD PROFILE (CAC/PIV)
@@ -122,3 +179,18 @@ app:
 
 # For air-gapped deployments, override MongoDB URI:
 # MONGODB_URI=mongodb://localhost:27017/mercenary
+
+---
+# COMMERCIAL/STANDARD PROFILE (Username/Password)
+spring:
+  config:
+    activate:
+      on-profile: standard
+
+app:
+  auth-mode: STANDARD
+
+sentinel:
+  bootstrap:
+    enabled: true
+    admin-password: ${SENTINEL_ADMIN_PASSWORD:Sentinel-Deploy-2026}

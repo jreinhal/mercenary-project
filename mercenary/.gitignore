@@ -37,5 +37,13 @@ target/
 # Local data
 data/
 
-# Claude Code local settings
-.claude/settings.local.json
+# Test data (remove before distribution)
+test-documents/
+
+# Claude Code (development tool - not part of product)
+.claude/
+
+# Sales materials (keep separate from codebase)
+SENTINEL_Sales_Brochure.pdf
+SENTINEL_Sales_Listings*.md
+src/main/resources/static/sales.html
