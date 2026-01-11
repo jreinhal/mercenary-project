@@ -4,6 +4,18 @@ spring:
   profiles:
     active: ${APP_PROFILE:dev}
 
+  # =================================================================
+  # CRITICAL SECURITY WARNING
+  # =================================================================
+  # DO NOT COMMIT REAL CREDENTIALS TO THIS FILE.
+  # THIS FILE IS PUBLICLY VISIBLE IN GIT HISTORY.
+  #
+  # USE ENVIRONMENT VARIABLES FOR ALL SECRETS.
+  # 
+  # MONGODB_URI should be set in your run configuration or OS environment.
+  # Example: MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/mercenary
+  # =================================================================
+
   # --- THE BAN HAMMER ---
   # This tells Spring: "Do NOT load your default MongoDB Vector Store logic. I have my own."
   autoconfigure:
@@ -11,8 +23,8 @@ spring:
 
   data:
     mongodb:
-      # SECURE DEFAULT: Localhost (No Auth)
-      # PRODUCTION GUIDANCE: Overwrite MONGODB_URI env var with secure connection string
+      # SECURE DEFAULT: Localhost (No Auth) - Safe for dev
+      # PRODUCTION: WE WILL READ 'MONGODB_URI' FROM ENVIRONMENT
       uri: ${MONGODB_URI:mongodb://localhost:27017/mercenary}
   servlet:
     multipart:

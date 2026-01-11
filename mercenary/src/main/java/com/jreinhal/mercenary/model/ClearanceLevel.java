@@ -20,7 +20,8 @@ public enum ClearanceLevel {
     UNCLASSIFIED(0, "Unclassified", "Public"),
     CUI(1, "Controlled Unclassified", "Confidential"),
     SECRET(2, "Secret", "Restricted"),
-    TOP_SECRET(3, "Top Secret", "Highly Restricted");
+    TOP_SECRET(3, "Top Secret", "Highly Restricted"),
+    SCI(4, "Sensitive Compartmented Information", "Eyes Only");
 
     private final int level;
     private final String governmentLabel;
