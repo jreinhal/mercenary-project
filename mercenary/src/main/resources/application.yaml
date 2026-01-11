@@ -192,5 +192,5 @@ app:
 
 sentinel:
   bootstrap:
-    enabled: true
-    admin-password: ${SENTINEL_ADMIN_PASSWORD:Sentinel-Deploy-2026}
+    enabled: false
+    admin-password: ${SENTINEL_ADMIN_PASSWORD:}

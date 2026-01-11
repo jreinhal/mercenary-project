@@ -35,10 +35,10 @@ public class DataInitializer {
      * Default admin password for fresh deployments.
      * Can be overridden via environment variable for automated deployments.
      */
-    @Value("${sentinel.bootstrap.admin-password:Sentinel-Deploy-2026}")
-    private String defaultAdminPassword;
+    @Value("${sentinel.bootstrap.admin-password:}")
+    private String adminPassword;
 
-    @Value("${sentinel.bootstrap.enabled:true}")
+    @Value("${sentinel.bootstrap.enabled:false}")
     private boolean bootstrapEnabled;
 
     /**
@@ -61,6 +61,18 @@ public class DataInitializer {
                 return;
             }
 
+            // SECURITY: Require explicit password when bootstrap is enabled
+            if (adminPassword == null || adminPassword.isBlank()) {
+                log.error("==========================================================");
+                log.error("  SECURITY ERROR: Bootstrap enabled but no password set!");
+                log.error("  Set SENTINEL_ADMIN_PASSWORD environment variable.");
+                log.error("  Bootstrap aborted for security.");
+                log.error("==========================================================");
+                throw new IllegalStateException(
+                    "SENTINEL_ADMIN_PASSWORD environment variable is REQUIRED when bootstrap is enabled"
+                );
+            }
+
             if (userRepository.count() == 0) {
                 log.warn("==========================================================");
                 log.warn(">>> EMPTY DATABASE DETECTED <<<");
@@ -73,7 +85,7 @@ public class DataInitializer {
                 admin.setEmail("admin@sentinel.local");
 
                 // Hash the password using BCrypt
-                admin.setPasswordHash(passwordEncoder.encode(defaultAdminPassword));
+                admin.setPasswordHash(passwordEncoder.encode(adminPassword));
 
                 // Full admin privileges
                 admin.setRoles(Set.of(UserRole.ADMIN));

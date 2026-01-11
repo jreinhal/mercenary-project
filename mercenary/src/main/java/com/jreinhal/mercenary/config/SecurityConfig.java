@@ -72,8 +72,7 @@ public class SecurityConfig {
                 // Public endpoints (health checks, static assets)
                 .requestMatchers("/api/health", "/api/status").permitAll()
                 .requestMatchers("/", "/index.html", "/manual.html").permitAll()
-                .requestMatchers("/sales-*.html").permitAll()
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/favicon.ico").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
                 // Admin endpoints require ADMIN role
@@ -96,17 +95,55 @@ public class SecurityConfig {
     }
 
     /**
-     * Default Security Configuration (Development / Standard Mode)
+     * Standard Security Configuration (Enterprise / Commercial Mode)
      *
-     * Relaxed security for development and non-government deployments.
-     * CSRF disabled, all endpoints accessible.
+     * Provides baseline security for non-government deployments:
+     * - CSRF protection enabled
+     * - Security headers (X-Frame-Options, Content-Type)
+     * - Public endpoints for static assets and health checks
+     * - All API endpoints require authentication
      */
     @Bean
     @Profile("!govcloud")
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            // CSRF Protection with cookie-based token (for SPA compatibility)
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers("/api/health", "/api/status")
+            )
+
+            // Security Headers
+            .headers(headers -> headers
+                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                .contentTypeOptions(contentType -> {})
+            )
+
+            // Authorization Rules
+            .authorizeHttpRequests(auth -> auth
+                // Public endpoints (health checks, static assets)
+                .requestMatchers("/api/health", "/api/status").permitAll()
+                .requestMatchers("/", "/index.html", "/manual.html").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+
+                // All API endpoints require authentication
+                .requestMatchers("/api/**").authenticated()
+
+                // Static pages are public
+                .anyRequest().permitAll()
+            )
+
+            // Form login for standard deployments
+            .formLogin(form -> form
+                .loginPage("/login")
+                .permitAll()
+            )
+            .logout(logout -> logout
+                .logoutSuccessUrl("/")
+                .permitAll()
+            );
+
         return http.build();
     }
 }
