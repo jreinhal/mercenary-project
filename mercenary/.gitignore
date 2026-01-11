@@ -1,49 +1,41 @@
-HELP.md
-.gradle
+# Build artifacts
+.gradle/
 build/
 !gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
 bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+out/
+target/
 
-### IntelliJ IDEA ###
-.idea
+# IDE settings
+.idea/
+.vscode/
 *.iws
 *.iml
 *.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-### NetBeans ###
+.classpath
+.project
+.settings/
+.factorypath
+.springBeans
+.sts4-cache
+.apt_generated
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
-.vscode/
-
-### Logs ###
+# Logs
 *.log
-error.log
 
-### Sensitive/Test Data ###
-intercepted_comms.txt
-*_comms.txt
-*.credentials
-*.secret
+# Environment and secrets
 .env
 .env.*
+*.secret
+*.credentials
+
+# Local data
+data/
+
+# Claude Code local settings
+.claude/settings.local.json

@@ -1,28 +1,24 @@
 version: '3.8'
 
 services:
-  # SERVICE 1: Your Mercenary AI App
-  mercenary-app:
+  # SENTINEL Intelligence Platform
+  sentinel-app:
     build: .
     ports:
-      - "8080:8080"  # Maps port 8080 on your laptop to 8080 in the container
+      - "8080:8080"
     environment:
-      # NETWORK MAGIC: We use "mongo-db" (the service name below) as the hostname.
-      # Docker automatically resolves this DNS name.
-      - SPRING_DATA_MONGODB_URI=mongodb+srv://Jreinhal:Mercenary2025@cluster0.peocz7g.mongodb.net/mercenary
-
-      # *** INSERT YOUR REAL OPENAI KEY BELOW ***
-      - SPRING_AI_OPENAI_API_KEY=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
+      # Configure via environment variables - DO NOT hardcode credentials
+      - SPRING_DATA_MONGODB_URI=${MONGODB_URI:-mongodb://mongo-db:27017/mercenary}
+      - SPRING_AI_OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
-      - mongo-db # Wait for the DB to start before starting the App
+      - mongo-db
 
-  # SERVICE 2: Local MongoDB (Replaces Atlas for this demo)
+  # Local MongoDB
   mongo-db:
-    image: mongo:latest
+    image: mongo:7
     ports:
       - "27017:27017"
     volumes:
-      # PERSISTENCE: This ensures DB data survives if you delete the container
       - mongo_data:/data/db
 
 volumes:

@@ -309,14 +309,24 @@ Proprietary. All rights reserved.
 
 ---
 
-## Support
+## What's Included
 
-For deployment assistance, integration support, or enterprise licensing:
+This sale includes:
 
-- **Documentation:** `/manual.html` (built into application)
-- **API Reference:** `/swagger-ui.html`
-- **Contact:** [Your contact information]
+- Complete source code (Java 21 / Spring Boot 3.3)
+- Docker deployment configurations
+- Web dashboard (HTML/CSS/JS)
+- API documentation via Swagger
+- Unit tests for authentication flows
+- Full transfer of intellectual property rights
 
 ---
 
-*SENTINEL INTELLIGENCE PLATFORM — Powered by Spring AI & MongoDB Vector Store*
+## Support
+
+- **Built-in Documentation:** `/manual.html`
+- **API Reference:** `/swagger-ui.html`
+
+---
+
+*SENTINEL INTELLIGENCE PLATFORM — Enterprise RAG for Regulated Industries*
