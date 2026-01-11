@@ -27,7 +27,7 @@ public interface AuthenticationService {
             return false;
 
         // Check clearance level
-        if (!user.getClearanceLevel().canAccess(required)) {
+        if (!user.getClearance().canAccess(required)) {
             return false;
         }
 

@@ -23,7 +23,7 @@ public class User {
     private String email;
 
     private Set<UserRole> roles = new HashSet<>();
-    private ClearanceLevel clearanceLevel = ClearanceLevel.UNCLASSIFIED;
+    private ClearanceLevel clearance = ClearanceLevel.UNCLASSIFIED;
     private Set<Department> allowedSectors = new HashSet<>();
 
     private AuthProvider authProvider = AuthProvider.LOCAL;
@@ -44,7 +44,7 @@ public class User {
         user.username = username;
         user.displayName = username.toUpperCase();
         user.roles = Set.of(UserRole.ADMIN);
-        user.clearanceLevel = ClearanceLevel.TOP_SECRET;
+        user.clearance = ClearanceLevel.TOP_SECRET;
         user.allowedSectors = Set.of(Department.values());
         user.authProvider = AuthProvider.LOCAL;
         user.createdAt = Instant.now();
@@ -93,12 +93,12 @@ public class User {
         this.roles = roles;
     }
 
-    public ClearanceLevel getClearanceLevel() {
-        return clearanceLevel;
+    public ClearanceLevel getClearance() {
+        return clearance;
     }
 
-    public void setClearanceLevel(ClearanceLevel clearanceLevel) {
-        this.clearanceLevel = clearanceLevel;
+    public void setClearance(ClearanceLevel clearance) {
+        this.clearance = clearance;
     }
 
     public Set<Department> getAllowedSectors() {
@@ -163,7 +163,7 @@ public class User {
     }
 
     public boolean canAccessClassification(ClearanceLevel required) {
-        return clearanceLevel.canAccess(required);
+        return clearance.canAccess(required);
     }
 
     /**

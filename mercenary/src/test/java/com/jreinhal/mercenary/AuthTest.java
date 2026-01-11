@@ -65,7 +65,7 @@ public class AuthTest {
         // Verify
         assertNotNull(result);
         assertEquals("New Recruit", result.getUsername());
-        assertEquals("UNCLASSIFIED", result.getClearanceLevel().name());
+        assertEquals("UNCLASSIFIED", result.getClearance().name());
         verify(userRepository, times(2)).save(any(User.class)); // 1 for create, 1 for login update
     }
 

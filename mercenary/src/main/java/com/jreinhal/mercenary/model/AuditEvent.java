@@ -67,7 +67,7 @@ public class AuditEvent {
         if (user != null) {
             this.userId = user.getId();
             this.username = user.getUsername();
-            this.userClearance = user.getClearanceLevel();
+            this.userClearance = user.getClearance();
         }
         return this;
     }

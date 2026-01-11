@@ -94,7 +94,7 @@ public class OidcAuthenticationService implements AuthenticationService {
                 user.setEmail(email);
                 user.setAuthProvider(AuthProvider.OIDC);
                 user.setRoles(Set.of(UserRole.VIEWER)); // Default to read-only
-                user.setClearanceLevel(ClearanceLevel.UNCLASSIFIED);
+                user.setClearance(ClearanceLevel.UNCLASSIFIED);
                 user.setAllowedSectors(Set.of(Department.OPERATIONS));
                 user.setCreatedAt(Instant.now());
                 user.setActive(true);
