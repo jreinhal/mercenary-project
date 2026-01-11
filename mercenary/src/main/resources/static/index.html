@@ -51,6 +51,51 @@
             --radius-lg: 8px;
         }
 
+        /* === THEMES === */
+        [data-theme="MEDICAL"] {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --bg-elevated: #e2e8f0;
+
+            --border-subtle: #e2e8f0;
+            --border-default: #cbd5e1;
+            --border-strong: #94a3b8;
+
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #64748b;
+
+            --accent-primary: #0ea5e9;
+            /* Sky Blue */
+            --accent-hover: #0284c7;
+            --accent-muted: rgba(14, 165, 233, 0.1);
+        }
+
+        [data-theme="LEGAL"] {
+            --bg-primary: #fdfbf7;
+            /* Warm Paper */
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f3f0e8;
+            --bg-elevated: #e6e4dc;
+
+            --border-subtle: #e6e4dc;
+            --border-default: #d1d5db;
+            --border-strong: #9ca3af;
+
+            --text-primary: #111827;
+            --text-secondary: #374151;
+            --text-tertiary: #6b7280;
+
+            --accent-primary: #b45309;
+            /* Amber/Bronze */
+            --accent-hover: #92400e;
+            --accent-muted: rgba(180, 83, 9, 0.1);
+
+            --font-ui: 'Georgia', 'Times New Roman', serif;
+            /* Serif for Legal */
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -2080,10 +2125,62 @@
         }
 
         function initSectorSelector() {
+            // Apply initial theme based on default selection
+            applyTheme(sectorSelect.value);
+
             sectorSelect.addEventListener('change', (e) => {
                 const sector = e.target.value;
                 document.getElementById('active-sector').textContent = sector;
+                applyTheme(sector);
             });
+        }
+
+        // === THEME ENGINE ===
+        const THEME_CONFIG = {
+            'DEFENSE': {
+                theme: 'default',
+                title: 'INTELLIGENCE PLATFORM',
+                operatorTitle: 'OPERATOR',
+                placeholder: 'Enter intelligence query or directives...'
+            },
+            'MEDICAL': {
+                theme: 'MEDICAL',
+                title: 'CLINICAL ASSISTANT',
+                operatorTitle: 'CLINICIAN',
+                placeholder: 'Enter patient symptoms or medical query...'
+            },
+            'LEGAL': {
+                theme: 'LEGAL',
+                title: 'LEGAL RESEARCH AID',
+                operatorTitle: 'COUNSEL',
+                placeholder: 'Enter case law query or precedent search...'
+            },
+            'FINANCIAL': {
+                theme: 'LEGAL', // Reuse professional theme
+                title: 'MARKET ANALYST',
+                operatorTitle: 'ANALYST',
+                placeholder: 'Enter market query or ticker symbol...'
+            }
+        };
+
+        function applyTheme(sector) {
+            const config = THEME_CONFIG[sector] || THEME_CONFIG['DEFENSE'];
+
+            // 1. Apply CSS Variables
+            if (config.theme === 'default') {
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', config.theme);
+            }
+
+            // 2. Update Terminology
+            document.querySelector('.brand-name').textContent = `SENTINEL // ${config.title}`;
+            document.querySelector('.operator-badge strong').previousSibling.textContent = `${config.operatorTitle}: `;
+            document.getElementById('query-input').placeholder = config.placeholder;
+
+            // 3. Update Welcome Screen if visible
+            const welcomeTitle = document.querySelector('.welcome-title');
+            if (welcomeTitle) welcomeTitle.textContent = `SENTINEL ${config.title}`;
         }
 
         // === TELEMETRY ===
