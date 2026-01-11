@@ -559,6 +559,34 @@
                 </div>
             </div>
 
+            <h3>Zero Trust Security Architecture</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>HTTPS Enforcement</h4>
+                    <p>All traffic encrypted with mandatory TLS 1.2+ - no plaintext allowed</p>
+                </div>
+                <div class="feature-card">
+                    <h4>HSTS Headers</h4>
+                    <p>HTTP Strict Transport Security with 1-year max-age and preload</p>
+                </div>
+                <div class="feature-card">
+                    <h4>CSRF Protection</h4>
+                    <p>Cookie-based token repository prevents cross-site request forgery</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Role-Based Access (RBAC)</h4>
+                    <p>ADMIN, OPERATOR, ANALYST tiers with granular endpoint authorization</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Multi-Factor Authentication</h4>
+                    <p>SSO/OIDC integration with Azure AD, Okta, or enterprise IdP</p>
+                </div>
+                <div class="feature-card">
+                    <h4>X-Frame-Options: DENY</h4>
+                    <p>Clickjacking protection prevents iframe embedding attacks</p>
+                </div>
+            </div>
+
             <h3>Compliance Alignment</h3>
             <table>
                 <thead>
@@ -570,35 +598,39 @@
                 <tbody>
                     <tr>
                         <td>SOC 2 Type II</td>
-                        <td>Audit logging, access controls, encryption</td>
+                        <td>Audit logging, RBAC access controls, encryption at rest/transit</td>
                     </tr>
                     <tr>
                         <td>SOX Section 404</td>
-                        <td>Change management, audit trails</td>
+                        <td>Change management, audit trails, role-based authorization</td>
                     </tr>
                     <tr>
                         <td>PCI-DSS v4.0</td>
-                        <td>Cardholder data protection, Luhn validation</td>
+                        <td>Cardholder data protection, Luhn validation, HTTPS enforced</td>
                     </tr>
                     <tr>
                         <td>GLBA</td>
-                        <td>Customer data privacy controls</td>
+                        <td>Customer data privacy controls with Zero Trust architecture</td>
                     </tr>
                     <tr>
                         <td>GDPR Article 22</td>
-                        <td>Explainable automated decisions</td>
+                        <td>Explainable automated decisions via Glass Box</td>
                     </tr>
                     <tr>
                         <td>SR 11-7</td>
-                        <td>Model risk management (Glass Box)</td>
+                        <td>Model risk management with complete audit trails</td>
                     </tr>
                     <tr>
                         <td>NIST CSF</td>
-                        <td>Security framework alignment</td>
+                        <td>Security framework alignment with HSTS, CSRF protection</td>
                     </tr>
                     <tr>
                         <td>FFIEC Guidelines</td>
-                        <td>Information security controls</td>
+                        <td>Information security controls, MFA support</td>
+                    </tr>
+                    <tr>
+                        <td>Section 508</td>
+                        <td>ARIA labels and accessibility compliance for all interfaces</td>
                     </tr>
                 </tbody>
             </table>

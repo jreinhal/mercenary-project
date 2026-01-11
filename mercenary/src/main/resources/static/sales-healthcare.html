@@ -301,6 +301,34 @@
                 </div>
             </div>
 
+            <h3>Zero Trust Security Architecture</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>HTTPS Enforcement</h4>
+                    <p>All traffic encrypted with mandatory TLS 1.2+ - no plaintext allowed</p>
+                </div>
+                <div class="feature-card">
+                    <h4>HSTS Headers</h4>
+                    <p>HTTP Strict Transport Security with 1-year max-age and preload</p>
+                </div>
+                <div class="feature-card">
+                    <h4>CSRF Protection</h4>
+                    <p>Cookie-based token repository prevents cross-site request forgery</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Role-Based Access (RBAC)</h4>
+                    <p>ADMIN, OPERATOR, ANALYST tiers with granular endpoint authorization</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Multi-Factor Authentication</h4>
+                    <p>SSO/OIDC integration with Azure AD, Okta, or enterprise IdP</p>
+                </div>
+                <div class="feature-card">
+                    <h4>X-Frame-Options: DENY</h4>
+                    <p>Clickjacking protection prevents iframe embedding attacks</p>
+                </div>
+            </div>
+
             <h3>Compliance Alignment</h3>
             <table>
                 <thead>
@@ -308,11 +336,12 @@
                 </thead>
                 <tbody>
                     <tr><td>HIPAA Privacy Rule</td><td>PII/PHI redaction before storage and transmission</td></tr>
-                    <tr><td>HIPAA Security Rule</td><td>Encryption at rest (AES-256), in transit (TLS 1.2+)</td></tr>
+                    <tr><td>HIPAA Security Rule</td><td>Encryption at rest (AES-256), in transit (TLS 1.2+), HTTPS enforced</td></tr>
                     <tr><td>HIPAA Safe Harbor</td><td>18-identifier de-identification support</td></tr>
                     <tr><td>HITECH Act</td><td>Audit logging with 7-year retention capability</td></tr>
                     <tr><td>21 CFR Part 11</td><td>Electronic signatures and audit trails</td></tr>
-                    <tr><td>NIST 800-66</td><td>Security control alignment</td></tr>
+                    <tr><td>NIST 800-66</td><td>Security control alignment with Zero Trust architecture</td></tr>
+                    <tr><td>Section 508</td><td>ARIA labels and accessibility compliance for all interfaces</td></tr>
                 </tbody>
             </table>
         </div>
