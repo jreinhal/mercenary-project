@@ -1723,10 +1723,13 @@
 <body>
 
     <!-- Feedback Modal -->
-    <div class="feedback-modal" id="feedback-modal">
+    <a href="#query-input" class="skip-link" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999;" onfocus="this.style.cssText='position:fixed;left:10px;top:10px;background:var(--accent-primary);color:white;padding:8px 16px;border-radius:4px;z-index:9999;text-decoration:none;'">Skip to main content</a>
+
+    <!-- Feedback Modal -->
+    <div class="feedback-modal" id="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
         <div class="feedback-modal-content">
             <div class="feedback-modal-header">
-                <span class="feedback-modal-title">Report Issue</span>
+                <span class="feedback-modal-title" id="feedback-modal-title">Report Issue</span>
                 <button class="icon-btn" onclick="closeFeedbackModal()" aria-label="Close feedback modal">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18" />
@@ -1771,7 +1774,7 @@
     </div>
 
     <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar" role="complementary" aria-label="Control Panel">
         <div class="sidebar-header">
             <span class="sidebar-title">Control Panel</span>
             <button class="icon-btn" onclick="toggleSidebar()" aria-label="Close control panel">
@@ -1822,10 +1825,10 @@
             </a>
             <div class="version-info">v1.0.0 | BUILD 2026.01</div>
         </div>
-    </div>
+    </aside>
 
     <!-- Header -->
-    <header class="header">
+    <header class="header" role="banner">
         <div class="brand">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -1879,7 +1882,7 @@
     </div>
 
     <!-- Main Workspace -->
-    <div class="workspace">
+    <main class="workspace" role="main">
         <!-- Left Panel: Chat Interface -->
         <div class="chat-panel">
             <div class="chat-header">
@@ -1923,7 +1926,7 @@
             </div>
 
             <!-- Chat Messages -->
-            <div class="chat-messages" id="chat-messages">
+            <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
                 <div class="welcome-state" id="welcome-state">
                     <svg class="welcome-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -1981,7 +1984,7 @@
                 <div class="chat-input-wrapper">
                     <input type="text" class="chat-input" id="query-input" placeholder="Enter intelligence query..."
                         autocomplete="off" aria-label="Intelligence Query Input">
-                    <button class="send-btn" id="send-btn" onclick="executeQuery()">
+                    <button class="send-btn" id="send-btn" onclick="executeQuery()" aria-label="Execute query">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="22" y1="2" x2="11" y2="13" />
                             <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -2056,7 +2059,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <!-- Footer -->
     <footer class="footer">
