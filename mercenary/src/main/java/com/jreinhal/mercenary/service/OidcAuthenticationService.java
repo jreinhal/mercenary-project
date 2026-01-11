@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Set;
 import java.time.Instant;
+import jakarta.annotation.PostConstruct;
 
 /**
  * OIDC/OAuth2 authentication for enterprise deployments.
@@ -69,6 +70,39 @@ public class OidcAuthenticationService implements AuthenticationService {
         log.info(">>> OIDC AUTHENTICATION MODE ACTIVE <<<");
         log.info(">>> JWT signature validation: ENABLED                  <<<");
         log.info("==========================================================");
+    }
+
+    /**
+     * Validate OIDC configuration on startup.
+     * Logs warnings for missing configuration to help operators diagnose issues.
+     */
+    @PostConstruct
+    public void validateConfiguration() {
+        boolean hasErrors = false;
+
+        if (issuer == null || issuer.isBlank()) {
+            log.error("OIDC Configuration Error: 'app.oidc.issuer' is not set!");
+            log.error("  Set OIDC_ISSUER environment variable or configure in application.yaml");
+            hasErrors = true;
+        }
+
+        if (clientId == null || clientId.isBlank()) {
+            log.error("OIDC Configuration Error: 'app.oidc.client-id' is not set!");
+            log.error("  Set OIDC_CLIENT_ID environment variable or configure in application.yaml");
+            hasErrors = true;
+        }
+
+        if (hasErrors) {
+            log.error("==========================================================");
+            log.error("  OIDC MODE ACTIVE BUT CONFIGURATION INCOMPLETE!");
+            log.error("  Authentication will fail until configuration is fixed.");
+            log.error("==========================================================");
+        } else {
+            log.info("OIDC Configuration validated:");
+            log.info("  Issuer: {}", issuer);
+            log.info("  Client ID: {}", clientId);
+            log.info("  Auto-provision: {}", autoProvision);
+        }
     }
 
     @Override

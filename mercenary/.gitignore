@@ -47,3 +47,6 @@ test-documents/
 SENTINEL_Sales_Brochure.pdf
 SENTINEL_Sales_Listings*.md
 src/main/resources/static/sales.html
+
+# PDF documents (store in documentation system)
+*.pdf
