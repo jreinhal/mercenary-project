@@ -715,6 +715,12 @@
                     <td>Corporate SSO (Azure AD, Okta)</td>
                 </tr>
                 <tr>
+                    <td><code>standard</code></td>
+                    <td>Username/Password (BCrypt)</td>
+                    <td>—</td>
+                    <td>Standalone deployments</td>
+                </tr>
+                <tr>
                     <td><code>dev</code></td>
                     <td>Auto-provisioned DEMO_USER</td>
                     <td>None (Local only)</td>
@@ -724,7 +730,7 @@
         </table>
 
         <h3>2.4 Clearance Hierarchy</h3>
-        <p>Beyond standard RBAC, Sentinel enforces <strong>Clearance-Based Access Control (CBAC)</strong>. Even an <code>ADMIN</code> cannot access <code>TOP_SECRET</code> data if their clearance is only <code>SECRET</code>.</p>
+        <p>Beyond standard RBAC, Sentinel enforces <strong>Clearance-Based Access Control (CBAC)</strong>. Even an <code>ADMIN</code> cannot access <code>SCI</code> data if their clearance is only <code>SECRET</code>.</p>
 
         <table>
             <thead>
@@ -737,8 +743,14 @@
             </thead>
             <tbody>
                 <tr>
+                    <td>4</td>
+                    <td>SCI</td>
+                    <td>Sensitive Compartmented Information</td>
+                    <td><span class="clearance ts">SCI</span></td>
+                </tr>
+                <tr>
                     <td>3</td>
-                    <td>Top Secret / SCI</td>
+                    <td>Top Secret</td>
                     <td>Highly Restricted</td>
                     <td><span class="clearance ts">TOP SECRET</span></td>
                 </tr>

@@ -16,7 +16,7 @@ Sentinel is a Retrieval-Augmented Generation (RAG) platform designed for sensiti
 |------------|-------------|
 | **Secure Document Ingestion** | Local vectorization of PDF, TXT, and MD files with automatic PII redaction |
 | **Air-Gap Operation** | Zero external dependencies — runs entirely on local infrastructure |
-| **Clearance-Based Access** | Four-tier classification model (UNCLASSIFIED → TOP SECRET) |
+| **Clearance-Based Access** | Five-tier classification model (UNCLASSIFIED → SCI) |
 | **Glass Box Reasoning** | Real-time pipeline transparency with step-by-step timing and metrics |
 | **Citation Enforcement** | Every AI response anchored to source documents with clickable verification |
 | **Multi-Query Decomposition** | Compound queries split into sub-queries for comprehensive retrieval |
@@ -64,6 +64,7 @@ Authentication → Role (RBAC) → Clearance → Sector → Audit Log
 
 | Level | Government Label | Commercial Label |
 |-------|------------------|------------------|
+| 4 | SCI | Sensitive Compartmented Information |
 | 3 | TOP SECRET | Highly Restricted |
 | 2 | SECRET | Restricted (HIPAA, Privileged) |
 | 1 | CUI | Confidential / Internal |
@@ -74,6 +75,7 @@ Authentication → Role (RBAC) → Clearance → Sector → Audit Log
 | Role | Permissions |
 |------|-------------|
 | `ADMIN` | QUERY, INGEST, DELETE, MANAGE_USERS, VIEW_AUDIT, CONFIGURE |
+| `OPERATOR` | QUERY, INGEST, DELETE, CACHE_CLEAR |
 | `ANALYST` | QUERY, INGEST |
 | `VIEWER` | QUERY |
 | `AUDITOR` | QUERY, VIEW_AUDIT |
@@ -269,9 +271,9 @@ app:
 | `/api/inspect/{filename}` | GET | View document content | Yes |
 | `/api/audit` | GET | Retrieve audit logs | Yes (VIEW_AUDIT permission) |
 | `/api/health` | GET | System health check | No |
-| `/swagger-ui.html` | GET | Interactive API documentation | No |
+| `/swagger-ui.html` | GET | Interactive API documentation | No (dev profile only) |
 
-Full API documentation available at `/swagger-ui.html` when running.
+Full API documentation available at `/swagger-ui.html` when running in `dev` profile. Swagger UI is disabled by default in production profiles for security.
 
 ---
 
@@ -337,9 +339,7 @@ src/main/java/com/jreinhal/mercenary/
 src/main/resources/
 ├── static/
 │   ├── index.html             # Dashboard with Glass Box UI
-│   ├── manual.html            # Operator Field Guide
-│   ├── sales.html             # Product sales page
-│   └── images/
+│   └── manual.html            # Operator Field Guide
 └── application.yaml           # Configuration
 
 src/test/java/
@@ -487,8 +487,7 @@ This sale includes:
 |----------|-----|-------------|
 | Dashboard | `/` | Main intelligence terminal |
 | Operator Manual | `/manual.html` | 9-section field guide |
-| Sales Page | `/sales.html` | Product overview for buyers |
-| API Reference | `/swagger-ui.html` | Interactive API documentation |
+| API Reference | `/swagger-ui.html` | Interactive API documentation (dev profile only) |
 | Deployment Guide | `DEPLOYMENT_CHECKLIST.md` | Production launch checklist |
 
 ---
