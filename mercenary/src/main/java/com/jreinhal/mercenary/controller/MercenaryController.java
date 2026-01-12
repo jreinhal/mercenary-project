@@ -662,11 +662,11 @@ public class MercenaryController {
 
             // Extract sources from response - support both [filename] and (filename) formats
             List<String> sources = new ArrayList<>();
-            // Pattern 1: [filename.ext] - standard format
-            java.util.regex.Matcher matcher1 = java.util.regex.Pattern.compile("\\[([^\\]]+\\.(pdf|txt|md))\\]", java.util.regex.Pattern.CASE_INSENSITIVE)
+            // Pattern 1: [filename.ext] or [Citation: filename.ext] - standard format
+            java.util.regex.Matcher matcher1 = java.util.regex.Pattern.compile("\\[(?:Citation:\\s*)?([^\\]]+\\.(pdf|txt|md))\\]", java.util.regex.Pattern.CASE_INSENSITIVE)
                     .matcher(response);
             while (matcher1.find()) {
-                String source = matcher1.group(1);
+                String source = matcher1.group(1).trim();
                 if (!sources.contains(source)) {
                     sources.add(source);
                 }
@@ -688,6 +688,13 @@ public class MercenaryController {
                 if (!sources.contains(source)) {
                     sources.add(source);
                 }
+            }
+
+            // FALLBACK: If LLM didn't cite sources, use the retrieved document sources
+            // This ensures users always see which documents were consulted
+            if (sources.isEmpty() && !docSources.isEmpty()) {
+                sources.addAll(docSources);
+                log.info("LLM response lacked citations - using retrieved document sources: {}", docSources);
             }
 
             return new EnhancedAskResponse(

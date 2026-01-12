@@ -201,11 +201,14 @@ export SENTINEL_ADMIN_PASSWORD=$(openssl rand -base64 32)
 export SWAGGER_ENABLED=false
 ```
 
-### 5. Bootstrap Configuration
+### 5. Bootstrap Configuration (Standard Profile Only)
 
 | Variable | Description | Recommended |
 |----------|-------------|-------------|
-| `sentinel.bootstrap.enabled` | Auto-create admin user | `false` after initial setup |
+| `sentinel.bootstrap.enabled` | Auto-create admin user (standard profile only) | `false` after initial setup |
+| `SENTINEL_ADMIN_PASSWORD` | Admin password for bootstrap | **Required** if bootstrap enabled |
+
+**Note:** Bootstrap is only available in the `standard` profile. For `enterprise` (OIDC) or `govcloud` (CAC/PIV) profiles, users are provisioned through the identity provider.
 
 ---
 
@@ -223,7 +226,7 @@ MONGODB_URI=mongodb://user:pass@host:27017/sentinel?authSource=admin
 
 # LLM Backend (REQUIRED)
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3
+LLM_MODEL=llama3
 EMBEDDING_MODEL=nomic-embed-text
 ```
 
@@ -249,19 +252,19 @@ These features significantly improve response quality but require more compute r
 
 | Feature | Variable | Default | Description |
 |---------|----------|---------|-------------|
-| **HiFi-RAG** | `HIFIRAG_ENABLED` | `false` | Two-pass retrieval with cross-encoder reranking. Reduces hallucinations by 60%+. |
-| **HGMem** | `HGMEM_ENABLED` | `false` | Hypergraph memory for multi-hop reasoning across documents. |
-| **RAGPart** | `RAGPART_ENABLED` | `false` | Corpus poisoning defense via document partitioning. |
+| **HiFi-RAG** | `HIFIRAG_ENABLED` | `true` | Two-pass retrieval with cross-encoder reranking. Reduces hallucinations by 60%+. |
+| **HGMem** | `HGMEM_ENABLED` | `true` | Hypergraph memory for multi-hop reasoning across documents. |
+| **RAGPart** | `RAGPART_ENABLED` | `true` | Corpus poisoning defense via document partitioning. |
 
-**To enable all advanced features:**
+**Note:** All advanced RAG features are enabled by default. To disable them (for lower resource environments), set the variables to `false`:
 ```bash
-# Add to your environment or startup script
-export HIFIRAG_ENABLED=true
-export HGMEM_ENABLED=true
-export RAGPART_ENABLED=true
+# Optional: Disable advanced features for resource-constrained environments
+export HIFIRAG_ENABLED=false
+export HGMEM_ENABLED=false
+export RAGPART_ENABLED=false
 ```
 
-**Note:** Without these features enabled, SENTINEL runs in "basic mode" using simple vector search. This is suitable for development but production deployments should enable these features for:
+**With these features enabled (default), SENTINEL provides:**
 - Higher quality answers with better source matching
 - Protection against adversarial document injection
 - Multi-hop reasoning across related documents
@@ -508,7 +511,6 @@ Before announcing production availability:
 ## Support
 
 For deployment assistance:
-- Sales Page: `/sales.html`
 - Operator Manual: `/manual.html`
 - API Reference: `/swagger-ui.html` (when enabled)
 

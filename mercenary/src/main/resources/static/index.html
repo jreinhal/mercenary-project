@@ -1799,6 +1799,19 @@
                     <div class="upload-zone-hint">PDF, TXT, MD | Max 50MB</div>
                 </div>
                 <input type="file" id="file-input" accept=".pdf,.txt,.md" style="display:none" multiple>
+
+                <!-- Upload Progress Container -->
+                <div id="upload-progress-container" style="display:none; margin-top:12px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span id="upload-filename" style="font-size:11px; font-family:var(--font-mono); color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px;"></span>
+                        <span id="upload-percent" style="font-size:11px; font-family:var(--font-mono); color:var(--accent-primary);">0%</span>
+                    </div>
+                    <div style="height:4px; background:var(--bg-tertiary); border-radius:2px; overflow:hidden;">
+                        <div id="upload-progress-bar" style="height:100%; width:0%; background:var(--accent-primary); border-radius:2px; transition:width 0.2s ease;"></div>
+                    </div>
+                    <div id="upload-stage" style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted); margin-top:4px;">Preparing...</div>
+                </div>
+
                 <div id="upload-status"
                     style="margin-top:12px; font-size:11px; font-family:var(--font-mono); color:var(--text-secondary);">
                 </div>
@@ -2227,12 +2240,20 @@
         // Close sidebar when clicking outside of it
         document.addEventListener('click', (e) => {
             const sidebar = document.getElementById('sidebar');
-            const sidebarToggle = document.querySelector('[onclick="toggleSidebar()"]');
+            const sidebarToggles = document.querySelectorAll('[onclick="toggleSidebar()"]');
 
-            // Check if sidebar is open and click was outside sidebar and toggle button
+            // Check if click was on any toggle button
+            let clickedOnToggle = false;
+            sidebarToggles.forEach(toggle => {
+                if (toggle.contains(e.target)) {
+                    clickedOnToggle = true;
+                }
+            });
+
+            // Check if sidebar is open and click was outside sidebar and all toggle buttons
             if (sidebar.classList.contains('open') &&
                 !sidebar.contains(e.target) &&
-                !sidebarToggle.contains(e.target)) {
+                !clickedOnToggle) {
                 closeSidebar();
             }
         });
@@ -2270,13 +2291,21 @@
 
         async function handleBatchUpload(files) {
             const statusEl = document.getElementById('upload-status');
+            const progressContainer = document.getElementById('upload-progress-container');
             const total = files.length;
             let successCount = 0;
             const errors = [];
 
+            // Hide status, show progress
+            statusEl.innerHTML = '';
+            progressContainer.style.display = 'block';
+
             for (let i = 0; i < total; i++) {
                 const file = files[i];
-                statusEl.innerHTML = `<span style="color:var(--accent-primary)">Uploading ${i + 1}/${total}: ${file.name}...</span>`;
+                document.getElementById('upload-filename').textContent = `${i + 1}/${total}: ${file.name}`;
+                document.getElementById('upload-percent').textContent = '0%';
+                document.getElementById('upload-progress-bar').style.width = '0%';
+                document.getElementById('upload-stage').textContent = 'Uploading...';
 
                 const result = await uploadSingleFile(file);
                 if (result.success) {
@@ -2285,6 +2314,9 @@
                     errors.push({ file: file.name, error: result.error });
                 }
             }
+
+            // Hide progress, show final status
+            progressContainer.style.display = 'none';
 
             if (successCount === total) {
                 statusEl.innerHTML = `<span style="color:var(--success)">✓ All ${total} files ingested</span>`;
@@ -2304,42 +2336,63 @@
             document.getElementById('file-input').value = '';
         }
 
-        async function uploadSingleFile(file) {
-            const sector = sectorSelect.value;
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('dept', sector);
+        function uploadSingleFile(file) {
+            return new Promise((resolve) => {
+                const sector = sectorSelect.value;
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('dept', sector);
 
-            try {
-                const response = await fetch(`${API_BASE}/ingest/file`, {
-                    method: 'POST',
-                    body: formData
+                const xhr = new XMLHttpRequest();
+
+                // Progress tracking
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        document.getElementById('upload-percent').textContent = `${percent}%`;
+                        document.getElementById('upload-progress-bar').style.width = `${percent}%`;
+
+                        if (percent < 100) {
+                            document.getElementById('upload-stage').textContent = 'Uploading...';
+                        } else {
+                            document.getElementById('upload-stage').textContent = 'Processing & vectorizing...';
+                        }
+                    }
                 });
 
-                if (response.ok) {
-                    fetchTelemetry();
-                    addToContext(file.name, sector);
-                    return { success: true };
-                } else {
-                    // Parse error response
-                    let errorMsg = 'Upload failed';
-                    try {
-                        const errorData = await response.json();
-                        errorMsg = errorData.message || errorData.error || errorMsg;
-                    } catch (e) {
-                        // Use HTTP status text
-                        if (response.status === 413) errorMsg = 'File too large (max 50MB)';
-                        else if (response.status === 415) errorMsg = 'Unsupported file type';
-                        else if (response.status === 401) errorMsg = 'Authentication required';
-                        else if (response.status === 403) errorMsg = 'Access denied - insufficient clearance';
-                        else errorMsg = `Server error (${response.status})`;
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        fetchTelemetry();
+                        addToContext(file.name, sector);
+                        resolve({ success: true });
+                    } else {
+                        let errorMsg = 'Upload failed';
+                        try {
+                            const errorData = JSON.parse(xhr.responseText);
+                            errorMsg = errorData.message || errorData.error || errorMsg;
+                        } catch (e) {
+                            if (xhr.status === 413) errorMsg = 'File too large (max 50MB)';
+                            else if (xhr.status === 415) errorMsg = 'Unsupported file type';
+                            else if (xhr.status === 401) errorMsg = 'Authentication required';
+                            else if (xhr.status === 403) errorMsg = 'Access denied - insufficient clearance';
+                            else errorMsg = `Server error (${xhr.status})`;
+                        }
+                        resolve({ success: false, error: errorMsg });
                     }
-                    return { success: false, error: errorMsg };
-                }
-            } catch (error) {
-                // Network or connection error
-                return { success: false, error: 'Network error - check connection' };
-            }
+                });
+
+                xhr.addEventListener('error', () => {
+                    resolve({ success: false, error: 'Network error - check connection' });
+                });
+
+                xhr.addEventListener('timeout', () => {
+                    resolve({ success: false, error: 'Upload timed out' });
+                });
+
+                xhr.open('POST', `${API_BASE}/ingest/file`);
+                xhr.timeout = 300000; // 5 minute timeout for large files
+                xhr.send(formData);
+            });
         }
 
         // === CONTEXT MANAGEMENT ===

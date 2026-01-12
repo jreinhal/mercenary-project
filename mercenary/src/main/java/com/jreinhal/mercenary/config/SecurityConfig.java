@@ -95,6 +95,33 @@ public class SecurityConfig {
     }
 
     /**
+     * Development Security Configuration
+     *
+     * Permits all requests - authentication handled by custom SecurityFilter
+     * which auto-provisions a DEMO_USER.
+     */
+    @Bean
+    @Profile("dev")
+    public SecurityFilterChain devSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // Disable CSRF for dev mode (simpler testing)
+            .csrf(csrf -> csrf.disable())
+
+            // Security Headers
+            .headers(headers -> headers
+                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                .contentTypeOptions(contentType -> {})
+            )
+
+            // Permit all requests - custom SecurityFilter handles auth
+            .authorizeHttpRequests(auth -> auth
+                .anyRequest().permitAll()
+            );
+
+        return http.build();
+    }
+
+    /**
      * Standard Security Configuration (Enterprise / Commercial Mode)
      *
      * Provides baseline security for non-government deployments:
@@ -104,7 +131,7 @@ public class SecurityConfig {
      * - All API endpoints require authentication
      */
     @Bean
-    @Profile("!govcloud")
+    @Profile({"enterprise", "standard"})
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             // CSRF Protection with cookie-based token (for SPA compatibility)
