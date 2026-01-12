@@ -84,12 +84,16 @@ Authentication → Role (RBAC) → Clearance → Sector → Audit Log
 
 Automatic detection and redaction of sensitive data during ingestion:
 - Social Security Numbers (SSN)
-- Credit Card Numbers (PCI-DSS)
+- Credit Card Numbers (PCI-DSS compliant, with Luhn validation)
 - Email Addresses
 - Phone Numbers
-- Dates of Birth
+- Dates of Birth (context-aware detection)
 - Medical Record Numbers (MRN)
-- IP Addresses
+- IP Addresses (IPv4 and IPv6)
+- Passport Numbers
+- Driver's License Numbers
+- Names (with context/honorific detection)
+- Physical Addresses
 
 ### Audit Events
 
