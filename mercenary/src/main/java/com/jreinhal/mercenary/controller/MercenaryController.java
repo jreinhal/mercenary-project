@@ -154,8 +154,15 @@ public class MercenaryController {
             @RequestParam(value = "query", required = false) String query) {
         String content = "";
 
+        // Normalize filename - strip common prefixes that LLMs sometimes add
+        String normalizedFileName = fileName
+                .replaceFirst("(?i)^filename:\\s*", "")
+                .replaceFirst("(?i)^source:\\s*", "")
+                .replaceFirst("(?i)^citation:\\s*", "")
+                .trim();
+
         // 1. Retrieve Content (Cache or Vector Store)
-        String cachedContent = secureDocCache.getIfPresent(fileName);
+        String cachedContent = secureDocCache.getIfPresent(normalizedFileName);
         if (cachedContent != null) {
             content = "--- SECURE DOCUMENT VIEWER (CACHE) ---\nFILE: " + fileName
                     + "\nSTATUS: DECRYPTED [RAM]\n----------------------------------\n\n"
@@ -163,24 +170,24 @@ public class MercenaryController {
         } else {
             try {
                 // FALLBACK: Manual filtering if VectorStore doesn't support metadata filters
-                // 1. Retrieve a broader set of documents using the filename as context
+                // 1. Retrieve a broader set of documents using the normalized filename as context
                 List<Document> potentialDocs = vectorStore.similaritySearch(
-                        SearchRequest.query(fileName).withTopK(20));
+                        SearchRequest.query(normalizedFileName).withTopK(20));
 
-                log.info("INSPECT DEBUG: Searching for '{}'. Found {} potential candidates.", fileName,
+                log.info("INSPECT DEBUG: Searching for '{}'. Found {} potential candidates.", normalizedFileName,
                         potentialDocs.size());
                 potentialDocs.forEach(d -> log.info("  >> Candidate Meta: {}", d.getMetadata()));
 
-                // 2. Filter in memory for exact source match
+                // 2. Filter in memory for exact source match (using normalized filename)
                 Optional<Document> match = potentialDocs.stream()
-                        .filter(doc -> fileName.equals(doc.getMetadata().get("source")) ||
-                                apiKeyMatch(fileName, doc.getMetadata()))
+                        .filter(doc -> normalizedFileName.equals(doc.getMetadata().get("source")) ||
+                                apiKeyMatch(normalizedFileName, doc.getMetadata()))
                         .findFirst();
 
                 if (match.isPresent()) {
                     String recoveredContent = match.get().getContent();
-                    secureDocCache.put(fileName, recoveredContent);
-                    content = "--- SECURE DOCUMENT VIEWER (ARCHIVE) ---\nFILE: " + fileName
+                    secureDocCache.put(normalizedFileName, recoveredContent);
+                    content = "--- SECURE DOCUMENT VIEWER (ARCHIVE) ---\nFILE: " + normalizedFileName
                             + "\nSTATUS: RECONSTRUCTED FROM VECTOR STORE\n----------------------------------\n\n"
                             + recoveredContent;
                 } else {

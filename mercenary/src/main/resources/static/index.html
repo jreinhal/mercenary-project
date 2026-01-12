@@ -1846,9 +1846,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
-            <span class="brand-name">SENTINEL</span>
-            <span class="brand-divider">//</span>
-            <span>INTELLIGENCE</span>
+            <span class="brand-name">SENTINEL // INTELLIGENCE PLATFORM</span>
         </div>
 
         <div class="header-center">
@@ -2587,26 +2585,37 @@
             sources.forEach(s => addToContext(s.filename, sectorSelect.value));
         }
 
+        // Helper to normalize filename by stripping common LLM prefixes
+        function normalizeFilename(filename) {
+            return filename
+                .replace(/^filename:\s*/i, '')
+                .replace(/^source:\s*/i, '')
+                .replace(/^citation:\s*/i, '')
+                .trim();
+        }
+
         function processCitations(text) {
-            // First, handle standard square bracket format: [filename.ext]
-            let result = text.replace(/\[([^\]]+\.(pdf|txt|md))\]/gi, (match, filename) => {
-                return `<span class="citation" onclick="openSource('${escapeHtml(filename)}')" title="View source">
+            // First, handle standard square bracket format: [filename.ext] or [Citation: filename.ext]
+            let result = text.replace(/\[(?:(?:filename|source|citation):\s*)?([^\]]+\.(pdf|txt|md))\]/gi, (match, filename) => {
+                const cleanFilename = normalizeFilename(filename);
+                return `<span class="citation" onclick="openSource('${escapeHtml(cleanFilename)}')" title="View source">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
                 </svg>
-                ${escapeHtml(filename)}
+                ${escapeHtml(cleanFilename)}
             </span>`;
             });
 
             // Also handle backtick format: `filename.ext` (fallback for non-compliant LLM responses)
             result = result.replace(/`([^`]+\.(pdf|txt|md))`/gi, (match, filename) => {
-                return `<span class="citation" onclick="openSource('${escapeHtml(filename)}')" title="View source">
+                const cleanFilename = normalizeFilename(filename);
+                return `<span class="citation" onclick="openSource('${escapeHtml(cleanFilename)}')" title="View source">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
                 </svg>
-                ${escapeHtml(filename)}
+                ${escapeHtml(cleanFilename)}
             </span>`;
             });
 
