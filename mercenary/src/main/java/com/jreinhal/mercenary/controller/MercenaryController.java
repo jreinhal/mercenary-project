@@ -23,12 +23,15 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @RestController
@@ -50,8 +53,39 @@ public class MercenaryController {
     private final AtomicInteger queryCount = new AtomicInteger(0);
     private final AtomicLong totalLatencyMs = new AtomicLong(0);
 
-    // FLASH CACHE
-    private final Map<String, String> secureDocCache = new ConcurrentHashMap<>();
+    // FLASH CACHE - Bounded to prevent OOM (Security Fix: DoS mitigation)
+    private static final int MAX_CACHE_ENTRIES = 100;
+    private static final Duration CACHE_TTL = Duration.ofHours(1);
+    private final Cache<String, String> secureDocCache = Caffeine.newBuilder()
+            .maximumSize(MAX_CACHE_ENTRIES)
+            .expireAfterWrite(CACHE_TTL)
+            .build();
+
+    // PROMPT INJECTION DETECTION - Defense-in-depth patterns
+    // Note: This is a heuristic layer, not a complete solution. Consider model-based guardrails for production.
+    private static final List<Pattern> INJECTION_PATTERNS = List.of(
+            // Direct instruction overrides
+            Pattern.compile("ignore\\s+(all\\s+)?(previous|prior|above)\\s+(instructions?|prompts?|rules?)", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("disregard\\s+(all\\s+)?(previous|prior|above)", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("forget\\s+(all\\s+)?(previous|prior|your)\\s+(instructions?|context|rules?)", Pattern.CASE_INSENSITIVE),
+            // System prompt extraction
+            Pattern.compile("(show|reveal|display|print|output)\\s+(me\\s+)?(the\\s+)?(system|initial)\\s+prompt", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("what\\s+(is|are)\\s+your\\s+(system\\s+)?(instructions?|rules?|prompt)", Pattern.CASE_INSENSITIVE),
+            // Role manipulation
+            Pattern.compile("you\\s+are\\s+now\\s+(a|an|in)\\s+", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("act\\s+as\\s+(if|though)\\s+you", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("pretend\\s+(to\\s+be|you\\s+are)", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("roleplay\\s+as", Pattern.CASE_INSENSITIVE),
+            // Jailbreak patterns
+            Pattern.compile("\\bDAN\\b.*mode", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("developer\\s+mode\\s+(enabled|on|activated)", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("bypass\\s+(your\\s+)?(safety|security|restrictions?|filters?)", Pattern.CASE_INSENSITIVE),
+            // Delimiter attacks
+            Pattern.compile("```\\s*(system|assistant)\\s*:", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("\\[INST\\]|\\[/INST\\]|<<SYS>>|<</SYS>>", Pattern.CASE_INSENSITIVE),
+            // Output manipulation
+            Pattern.compile("(start|begin)\\s+(your\\s+)?response\\s+with", Pattern.CASE_INSENSITIVE)
+    );
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore,
             SecureIngestionService ingestionService, MongoTemplate mongoTemplate,
@@ -121,10 +155,11 @@ public class MercenaryController {
         String content = "";
 
         // 1. Retrieve Content (Cache or Vector Store)
-        if (secureDocCache.containsKey(fileName)) {
+        String cachedContent = secureDocCache.getIfPresent(fileName);
+        if (cachedContent != null) {
             content = "--- SECURE DOCUMENT VIEWER (CACHE) ---\nFILE: " + fileName
                     + "\nSTATUS: DECRYPTED [RAM]\n----------------------------------\n\n"
-                    + secureDocCache.get(fileName);
+                    + cachedContent;
         } else {
             try {
                 // FALLBACK: Manual filtering if VectorStore doesn't support metadata filters
@@ -775,20 +810,32 @@ public class MercenaryController {
     /**
      * FALLBACK: Search in-memory cache if vector store returns nothing.
      * Ensures demo stability even if embeddings/DB are unconfigured.
+     *
+     * Security: Requires at least 30% of query terms to match OR minimum 2 matches
+     * to prevent information leakage from overly loose matching.
      */
     private List<Document> searchInMemoryCache(String query) {
         List<Document> results = new ArrayList<>();
         String[] terms = query.toLowerCase().split("\\s+");
+        // Filter to meaningful terms (length > 3)
+        String[] meaningfulTerms = Arrays.stream(terms)
+                .filter(t -> t.length() > 3)
+                .toArray(String[]::new);
 
-        for (Map.Entry<String, String> entry : secureDocCache.entrySet()) {
+        // Minimum matches required: at least 30% of terms OR minimum 2, whichever is higher
+        int minMatchesRequired = Math.max(2, (int) Math.ceil(meaningfulTerms.length * 0.3));
+
+        for (Map.Entry<String, String> entry : secureDocCache.asMap().entrySet()) {
             String filename = entry.getKey();
             String content = entry.getValue();
             String lowerContent = content.toLowerCase();
 
-            long matches = Arrays.stream(terms)
-                    .filter(t -> t.length() > 3).filter(lowerContent::contains).count();
+            long matches = Arrays.stream(meaningfulTerms)
+                    .filter(lowerContent::contains).count();
 
-            if (matches > 0 || Arrays.stream(terms).anyMatch(t -> filename.toLowerCase().contains(t))) {
+            // Require minimum threshold OR exact filename match
+            boolean filenameMatch = Arrays.stream(terms).anyMatch(t -> filename.toLowerCase().contains(t));
+            if (matches >= minMatchesRequired || filenameMatch) {
                 Document doc = new Document(content);
                 doc.getMetadata().put("source", filename);
                 doc.getMetadata().put("filename", filename);
@@ -810,8 +857,20 @@ public class MercenaryController {
         return false;
     }
 
+    /**
+     * Detect potential prompt injection attacks using pattern matching.
+     *
+     * NOTE: This is a defense-in-depth heuristic layer, not a complete solution.
+     * Sophisticated attacks may bypass pattern matching. For high-security deployments,
+     * consider integrating a model-based guardrail service (e.g., Rebuff, LLM Guard, NeMo Guardrails).
+     *
+     * @param query The user's input query
+     * @return true if potential injection detected, false otherwise
+     */
     private boolean isPromptInjection(String query) {
-        String lower = query.toLowerCase();
-        return lower.contains("ignore previous") || lower.contains("ignore all") || lower.contains("system prompt");
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+        return INJECTION_PATTERNS.stream().anyMatch(pattern -> pattern.matcher(query).find());
     }
 }

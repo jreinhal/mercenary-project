@@ -122,7 +122,8 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
-    enabled: ${SWAGGER_ENABLED:true}
+    # SECURITY: Disabled by default in production. Enable only for dev.
+    enabled: ${SWAGGER_ENABLED:false}
     operationsSorter: method
     tagsSorter: alpha
     filter: true
@@ -143,6 +144,11 @@ spring:
 
 app:
   auth-mode: DEV
+
+# Enable Swagger UI for development
+springdoc:
+  swagger-ui:
+    enabled: true
 
 ---
 # ENTERPRISE PROFILE (Azure AD / Okta)
@@ -176,6 +182,18 @@ spring:
 
 app:
   auth-mode: CAC
+  cac:
+    # SECURITY: Disable auto-provisioning by default in govcloud
+    # New CAC users must be pre-registered by an administrator
+    auto-provision: ${CAC_AUTO_PROVISION:false}
+    # Least-privilege defaults if auto-provision is enabled
+    default-role: ${CAC_DEFAULT_ROLE:VIEWER}
+    default-clearance: ${CAC_DEFAULT_CLEARANCE:UNCLASSIFIED}
+
+# Disable Swagger UI in government deployments
+springdoc:
+  swagger-ui:
+    enabled: false
 
 # For air-gapped deployments, override MongoDB URI:
 # MONGODB_URI=mongodb://localhost:27017/mercenary
