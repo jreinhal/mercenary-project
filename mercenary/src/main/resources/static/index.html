@@ -96,6 +96,111 @@
             /* Serif for Legal */
         }
 
+        /* === ACADEMIC THEME (Research Edition) === */
+        [data-theme="ACADEMIC"] {
+            --bg-primary: #f9fafb;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f3f4f6;
+            --bg-elevated: #e5e7eb;
+
+            --border-subtle: #e5e7eb;
+            --border-default: #d1d5db;
+            --border-strong: #9ca3af;
+
+            --text-primary: #1f2937;
+            --text-secondary: #4b5563;
+            --text-tertiary: #6b7280;
+
+            /* Academic Purple/Indigo */
+            --accent-primary: #6366f1;
+            --accent-hover: #4f46e5;
+            --accent-muted: rgba(99, 102, 241, 0.1);
+
+            /* Scholarly success colors */
+            --success: #059669;
+            --success-muted: rgba(5, 150, 105, 0.1);
+
+            --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* === CORPORATE THEME (Professional Edition) === */
+        [data-theme="CORPORATE"] {
+            --bg-primary: #fafafa;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f4f4f5;
+            --bg-elevated: #e4e4e7;
+
+            --border-subtle: #e4e4e7;
+            --border-default: #d4d4d8;
+            --border-strong: #a1a1aa;
+
+            --text-primary: #18181b;
+            --text-secondary: #3f3f46;
+            --text-tertiary: #71717a;
+
+            /* Corporate Blue */
+            --accent-primary: #2563eb;
+            --accent-hover: #1d4ed8;
+            --accent-muted: rgba(37, 99, 235, 0.08);
+
+            /* Business success colors */
+            --success: #16a34a;
+            --success-muted: rgba(22, 163, 74, 0.1);
+
+            --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* === DARK THEME (Universal Dark Mode) === */
+        [data-theme="DARK"] {
+            --bg-primary: #18181b;
+            --bg-secondary: #1f1f23;
+            --bg-tertiary: #27272a;
+            --bg-elevated: #3f3f46;
+
+            --border-subtle: #3f3f46;
+            --border-default: #52525b;
+            --border-strong: #71717a;
+
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-tertiary: #71717a;
+
+            --accent-primary: #60a5fa;
+            --accent-hover: #93c5fd;
+            --accent-muted: rgba(96, 165, 250, 0.15);
+
+            --success: #4ade80;
+            --success-muted: rgba(74, 222, 128, 0.15);
+            --warning: #fbbf24;
+            --warning-muted: rgba(251, 191, 36, 0.15);
+            --error: #f87171;
+            --error-muted: rgba(248, 113, 113, 0.15);
+        }
+
+        /* === COMMUNITY THEME (Open Source Edition) === */
+        [data-theme="COMMUNITY"] {
+            --bg-primary: #fefefe;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f8fafc;
+            --bg-elevated: #f1f5f9;
+
+            --border-subtle: #e2e8f0;
+            --border-default: #cbd5e1;
+            --border-strong: #94a3b8;
+
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #64748b;
+
+            /* Open Source Green */
+            --accent-primary: #10b981;
+            --accent-hover: #059669;
+            --accent-muted: rgba(16, 185, 129, 0.1);
+
+            --success: #22c55e;
+            --success-muted: rgba(34, 197, 94, 0.1);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -1818,13 +1923,24 @@
             </div>
 
             <div class="sidebar-section">
-                <div class="sidebar-section-title">Target Sector</div>
+                <div class="sidebar-section-title sector-label">SECTOR</div>
                 <select class="sector-select" id="sector-select" aria-label="Select Target Sector">
-                    <option value="DEFENSE">Defense / Military</option>
-                    <option value="LEGAL">Legal / Contracts</option>
-                    <option value="MEDICAL">Medical / Clinical</option>
-                    <option value="FINANCE">Finance / Markets</option>
-                    <option value="ENTERPRISE">Enterprise (General)</option>
+                    <optgroup label="Enterprise">
+                        <option value="DEFENSE">Defense / Military</option>
+                        <option value="LEGAL">Legal / Contracts</option>
+                        <option value="MEDICAL">Medical / Clinical</option>
+                    </optgroup>
+                    <optgroup label="Professional">
+                        <option value="CORPORATE">Corporate (General)</option>
+                        <option value="FINANCIAL">Finance / Markets</option>
+                        <option value="HR">Human Resources</option>
+                    </optgroup>
+                    <optgroup label="Research">
+                        <option value="ACADEMIC">Academic / Research</option>
+                    </optgroup>
+                    <optgroup label="Display">
+                        <option value="DARK">Dark Mode</option>
+                    </optgroup>
                 </select>
             </div>
         </div>
@@ -1836,7 +1952,7 @@
                 </svg>
                 Operator Manual
             </a>
-            <div class="version-info">v1.0.0 | BUILD 2026.01</div>
+            <div class="version-info">v2.1.0 | BUILD 2026.01</div>
         </div>
     </aside>
 
@@ -2139,9 +2255,17 @@
         }
 
         function initSectorSelector() {
-            // Apply initial theme based on default selection
+            // Load saved theme preference or use default
+            const savedTheme = localStorage.getItem('sentinel-theme');
+            if (savedTheme && THEME_CONFIG[savedTheme]) {
+                sectorSelect.value = savedTheme;
+                document.getElementById('active-sector').textContent = savedTheme;
+            }
+
+            // Apply initial theme
             applyTheme(sectorSelect.value);
 
+            // Listen for sector/theme changes
             sectorSelect.addEventListener('change', (e) => {
                 const sector = e.target.value;
                 document.getElementById('active-sector').textContent = sector;
@@ -2150,30 +2274,92 @@
         }
 
         // === THEME ENGINE ===
+        // Edition-aware theming system supporting Enterprise, Professional, Research, and Community
         const THEME_CONFIG = {
+            // === ENTERPRISE EDITION THEMES (Government/Defense) ===
             'DEFENSE': {
-                theme: 'default',
+                theme: 'default',  // Dark Bloomberg-style - maintains government UI compliance
                 title: 'INTELLIGENCE PLATFORM',
                 operatorTitle: 'OPERATOR',
-                placeholder: 'Enter intelligence query or directives...'
+                sectorLabel: 'SECTOR',  // Government terminology
+                placeholder: 'Enter intelligence query or directives...',
+                showClassification: true  // Government requires classification banners
             },
             'MEDICAL': {
                 theme: 'MEDICAL',
                 title: 'CLINICAL ASSISTANT',
                 operatorTitle: 'CLINICIAN',
-                placeholder: 'Enter patient symptoms or medical query...'
+                sectorLabel: 'DEPARTMENT',
+                placeholder: 'Enter patient symptoms or medical query...',
+                showClassification: false
             },
             'LEGAL': {
                 theme: 'LEGAL',
                 title: 'LEGAL RESEARCH AID',
                 operatorTitle: 'COUNSEL',
-                placeholder: 'Enter case law query or precedent search...'
+                sectorLabel: 'PRACTICE',
+                placeholder: 'Enter case law query or precedent search...',
+                showClassification: false
+            },
+            // === PROFESSIONAL EDITION THEMES (Corporate) ===
+            'CORPORATE': {
+                theme: 'CORPORATE',
+                title: 'KNOWLEDGE PLATFORM',
+                operatorTitle: 'USER',
+                sectorLabel: 'WORKSPACE',  // Corporate terminology
+                placeholder: 'Ask a question about your documents...',
+                showClassification: false
             },
             'FINANCIAL': {
-                theme: 'LEGAL', // Reuse professional theme
+                theme: 'CORPORATE',
                 title: 'MARKET ANALYST',
                 operatorTitle: 'ANALYST',
-                placeholder: 'Enter market query or ticker symbol...'
+                sectorLabel: 'WORKSPACE',
+                placeholder: 'Enter market query or ticker symbol...',
+                showClassification: false
+            },
+            'HR': {
+                theme: 'CORPORATE',
+                title: 'HR ASSISTANT',
+                operatorTitle: 'USER',
+                sectorLabel: 'WORKSPACE',
+                placeholder: 'Search policies, handbooks, or benefits...',
+                showClassification: false
+            },
+            // === RESEARCH EDITION THEMES (Academic) ===
+            'ACADEMIC': {
+                theme: 'ACADEMIC',
+                title: 'RESEARCH ASSISTANT',
+                operatorTitle: 'RESEARCHER',
+                sectorLabel: 'COLLECTION',  // Academic terminology
+                placeholder: 'Search your research papers and documents...',
+                showClassification: false
+            },
+            'RESEARCH': {
+                theme: 'ACADEMIC',
+                title: 'RESEARCH PLATFORM',
+                operatorTitle: 'RESEARCHER',
+                sectorLabel: 'COLLECTION',
+                placeholder: 'Enter your research query...',
+                showClassification: false
+            },
+            // === COMMUNITY EDITION THEME (Open Source) ===
+            'COMMUNITY': {
+                theme: 'COMMUNITY',
+                title: 'RAG ENGINE',
+                operatorTitle: 'USER',
+                sectorLabel: 'FOLDER',  // Simple terminology
+                placeholder: 'Ask a question about your documents...',
+                showClassification: false
+            },
+            // === UNIVERSAL DARK MODE (All Editions) ===
+            'DARK': {
+                theme: 'DARK',
+                title: 'KNOWLEDGE PLATFORM',
+                operatorTitle: 'USER',
+                sectorLabel: 'WORKSPACE',
+                placeholder: 'Ask a question about your documents...',
+                showClassification: false
             }
         };
 
@@ -2192,9 +2378,40 @@
             document.querySelector('.operator-badge strong').previousSibling.textContent = `${config.operatorTitle}: `;
             document.getElementById('query-input').placeholder = config.placeholder;
 
-            // 3. Update Welcome Screen if visible
+            // 3. Update sector label terminology (Sector vs Workspace vs Collection)
+            const sectorLabels = document.querySelectorAll('.sector-label, .sidebar-section-title');
+            sectorLabels.forEach(label => {
+                if (label.textContent.includes('SECTOR') || label.textContent.includes('WORKSPACE') ||
+                    label.textContent.includes('COLLECTION') || label.textContent.includes('FOLDER')) {
+                    label.textContent = config.sectorLabel;
+                }
+            });
+
+            // 4. Update Welcome Screen if visible
             const welcomeTitle = document.querySelector('.welcome-title');
             if (welcomeTitle) welcomeTitle.textContent = `SENTINEL ${config.title}`;
+
+            // 5. Handle government-specific UI requirements
+            const classificationBanner = document.getElementById('classification-banner');
+            if (classificationBanner) {
+                classificationBanner.style.display = config.showClassification ? 'flex' : 'none';
+            }
+
+            // 6. Store theme preference
+            localStorage.setItem('sentinel-theme', sector);
+        }
+
+        // Load saved theme on startup
+        function loadSavedTheme() {
+            const savedTheme = localStorage.getItem('sentinel-theme');
+            if (savedTheme && THEME_CONFIG[savedTheme]) {
+                applyTheme(savedTheme);
+                // Update sector select if it exists
+                const sectorSelect = document.getElementById('sector-select');
+                if (sectorSelect) {
+                    sectorSelect.value = savedTheme;
+                }
+            }
         }
 
         // === TELEMETRY ===
