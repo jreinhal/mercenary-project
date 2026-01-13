@@ -1,0 +1,33 @@
+# FINANCE SECTOR - INVESTMENT PORTFOLIO ANALYSIS
+
+## Document ID: FIN-2025-0934
+## Data Classification: PCI-DSS COMPLIANT
+
+### Section 1: Portfolio Performance
+
+Investment portfolio managed by Chief Investment Officer Andrew Park delivered 18.2% returns.
+Total AUM (Assets Under Management) reached $892 million as of December 31, 2025.
+Strong performance driven by technology sector holdings and M&A activity.
+
+Top performing allocations:
+- Technology equities: +24.7% (representing $312M allocation)
+- Government bonds: +8.3% (representing $267M allocation)
+- Real estate: +12.1% (representing $178M allocation)
+- Cash equivalents: +5.2% (representing $135M allocation)
+
+### Section 2: Risk Assessment
+
+Risk Manager Daniel Foster completed quarterly risk analysis.
+VaR (Value at Risk) at 95% confidence: $12.4 million daily exposure.
+Stress test scenarios modeled by Dr. Lisa Wang showed resilience to market shocks.
+
+Key risk metrics:
+- Sharpe Ratio: 1.42 (exceeds 1.0 benchmark)
+- Beta vs S&P 500: 0.87 (lower volatility than market)
+- Maximum drawdown: 6.2% (within 10% tolerance)
+
+### Section 3: Connection to Earnings
+
+CFO Jennifer Armstrong (ref: FIN-2025-0892) incorporated portfolio gains into Q4 earnings.
+Investment income contributed $4.2 million to total revenue.
+Andrew Park coordinated with Apex Technologies on infrastructure valuation.

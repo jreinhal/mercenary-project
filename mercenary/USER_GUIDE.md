@@ -46,6 +46,13 @@ SENTINEL uses a **"Glass Box"** reasoning engine. It doesn't just give you an an
 *   **Medium (Yellow):** Answer is inferred or supported by fewer documents.
 *   **Low (Red):** Information is scarce. Proceed with caution.
 
+### Hallucination Defense (QuCo-RAG)
+SENTINEL uses **QuCo-RAG** (Uncertainty Quantification) to detect potential hallucinations before they reach you:
+*   The system extracts entities (names, organizations, dates, technical terms) from your query.
+*   It checks whether these entities appear frequently in the knowledge base.
+*   If an entity is rare or unknown, the system flags it as **high uncertainty** and retrieves additional context to improve accuracy.
+*   You may see a warning like `⚠️ High uncertainty detected` if the system has low confidence in certain claims.
+
 ---
 
 ## 4. Troubleshooting

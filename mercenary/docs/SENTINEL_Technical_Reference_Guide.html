@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL Intelligence Platform - Technical Reference Guide</title>
+    <style>
+        :root {
+            --primary-color: #1e40af;
+            --secondary-color: #3b82f6;
+            --accent-color: #10b981;
+            --text-color: #1f2937;
+            --bg-color: #f9fafb;
+            --code-bg: #1e293b;
+            --border-color: #e5e7eb;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background: var(--bg-color);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 3rem 0;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        header .subtitle {
+            font-size: 1.25rem;
+            opacity: 0.9;
+        }
+
+        header .meta {
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            opacity: 0.8;
+        }
+
+        .classification-banner {
+            background: var(--accent-color);
+            color: white;
+            text-align: center;
+            padding: 0.5rem;
+            font-weight: bold;
+            font-size: 0.875rem;
+        }
+
+        /* Navigation */
+        nav {
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            justify-content: center;
+        }
+
+        nav a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--primary-color);
+        }
+
+        /* Main Content */
+        main {
+            background: white;
+            padding: 3rem 0;
+        }
+
+        section {
+            margin-bottom: 4rem;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            color: var(--primary-color);
+            border-bottom: 3px solid var(--secondary-color);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            color: var(--text-color);
+            margin: 2rem 0 1rem;
+        }
+
+        h4 {
+            font-size: 1.1rem;
+            color: #4b5563;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0 2rem;
+            font-size: 0.875rem;
+        }
+
+        th {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        tr:hover {
+            background: #f1f5f9;
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 1rem 0 2rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+
+        p code, li code, td code {
+            background: #f1f5f9;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.875em;
+            color: #be185d;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 1rem 0 1rem 2rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .card h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            border-left: 4px solid var(--secondary-color);
+            color: #1e40af;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            color: #92400e;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            border-left: 4px solid var(--accent-color);
+            color: #065f46;
+        }
+
+        .alert-danger {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #991b1b;
+        }
+
+        /* New feature badge */
+        .badge-new {
+            display: inline-block;
+            background: var(--accent-color);
+            color: white;
+            font-size: 0.625rem;
+            font-weight: bold;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+            text-transform: uppercase;
+        }
+
+        /* TOC */
+        .toc {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .toc ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .toc > ul > li {
+            margin-bottom: 1rem;
+        }
+
+        .toc > ul > li > a {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .toc ul ul {
+            margin-left: 1.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-color);
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            color: var(--secondary-color);
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--code-bg);
+            color: #94a3b8;
+            padding: 2rem 0;
+            text-align: center;
+            font-size: 0.875rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.75rem;
+            }
+
+            nav ul {
+                gap: 1rem;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            nav, .classification-banner {
+                display: none;
+            }
+
+            main {
+                padding: 0;
+            }
+
+            pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="classification-banner">CLASSIFICATION: UNCLASSIFIED // FOUO</div>
+
+    <header>
+        <div class="container">
+            <h1>SENTINEL Intelligence Platform</h1>
+            <p class="subtitle">Technical Reference Guide</p>
+            <p class="meta">Version 2.1 | January 2026 | Spring Boot 3.3 | Spring AI 1.0 | MongoDB | Ollama</p>
+        </div>
+    </header>
+
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#architecture">Architecture</a></li>
+                <li><a href="#rag-pipeline">RAG Pipeline</a></li>
+                <li><a href="#advanced-rag">Advanced RAG</a></li>
+                <li><a href="#security">Security</a></li>
+                <li><a href="#deployment">Deployment</a></li>
+                <li><a href="#api">API Reference</a></li>
+                <li><a href="#configuration">Configuration</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main>
+        <div class="container">
+            <!-- Table of Contents -->
+            <div class="toc">
+                <h3>Table of Contents</h3>
+                <ul>
+                    <li>
+                        <a href="#part1">Part I: Platform Overview</a>
+                        <ul>
+                            <li><a href="#ch1">Chapter 1: Executive Summary</a></li>
+                            <li><a href="#ch2">Chapter 2: System Architecture</a></li>
+                            <li><a href="#ch3">Chapter 3: Quick Start Guide</a></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#part2">Part II: User Operations</a>
+                        <ul>
+                            <li><a href="#ch4">Chapter 4: Dashboard Interface</a></li>
+                            <li><a href="#ch5">Chapter 5: Intelligence Queries</a></li>
+                            <li><a href="#ch6">Chapter 6: Document Ingestion</a></li>
+                            <li><a href="#ch7">Chapter 7: Understanding Results</a></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#part3">Part III: Technical Architecture</a>
+                        <ul>
+                            <li><a href="#ch8">Chapter 8: Spring Boot Foundation</a></li>
+                            <li><a href="#ch9">Chapter 9: Spring AI Integration</a></li>
+                            <li><a href="#ch10">Chapter 10: MongoDB Vector Store</a></li>
+                            <li><a href="#ch11">Chapter 11: RAG Pipeline Implementation</a></li>
+                            <li><a href="#ch12">Chapter 12: Ollama LLM Configuration</a></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#part4">Part IV: Security Framework</a>
+                        <ul>
+                            <li><a href="#ch13">Chapter 13: Authentication Architecture</a></li>
+                            <li><a href="#ch14">Chapter 14: Authorization & RBAC</a></li>
+                            <li><a href="#ch15">Chapter 15: Audit Logging</a></li>
+                            <li><a href="#ch16">Chapter 16: Data Protection</a></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#part7">Part VII: Advanced RAG Techniques</a>
+                        <ul>
+                            <li><a href="#ch26">Chapter 26: RAGPart, HiFi-RAG, HGMem</a></li>
+                            <li><a href="#ch26a">Chapter 26a: QuCo-RAG Hallucination Detection</a></li>
+                            <li><a href="#ch26b">Chapter 26b: MegaRAG Multimodal</a> <span class="badge-new">New</span></li>
+                            <li><a href="#ch26c">Chapter 26c: MiA-RAG Mindscape</a> <span class="badge-new">New</span></li>
+                            <li><a href="#ch26d">Chapter 26d: Bidirectional RAG</a> <span class="badge-new">New</span></li>
+                            <li><a href="#ch26e">Chapter 26e: Hybrid RAG with RRF</a> <span class="badge-new">New</span></li>
+                            <li><a href="#ch26f">Chapter 26f: Graph-O1 MCTS</a> <span class="badge-new">New</span></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#appendices">Appendices</a>
+                        <ul>
+                            <li><a href="#appendix-a">Appendix A: REST API Reference</a></li>
+                            <li><a href="#appendix-b">Appendix B: Configuration Options</a></li>
+                            <li><a href="#appendix-c">Appendix C: Error Codes</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Part I: Platform Overview -->
+            <section id="part1">
+                <h2>Part I: Platform Overview</h2>
+
+                <section id="ch1">
+                    <h3>Chapter 1: Executive Summary</h3>
+                    <p>SENTINEL is a Retrieval-Augmented Generation (RAG) platform engineered for sensitive enterprise and government environments. It enables natural-language queries against document collections while enforcing strict access controls and maintaining complete audit trails.</p>
+
+                    <h4>1.1 Core Capabilities</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Capability</th>
+                                <th>Description</th>
+                                <th>Business Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Secure Document Ingestion</td>
+                                <td>PDF, TXT, MD processing with automatic PII redaction</td>
+                                <td>Compliance-ready data handling</td>
+                            </tr>
+                            <tr>
+                                <td>Air-Gap Operation</td>
+                                <td>Zero external dependencies, runs on local infrastructure</td>
+                                <td>Complete data sovereignty</td>
+                            </tr>
+                            <tr>
+                                <td>Clearance-Based Access</td>
+                                <td>Four-tier classification (UNCLASSIFIED to TOP SECRET)</td>
+                                <td>Need-to-know enforcement</td>
+                            </tr>
+                            <tr>
+                                <td>Glass Box Reasoning</td>
+                                <td>Full retrieval chain visibility with citations</td>
+                                <td>Audit trail for every answer</td>
+                            </tr>
+                            <tr>
+                                <td>Hybrid Search</td>
+                                <td>Semantic + keyword search combined</td>
+                                <td>Maximum recall for queries</td>
+                            </tr>
+                            <tr>
+                                <td>Multi-Query Decomposition</td>
+                                <td>Complex questions split into sub-queries</td>
+                                <td>Comprehensive answers</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h4>1.2 Technical Stack</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                <th>Technology</th>
+                                <th>Version</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Runtime</td><td>Java (LTS)</td><td>21</td></tr>
+                            <tr><td>Framework</td><td>Spring Boot</td><td>3.3.0</td></tr>
+                            <tr><td>AI Framework</td><td>Spring AI</td><td>1.0.0-M1</td></tr>
+                            <tr><td>Vector Store</td><td>MongoDB</td><td>7.0</td></tr>
+                            <tr><td>LLM Interface</td><td>Ollama</td><td>Latest</td></tr>
+                            <tr><td>Document Parsing</td><td>Apache Tika</td><td>2.9.2</td></tr>
+                            <tr><td>API Documentation</td><td>SpringDoc OpenAPI</td><td>2.5.0</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section id="ch2">
+                    <h3>Chapter 2: System Architecture</h3>
+                    <p>SENTINEL follows a classic three-tier architecture adapted for AI workloads. The design prioritizes security, auditability, and air-gap compatibility.</p>
+
+                    <h4>2.1 Layer Responsibilities</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Layer</th>
+                                <th>Components</th>
+                                <th>Responsibility</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Presentation</td>
+                                <td>Thymeleaf Templates, Static Assets</td>
+                                <td>User interface rendering, form handling</td>
+                            </tr>
+                            <tr>
+                                <td>Security</td>
+                                <td>SecurityFilter, AuthenticationService</td>
+                                <td>Request authentication, context establishment</td>
+                            </tr>
+                            <tr>
+                                <td>Controller</td>
+                                <td>MercenaryController, AuditController</td>
+                                <td>HTTP routing, request validation, response formatting</td>
+                            </tr>
+                            <tr>
+                                <td>Service</td>
+                                <td>SecureIngestionService, QueryDecomposition, AuditService</td>
+                                <td>Business logic, document processing, query handling</td>
+                            </tr>
+                            <tr>
+                                <td>Data</td>
+                                <td>MongoDB, Ollama, Apache Tika</td>
+                                <td>Persistence, AI inference, document parsing</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h4>2.2 Data Flow</h4>
+                    <p>Every request follows a consistent path through the security stack:</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Step</th>
+                                <th>Component</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>1</td><td>SecurityFilter</td><td>Extract credentials, authenticate user, establish SecurityContext</td></tr>
+                            <tr><td>2</td><td>Controller</td><td>Validate request parameters, check RBAC permissions</td></tr>
+                            <tr><td>3</td><td>Service</td><td>Execute business logic, enforce clearance restrictions</td></tr>
+                            <tr><td>4</td><td>AuditService</td><td>Log all security-relevant events to audit_log collection</td></tr>
+                            <tr><td>5</td><td>Response</td><td>Return results with classification markings</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section id="ch3">
+                    <h3>Chapter 3: Quick Start Guide</h3>
+
+                    <h4>3.1 Prerequisites</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Requirement</th>
+                                <th>Minimum Version</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Java JDK</td><td>21</td><td>OpenJDK or Oracle JDK</td></tr>
+                            <tr><td>MongoDB</td><td>7.0</td><td>Community or Enterprise</td></tr>
+                            <tr><td>Ollama</td><td>Latest</td><td>With llama3 and nomic-embed-text models</td></tr>
+                            <tr><td>Memory</td><td>16 GB RAM</td><td>32 GB recommended for production</td></tr>
+                            <tr><td>Storage</td><td>50 GB SSD</td><td>For models and vector data</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h4>3.2 Installation Steps</h4>
+<pre><code># Step 1: Start MongoDB
+mongod --dbpath /data/db
+
+# Step 2: Start Ollama and pull models
+ollama serve
+ollama pull llama3
+ollama pull nomic-embed-text
+
+# Step 3: Build and run SENTINEL
+./gradlew bootJar
+java -jar build/libs/mercenary-1.0.0.jar
+
+# Step 4: Access the dashboard
+# Open http://localhost:8080 in your browser</code></pre>
+
+                    <h4>3.3 Profile Selection</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Profile</th>
+                                <th>Command</th>
+                                <th>Authentication</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>dev (default)</td><td><code>java -jar mercenary.jar</code></td><td>Auto-provisioned demo user</td></tr>
+                            <tr><td>enterprise</td><td><code>APP_PROFILE=enterprise java -jar mercenary.jar</code></td><td>OIDC/JWT Bearer tokens</td></tr>
+                            <tr><td>govcloud</td><td><code>APP_PROFILE=govcloud java -jar mercenary.jar</code></td><td>CAC/PIV X.509 certificates</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+            </section>
+
+            <!-- Part VII: Advanced RAG Techniques -->
+            <section id="part7">
+                <h2>Part VII: Advanced RAG Techniques</h2>
+                <p>SENTINEL implements cutting-edge RAG techniques based on recent academic research to improve retrieval quality, defend against adversarial attacks, and reduce hallucinations.</p>
+
+                <section id="ch26">
+                    <h3>Chapter 26: Core RAG Enhancements</h3>
+
+                    <h4>26.1 RAGPart Defense (arXiv:2512.24268)</h4>
+                    <p>RAGPart defends against corpus poisoning attacks by partitioning the document corpus and requiring consensus across partitions:</p>
+<pre><code># application.yaml - RAGPart configuration
+sentinel:
+  ragpart:
+    enabled: true
+    partitions: 4              # Number of corpus partitions
+    combination-size: 3        # Required consensus
+    suspicion-threshold: 0.4   # Poisoning detection threshold
+
+# How it works:
+# 1. Documents randomly assigned to partitions at ingestion
+# 2. Query runs against each partition independently
+# 3. Results merged only if found in 3+ partitions
+# 4. Isolated poisoned documents cannot influence results</code></pre>
+
+                    <h4>26.2 HiFi-RAG Pipeline (arXiv:2512.22442)</h4>
+                    <p>HiFi-RAG implements hierarchical filtering with two-pass generation for improved relevance:</p>
+<pre><code># HiFi-RAG configuration
+sentinel:
+  hifirag:
+    enabled: true
+    initial-retrieval-k: 20    # First pass: broad retrieval
+    filtered-top-k: 5          # Second pass: precision filter
+    relevance-threshold: 0.5   # Minimum relevance score
+    max-iterations: 2          # Iterative refinement rounds
+
+# Pipeline:
+# Pass 1: Retrieve top 20 documents by similarity
+# Pass 2: LLM scores each for query relevance
+# Pass 3: Keep only top 5 by relevance score
+# Pass 4: Generate final response from filtered set</code></pre>
+
+                    <h4>26.3 HGMem Hypergraph Memory (arXiv:2512.23959)</h4>
+                    <p>HGMem enables multi-hop reasoning across document relationships:</p>
+<pre><code># HGMem configuration
+sentinel:
+  hgmem:
+    enabled: true
+    max-memory-points: 50           # Max relationship nodes
+    merge-similarity-threshold: 0.7 # Node merging threshold
+
+# Enables queries like:
+# "What projects involve people who worked on Project Alpha?"
+# 1. Find people associated with Project Alpha
+# 2. Find other projects those people are associated with
+# 3. Return synthesized multi-hop answer</code></pre>
+                </section>
+
+                <section id="ch26a">
+                    <h3>Chapter 26a: QuCo-RAG Hallucination Detection</h3>
+                    <p>QuCo-RAG (arXiv:2512.19134) detects hallucination risk by analyzing entity frequency in training corpora. When entities appear infrequently or never co-occur with context entities, the system flags potential hallucination risk.</p>
+
+<pre><code># QuCo-RAG configuration
+sentinel:
+  qucorag:
+    enabled: true
+    uncertainty-threshold: 0.7       # Flag responses above this
+    low-frequency-threshold: 1000    # Entity frequency cutoff
+    zero-cooccurrence-penalty: 0.3   # Penalty for no co-occurrence
+    # Infini-gram API (optional, requires internet)
+    infini-gram-enabled: false
+    infini-gram-timeout-ms: 5000
+    # LLM-based entity extraction (higher accuracy)
+    llm-extraction-enabled: false
+    llm-extraction-timeout-ms: 3000</code></pre>
+
+                    <div class="alert alert-info">
+                        <strong>How it works:</strong> QuCo-RAG extracts named entities from responses and queries training corpus statistics. Low-frequency entities or entities that never co-occur with context trigger uncertainty flags, allowing users to verify potentially hallucinated content.
+                    </div>
+                </section>
+
+                <section id="ch26b">
+                    <h3>Chapter 26b: MegaRAG Multimodal Knowledge Graph <span class="badge-new">New v2.1</span></h3>
+                    <p>MegaRAG (arXiv:2512.20626) enables cross-modal retrieval combining text, images, charts, and data visualizations in a unified knowledge graph.</p>
+
+                    <h4>Key Features</h4>
+                    <ul>
+                        <li><strong>Visual Entity Extraction:</strong> Identifies objects, text, and data in images</li>
+                        <li><strong>Chart Data Extraction:</strong> Parses bar charts, line graphs, pie charts into structured data</li>
+                        <li><strong>Cross-Modal Linking:</strong> Connects visual elements to textual descriptions</li>
+                        <li><strong>OCR Integration:</strong> Extracts text from images and scanned documents</li>
+                    </ul>
+
+<pre><code># MegaRAG configuration
+sentinel:
+  megarag:
+    enabled: true
+    visual-weight: 0.3           # Weight for visual vs text (0.0-1.0)
+    link-threshold: 0.7          # Min confidence for cross-modal links
+    chart-extraction: true       # Enable chart data extraction
+    ocr-enabled: true            # Enable OCR for image text</code></pre>
+
+                    <h4>Implementation Details</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                <th>Class</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Visual Analyzer</td><td><code>VisualAssetAnalyzer</code></td><td>Extracts visual features from images</td></tr>
+                            <tr><td>Entity Linker</td><td><code>VisualEntityLinker</code></td><td>Links visual entities to text entities</td></tr>
+                            <tr><td>Chart Parser</td><td><code>ChartDataExtractor</code></td><td>Converts charts to structured data</td></tr>
+                            <tr><td>Cross-Modal Search</td><td><code>MegaRagService</code></td><td>Unified multimodal retrieval</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section id="ch26c">
+                    <h3>Chapter 26c: MiA-RAG Mindscape-Aware Retrieval <span class="badge-new">New v2.1</span></h3>
+                    <p>MiA-RAG (arXiv:2512.17220) builds hierarchical summaries for long-document coherence, maintaining a "mindscape" of document structure.</p>
+
+                    <h4>Summarization Hierarchy</h4>
+                    <ol>
+                        <li><strong>Chunk Level:</strong> Individual text segments (~500 tokens)</li>
+                        <li><strong>Paragraph Level:</strong> Related chunks grouped semantically</li>
+                        <li><strong>Section Level:</strong> Thematic groupings</li>
+                        <li><strong>Document Level:</strong> Global summary and key themes</li>
+                    </ol>
+
+<pre><code># MiA-RAG configuration
+sentinel:
+  miarag:
+    enabled: true
+    min-chunks-for-mindscape: 10   # Minimum chunks to trigger mindscape
+    levels: 4                      # Summarization hierarchy depth
+    global-context-tokens: 500     # Context window for conditioning</code></pre>
+
+                    <h4>Benefits</h4>
+                    <ul>
+                        <li>Maintains coherence across long documents</li>
+                        <li>Provides global context for local queries</li>
+                        <li>Enables document-aware response generation</li>
+                        <li>Reduces context fragmentation issues</li>
+                    </ul>
+                </section>
+
+                <section id="ch26d">
+                    <h3>Chapter 26d: Bidirectional RAG Experience Store <span class="badge-new">New v2.1</span></h3>
+                    <p>Bidirectional RAG (arXiv:2512.22199) implements a self-improving system that learns from validated query-response pairs.</p>
+
+                    <h4>Experience Flow</h4>
+                    <div class="card">
+                        <ol>
+                            <li><strong>Query Processing:</strong> User query generates response with citations</li>
+                            <li><strong>Grounding Check:</strong> System verifies response is grounded in sources</li>
+                            <li><strong>Novelty Detection:</strong> Identifies if response contains new insights</li>
+                            <li><strong>Experience Storage:</strong> High-quality responses stored for future retrieval</li>
+                            <li><strong>Experience Retrieval:</strong> Previous experiences enhance future responses</li>
+                        </ol>
+                    </div>
+
+<pre><code># Bidirectional RAG configuration
+sentinel:
+  birag:
+    enabled: true
+    grounding-threshold: 0.8      # Min score for auto-validation
+    novelty-threshold: 0.7        # Threshold for new insights
+    require-approval: true        # Admin approval for pending experiences
+    max-experiences: 5            # Max experiences per query</code></pre>
+
+                    <h4>Experience Store Collections</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Collection</th>
+                                <th>Contents</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>experiences_validated</code></td><td>Approved query-response pairs</td><td>Active retrieval</td></tr>
+                            <tr><td><code>experiences_pending</code></td><td>Awaiting admin review</td><td>Pending approval</td></tr>
+                            <tr><td><code>experiences_rejected</code></td><td>Rejected experiences</td><td>Archived</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section id="ch26e">
+                    <h3>Chapter 26e: Hybrid RAG with Reciprocal Rank Fusion <span class="badge-new">New v2.1</span></h3>
+                    <p>Hybrid RAG (arXiv:2512.12694) combines semantic vector search with keyword-based retrieval using Reciprocal Rank Fusion (RRF) for optimal recall.</p>
+
+                    <h4>Retrieval Strategies</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Strategy</th>
+                                <th>Strengths</th>
+                                <th>Weaknesses</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Semantic (Vector)</td>
+                                <td>Conceptual matching, paraphrase handling</td>
+                                <td>May miss exact terminology</td>
+                            </tr>
+                            <tr>
+                                <td>Keyword (BM25-style)</td>
+                                <td>Exact term matching, acronyms</td>
+                                <td>No semantic understanding</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Hybrid (RRF)</strong></td>
+                                <td>Best of both approaches</td>
+                                <td>Slightly higher latency</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+<pre><code># Hybrid RAG configuration
+sentinel:
+  hybridrag:
+    enabled: true
+    rrf-k: 60                      # RRF parameter (higher = more top-rank emphasis)
+    semantic-weight: 0.6           # Weight for semantic retrieval
+    keyword-weight: 0.4            # Weight for keyword retrieval
+    multi-query-count: 3           # Query variants for expansion
+    ocr-tolerance: true            # Handle OCR errors (0/O, 1/l, etc.)
+    llm-expansion: false           # LLM-based query expansion</code></pre>
+
+                    <h4>RRF Formula</h4>
+                    <div class="alert alert-info">
+                        <strong>Score Calculation:</strong><br>
+                        <code>RRF_score(d) = sum( weight_i / (k + rank_i(d)) )</code><br><br>
+                        Where <code>k</code> is typically 60, and documents are ranked by their combined RRF scores across all retrieval methods.
+                    </div>
+
+                    <h4>Query Expansion</h4>
+                    <p>The <code>QueryExpander</code> component generates query variants through:</p>
+                    <ul>
+                        <li><strong>Synonym Replacement:</strong> "find" → "search", "locate", "discover"</li>
+                        <li><strong>Question Reformulation:</strong> "What is X?" → "X definition", "about X"</li>
+                        <li><strong>LLM Paraphrasing:</strong> (Optional) AI-generated query variants</li>
+                    </ul>
+                </section>
+
+                <section id="ch26f">
+                    <h3>Chapter 26f: Graph-O1 MCTS Reasoning <span class="badge-new">New v2.1</span></h3>
+                    <p>Graph-O1 (arXiv:2512.17912) applies Monte Carlo Tree Search (MCTS) to knowledge graph traversal, treating retrieval as a sequential decision problem.</p>
+
+                    <h4>MCTS Phases</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Phase</th>
+                                <th>Algorithm</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Selection</td>
+                                <td>UCB1 (Upper Confidence Bound)</td>
+                                <td>Choose most promising path to explore</td>
+                            </tr>
+                            <tr>
+                                <td>Expansion</td>
+                                <td>Graph edge traversal</td>
+                                <td>Add new nodes from unexplored edges</td>
+                            </tr>
+                            <tr>
+                                <td>Simulation</td>
+                                <td>LLM evaluation</td>
+                                <td>Score reasoning path quality</td>
+                            </tr>
+                            <tr>
+                                <td>Backpropagation</td>
+                                <td>Value update</td>
+                                <td>Update path statistics</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+<pre><code># Graph-O1 configuration
+sentinel:
+  grapho1:
+    enabled: true
+    max-iterations: 50             # Maximum MCTS iterations
+    exploration-constant: 1.414    # UCB1 exploration (sqrt(2))
+    max-depth: 5                   # Maximum reasoning depth
+    simulation-count: 3            # Simulations per evaluation
+    min-confidence: 0.6            # Early termination threshold</code></pre>
+
+                    <h4>UCB1 Formula</h4>
+                    <div class="alert alert-info">
+                        <strong>Node Selection:</strong><br>
+                        <code>UCB1(n) = Q(n)/N(n) + C * sqrt(ln(N(parent)) / N(n))</code><br><br>
+                        Where <code>Q(n)</code> is total reward, <code>N(n)</code> is visit count, and <code>C</code> is exploration constant (default: √2).
+                    </div>
+
+                    <h4>Integration with HGMem</h4>
+                    <p>Graph-O1 enhances the HGMem hypergraph traversal by applying strategic reasoning to path selection. Rather than greedy traversal, MCTS explores multiple reasoning chains and selects the highest-confidence path.</p>
+                </section>
+            </section>
+
+            <!-- Security Framework -->
+            <section id="security">
+                <h2>Part IV: Security Framework</h2>
+
+                <section id="ch13">
+                    <h3>Chapter 13: Authentication Architecture</h3>
+                    <p>SENTINEL implements a pluggable authentication architecture supporting three modes: DEV (development), OIDC (enterprise), and CAC (government).</p>
+
+                    <h4>Authentication Modes</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Mode</th>
+                                <th>Implementation</th>
+                                <th>Use Case</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>DEV</td><td><code>DevAuthenticationService</code></td><td>Local development, auto-login</td></tr>
+                            <tr><td>OIDC</td><td><code>OidcAuthenticationService</code></td><td>Enterprise SSO (Azure AD, Okta)</td></tr>
+                            <tr><td>CAC</td><td><code>CacAuthenticationService</code></td><td>Government PKI, X.509 certificates</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section id="ch14">
+                    <h3>Chapter 14: Authorization & RBAC</h3>
+                    <h4>Role Definitions</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Role</th>
+                                <th>Permissions</th>
+                                <th>Typical Assignment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>ADMIN</td><td>QUERY, INGEST, DELETE, MANAGE_USERS, VIEW_AUDIT, CONFIGURE</td><td>System administrators</td></tr>
+                            <tr><td>ANALYST</td><td>QUERY, INGEST</td><td>Intelligence analysts, researchers</td></tr>
+                            <tr><td>VIEWER</td><td>QUERY</td><td>Read-only consumers, executives</td></tr>
+                            <tr><td>AUDITOR</td><td>QUERY, VIEW_AUDIT</td><td>Compliance officers, IG staff</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section id="ch16">
+                    <h3>Chapter 16: Data Protection</h3>
+                    <h4>16.1 PII Redaction</h4>
+                    <p>SENTINEL automatically detects and redacts personally identifiable information during document ingestion.</p>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pattern</th>
+                                <th>Example</th>
+                                <th>Replacement</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Social Security Number</td><td>123-45-6789</td><td>[REDACTED-SSN]</td></tr>
+                            <tr><td>Email Address</td><td>user@example.com</td><td>[REDACTED-EMAIL]</td></tr>
+                            <tr><td>Phone Number</td><td>555-123-4567</td><td>[REDACTED-PHONE]</td></tr>
+                            <tr><td>Credit Card</td><td>4111-1111-1111-1111</td><td>[REDACTED-CC]</td></tr>
+                            <tr><td>Date of Birth</td><td>01/15/1990</td><td>[REDACTED-DOB]</td></tr>
+                            <tr><td>IP Address</td><td>192.168.1.1</td><td>[REDACTED-IP]</td></tr>
+                            <tr><td>Passport Number</td><td>AB1234567</td><td>[REDACTED-PASSPORT]</td></tr>
+                            <tr><td>Driver's License</td><td>D123-456-78-901</td><td>[REDACTED-DL]</td></tr>
+                            <tr><td>Medical ID</td><td>MED-12345678</td><td>[REDACTED-MEDICAL]</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+            </section>
+
+            <!-- API Reference -->
+            <section id="appendix-a">
+                <h2>Appendix A: REST API Reference</h2>
+
+                <h3>A.1 Query Endpoint</h3>
+<pre><code>GET /api/ask
+
+Description: Execute an intelligence query against the document corpus.
+
+Parameters:
+  q (required)      - Query string (max 2000 characters)
+  sector (optional) - Target sector (default: OPERATIONS)
+                      Valid: OPERATIONS, INTELLIGENCE, SCIENCE, MEDICAL, LOGISTICS
+
+Headers:
+  Authorization: Bearer {token}  (OIDC mode)
+  X-Client-Cert: {DN}           (CAC mode, via proxy)
+
+Success Response (200):
+  Content-Type: text/plain
+  Body: AI-generated response with [citations]
+
+Error Responses:
+  401 - {"error": "Authentication required"}
+  200 - "ACCESS DENIED: Sector not authorized"
+  200 - "SECURITY ALERT: Invalid query detected"</code></pre>
+
+                <h3>A.2 Document Ingestion Endpoint</h3>
+<pre><code>POST /api/ingest/file
+
+Description: Upload and ingest a document into the vector store.
+
+Content-Type: multipart/form-data
+
+Parameters:
+  file (required)           - Document file (PDF, TXT, MD, DOCX)
+  sector (optional)         - Target sector (default: user's primary)
+  classification (optional) - Classification level 0-3 (default: 0)
+
+Success Response (200):
+{
+  "status": "success",
+  "filename": "report.pdf",
+  "chunks": 15,
+  "sector": "OPERATIONS",
+  "classification": 1
+}
+
+Error Responses:
+  400 - {"error": "Unsupported file type"}
+  403 - {"error": "INGEST permission required"}
+  413 - {"error": "File too large (max 50MB)"}</code></pre>
+
+                <h3>A.3 Telemetry Endpoint</h3>
+<pre><code>GET /api/telemetry
+
+Description: Retrieve system metrics and statistics.
+
+Success Response (200):
+{
+  "documentCount": 1234,
+  "queryCount": 567,
+  "averageLatencyMs": 2340,
+  "vectorDbStatus": "healthy",
+  "llmStatus": "healthy",
+  "uptime": "3d 14h 22m"
+}</code></pre>
+            </section>
+
+            <!-- Configuration -->
+            <section id="appendix-b">
+                <h2>Appendix B: Configuration Options</h2>
+
+                <h3>B.1 Core Environment Variables</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>APP_PROFILE</td><td>dev</td><td>Profile: dev, enterprise, govcloud</td></tr>
+                        <tr><td>AUTH_MODE</td><td>DEV</td><td>Auth mode: DEV, OIDC, CAC</td></tr>
+                        <tr><td>OLLAMA_URL</td><td>http://localhost:11434</td><td>Ollama endpoint</td></tr>
+                        <tr><td>MONGODB_URI</td><td>mongodb://localhost:27017/mercenary</td><td>MongoDB connection string</td></tr>
+                        <tr><td>LLM_MODEL</td><td>llama3</td><td>Chat completion model</td></tr>
+                        <tr><td>EMBEDDING_MODEL</td><td>nomic-embed-text</td><td>Embedding model</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>B.2 Advanced RAG Configuration</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>RAGPART_ENABLED</td><td>true</td><td>Corpus poisoning defense</td></tr>
+                        <tr><td>HIFIRAG_ENABLED</td><td>true</td><td>Hierarchical filtering</td></tr>
+                        <tr><td>HGMEM_ENABLED</td><td>true</td><td>Hypergraph memory</td></tr>
+                        <tr><td>QUCORAG_ENABLED</td><td>true</td><td>Hallucination detection</td></tr>
+                        <tr><td>MEGARAG_ENABLED</td><td>true</td><td>Multimodal retrieval</td></tr>
+                        <tr><td>MIARAG_ENABLED</td><td>true</td><td>Mindscape-aware retrieval</td></tr>
+                        <tr><td>BIRAG_ENABLED</td><td>true</td><td>Bidirectional experience store</td></tr>
+                        <tr><td>HYBRIDRAG_ENABLED</td><td>true</td><td>RRF hybrid retrieval</td></tr>
+                        <tr><td>GRAPHO1_ENABLED</td><td>true</td><td>MCTS graph reasoning</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>B.3 PII Redaction Configuration</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>PII_ENABLED</td><td>true</td><td>Enable PII redaction engine</td></tr>
+                        <tr><td>PII_MODE</td><td>MASK</td><td>MASK, TOKENIZE, or REMOVE</td></tr>
+                        <tr><td>PII_AUDIT</td><td>true</td><td>Log all redactions to audit</td></tr>
+                        <tr><td>PII_SSN</td><td>true</td><td>Detect Social Security Numbers</td></tr>
+                        <tr><td>PII_EMAIL</td><td>true</td><td>Detect email addresses</td></tr>
+                        <tr><td>PII_PHONE</td><td>true</td><td>Detect phone numbers</td></tr>
+                        <tr><td>PII_CREDIT_CARD</td><td>true</td><td>Detect credit card numbers</td></tr>
+                        <tr><td>PII_DOB</td><td>true</td><td>Detect dates of birth</td></tr>
+                        <tr><td>PII_IP</td><td>true</td><td>Detect IP addresses</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Error Codes -->
+            <section id="appendix-c">
+                <h2>Appendix C: Error Codes</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Error</th>
+                            <th>HTTP</th>
+                            <th>Response Body</th>
+                            <th>Resolution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Authentication required</td>
+                            <td>401</td>
+                            <td><code>{"error": "Authentication required"}</code></td>
+                            <td>Provide valid credentials</td>
+                        </tr>
+                        <tr>
+                            <td>Access denied: sector</td>
+                            <td>200</td>
+                            <td>"ACCESS DENIED: Sector not authorized"</td>
+                            <td>Request sector access</td>
+                        </tr>
+                        <tr>
+                            <td>Access denied: clearance</td>
+                            <td>200</td>
+                            <td>"ACCESS DENIED: Clearance insufficient"</td>
+                            <td>Elevation required</td>
+                        </tr>
+                        <tr>
+                            <td>Security alert</td>
+                            <td>200</td>
+                            <td>"SECURITY ALERT: Invalid query detected"</td>
+                            <td>Remove injection patterns</td>
+                        </tr>
+                        <tr>
+                            <td>Server error</td>
+                            <td>500</td>
+                            <td><code>{"error": "Internal server error"}</code></td>
+                            <td>Check server logs</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="alert alert-warning">
+                    <strong>Note:</strong> SENTINEL returns HTTP 200 for authorization failures to prevent information leakage about resource existence (security through obscurity defense).
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>SENTINEL Intelligence Platform - Technical Reference Guide v2.1</p>
+            <p>&copy; 2026 All Rights Reserved</p>
+        </div>
+    </footer>
+</body>
+</html>

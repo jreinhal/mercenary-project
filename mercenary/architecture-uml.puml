@@ -1,0 +1,282 @@
+@startuml Sentinel_Intelligence_Platform_Architecture
+
+!define RECTANGLE class
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle uml2
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam packageFontSize 14
+skinparam arrowThickness 1.5
+skinparam roundcorner 8
+
+title **SENTINEL Intelligence Platform - End-to-End Architecture**\n(Enterprise RAG System for Regulated Industries)
+
+' ==================== ACTORS ====================
+actor "User\n(Analyst/Admin)" as User
+actor "Auditor" as Auditor
+
+' ==================== PRESENTATION LAYER ====================
+package "Presentation Layer" #E8F5E9 {
+    [Web Dashboard\n(Thymeleaf)] as WebUI
+    [REST API\n(JSON)] as RestAPI
+}
+
+' ==================== API LAYER ====================
+package "API Layer (Controllers)" #E3F2FD {
+    [MercenaryController\n/api/*] as MainController {
+        POST /ingest/file
+        GET /ask
+        GET /ask/enhanced
+        GET /inspect
+        GET /status
+        GET /telemetry
+        GET /reasoning/{id}
+    }
+
+    [AuditController\n/api/audit/*] as AuditController {
+        GET /events
+        GET /stats
+    }
+}
+
+' ==================== SECURITY LAYER ====================
+package "Security Layer" #FFF3E0 {
+    [SecurityFilter\n(Servlet Filter)] as SecurityFilter
+    [SecurityContext\n(Thread-Local)] as SecurityContext
+    [SecurityConfig\n(Spring Security)] as SecurityConfig
+
+    package "Authentication Services" #FFE0B2 {
+        interface AuthenticationService
+        [CacAuthenticationService\n(X.509/PKI)] as CacAuth
+        [OidcAuthenticationService\n(JWT/OAuth2)] as OidcAuth
+        [StandardAuthenticationService\n(BCrypt)] as StandardAuth
+        [DevAuthenticationService\n(Auto-provision)] as DevAuth
+    }
+
+    package "Authorization" #FFCC80 {
+        [RBAC\n(Role-Based)] as RBAC
+        [Clearance Level\n(5 Levels)] as Clearance
+        [Sector Access\n(Department)] as SectorAccess
+    }
+}
+
+' ==================== SERVICE LAYER ====================
+package "Service Layer" #F3E5F5 {
+    [QueryDecomposition\nService] as QueryDecomp {
+        Split compound queries
+        Merge results
+    }
+
+    [SecureIngestion\nService] as IngestionSvc {
+        Parse documents
+        Apply PII redaction
+        Chunk & embed
+    }
+
+    [PiiRedaction\nService] as PiiSvc {
+        NIST 800-122
+        GDPR/HIPAA
+        15+ PII types
+    }
+
+    [AuditService\n(STIG-Compliant)] as AuditSvc {
+        Log all events
+        Compliance reporting
+    }
+}
+
+' ==================== RAG PIPELINE LAYER ====================
+package "RAG Pipeline Layer" #E1F5FE {
+    package "HiFi-RAG (arXiv:2512.22442)" #B3E5FC {
+        [HiFiRagService\n(Two-Pass Retrieval)] as HiFiRag
+        [CrossEncoderReranker\n(Semantic Scoring)] as Reranker
+        [GapDetector\n(Missing Concepts)] as GapDetector
+    }
+
+    package "RAG-PART (arXiv:2512.24268)" #81D4FA {
+        [RagPartService\n(Poison Defense)] as RagPart
+        [PartitionAssigner\n(Document Partitioning)] as Partitioner
+        [SuspicionScorer\n(Anomaly Detection)] as SuspicionScorer
+    }
+
+    package "HG-Mem (arXiv:2512.23959)" #4FC3F7 {
+        [HyperGraphMemory\n(Multi-hop Reasoning)] as HGMem
+        [EntityExtractor\n(NER)] as EntityExtractor
+        [HGMemQueryEngine\n(Graph Traversal)] as HGMemEngine
+    }
+}
+
+' ==================== REASONING LAYER ====================
+package "Reasoning Layer (Glass Box)" #FFFDE7 {
+    [ReasoningTracer\n(Thread-Local)] as Tracer
+    [ReasoningTrace\n(Step Collection)] as Trace
+
+    note right of Trace
+        Step Types:
+        - QUERY_ANALYSIS
+        - VECTOR_SEARCH
+        - RERANKING
+        - POISON_DETECTION
+        - GRAPH_TRAVERSAL
+        - GAP_DETECTION
+        - LLM_GENERATION
+    end note
+}
+
+' ==================== DATA LAYER ====================
+package "Data Layer" #FFEBEE {
+    interface VectorStore
+    [LocalMongoVectorStore\n(Air-Gap)] as LocalVector
+    [MongoDBAtlasVectorStore\n(Cloud)] as AtlasVector
+
+    package "Repositories" #FFCDD2 {
+        [UserRepository] as UserRepo
+        [ChatLogRepository] as ChatRepo
+    }
+}
+
+' ==================== DATA MODELS ====================
+package "Data Models" #F5F5F5 {
+    class User {
+        id: String
+        username: String
+        roles: Set<UserRole>
+        clearance: ClearanceLevel
+        allowedSectors: Set<Department>
+        authProvider: AuthProvider
+    }
+
+    class AuditEvent {
+        id: String
+        timestamp: Instant
+        eventType: EventType
+        userId: String
+        action: String
+        outcome: Outcome
+    }
+
+    class ChatLog {
+        id: String
+        department: String
+        content: String
+        timestamp: LocalDateTime
+    }
+
+    enum ClearanceLevel {
+        UNCLASSIFIED (0)
+        CUI (1)
+        SECRET (2)
+        TOP_SECRET (3)
+        SCI (4)
+    }
+
+    enum UserRole {
+        ADMIN
+        ANALYST
+        VIEWER
+        AUDITOR
+    }
+
+    enum Department {
+        OPERATIONS
+        FINANCE
+        LEGAL
+        ENTERPRISE
+        MEDICAL
+        DEFENSE
+    }
+}
+
+' ==================== EXTERNAL SERVICES ====================
+package "External Services" #ECEFF1 {
+    database "MongoDB\n(Local/Atlas)" as MongoDB {
+        users
+        chat_history
+        audit_log
+        vector_store
+        hypergraph_nodes
+        hypergraph_edges
+    }
+
+    [Ollama LLM\n(llama3)] as Ollama {
+        Chat Generation
+        Embeddings
+    }
+}
+
+' ==================== RELATIONSHIPS ====================
+
+' User interactions
+User --> WebUI : Browser
+User --> RestAPI : HTTP/JSON
+Auditor --> AuditController : View Logs
+
+' Presentation to Controllers
+WebUI --> MainController
+RestAPI --> MainController
+RestAPI --> AuditController
+
+' Security Flow
+MainController --> SecurityFilter : Every Request
+AuditController --> SecurityFilter
+SecurityFilter --> AuthenticationService : Authenticate
+AuthenticationService <|.. CacAuth
+AuthenticationService <|.. OidcAuth
+AuthenticationService <|.. StandardAuth
+AuthenticationService <|.. DevAuth
+SecurityFilter --> SecurityContext : Set User
+SecurityFilter --> RBAC : Check Role
+RBAC --> Clearance : Verify Level
+Clearance --> SectorAccess : Check Access
+
+' Controller to Services
+MainController --> QueryDecomp : /ask
+MainController --> IngestionSvc : /ingest
+MainController --> AuditSvc : Log Events
+AuditController --> AuditSvc : Query Logs
+
+' Ingestion Flow
+IngestionSvc --> PiiSvc : Redact PII
+IngestionSvc --> VectorStore : Store Embeddings
+IngestionSvc --> HGMem : Build Graph
+
+' Query Flow
+QueryDecomp --> HiFiRag : Pass 1 & 2
+HiFiRag --> Reranker : Score Results
+HiFiRag --> GapDetector : Find Gaps
+HiFiRag --> RagPart : Poison Check
+RagPart --> Partitioner : Get Partitions
+RagPart --> SuspicionScorer : Score Anomaly
+HiFiRag --> HGMem : Multi-hop
+HGMem --> EntityExtractor : Extract Entities
+HGMem --> HGMemEngine : Traverse Graph
+HiFiRag --> Tracer : Record Steps
+
+' Tracing
+Tracer --> Trace : Collect
+MainController --> Tracer : Get Trace
+
+' Data Access
+VectorStore <|.. LocalVector
+VectorStore <|.. AtlasVector
+LocalVector --> MongoDB
+AtlasVector --> MongoDB
+UserRepo --> MongoDB
+ChatRepo --> MongoDB
+HGMem --> MongoDB
+
+' LLM Integration
+HiFiRag --> Ollama : Generate
+IngestionSvc --> Ollama : Embed
+
+' Audit
+AuditSvc --> MongoDB : Store Events
+
+' Model relationships
+User "1" --> "*" UserRole
+User "1" --> "1" ClearanceLevel
+User "1" --> "*" Department
+AuditEvent --> User
+
+@enduml

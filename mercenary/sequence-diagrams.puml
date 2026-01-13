@@ -1,0 +1,818 @@
+@startuml Query_Flow_Sequence
+
+!define RECTANGLE class
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam participantPadding 10
+skinparam boxPadding 5
+
+title **SENTINEL - Query Execution Flow**\n(End-to-End Sequence)
+
+actor User
+participant "Web UI" as UI
+participant "SecurityFilter" as SF
+participant "SecurityContext" as SC
+participant "AuthService" as Auth
+participant "AuditService" as Audit
+participant "MercenaryController" as MC
+participant "QueryDecomposition\nService" as QD
+participant "ReasoningTracer" as RT
+participant "HiFiRagService" as HiFi
+participant "CrossEncoderReranker" as CER
+participant "GapDetector" as GD
+participant "RagPartService" as RP
+participant "HyperGraphMemory" as HGM
+participant "VectorStore" as VS
+participant "Ollama LLM" as LLM
+database "MongoDB" as DB
+
+== Authentication & Authorization ==
+
+User -> UI : Submit query\n"What is X and Y?" + dept=FINANCE
+UI -> MC : GET /api/ask/enhanced?q=...&dept=FINANCE
+MC -> SF : Filter intercepts request
+
+SF -> Auth : authenticate(request)
+alt DEV Mode
+    Auth -> Auth : Auto-provision demo user
+else CAC Mode
+    Auth -> Auth : Parse X.509 certificate
+else OIDC Mode
+    Auth -> Auth : Validate JWT token
+else STANDARD Mode
+    Auth -> Auth : Verify password hash
+end
+Auth --> SF : User object
+
+SF -> SC : setCurrentUser(user)
+SF -> SF : Check RBAC: user.hasPermission(QUERY)
+SF -> SF : Check Clearance: user.clearance >= dept.minClearance
+SF -> SF : Check Sector: dept ∈ user.allowedSectors
+
+alt Access Denied
+    SF -> Audit : log(ACCESS_DENIED)
+    SF --> UI : 403 Forbidden
+else Access Granted
+    SF -> Audit : log(AUTH_SUCCESS)
+    SF --> MC : Proceed
+end
+
+== Query Processing ==
+
+MC -> RT : startTrace(query, dept)
+MC -> QD : decomposeQuery(query)
+
+QD -> QD : Detect compound query\n("What is X and what is Y")
+QD -> QD : Split into sub-queries:\n["What is X", "What is Y"]
+QD --> MC : List<SubQuery>
+
+loop For each sub-query
+    MC -> HiFi : retrieve(subQuery, dept)
+
+    == Pass 1: Broad Retrieval ==
+    HiFi -> RT : addStep(VECTOR_SEARCH, "Pass 1")
+    HiFi -> VS : similaritySearch(query, threshold=0.1)
+    VS -> DB : Vector search
+    DB --> VS : Results (high recall)
+    VS --> HiFi : List<Document>
+
+    == Reranking ==
+    HiFi -> RT : addStep(RERANKING, "Cross-encoder scoring")
+    HiFi -> CER : rerank(query, documents)
+    CER -> LLM : Score semantic relevance
+    LLM --> CER : Relevance scores
+    CER --> HiFi : Ranked documents
+
+    == Gap Detection ==
+    HiFi -> RT : addStep(GAP_DETECTION, "Missing concepts")
+    HiFi -> GD : detectGaps(query, rankedDocs)
+    GD -> GD : Identify missing concepts
+    GD --> HiFi : List<GapConcept>
+
+    == Pass 2: Targeted Retrieval ==
+    alt Gaps found
+        HiFi -> RT : addStep(VECTOR_SEARCH, "Pass 2 - Fill gaps")
+        HiFi -> VS : similaritySearch(gapQueries)
+        VS -> DB : Targeted search
+        DB --> VS : Gap-filling results
+        VS --> HiFi : Additional documents
+    end
+
+    == Poison Defense ==
+    HiFi -> RT : addStep(POISON_DETECTION, "RAGPart check")
+    HiFi -> RP : filterSuspicious(documents)
+    RP -> RP : Run query against k partitions
+    RP -> RP : Score document consistency
+    RP --> HiFi : Clean documents (suspicious filtered)
+
+    == Multi-hop Reasoning ==
+    HiFi -> RT : addStep(GRAPH_TRAVERSAL, "HG-Mem")
+    HiFi -> HGM : traverse(query, documents)
+    HGM -> DB : Query hypergraph_nodes
+    HGM -> DB : Query hypergraph_edges
+    HGM -> HGM : Multi-hop entity reasoning
+    HGM --> HiFi : Enhanced context
+
+    HiFi --> MC : RetrievalResult
+end
+
+== Response Generation ==
+
+MC -> QD : mergeResults(results)
+QD -> QD : Deduplicate documents
+QD -> QD : Combine contexts
+QD --> MC : MergedContext
+
+MC -> RT : addStep(CONTEXT_ASSEMBLY, "Prepare LLM input")
+MC -> MC : Assemble prompt with context
+
+MC -> RT : addStep(LLM_GENERATION, "Generate response")
+MC -> LLM : generate(prompt, context)
+LLM --> MC : Response with citations
+
+MC -> RT : endTrace()
+RT --> MC : ReasoningTrace
+
+== Audit & Response ==
+
+MC -> Audit : log(QUERY_EXECUTED, response)
+Audit -> DB : Insert audit_event
+
+MC -> DB : Save to chat_history
+
+MC --> UI : { response, sources, reasoning_trace }
+UI --> User : Display answer + sources + pipeline steps
+
+@enduml
+
+
+@startuml Ingestion_Flow_Sequence
+
+!define RECTANGLE class
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam participantPadding 10
+skinparam boxPadding 5
+
+title **SENTINEL - Document Ingestion Flow**\n(End-to-End Sequence)
+
+actor User
+participant "Web UI" as UI
+participant "SecurityFilter" as SF
+participant "AuthService" as Auth
+participant "AuditService" as Audit
+participant "MercenaryController" as MC
+participant "SecureIngestion\nService" as SIS
+participant "PiiRedaction\nService" as PII
+participant "TokenTextSplitter" as TTS
+participant "VectorStore" as VS
+participant "HyperGraphMemory" as HGM
+participant "EntityExtractor" as EE
+participant "Ollama" as LLM
+database "MongoDB" as DB
+
+== Authentication ==
+
+User -> UI : Upload document\n(PDF/TXT) + dept=FINANCE
+UI -> MC : POST /api/ingest/file\n{file, department}
+MC -> SF : Filter intercepts
+
+SF -> Auth : authenticate(request)
+Auth --> SF : User object
+SF -> SF : Check permission: INGEST
+SF -> SF : Check clearance >= dept.minClearance
+
+alt Access Denied
+    SF -> Audit : log(ACCESS_DENIED)
+    SF --> UI : 403 Forbidden
+else Access Granted
+    SF --> MC : Proceed
+end
+
+== Document Processing ==
+
+MC -> SIS : ingestDocument(file, dept, user)
+
+SIS -> SIS : Read file with Apache Tika
+note right: Supports PDF, TXT,\nDOCX, MD, etc.
+
+SIS -> SIS : Extract text content
+
+== PII Redaction ==
+
+SIS -> PII : redact(content)
+
+PII -> PII : Detect SSN patterns\n(XXX-XX-XXXX)
+PII -> PII : Detect email addresses
+PII -> PII : Detect phone numbers
+PII -> PII : Detect credit cards\n(with Luhn validation)
+PII -> PII : Detect DOB patterns
+PII -> PII : Detect IP addresses
+PII -> PII : Detect medical record numbers
+PII -> PII : Detect personal names
+PII -> PII : Detect physical addresses
+
+note right of PII
+    NIST 800-122 compliant
+    GDPR Article 4(1)
+    HIPAA Safe Harbor (18 identifiers)
+    PCI-DSS card data
+end note
+
+PII --> SIS : RedactedContent\n(with [REDACTED-TYPE] tokens)
+
+== Document Chunking ==
+
+SIS -> TTS : split(redactedContent)
+TTS -> TTS : TokenTextSplitter\n(chunk_size=800, overlap=100)
+TTS --> SIS : List<TextChunk>
+
+== Embedding Generation ==
+
+loop For each chunk
+    SIS -> LLM : embed(chunk)
+    note right: nomic-embed-text model
+    LLM --> SIS : Vector embedding
+end
+
+== Vector Storage ==
+
+SIS -> VS : add(documents)
+
+VS -> VS : Prepare metadata:\n- source: filename\n- department: FINANCE\n- timestamp: now\n- userId: user.id
+
+VS -> DB : Insert into vector_store
+note right
+    Document structure:
+    {
+      content: "chunk text",
+      embedding: [0.1, 0.2, ...],
+      metadata: { source, dept, ... }
+    }
+end note
+
+DB --> VS : Inserted
+VS --> SIS : Success
+
+== HyperGraph Building ==
+
+SIS -> HGM : buildGraph(chunks)
+
+loop For each chunk
+    HGM -> EE : extractEntities(chunk)
+    EE -> EE : Named Entity Recognition
+    EE --> HGM : List<Entity>
+
+    HGM -> DB : Upsert hypergraph_nodes
+
+    HGM -> HGM : Identify relationships\nbetween entities
+    HGM -> DB : Insert hypergraph_edges
+end
+
+HGM --> SIS : Graph built
+
+== Audit & Response ==
+
+SIS -> Audit : log(DOCUMENT_INGESTED, metadata)
+Audit -> DB : Insert audit_event
+
+SIS --> MC : IngestionResult\n{ chunks: N, entities: M }
+
+MC --> UI : { success: true, message: "Ingested N chunks" }
+UI --> User : Display success
+
+@enduml
+
+
+@startuml Component_Diagram
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle uml2
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam packageStyle rectangle
+
+title **SENTINEL - Component Diagram**
+
+package "Client Layer" #E8F5E9 {
+    [Browser] as Browser
+    [REST Client] as RestClient
+}
+
+package "API Gateway" #E3F2FD {
+    [MercenaryController] as MainAPI
+    [AuditController] as AuditAPI
+}
+
+package "Security" #FFF3E0 {
+    [SecurityFilter] as SecFilter
+    [SecurityContext] as SecContext
+
+    package "Auth Providers" {
+        [CAC Auth] as CACAuth
+        [OIDC Auth] as OIDCAuth
+        [Standard Auth] as StdAuth
+        [Dev Auth] as DevAuth
+    }
+}
+
+package "Core Services" #F3E5F5 {
+    [QueryDecompositionService] as QuerySvc
+    [SecureIngestionService] as IngestSvc
+    [PiiRedactionService] as PiiSvc
+    [AuditService] as AuditSvc
+}
+
+package "RAG Pipeline" #E1F5FE {
+    [HiFiRagService] as HiFiRAG
+    [RagPartService] as RAGPart
+    [HyperGraphMemory] as HGMem
+
+    [CrossEncoderReranker] as Reranker
+    [GapDetector] as GapDet
+    [SuspicionScorer] as SuspScore
+    [EntityExtractor] as EntityExt
+}
+
+package "Reasoning" #FFFDE7 {
+    [ReasoningTracer] as Tracer
+}
+
+package "Data Access" #FFEBEE {
+    [VectorStore] as VecStore
+    [UserRepository] as UserRepo
+    [ChatLogRepository] as ChatRepo
+}
+
+package "External" #ECEFF1 {
+    database "MongoDB" as Mongo
+    [Ollama LLM] as Ollama
+}
+
+' Client connections
+Browser --> MainAPI : HTTP
+RestClient --> MainAPI : HTTP
+RestClient --> AuditAPI : HTTP
+
+' Security flow
+MainAPI --> SecFilter
+AuditAPI --> SecFilter
+SecFilter --> SecContext
+SecFilter --> CACAuth
+SecFilter --> OIDCAuth
+SecFilter --> StdAuth
+SecFilter --> DevAuth
+
+' API to Services
+MainAPI --> QuerySvc
+MainAPI --> IngestSvc
+MainAPI --> Tracer
+AuditAPI --> AuditSvc
+
+' Service dependencies
+IngestSvc --> PiiSvc
+IngestSvc --> VecStore
+IngestSvc --> HGMem
+
+' RAG Pipeline
+QuerySvc --> HiFiRAG
+HiFiRAG --> Reranker
+HiFiRAG --> GapDet
+HiFiRAG --> RAGPart
+HiFiRAG --> HGMem
+HiFiRAG --> Tracer
+
+RAGPart --> SuspScore
+HGMem --> EntityExt
+
+' Data access
+HiFiRAG --> VecStore
+HGMem --> Mongo
+VecStore --> Mongo
+UserRepo --> Mongo
+ChatRepo --> Mongo
+AuditSvc --> Mongo
+
+' LLM
+HiFiRAG --> Ollama
+Reranker --> Ollama
+IngestSvc --> Ollama
+
+@enduml
+
+
+@startuml Class_Diagram_Core
+
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 10
+
+title **SENTINEL - Core Class Diagram**
+
+package "Model" #F5F5F5 {
+    class User {
+        -id: String
+        -username: String
+        -displayName: String
+        -email: String
+        -roles: Set<UserRole>
+        -clearance: ClearanceLevel
+        -allowedSectors: Set<Department>
+        -authProvider: AuthProvider
+        -externalId: String
+        -passwordHash: String
+        -createdAt: Instant
+        -lastLoginAt: Instant
+        -active: boolean
+        +hasPermission(Permission): boolean
+        +canAccessSector(Department): boolean
+    }
+
+    enum UserRole {
+        ADMIN
+        ANALYST
+        VIEWER
+        AUDITOR
+        +getPermissions(): Set<Permission>
+    }
+
+    enum ClearanceLevel {
+        UNCLASSIFIED
+        CUI
+        SECRET
+        TOP_SECRET
+        SCI
+        +getLevel(): int
+        +canAccess(ClearanceLevel): boolean
+    }
+
+    enum Department {
+        OPERATIONS
+        FINANCE
+        LEGAL
+        ENTERPRISE
+        MEDICAL
+        DEFENSE
+        +getMinClearance(): ClearanceLevel
+    }
+
+    class AuditEvent {
+        -id: String
+        -timestamp: Instant
+        -eventType: EventType
+        -userId: String
+        -username: String
+        -userClearance: ClearanceLevel
+        -sourceIp: String
+        -userAgent: String
+        -sessionId: String
+        -action: String
+        -resourceType: String
+        -resourceId: String
+        -outcome: Outcome
+        -outcomeReason: String
+        -responseSummary: String
+        -metadata: Map<String,Object>
+    }
+
+    class ChatLog {
+        -id: String
+        -department: String
+        -role: String
+        -content: String
+        -timestamp: LocalDateTime
+    }
+}
+
+package "Reasoning" #FFFDE7 {
+    class ReasoningTracer <<singleton>> {
+        -{static} traces: ThreadLocal<ReasoningTrace>
+        +{static} startTrace(query, dept): void
+        +{static} addStep(type, label, detail): void
+        +{static} endTrace(): ReasoningTrace
+        +{static} getTrace(): ReasoningTrace
+    }
+
+    class ReasoningTrace {
+        -traceId: String
+        -query: String
+        -department: String
+        -startTime: long
+        -endTime: long
+        -steps: List<ReasoningStep>
+        +addStep(step): void
+        +getDurationMs(): long
+    }
+
+    class ReasoningStep {
+        -type: StepType
+        -label: String
+        -detail: String
+        -durationMs: long
+        -data: Map<String,Object>
+    }
+
+    enum StepType {
+        QUERY_ANALYSIS
+        QUERY_DECOMPOSITION
+        VECTOR_SEARCH
+        KEYWORD_SEARCH
+        RERANKING
+        POISON_DETECTION
+        GRAPH_TRAVERSAL
+        GAP_DETECTION
+        CONTEXT_ASSEMBLY
+        LLM_GENERATION
+    }
+}
+
+package "Security" #FFF3E0 {
+    interface AuthenticationService {
+        +authenticate(request): User
+        +supports(AuthProvider): boolean
+    }
+
+    class CacAuthenticationService {
+        -userRepository: UserRepository
+        -certParser: CacCertificateParser
+        +authenticate(request): User
+    }
+
+    class OidcAuthenticationService {
+        -jwtValidator: JwtValidator
+        -userRepository: UserRepository
+        +authenticate(request): User
+    }
+
+    class StandardAuthenticationService {
+        -passwordEncoder: PasswordEncoder
+        -userRepository: UserRepository
+        +authenticate(request): User
+    }
+
+    class SecurityFilter {
+        -authServices: List<AuthenticationService>
+        -auditService: AuditService
+        +doFilter(req, res, chain): void
+        -authenticate(request): User
+    }
+
+    class SecurityContext <<singleton>> {
+        -{static} currentUser: ThreadLocal<User>
+        +{static} setCurrentUser(user): void
+        +{static} getCurrentUser(): User
+        +{static} clear(): void
+    }
+}
+
+' Relationships
+User "1" *-- "*" UserRole
+User "1" *-- "1" ClearanceLevel
+User "1" *-- "*" Department
+AuditEvent --> User : references
+
+AuthenticationService <|.. CacAuthenticationService
+AuthenticationService <|.. OidcAuthenticationService
+AuthenticationService <|.. StandardAuthenticationService
+
+SecurityFilter --> AuthenticationService : uses
+SecurityFilter --> SecurityContext : sets
+
+ReasoningTracer --> ReasoningTrace : creates
+ReasoningTrace "1" *-- "*" ReasoningStep
+ReasoningStep --> StepType
+
+@enduml
+
+
+@startuml Class_Diagram_RAG
+
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 10
+
+title **SENTINEL - RAG Pipeline Class Diagram**
+
+package "RAG Services" #E1F5FE {
+    class QueryDecompositionService {
+        -compoundPatterns: List<Pattern>
+        +decomposeQuery(query): List<String>
+        +mergeResults(results): MergedResult
+        -detectCompoundQuery(query): boolean
+    }
+
+    class HiFiRagService {
+        -vectorStore: VectorStore
+        -reranker: CrossEncoderReranker
+        -gapDetector: GapDetector
+        -ragPart: RagPartService
+        -hgMem: HyperGraphMemory
+        -tracer: ReasoningTracer
+        +retrieve(query, dept): RetrievalResult
+        -pass1BroadRetrieval(query): List<Document>
+        -pass2TargetedRetrieval(gaps): List<Document>
+    }
+
+    class CrossEncoderReranker {
+        -chatClient: ChatClient
+        +rerank(query, docs): List<ScoredDocument>
+        -scoreRelevance(query, doc): double
+    }
+
+    class GapDetector {
+        -chatClient: ChatClient
+        +detectGaps(query, docs): List<String>
+        -identifyMissingConcepts(query, context): List<String>
+    }
+}
+
+package "Poison Defense" #B3E5FC {
+    class RagPartService {
+        -partitioner: PartitionAssigner
+        -scorer: SuspicionScorer
+        -numPartitions: int
+        -kCombinations: int
+        +filterSuspicious(docs): List<Document>
+        -runPartitionedQueries(query): Map<Doc,Results>
+    }
+
+    class PartitionAssigner {
+        -numPartitions: int
+        +assignPartition(docId): int
+        +getPartitionsForDoc(docId): Set<Integer>
+    }
+
+    class SuspicionScorer {
+        -threshold: double
+        +score(doc, partitionResults): double
+        +isSuspicious(score): boolean
+    }
+}
+
+package "Graph Memory" #81D4FA {
+    class HyperGraphMemory {
+        -mongoTemplate: MongoTemplate
+        -entityExtractor: EntityExtractor
+        -queryEngine: HGMemQueryEngine
+        +buildGraph(chunks): void
+        +traverse(query, docs): EnhancedContext
+    }
+
+    class EntityExtractor {
+        -chatClient: ChatClient
+        +extractEntities(text): List<Entity>
+        -identifyRelationships(entities): List<Edge>
+    }
+
+    class HGMemQueryEngine {
+        -mongoTemplate: MongoTemplate
+        +query(startEntities, hops): SubGraph
+        -traverseEdges(node, depth): List<Node>
+    }
+
+    class Entity {
+        -id: String
+        -name: String
+        -type: EntityType
+        -mentions: List<Mention>
+    }
+
+    class HyperEdge {
+        -id: String
+        -nodes: Set<String>
+        -relationship: String
+        -weight: double
+    }
+}
+
+package "Data Access" #FFEBEE {
+    interface VectorStore {
+        +add(docs): void
+        +similaritySearch(query, k, threshold): List<Document>
+        +delete(ids): void
+    }
+
+    class LocalMongoVectorStore {
+        -mongoTemplate: MongoTemplate
+        -embeddingModel: EmbeddingModel
+        +add(docs): void
+        +similaritySearch(query, k, threshold): List<Document>
+    }
+
+    class MongoDBAtlasVectorStore {
+        -atlasClient: MongoClient
+        +add(docs): void
+        +similaritySearch(query, k, threshold): List<Document>
+    }
+}
+
+' Relationships
+HiFiRagService --> CrossEncoderReranker : uses
+HiFiRagService --> GapDetector : uses
+HiFiRagService --> RagPartService : uses
+HiFiRagService --> HyperGraphMemory : uses
+HiFiRagService --> VectorStore : uses
+
+RagPartService --> PartitionAssigner : uses
+RagPartService --> SuspicionScorer : uses
+
+HyperGraphMemory --> EntityExtractor : uses
+HyperGraphMemory --> HGMemQueryEngine : uses
+HGMemQueryEngine ..> Entity : queries
+HGMemQueryEngine ..> HyperEdge : queries
+
+VectorStore <|.. LocalMongoVectorStore
+VectorStore <|.. MongoDBAtlasVectorStore
+
+QueryDecompositionService --> HiFiRagService : uses
+
+@enduml
+
+
+@startuml Deployment_Diagram
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam nodeStyle rectangle
+
+title **SENTINEL - Deployment Architecture**
+
+node "Air-Gap / Classified Network" #E8F5E9 {
+    node "Docker Host" {
+        artifact "sentinel:latest" as SentinelContainer {
+            component [Spring Boot App\nPort 8080] as SpringApp
+        }
+
+        artifact "mongodb:7" as MongoContainer {
+            database [MongoDB\nPort 27017] as MongoLocal
+        }
+
+        artifact "ollama:latest" as OllamaContainer {
+            component [Ollama LLM\nPort 11434] as OllamaLocal
+        }
+    }
+
+    SpringApp --> MongoLocal : MongoDB Protocol
+    SpringApp --> OllamaLocal : HTTP REST
+}
+
+node "Enterprise / Cloud Network" #E3F2FD {
+    node "Kubernetes Cluster" {
+        node "App Pod" {
+            artifact "sentinel:latest" as SentinelCloud {
+                component [Spring Boot App\nPort 8080] as SpringCloud
+            }
+        }
+    }
+
+    cloud "MongoDB Atlas" {
+        database [Atlas Cluster\n+ Vector Search] as AtlasDB
+    }
+
+    cloud "Identity Provider" {
+        component [Azure AD\n/ Okta] as IdP
+    }
+
+    node "GPU Server" {
+        artifact "ollama:latest" as OllamaGPU {
+            component [Ollama LLM\n(GPU Accelerated)] as OllamaCloud
+        }
+    }
+
+    SpringCloud --> AtlasDB : MongoDB Protocol
+    SpringCloud --> OllamaCloud : HTTP REST
+    SpringCloud --> IdP : OIDC/OAuth2
+}
+
+actor "Analyst" as Analyst
+actor "Admin" as Admin
+
+Analyst --> SpringApp : HTTPS
+Admin --> SpringApp : HTTPS
+Analyst --> SpringCloud : HTTPS
+Admin --> SpringCloud : HTTPS
+
+note right of SentinelContainer
+    Environment Variables:
+    APP_PROFILE=govcloud
+    AUTH_MODE=CAC
+    MONGODB_URI=mongodb://mongo:27017
+    OLLAMA_URL=http://ollama:11434
+end note
+
+note right of SentinelCloud
+    Environment Variables:
+    APP_PROFILE=enterprise
+    AUTH_MODE=OIDC
+    MONGODB_URI=mongodb+srv://...
+    OLLAMA_URL=http://ollama-gpu:11434
+end note
+
+@enduml

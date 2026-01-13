@@ -1,0 +1,37 @@
+# MEDICAL SECTOR - CLINICAL TRIAL DATA SUMMARY
+
+## Document ID: MED-2025-7823
+## Data Classification: HIPAA PROTECTED
+
+### Section 1: Trial Overview
+
+Protocol SENT-2025-001: AI-Assisted Diagnostic Support Clinical Trial
+Principal Investigator: Dr. Katherine Williams, MD PhD
+Institution: Johns Hopkins University Medical Center
+Trial Phase: Phase 2b, randomized controlled study
+
+Enrollment statistics:
+- Total enrolled patients: 847
+- Active participants: 792
+- Completed treatment: 412
+- Withdrawn: 55 (6.5% dropout rate)
+
+### Section 2: Efficacy Results
+
+Primary endpoint: Diagnostic accuracy improvement vs standard of care
+Results: 34% improvement in early detection of malignant lesions
+Secondary endpoint: Time to diagnosis reduced from 72 hours to 18 hours average
+
+Key findings by site:
+- Site A (Dr. Michael Roberts, Boston): 38% improvement (n=312)
+- Site B (Dr. Lisa Chang, Chicago): 31% improvement (n=285)
+- Site C (Dr. James Patterson, Houston): 33% improvement (n=250)
+
+### Section 3: Safety Data
+
+Adverse events tracked by Safety Officer Dr. Sarah Thompson.
+Total AE reports: 23 (2.7% of participants)
+Serious AE: 2 events, both unrelated to study intervention per DSMB review.
+
+DSMB recommendation: Continue enrollment with no protocol modifications.
+FDA correspondence managed by Regulatory Affairs lead Jennifer Martinez.

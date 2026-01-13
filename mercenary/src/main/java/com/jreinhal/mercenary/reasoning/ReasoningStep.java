@@ -9,31 +9,30 @@ import java.util.Map;
  * and relevant metrics for that operation.
  */
 public record ReasoningStep(
-    /**
-     * Type of reasoning step.
-     */
-    StepType type,
+        /**
+         * Type of reasoning step.
+         */
+        StepType type,
 
-    /**
-     * Human-readable label for this step.
-     */
-    String label,
+        /**
+         * Human-readable label for this step.
+         */
+        String label,
 
-    /**
-     * Detailed description of what happened.
-     */
-    String detail,
+        /**
+         * Detailed description of what happened.
+         */
+        String detail,
 
-    /**
-     * Duration of this step in milliseconds.
-     */
-    long durationMs,
+        /**
+         * Duration of this step in milliseconds.
+         */
+        long durationMs,
 
-    /**
-     * Step-specific data and metrics.
-     */
-    Map<String, Object> data
-) {
+        /**
+         * Step-specific data and metrics.
+         */
+        Map<String, Object> data) {
     /**
      * Types of reasoning steps in the RAG pipeline.
      */
@@ -129,6 +128,46 @@ public record ReasoningStep(
         SECURITY_CHECK,
 
         /**
+         * Uncertainty analysis (QuCo-RAG hallucination detection).
+         */
+        UNCERTAINTY_ANALYSIS,
+
+        /**
+         * Cross-modal retrieval (MegaRAG visual + text).
+         */
+        CROSS_MODAL_RETRIEVAL,
+
+        /**
+         * Mindscape-aware retrieval (MiA-RAG hierarchical context).
+         */
+        MINDSCAPE_RETRIEVAL,
+
+        /**
+         * Hybrid retrieval with RRF fusion.
+         */
+        HYBRID_RETRIEVAL,
+
+        /**
+         * Experience validation (Bidirectional RAG).
+         */
+        EXPERIENCE_VALIDATION,
+
+        /**
+         * MCTS graph reasoning (Graph-O1).
+         */
+        MCTS_REASONING,
+
+        /**
+         * Visual asset analysis (MegaRAG).
+         */
+        VISUAL_ANALYSIS,
+
+        /**
+         * Mindscape building (MiA-RAG summarization).
+         */
+        MINDSCAPE_BUILDING,
+
+        /**
          * Error or exception handling.
          */
         ERROR
@@ -144,7 +183,8 @@ public record ReasoningStep(
     /**
      * Create a reasoning step with additional data.
      */
-    public static ReasoningStep of(StepType type, String label, String detail, long durationMs, Map<String, Object> data) {
+    public static ReasoningStep of(StepType type, String label, String detail, long durationMs,
+            Map<String, Object> data) {
         return new ReasoningStep(type, label, detail, durationMs, data);
     }
 }

@@ -1,0 +1,33 @@
+# LEGAL SECTOR - INTELLECTUAL PROPERTY BRIEF
+
+## Document ID: LEG-2025-4589
+## Data Classification: ATTORNEY-CLIENT PRIVILEGED
+
+### Section 1: Patent Portfolio Summary
+
+The company holds 47 active patents related to RAG technology and AI systems.
+Chief IP Counsel Amanda Roberts oversees portfolio with external firm Finnegan LLP.
+Recent patent grants include QuCo-RAG uncertainty quantification method (Patent No. 11,847,234).
+
+Key patent families:
+- RAG pipeline optimization: 12 patents (US, EU, JP, CN)
+- Vector embedding methods: 8 patents (US, EU)
+- Security and compliance: 15 patents (US)
+- User interface innovations: 12 patents (US, EU)
+
+### Section 2: Trade Secret Protection
+
+Trade secret inventory maintained by Thomas Wright (ref: LEG-2025-4521).
+92 classified trade secrets including HGMem algorithm implementation details.
+All employees bound by NDA reviewed by Rebecca Martinez.
+
+Protection measures:
+- Access control: Role-based clearance levels
+- Audit logging: STIG-compliant activity tracking
+- Encryption: AES-256 for data at rest and TLS 1.3 in transit
+
+### Section 3: Licensing Strategy
+
+Licensing revenue managed in coordination with CFO Jennifer Armstrong.
+Patent licensing generated $2.1 million in Q4 2025 (ref: FIN-2025-0892).
+Strategic cross-licensing agreement with Morrison & Foerster LLP client pending.

@@ -50,3 +50,11 @@ src/main/resources/static/sales.html
 
 # PDF documents (store in documentation system)
 *.pdf
+
+# Temporary files
+nul
+tmpclaude-*
+*.tmp
+*_log*.txt
+build_*.txt
+QuCo-RAG/

@@ -21,7 +21,7 @@ import java.util.regex.*;
  * - TECHNICAL: Technical terms, acronyms, protocols
  * - REFERENCE: Document/file references, IDs
  */
-@Component
+@Component("hgmemEntityExtractor")
 public class EntityExtractor {
 
     private static final Logger log = LoggerFactory.getLogger(EntityExtractor.class);
@@ -50,60 +50,53 @@ public class EntityExtractor {
     // Patterns for entity extraction
     private static final Pattern DATE_PATTERN = Pattern.compile(
             "\\b(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|" +
-            "\\d{4}[/-]\\d{2}[/-]\\d{2}|" +
-            "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{1,2},?\\s+\\d{4}|" +
-            "\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{4}|" +
-            "Q[1-4]\\s+\\d{4}|" +
-            "FY\\s*\\d{2,4}|" +
-            "(?:19|20)\\d{2})\\b",
-            Pattern.CASE_INSENSITIVE
-    );
+                    "\\d{4}[/-]\\d{2}[/-]\\d{2}|" +
+                    "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{1,2},?\\s+\\d{4}|" +
+                    "\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{4}|" +
+                    "Q[1-4]\\s+\\d{4}|" +
+                    "FY\\s*\\d{2,4}|" +
+                    "(?:19|20)\\d{2})\\b",
+            Pattern.CASE_INSENSITIVE);
 
     private static final Pattern TECHNICAL_PATTERN = Pattern.compile(
             "\\b([A-Z]{2,}(?:-[A-Z0-9]+)*|" +
-            "(?:API|SDK|URL|URI|SQL|HTTP|HTTPS|REST|SOAP|JWT|OAuth|SSL|TLS|SSH|FTP|DNS|TCP|IP|UUID|JSON|XML|HTML|CSS)[s]?|" +
-            "\\w+(?:Service|Controller|Repository|Factory|Manager|Handler|Client|Server))\\b"
-    );
+                    "(?:API|SDK|URL|URI|SQL|HTTP|HTTPS|REST|SOAP|JWT|OAuth|SSL|TLS|SSH|FTP|DNS|TCP|IP|UUID|JSON|XML|HTML|CSS)[s]?|"
+                    +
+                    "\\w+(?:Service|Controller|Repository|Factory|Manager|Handler|Client|Server))\\b");
 
     private static final Pattern REFERENCE_PATTERN = Pattern.compile(
             "\\b((?:DOC|REF|ID|CASE|TICKET|PR|MR|CR)-?\\d+|" +
-            "#\\d+|" +
-            "[A-Z]{2,3}-\\d{3,}|" +
-            "\\b\\w+\\.(pdf|doc|docx|txt|md|csv|xlsx)\\b)",
-            Pattern.CASE_INSENSITIVE
-    );
+                    "#\\d+|" +
+                    "[A-Z]{2,3}-\\d{3,}|" +
+                    "\\b\\w+\\.(pdf|doc|docx|txt|md|csv|xlsx)\\b)",
+            Pattern.CASE_INSENSITIVE);
 
     // Common name prefixes/suffixes
     private static final Set<String> NAME_PREFIXES = Set.of(
-            "mr", "mrs", "ms", "dr", "prof", "sir", "dame", "gen", "col", "maj", "capt", "lt", "sgt"
-    );
+            "mr", "mrs", "ms", "dr", "prof", "sir", "dame", "gen", "col", "maj", "capt", "lt", "sgt");
 
     private static final Set<String> NAME_SUFFIXES = Set.of(
-            "jr", "sr", "ii", "iii", "iv", "phd", "md", "esq"
-    );
+            "jr", "sr", "ii", "iii", "iv", "phd", "md", "esq");
 
     // Organization indicators
     private static final Set<String> ORG_INDICATORS = Set.of(
             "inc", "corp", "corporation", "llc", "ltd", "company", "co",
             "agency", "department", "bureau", "division", "office",
             "institute", "university", "college", "school", "foundation",
-            "association", "organization", "group", "team", "committee"
-    );
+            "association", "organization", "group", "team", "committee");
 
     // Location indicators
     private static final Set<String> LOCATION_INDICATORS = Set.of(
             "city", "town", "village", "state", "province", "country", "region",
             "street", "avenue", "road", "drive", "lane", "blvd", "highway",
-            "building", "floor", "room", "suite", "office"
-    );
+            "building", "floor", "room", "suite", "office");
 
     // Common stop words to filter out
     private static final Set<String> STOP_WORDS = Set.of(
             "the", "a", "an", "and", "or", "but", "is", "are", "was", "were",
             "be", "been", "being", "have", "has", "had", "do", "does", "did",
             "will", "would", "could", "should", "may", "might", "must",
-            "this", "that", "these", "those", "it", "its", "they", "them"
-    );
+            "this", "that", "these", "those", "it", "its", "they", "them");
 
     /**
      * Extract entities from text.
@@ -129,7 +122,7 @@ public class EntityExtractor {
         for (Entity e : entities) {
             String key = e.normalizedValue() + "_" + e.type();
             if (!deduplicated.containsKey(key) ||
-                deduplicated.get(key).value().length() < e.value().length()) {
+                    deduplicated.get(key).value().length() < e.value().length()) {
                 deduplicated.put(key, e);
             }
         }
@@ -206,7 +199,8 @@ public class EntityExtractor {
             String[] words = phrase.split("\\s+");
 
             // Skip very short phrases
-            if (words.length < 2) continue;
+            if (words.length < 2)
+                continue;
 
             // Classify as person, organization, or location
             EntityType type = classifyCapitalizedPhrase(phrase, words);
@@ -217,7 +211,8 @@ public class EntityExtractor {
         }
 
         // Also extract single capitalized words that might be names
-        Pattern singleCapPattern = Pattern.compile("\\b(?:Mr|Mrs|Ms|Dr|Prof)\\.?\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)\\b");
+        Pattern singleCapPattern = Pattern
+                .compile("\\b(?:Mr|Mrs|Ms|Dr|Prof)\\.?\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)\\b");
         matcher = singleCapPattern.matcher(text);
 
         while (matcher.find()) {
@@ -270,7 +265,7 @@ public class EntityExtractor {
             boolean allShort = Arrays.stream(words).allMatch(w -> w.length() <= 12);
             boolean noIndicators = Arrays.stream(words)
                     .noneMatch(w -> ORG_INDICATORS.contains(w.toLowerCase()) ||
-                                    LOCATION_INDICATORS.contains(w.toLowerCase()));
+                            LOCATION_INDICATORS.contains(w.toLowerCase()));
             if (allShort && noIndicators) {
                 return EntityType.PERSON;
             }

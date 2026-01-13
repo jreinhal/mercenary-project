@@ -10,6 +10,7 @@ import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.reasoning.ReasoningTrace;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.reasoning.ReasoningStep.StepType;
+import com.jreinhal.mercenary.rag.qucorag.QuCoRagService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
@@ -47,6 +48,7 @@ public class MercenaryController {
     private final AuditService auditService;
     private final QueryDecompositionService queryDecompositionService;
     private final ReasoningTracer reasoningTracer;
+    private final QuCoRagService quCoRagService;
 
     // METRICS
     private final AtomicInteger docCount = new AtomicInteger(0);
@@ -62,15 +64,20 @@ public class MercenaryController {
             .build();
 
     // PROMPT INJECTION DETECTION - Defense-in-depth patterns
-    // Note: This is a heuristic layer, not a complete solution. Consider model-based guardrails for production.
+    // Note: This is a heuristic layer, not a complete solution. Consider
+    // model-based guardrails for production.
     private static final List<Pattern> INJECTION_PATTERNS = List.of(
             // Direct instruction overrides
-            Pattern.compile("ignore\\s+(all\\s+)?(previous|prior|above)\\s+(instructions?|prompts?|rules?)", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("ignore\\s+(all\\s+)?(previous|prior|above)\\s+(instructions?|prompts?|rules?)",
+                    Pattern.CASE_INSENSITIVE),
             Pattern.compile("disregard\\s+(all\\s+)?(previous|prior|above)", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("forget\\s+(all\\s+)?(previous|prior|your)\\s+(instructions?|context|rules?)", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("forget\\s+(all\\s+)?(previous|prior|your)\\s+(instructions?|context|rules?)",
+                    Pattern.CASE_INSENSITIVE),
             // System prompt extraction
-            Pattern.compile("(show|reveal|display|print|output)\\s+(me\\s+)?(the\\s+)?(system|initial)\\s+prompt", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("what\\s+(is|are)\\s+your\\s+(system\\s+)?(instructions?|rules?|prompt)", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("(show|reveal|display|print|output)\\s+(me\\s+)?(the\\s+)?(system|initial)\\s+prompt",
+                    Pattern.CASE_INSENSITIVE),
+            Pattern.compile("what\\s+(is|are)\\s+your\\s+(system\\s+)?(instructions?|rules?|prompt)",
+                    Pattern.CASE_INSENSITIVE),
             // Role manipulation
             Pattern.compile("you\\s+are\\s+now\\s+(a|an|in)\\s+", Pattern.CASE_INSENSITIVE),
             Pattern.compile("act\\s+as\\s+(if|though)\\s+you", Pattern.CASE_INSENSITIVE),
@@ -84,13 +91,13 @@ public class MercenaryController {
             Pattern.compile("```\\s*(system|assistant)\\s*:", Pattern.CASE_INSENSITIVE),
             Pattern.compile("\\[INST\\]|\\[/INST\\]|<<SYS>>|<</SYS>>", Pattern.CASE_INSENSITIVE),
             // Output manipulation
-            Pattern.compile("(start|begin)\\s+(your\\s+)?response\\s+with", Pattern.CASE_INSENSITIVE)
-    );
+            Pattern.compile("(start|begin)\\s+(your\\s+)?response\\s+with", Pattern.CASE_INSENSITIVE));
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore,
             SecureIngestionService ingestionService, MongoTemplate mongoTemplate,
             AuditService auditService,
-            QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer) {
+            QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer,
+            QuCoRagService quCoRagService) {
         this.chatClient = builder.build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;
@@ -98,6 +105,7 @@ public class MercenaryController {
         this.auditService = auditService;
         this.queryDecompositionService = queryDecompositionService;
         this.reasoningTracer = reasoningTracer;
+        this.quCoRagService = quCoRagService;
 
         // Initialize doc count from DB
         try {
@@ -170,7 +178,8 @@ public class MercenaryController {
         } else {
             try {
                 // FALLBACK: Manual filtering if VectorStore doesn't support metadata filters
-                // 1. Retrieve a broader set of documents using the normalized filename as context
+                // 1. Retrieve a broader set of documents using the normalized filename as
+                // context
                 List<Document> potentialDocs = vectorStore.similaritySearch(
                         SearchRequest.query(normalizedFileName).withTopK(20));
 
@@ -339,7 +348,15 @@ public class MercenaryController {
                 return "SECURITY ALERT: Indirect Prompt Injection Detected. Access Denied.";
             }
 
-            // 1.5 MULTI-QUERY DECOMPOSITION (Enterprise Feature)
+            // 1.5 QuCo-RAG: Uncertainty Analysis (arXiv:2512.19134)
+            // Detect potential hallucination risk before generation
+            QuCoRagService.UncertaintyResult uncertaintyResult = quCoRagService.analyzeQueryUncertainty(query);
+            if (quCoRagService.shouldTriggerRetrieval(uncertaintyResult.uncertaintyScore())) {
+                log.info("QuCo-RAG: High uncertainty detected ({}), expanding retrieval",
+                        String.format("%.3f", uncertaintyResult.uncertaintyScore()));
+            }
+
+            // 1.6 MULTI-QUERY DECOMPOSITION (Enterprise Feature)
             // Detect and handle compound queries like "What is X and what is Y"
             List<String> subQueries = queryDecompositionService.decompose(query);
             boolean isCompoundQuery = subQueries.size() > 1;
@@ -445,6 +462,17 @@ public class MercenaryController {
                 response = sim.toString();
             }
 
+            // QuCo-RAG: Post-generation hallucination detection (arXiv:2512.19134)
+            // Check for novel entities with zero co-occurrence - potential hallucinations
+            QuCoRagService.HallucinationResult hallucinationResult = quCoRagService.detectHallucinationRisk(response, query);
+            if (hallucinationResult.isHighRisk()) {
+                log.warn("QuCo-RAG: High hallucination risk detected. Flagged entities: {}",
+                        hallucinationResult.flaggedEntities());
+                // Append warning to response
+                response = response + "\n\n⚠️ **Confidence Warning**: Some information in this response may require additional verification. " +
+                        "Flagged terms: " + String.join(", ", hallucinationResult.flaggedEntities());
+            }
+
             long timeTaken = System.currentTimeMillis() - start;
             totalLatencyMs.addAndGet(timeTaken);
             queryCount.incrementAndGet();
@@ -469,8 +497,8 @@ public class MercenaryController {
             List<Map<String, Object>> reasoning,
             List<String> sources,
             Map<String, Object> metrics,
-            String traceId
-    ) {}
+            String traceId) {
+    }
 
     /**
      * Enhanced /ask endpoint with full Glass Box reasoning transparency.
@@ -491,18 +519,21 @@ public class MercenaryController {
         // Security checks
         if (user == null) {
             auditService.logAccessDenied(null, "/api/ask/enhanced", "Unauthenticated access attempt", request);
-            return new EnhancedAskResponse("ACCESS DENIED: Authentication required.", List.of(), List.of(), Map.of(), null);
+            return new EnhancedAskResponse("ACCESS DENIED: Authentication required.", List.of(), List.of(), Map.of(),
+                    null);
         }
 
         if (!user.hasPermission(UserRole.Permission.QUERY)) {
             auditService.logAccessDenied(user, "/api/ask/enhanced", "Missing QUERY permission", request);
-            return new EnhancedAskResponse("ACCESS DENIED: Insufficient permissions.", List.of(), List.of(), Map.of(), null);
+            return new EnhancedAskResponse("ACCESS DENIED: Insufficient permissions.", List.of(), List.of(), Map.of(),
+                    null);
         }
 
         if (!user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/ask/enhanced",
                     "Insufficient clearance for " + department.name(), request);
-            return new EnhancedAskResponse("ACCESS DENIED: Insufficient clearance.", List.of(), List.of(), Map.of(), null);
+            return new EnhancedAskResponse("ACCESS DENIED: Insufficient clearance.", List.of(), List.of(), Map.of(),
+                    null);
         }
 
         // Start reasoning trace
@@ -545,7 +576,8 @@ public class MercenaryController {
                 List<Document> limited = subResults.stream().limit(5).toList();
                 allDocs.addAll(limited);
 
-                reasoningTracer.addStep(StepType.VECTOR_SEARCH, "Vector Search" + (isCompoundQuery ? " [" + (i+1) + "/" + subQueries.size() + "]" : ""),
+                reasoningTracer.addStep(StepType.VECTOR_SEARCH,
+                        "Vector Search" + (isCompoundQuery ? " [" + (i + 1) + "/" + subQueries.size() + "]" : ""),
                         "Found " + subResults.size() + " candidates, kept " + limited.size(),
                         System.currentTimeMillis() - stepStart,
                         Map.of("query", subQuery, "candidateCount", subResults.size(), "keptCount", limited.size()));
@@ -573,8 +605,10 @@ public class MercenaryController {
                     .map(doc -> {
                         Map<String, Object> meta = doc.getMetadata();
                         String filename = (String) meta.get("source");
-                        if (filename == null) filename = (String) meta.get("filename");
-                        if (filename == null) filename = "Unknown_Document.txt";
+                        if (filename == null)
+                            filename = (String) meta.get("filename");
+                        if (filename == null)
+                            filename = "Unknown_Document.txt";
                         return "SOURCE: " + filename + "\nCONTENT: " + doc.getContent();
                     })
                     .collect(Collectors.joining("\n\n---\n\n"));
@@ -640,7 +674,8 @@ public class MercenaryController {
                 sim.append("Based on the retrieved intelligence:\n\n");
                 for (Document d : topDocs) {
                     String src = (String) d.getMetadata().getOrDefault("source", "Unknown");
-                    String preview = d.getContent().substring(0, Math.min(200, d.getContent().length())).replace("\n", " ");
+                    String preview = d.getContent().substring(0, Math.min(200, d.getContent().length())).replace("\n",
+                            " ");
                     sim.append("- ").append(preview).append("... [").append(src).append("]\n");
                 }
                 if (topDocs.isEmpty()) {
@@ -652,6 +687,26 @@ public class MercenaryController {
                     llmSuccess ? "Generated response (" + response.length() + " chars)" : "Fallback mode (LLM offline)",
                     System.currentTimeMillis() - stepStart,
                     Map.of("success", llmSuccess, "responseLength", response.length()));
+
+            // Step 7: QuCo-RAG Post-generation Hallucination Detection (arXiv:2512.19134)
+            stepStart = System.currentTimeMillis();
+            QuCoRagService.HallucinationResult hallucinationResult = quCoRagService.detectHallucinationRisk(response, query);
+            boolean hasHallucinationRisk = hallucinationResult.isHighRisk();
+            if (hasHallucinationRisk) {
+                log.warn("QuCo-RAG: High hallucination risk detected. Flagged entities: {}",
+                        hallucinationResult.flaggedEntities());
+                // Append warning to response
+                response = response + "\n\n⚠️ **Confidence Warning**: Some information in this response may require additional verification. " +
+                        "Flagged terms: " + String.join(", ", hallucinationResult.flaggedEntities());
+            }
+            reasoningTracer.addStep(StepType.UNCERTAINTY_ANALYSIS, "Hallucination Check",
+                    hasHallucinationRisk
+                        ? "WARNING: " + hallucinationResult.flaggedEntities().size() + " entities flagged (risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")"
+                        : "Passed (risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")",
+                    System.currentTimeMillis() - stepStart,
+                    Map.of("riskScore", hallucinationResult.riskScore(),
+                           "flaggedEntities", hallucinationResult.flaggedEntities(),
+                           "isHighRisk", hasHallucinationRisk));
 
             // Complete trace
             long timeTaken = System.currentTimeMillis() - start;
@@ -667,10 +722,13 @@ public class MercenaryController {
             // Audit log
             auditService.logQuery(user, query, department, response, request);
 
-            // Extract sources from response - support both [filename] and (filename) formats
+            // Extract sources from response - support both [filename] and (filename)
+            // formats
             List<String> sources = new ArrayList<>();
             // Pattern 1: [filename.ext] or [Citation: filename.ext] - standard format
-            java.util.regex.Matcher matcher1 = java.util.regex.Pattern.compile("\\[(?:Citation:\\s*)?([^\\]]+\\.(pdf|txt|md))\\]", java.util.regex.Pattern.CASE_INSENSITIVE)
+            java.util.regex.Matcher matcher1 = java.util.regex.Pattern
+                    .compile("\\[(?:Citation:\\s*)?([^\\]]+\\.(pdf|txt|md))\\]",
+                            java.util.regex.Pattern.CASE_INSENSITIVE)
                     .matcher(response);
             while (matcher1.find()) {
                 String source = matcher1.group(1).trim();
@@ -679,7 +737,8 @@ public class MercenaryController {
                 }
             }
             // Pattern 2: (filename.ext) - LLM sometimes uses parentheses
-            java.util.regex.Matcher matcher2 = java.util.regex.Pattern.compile("\\(([^)]+\\.(pdf|txt|md))\\)", java.util.regex.Pattern.CASE_INSENSITIVE)
+            java.util.regex.Matcher matcher2 = java.util.regex.Pattern
+                    .compile("\\(([^)]+\\.(pdf|txt|md))\\)", java.util.regex.Pattern.CASE_INSENSITIVE)
                     .matcher(response);
             while (matcher2.find()) {
                 String source = matcher2.group(1);
@@ -688,7 +747,9 @@ public class MercenaryController {
                 }
             }
             // Pattern 3: "Citation: filename.ext" or "Source: filename.ext"
-            java.util.regex.Matcher matcher3 = java.util.regex.Pattern.compile("(?:Citation|Source|filename):\\s*([^\\s,]+\\.(pdf|txt|md))", java.util.regex.Pattern.CASE_INSENSITIVE)
+            java.util.regex.Matcher matcher3 = java.util.regex.Pattern
+                    .compile("(?:Citation|Source|filename):\\s*([^\\s,]+\\.(pdf|txt|md))",
+                            java.util.regex.Pattern.CASE_INSENSITIVE)
                     .matcher(response);
             while (matcher3.find()) {
                 String source = matcher3.group(1);
@@ -712,10 +773,8 @@ public class MercenaryController {
                             "latencyMs", timeTaken,
                             "documentsRetrieved", topDocs.size(),
                             "subQueries", subQueries.size(),
-                            "llmSuccess", llmSuccess
-                    ),
-                    completedTrace != null ? completedTrace.getTraceId() : null
-            );
+                            "llmSuccess", llmSuccess),
+                    completedTrace != null ? completedTrace.getTraceId() : null);
 
         } catch (Exception e) {
             log.error("Error in /ask/enhanced endpoint", e);
@@ -836,7 +895,8 @@ public class MercenaryController {
                 .filter(t -> t.length() > 3)
                 .toArray(String[]::new);
 
-        // Minimum matches required: at least 30% of terms OR minimum 2, whichever is higher
+        // Minimum matches required: at least 30% of terms OR minimum 2, whichever is
+        // higher
         int minMatchesRequired = Math.max(2, (int) Math.ceil(meaningfulTerms.length * 0.3));
 
         for (Map.Entry<String, String> entry : secureDocCache.asMap().entrySet()) {
@@ -875,8 +935,10 @@ public class MercenaryController {
      * Detect potential prompt injection attacks using pattern matching.
      *
      * NOTE: This is a defense-in-depth heuristic layer, not a complete solution.
-     * Sophisticated attacks may bypass pattern matching. For high-security deployments,
-     * consider integrating a model-based guardrail service (e.g., Rebuff, LLM Guard, NeMo Guardrails).
+     * Sophisticated attacks may bypass pattern matching. For high-security
+     * deployments,
+     * consider integrating a model-based guardrail service (e.g., Rebuff, LLM
+     * Guard, NeMo Guardrails).
      *
      * @param query The user's input query
      * @return true if potential injection detected, false otherwise

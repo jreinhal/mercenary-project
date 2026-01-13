@@ -88,6 +88,89 @@ sentinel:
       timeout-seconds: ${HIFIRAG_RERANKER_TIMEOUT:30}
       use-llm: ${HIFIRAG_USE_LLM:true}
 
+  # QuCo-RAG: Uncertainty Quantification (arXiv:2512.19134)
+  # Detects hallucination risk by analyzing entity frequency
+  qucorag:
+    enabled: ${QUCORAG_ENABLED:true}
+    uncertainty-threshold: ${QUCORAG_THRESHOLD:0.7}
+    low-frequency-threshold: ${QUCORAG_LOW_FREQ:1000}
+    zero-cooccurrence-penalty: ${QUCORAG_ZERO_PENALTY:0.3}
+    # Infini-gram API (optional, requires internet)
+    infini-gram-enabled: ${QUCORAG_INFINI_GRAM:false}
+    infini-gram-timeout-ms: ${QUCORAG_TIMEOUT:5000}
+    infini-gram-index: ${QUCORAG_INDEX:v4_olmo-2-0325-32b-instruct_llama}
+    # LLM-based entity extraction (higher accuracy, adds ~200-500ms latency)
+    llm-extraction-enabled: ${QUCORAG_LLM_EXTRACTION:false}
+    llm-extraction-timeout-ms: ${QUCORAG_LLM_TIMEOUT:3000}
+
+  # MegaRAG: Multimodal Knowledge Graph (arXiv:2512.20626)
+  # Cross-modal retrieval for images, charts, and text
+  megarag:
+    enabled: ${MEGARAG_ENABLED:true}
+    # Visual retrieval weight vs text (0.0-1.0)
+    visual-weight: ${MEGARAG_VISUAL_WEIGHT:0.3}
+    # Minimum confidence for cross-modal links
+    link-threshold: ${MEGARAG_LINK_THRESHOLD:0.7}
+    # Enable chart data extraction
+    chart-extraction: ${MEGARAG_CHART_EXTRACTION:true}
+    # Enable OCR for image text
+    ocr-enabled: ${MEGARAG_OCR:true}
+
+  # MiA-RAG: Mindscape-Aware Retrieval (arXiv:2512.17220)
+  # Hierarchical summaries for long-document coherence
+  miarag:
+    enabled: ${MIARAG_ENABLED:true}
+    # Minimum chunks to trigger mindscape building
+    min-chunks-for-mindscape: ${MIARAG_MIN_CHUNKS:10}
+    # Summarization levels (chunk -> paragraph -> section -> document)
+    levels: ${MIARAG_LEVELS:4}
+    # Context window for global conditioning
+    global-context-tokens: ${MIARAG_CONTEXT_TOKENS:500}
+
+  # Bidirectional RAG: Experience Store (arXiv:2512.22199)
+  # Self-improving RAG with grounding verification
+  birag:
+    enabled: ${BIRAG_ENABLED:true}
+    # Minimum grounding score for auto-validation
+    grounding-threshold: ${BIRAG_GROUNDING_THRESHOLD:0.8}
+    # Novelty detection threshold
+    novelty-threshold: ${BIRAG_NOVELTY_THRESHOLD:0.7}
+    # Require admin approval for pending experiences
+    require-approval: ${BIRAG_REQUIRE_APPROVAL:true}
+    # Max experiences to retrieve per query
+    max-experiences: ${BIRAG_MAX_EXPERIENCES:5}
+
+  # Hybrid RAG: Reciprocal Rank Fusion (arXiv:2512.12694)
+  # Combines semantic and keyword retrieval with OCR tolerance
+  hybridrag:
+    enabled: ${HYBRIDRAG_ENABLED:true}
+    # RRF k parameter (higher = more emphasis on top ranks)
+    rrf-k: ${HYBRIDRAG_RRF_K:60}
+    # Weight for semantic retrieval (keyword weight = 1 - semantic)
+    semantic-weight: ${HYBRIDRAG_SEMANTIC_WEIGHT:0.6}
+    keyword-weight: ${HYBRIDRAG_KEYWORD_WEIGHT:0.4}
+    # Number of query variants for multi-query retrieval
+    multi-query-count: ${HYBRIDRAG_MULTI_QUERY:3}
+    # OCR error tolerance (common character substitutions)
+    ocr-tolerance: ${HYBRIDRAG_OCR_TOLERANCE:true}
+    # LLM-based query expansion (higher quality, adds latency)
+    llm-expansion: ${HYBRIDRAG_LLM_EXPANSION:false}
+
+  # Graph-O1: MCTS Graph Reasoning (arXiv:2512.17912)
+  # Monte Carlo Tree Search for knowledge graph traversal
+  grapho1:
+    enabled: ${GRAPHO1_ENABLED:true}
+    # Maximum MCTS iterations
+    max-iterations: ${GRAPHO1_MAX_ITER:50}
+    # UCB1 exploration constant (sqrt(2) is common)
+    exploration-constant: ${GRAPHO1_EXPLORE_C:1.414}
+    # Maximum reasoning depth in graph
+    max-depth: ${GRAPHO1_MAX_DEPTH:5}
+    # Simulations per node evaluation
+    simulation-count: ${GRAPHO1_SIM_COUNT:3}
+    # Minimum confidence for early termination
+    min-confidence: ${GRAPHO1_MIN_CONF:0.6}
+
   # PII Redaction Engine
   # Industry-standard compliance: NIST 800-122, GDPR, HIPAA Safe Harbor, PCI-DSS
   pii:

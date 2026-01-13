@@ -1,0 +1,33 @@
+# FINANCE SECTOR - Q4 2025 EARNINGS REPORT
+
+## Document ID: FIN-2025-0892
+## Data Classification: PCI-DSS COMPLIANT
+
+### Section 1: Revenue Analysis
+
+Total revenue for Q4 2025 reached $47.2 million, representing a 23% YoY increase.
+The SENTINEL platform contributed $12.8 million in enterprise license sales.
+CFO Jennifer Armstrong reported exceptional growth in the government sector.
+
+Revenue breakdown by vertical:
+- Government/Defense contracts: $18.4 million (39%)
+- Healthcare/HIPAA-compliant: $11.3 million (24%)
+- Financial services: $9.8 million (21%)
+- Legal/Professional services: $7.7 million (16%)
+
+### Section 2: Cost Analysis
+
+Operating expenses totaled $29.1 million, resulting in operating income of $18.1 million.
+R&D investment increased 34% to support RAGPart and HGMem development.
+Cloud infrastructure costs managed by vendor Apex Technologies remained stable.
+
+Key cost centers:
+- Personnel (210 FTEs): $15.2 million
+- Cloud/Infrastructure: $8.7 million
+- R&D investment: $5.2 million
+
+### Section 3: Compliance Audit
+
+Compliance Officer Michelle Zhang confirmed PCI-DSS Level 1 certification renewed.
+SOC 2 Type II audit completed by external firm Deloitte with zero findings.
+Credit card processing handled 2.3 million transactions with 99.99% success rate.

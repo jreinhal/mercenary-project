@@ -1,0 +1,35 @@
+# DEFENSE SECTOR - OPERATION DIAMOND SHIELD AFTER-ACTION REPORT
+
+## Document ID: DEF-2025-TS-9821
+## Classification: SECRET//NOFORN
+
+### Section 1: Operation Summary
+
+Operation Diamond Shield was a multi-domain exercise conducted November 15-22, 2025.
+Exercise Director: Major General Richard Hayes, USAF
+Participating forces: US Army, US Navy, US Air Force, Royal Navy, Bundeswehr
+
+Exercise objectives:
+- Validate C4ISR interoperability across coalition partners
+- Test SENTINEL Platform integration with tactical systems
+- Assess cyber defense posture against simulated adversary actions
+
+### Section 2: Intelligence Integration
+
+SENTINEL Platform designated primary OSINT aggregation tool.
+Platform processed 142,847 intelligence reports during exercise.
+LTC Jennifer Brooks managed Joint Intelligence Operations Center (JIOC).
+
+Key integration milestones:
+- Real-time threat correlation: 89% accuracy vs analyst baseline
+- Multi-source fusion latency: 3.2 seconds average
+- False positive rate: 2.1% (below 5% threshold)
+
+### Section 3: Lessons Learned
+
+Colonel Thomas Richardson identified 12 areas for improvement.
+Major improvements needed in secure air-gap deployment procedures.
+Coordination with Director Patterson (ref: OPS-2025-1242) on civilian-military interface.
+
+Classified annex prepared by Captain Sarah Mitchell for CENTCOM review.
+FedRAMP certification identified as prerequisite for permanent DOD deployment.
