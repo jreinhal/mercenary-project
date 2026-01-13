@@ -93,9 +93,11 @@
 │  │  ┌─────────────────────────────────────────────────────────────────────────────┐ │   │
 │  │  │  ReasoningTracer (Thread-Local)                                             │ │   │
 │  │  │  ───────────────────────────────────────────────────────────────────────    │ │   │
-│  │  │  Step Types: QUERY_ANALYSIS → VECTOR_SEARCH → RERANKING → POISON_DETECTION │ │   │
-│  │  │              → GRAPH_TRAVERSAL → GAP_DETECTION → CONTEXT_ASSEMBLY          │ │   │
-│  │  │              → LLM_GENERATION                                               │ │   │
+│  │  │  Step Types: QUERY_ANALYSIS → VECTOR_SEARCH → HYBRID_RETRIEVAL → RERANKING │ │   │
+│  │  │              → POISON_DETECTION → GRAPH_TRAVERSAL → MCTS_REASONING         │ │   │
+│  │  │              → CROSS_MODAL_RETRIEVAL → MINDSCAPE_RETRIEVAL                 │ │   │
+│  │  │              → EXPERIENCE_VALIDATION → UNCERTAINTY_ANALYSIS                │ │   │
+│  │  │              → GAP_DETECTION → CONTEXT_ASSEMBLY → LLM_GENERATION           │ │   │
 │  │  └─────────────────────────────────────────────────────────────────────────────┘ │   │
 │  └──────────────────────────────────────────────────────────────────────────────────┘   │
 │                 │                                                                        │

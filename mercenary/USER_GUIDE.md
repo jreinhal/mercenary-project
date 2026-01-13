@@ -1,6 +1,6 @@
 # SENTINEL Intelligence Platform - User Guide
 
-**Version:** 1.0.0
+**Version:** 2.1.0
 **Classification:** UNCLASSIFIED // FOR OFFICIAL USE ONLY
 
 ## 1. Quick Start
@@ -55,7 +55,44 @@ SENTINEL uses **QuCo-RAG** (Uncertainty Quantification) to detect potential hall
 
 ---
 
-## 4. Troubleshooting
+## 4. Advanced RAG Features (v2.1)
+
+SENTINEL v2.1 includes 9 cutting-edge RAG technologies based on the latest academic research:
+
+### Hybrid Retrieval (RRF Fusion)
+Combines semantic vector search with keyword search using **Reciprocal Rank Fusion**:
+*   **15-25% improved recall** compared to semantic-only search
+*   **Multi-query expansion** generates query variants automatically
+*   **OCR error tolerance** handles scanned document mistakes (0/O, 1/l/I substitutions)
+
+### Graph-O1 MCTS Reasoning
+Uses **Monte Carlo Tree Search** for intelligent knowledge graph traversal:
+*   Strategic exploration of reasoning paths (not brute-force)
+*   **UCB1 bandit algorithm** balances exploration vs. exploitation
+*   **Early termination** when high-confidence path is found
+
+### MegaRAG Multimodal
+Enables **cross-modal retrieval** across text, images, and charts:
+*   Automatically extracts data from embedded charts
+*   OCR-enabled image text search
+*   Visual entity linking connects images to text concepts
+
+### MiA-RAG Mindscape
+Provides **long-document coherence** through hierarchical summarization:
+*   Builds multi-level summaries (chunk → paragraph → section → document)
+*   Prevents "lost in the middle" problem in 100+ page documents
+*   Global context conditioning maintains document-level understanding
+
+### Bidirectional RAG Experience Store
+Enables **continuous self-improvement**:
+*   Stores verified Q&A pairs for future retrieval
+*   **Grounding verification** validates response-to-source alignment
+*   **Novelty detection** identifies new valuable information
+*   Optional admin approval workflow for quality control
+
+---
+
+## 5. Troubleshooting
 
 **"System Offline / LLM Unreachable"**
 *   The system has entered "Offline Mode." It will still retrieve documents but may not be able to synthesize fluent answers. It will provide raw excerpts instead.
@@ -68,4 +105,18 @@ SENTINEL uses **QuCo-RAG** (Uncertainty Quantification) to detect potential hall
 *   If the screen is blank, try refreshing the page (`Ctrl + R`) or clearing your browser cache.
 
 ---
-*Powered by Project Mercenary HyperGraph Engine*
+*Powered by Project Mercenary HyperGraph Engine v2.1*
+
+### Academic Papers Implemented
+
+| Feature | Paper | Citation |
+|---------|-------|----------|
+| HiFi-RAG | arXiv:2512.22442v1 | High-Fidelity Retrieval |
+| RAGPart | arXiv:2512.24268v1 | Corpus Poisoning Defense |
+| HGMem | arXiv:2512.23959v2 | Hypergraph Memory |
+| QuCo-RAG | arXiv:2512.19134 | Hallucination Detection |
+| MegaRAG | arXiv:2512.20626 | Multimodal Knowledge Graph |
+| MiA-RAG | arXiv:2512.17220 | Mindscape-Aware Retrieval |
+| BiRAG | arXiv:2512.22199 | Bidirectional Experience Store |
+| Hybrid RAG | arXiv:2512.12694 | Reciprocal Rank Fusion |
+| Graph-O1 | arXiv:2512.17912 | MCTS Graph Reasoning |
