@@ -12,9 +12,6 @@ import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.reasoning.ReasoningStep.StepType;
 import com.jreinhal.mercenary.rag.qucorag.QuCoRagService;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.SystemPromptTemplate;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -433,17 +430,15 @@ public class MercenaryController {
 
             }
 
-            SystemPromptTemplate systemPrompt = new SystemPromptTemplate(systemText);
-            UserMessage userMessage = new UserMessage(query);
-            Prompt prompt = new Prompt(
-                    List.of(systemPrompt.createMessage(Map.of("information", information)), userMessage));
+            String systemMessage = systemText.replace("{information}", information);
 
             String response;
             try {
-                // Warning suppression for deprecated call
-                @SuppressWarnings("deprecation")
-                String rawResponse = chatClient.call(prompt).getResult().getOutput().getContent();
-                response = rawResponse;
+                response = chatClient.prompt()
+                        .system(systemMessage)
+                        .user(query)
+                        .call()
+                        .content();
             } catch (Exception llmError) {
                 log.error("LLM Generation Failed (Offline/Misconfigured). Generating Simulation Response.", llmError);
                 // Fallback: Construct a response from the retrieved documents directly
@@ -656,17 +651,16 @@ public class MercenaryController {
                         .formatted(dept);
             }
 
-            SystemPromptTemplate systemPrompt = new SystemPromptTemplate(systemText);
-            UserMessage userMessage = new UserMessage(query);
-            Prompt prompt = new Prompt(
-                    List.of(systemPrompt.createMessage(Map.of("information", information)), userMessage));
+            String systemMessage = systemText.replace("{information}", information);
 
             String response;
             boolean llmSuccess = true;
             try {
-                @SuppressWarnings("deprecation")
-                String rawResponse = chatClient.call(prompt).getResult().getOutput().getContent();
-                response = rawResponse;
+                response = chatClient.prompt()
+                        .system(systemMessage)
+                        .user(query)
+                        .call()
+                        .content();
             } catch (Exception llmError) {
                 llmSuccess = false;
                 log.error("LLM Generation Failed", llmError);

@@ -4,8 +4,6 @@ import com.jreinhal.mercenary.rag.hifirag.HiFiRagService.ScoredDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -132,7 +130,7 @@ public class CrossEncoderReranker {
                 content = content.substring(0, 1000) + "...";
             }
 
-            String prompt = String.format("""
+            String promptText = String.format("""
                 Rate the relevance of this document to the query on a scale of 0.0 to 1.0.
 
                 QUERY: %s
@@ -147,9 +145,10 @@ public class CrossEncoderReranker {
 
                 Score:""", query, content);
 
-            @SuppressWarnings("deprecation")
-            String response = chatClient.call(new Prompt(new UserMessage(prompt)))
-                    .getResult().getOutput().getContent();
+            String response = chatClient.prompt()
+                    .user(promptText)
+                    .call()
+                    .content();
 
             // Extract score from response
             double score = parseScore(response);
