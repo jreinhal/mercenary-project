@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/24556675/README.md)
 # SENTINEL // INTELLIGENCE PLATFORM
 
 **Secure RAG infrastructure for regulated industries.**
@@ -24,6 +23,12 @@ Sentinel is a Retrieval-Augmented Generation (RAG) platform designed for sensiti
 | **HiFi-RAG** | Iterative two-pass retrieval with cross-encoder reranking (arXiv:2512.22442v1) |
 | **RAGPart Poisoning Defense** | Corpus poisoning detection via document partitioning (arXiv:2512.24268v1) |
 | **HGMem Graph Memory** | Hypergraph memory for multi-hop reasoning (arXiv:2512.23959v2) |
+| **QuCo-RAG Hallucination Defense** | Entity-based uncertainty quantification to prevent false claims (arXiv:2512.19134) |
+| **MegaRAG Multimodal** | Cross-modal retrieval combining text, images, and charts (arXiv:2512.20626) |
+| **MiA-RAG Mindscape** | Hierarchical summarization for long-document coherence (arXiv:2512.17220) |
+| **Bidirectional RAG** | Self-improving experience store with grounding verification (arXiv:2512.22199) |
+| **Hybrid RAG (RRF)** | Reciprocal Rank Fusion combining semantic + keyword search (arXiv:2512.12694) |
+| **Graph-O1 MCTS** | Monte Carlo Tree Search for intelligent graph traversal (arXiv:2512.17912) |
 | **STIG-Aligned Audit Logging** | Every authentication, query, and access event persisted for compliance |
 
 ---
@@ -120,10 +125,16 @@ Unlike black-box AI systems, Sentinel exposes its complete reasoning pipeline in
 | Query Decomposition | `QUERY_DECOMPOSITION` | Split compound queries into sub-queries |
 | Vector Search | `VECTOR_SEARCH` | Semantic similarity search |
 | Keyword Search | `KEYWORD_SEARCH` | Fallback keyword matching |
+| Hybrid Retrieval | `HYBRID_RETRIEVAL` | RRF fusion of semantic + keyword results |
 | HiFi Reranking | `RERANKING` | Cross-encoder semantic scoring |
 | RAGPart Defense | `POISON_DETECTION` | Corpus poisoning anomaly detection |
 | HGMem Traversal | `GRAPH_TRAVERSAL` | Hypergraph multi-hop reasoning |
+| MCTS Reasoning | `MCTS_REASONING` | Graph-O1 Monte Carlo Tree Search |
+| Cross-Modal Retrieval | `CROSS_MODAL_RETRIEVAL` | MegaRAG visual + text retrieval |
+| Mindscape Retrieval | `MINDSCAPE_RETRIEVAL` | MiA-RAG hierarchical context |
+| Experience Validation | `EXPERIENCE_VALIDATION` | Bidirectional RAG grounding check |
 | Gap Detection | `GAP_DETECTION` | Identify missing information |
+| Uncertainty Analysis | `UNCERTAINTY_ANALYSIS` | QuCo-RAG hallucination risk detection |
 | Context Assembly | `CONTEXT_ASSEMBLY` | Build LLM context window |
 | Response Generation | `LLM_GENERATION` | Generate answer with citations |
 
@@ -170,6 +181,60 @@ Based on [arXiv:2512.23959v2](https://arxiv.org/abs/2512.23959), implements:
 - **Hypergraph Storage**: MongoDB-backed node and hyperedge collections
 - **Multi-hop Traversal**: BFS graph exploration for relationship discovery
 - **Hybrid Query**: Combines vector similarity with graph context
+
+### QuCo-RAG (Hallucination Defense)
+
+Based on [arXiv:2512.19134](https://arxiv.org/abs/2512.19134), implements:
+- **Entity Extraction**: Pattern-based NER for PERSON, ORG, TECH, DATE, LOCATION
+- **Frequency Analysis**: Checks entity frequency in corpus (local or Infini-gram API)
+- **Co-occurrence Verification**: Validates entity relationships exist in training data
+- **Uncertainty Scoring**: Computes hallucination risk score (0.0 - 1.0)
+- **Adaptive Retrieval**: Triggers additional retrieval when uncertainty exceeds threshold
+- **Air-Gap Safe**: Falls back to local corpus analysis when offline
+
+### MegaRAG (Multimodal Knowledge Graph)
+
+Based on [arXiv:2512.20626](https://arxiv.org/abs/2512.20626), implements:
+- **Cross-Modal Retrieval**: Unified search across text, images, and charts
+- **Visual Entity Linking**: Connects image content to text entities
+- **Chart Data Extraction**: Automatic parsing of embedded chart data
+- **OCR Integration**: Text extraction from images for searchability
+- **Weighted Fusion**: Configurable visual vs. text retrieval weights
+
+### MiA-RAG (Mindscape-Aware Retrieval)
+
+Based on [arXiv:2512.17220](https://arxiv.org/abs/2512.17220), implements:
+- **Hierarchical Summarization**: Multi-level document summaries (chunk → paragraph → section → document)
+- **Global Context Conditioning**: Maintains document-level understanding across chunks
+- **Mindscape Building**: Automatic construction of hierarchical document representations
+- **Long-Document Coherence**: Prevents context fragmentation in multi-page documents
+
+### Bidirectional RAG (Experience Store)
+
+Based on [arXiv:2512.22199](https://arxiv.org/abs/2512.22199), implements:
+- **Experience Store**: MongoDB-backed storage for validated Q&A pairs
+- **Grounding Verification**: Automatic validation of response-to-source alignment
+- **Novelty Detection**: Identifies new information worthy of storage
+- **Self-Improvement Loop**: System learns from verified successful responses
+- **Admin Approval Workflow**: Optional human review for pending experiences
+
+### Hybrid RAG (Reciprocal Rank Fusion)
+
+Based on [arXiv:2512.12694](https://arxiv.org/abs/2512.12694), implements:
+- **RRF Fusion**: Mathematically combines semantic and keyword retrieval scores
+- **Multi-Query Expansion**: Generates query variants for improved recall
+- **OCR Error Tolerance**: Handles common OCR character substitutions (0/O, 1/l/I)
+- **Query Paraphrasing**: LLM-based query expansion for synonym coverage
+- **Configurable Weights**: Adjustable semantic vs. keyword retrieval balance
+
+### Graph-O1 (MCTS Reasoning)
+
+Based on [arXiv:2512.17912](https://arxiv.org/abs/2512.17912), implements:
+- **Monte Carlo Tree Search**: Strategic exploration of knowledge graph paths
+- **UCB1 Selection**: Upper Confidence Bound algorithm for path selection
+- **LLM-Based Simulation**: Evaluates reasoning path quality via local LLM
+- **Backpropagation**: Updates path scores based on simulation outcomes
+- **Early Termination**: Stops when high-confidence path is found
 
 ---
 
@@ -312,10 +377,30 @@ src/main/java/com/jreinhal/mercenary/
 │   │   ├── PartitionAssigner.java
 │   │   ├── RagPartService.java
 │   │   └── SuspicionScorer.java
-│   └── hgmem/                 # HGMem hypergraph memory
-│       ├── EntityExtractor.java
-│       ├── HGMemQueryEngine.java
-│       └── HyperGraphMemory.java
+│   ├── qucorag/               # QuCo-RAG hallucination defense
+│   │   ├── EntityExtractor.java
+│   │   ├── InfiniGramClient.java
+│   │   ├── LlmEntityExtractor.java
+│   │   └── QuCoRagService.java
+│   ├── hgmem/                 # HGMem hypergraph memory
+│   │   ├── EntityExtractor.java
+│   │   ├── HGMemQueryEngine.java
+│   │   └── HyperGraphMemory.java
+│   ├── megarag/               # MegaRAG multimodal (arXiv:2512.20626)
+│   │   ├── ImageAnalyzer.java
+│   │   ├── MegaRagService.java
+│   │   └── VisualEntityLinker.java
+│   ├── miarag/                # MiA-RAG mindscape (arXiv:2512.17220)
+│   │   ├── MiARagService.java
+│   │   └── MindscapeBuilder.java
+│   ├── birag/                 # Bidirectional RAG (arXiv:2512.22199)
+│   │   ├── BidirectionalRagService.java
+│   │   └── GroundingVerifier.java
+│   ├── hybridrag/             # Hybrid RAG with RRF (arXiv:2512.12694)
+│   │   ├── HybridRagService.java
+│   │   └── QueryExpander.java
+│   └── grapho1/               # Graph-O1 MCTS (arXiv:2512.17912)
+│       └── GraphO1Service.java
 ├── reasoning/                 # Glass Box Reasoning Engine
 │   ├── ReasoningStep.java     # Individual step record
 │   ├── ReasoningTrace.java    # Complete trace container
@@ -497,4 +582,4 @@ This sale includes:
 
 ---
 
-*SENTINEL INTELLIGENCE PLATFORM v2.0.0 — Enterprise RAG for Regulated Industries*
+*SENTINEL INTELLIGENCE PLATFORM v2.1.0 — Enterprise RAG for Regulated Industries*
