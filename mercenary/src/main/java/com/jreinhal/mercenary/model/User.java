@@ -33,6 +33,7 @@ public class User {
     private Instant createdAt;
     private Instant lastLoginAt;
     private boolean active = true;
+    private boolean pendingApproval = false; // For OIDC approval workflow
 
     // Default constructor for MongoDB
     public User() {
@@ -156,6 +157,14 @@ public class User {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public boolean isPendingApproval() {
+        return pendingApproval;
+    }
+
+    public void setPendingApproval(boolean pendingApproval) {
+        this.pendingApproval = pendingApproval;
     }
 
     // Authorization helpers

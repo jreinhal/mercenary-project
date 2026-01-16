@@ -99,6 +99,8 @@ public class SecurityConfig {
      *
      * Permits all requests - authentication handled by custom SecurityFilter
      * which auto-provisions a DEMO_USER.
+     *
+     * NOTE: CSP is handled by CspNonceFilter which generates dynamic nonces.
      */
     @Bean
     @Profile("dev")
@@ -107,10 +109,18 @@ public class SecurityConfig {
             // Disable CSRF for dev mode (simpler testing)
             .csrf(csrf -> csrf.disable())
 
-            // Security Headers
+            // Security Headers (CSP handled by CspNonceFilter)
             .headers(headers -> headers
                 .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
                 .contentTypeOptions(contentType -> {})
+                // Additional security headers
+                .referrerPolicy(referrer -> referrer
+                    .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
+                )
+                .permissionsPolicy(permissions -> permissions
+                    .policy("geolocation=(), microphone=(), camera=()")
+                )
+                // CSP is set dynamically by CspNonceFilter - don't set static CSP here
             )
 
             // Permit all requests - custom SecurityFilter handles auth
@@ -126,9 +136,11 @@ public class SecurityConfig {
      *
      * Provides baseline security for non-government deployments:
      * - CSRF protection enabled
-     * - Security headers (X-Frame-Options, Content-Type)
+     * - Security headers (X-Frame-Options, Content-Type, Referrer-Policy, Permissions-Policy)
      * - Public endpoints for static assets and health checks
      * - All API endpoints require authentication
+     *
+     * NOTE: CSP is handled by CspNonceFilter which generates dynamic nonces.
      */
     @Bean
     @Profile({"enterprise", "standard"})
@@ -140,10 +152,19 @@ public class SecurityConfig {
                 .ignoringRequestMatchers("/api/health", "/api/status")
             )
 
-            // Security Headers
+            // Security Headers (CSP handled by CspNonceFilter)
             .headers(headers -> headers
                 .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
                 .contentTypeOptions(contentType -> {})
+                // Additional security headers
+                .referrerPolicy(referrer -> referrer
+                    .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
+                )
+                .permissionsPolicy(permissions -> permissions
+                    .policy("geolocation=(), microphone=(), camera=()")
+                )
+                .cacheControl(cache -> {})
+                // CSP is set dynamically by CspNonceFilter - don't set static CSP here
             )
 
             // Authorization Rules

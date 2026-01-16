@@ -28,6 +28,12 @@ public class PiiRedactionService {
 
     private static final Logger log = LoggerFactory.getLogger(PiiRedactionService.class);
 
+    private final TokenizationVault tokenizationVault;
+
+    public PiiRedactionService(TokenizationVault tokenizationVault) {
+        this.tokenizationVault = tokenizationVault;
+    }
+
     public enum RedactionMode {
         MASK,       // [REDACTED-SSN], [REDACTED-EMAIL], etc.
         TOKENIZE,   // <<PII:SSN:a1b2c3>>, reversible tokens
@@ -385,16 +391,25 @@ public class PiiRedactionService {
     private String generateReplacement(String original, PiiType type, RedactionMode mode) {
         return switch (mode) {
             case MASK -> "[REDACTED-" + type.name() + "]";
-            case TOKENIZE -> "<<PII:" + type.name() + ":" + generateToken(original) + ">>";
+            case TOKENIZE -> generateToken(original, type); // Uses cryptographic vault
             case REMOVE -> "";
         };
     }
 
-    private String generateToken(String original) {
-        // Generate a short, reversible token based on content hash
-        // In production, this would use a secure tokenization vault
-        return Integer.toHexString(original.hashCode()).substring(0, Math.min(6,
-                Integer.toHexString(original.hashCode()).length()));
+    /**
+     * Generate a secure token using the tokenization vault.
+     * Falls back to hash-based tokens if vault is unavailable.
+     */
+    private String generateToken(String original, PiiType type) {
+        try {
+            // Use cryptographic tokenization vault
+            return tokenizationVault.tokenize(original, type.name(), "SYSTEM");
+        } catch (Exception e) {
+            log.warn("Tokenization vault unavailable, using hash fallback");
+            // Fallback to hash (less secure but functional)
+            return Integer.toHexString(original.hashCode()).substring(0, Math.min(6,
+                    Integer.toHexString(original.hashCode()).length()));
+        }
     }
 
     private RedactionMode parseMode(String modeStr) {

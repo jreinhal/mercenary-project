@@ -56,10 +56,15 @@ app:
   auth-mode: ${AUTH_MODE:DEV}
 
 # ============================================
+# SENTINEL Configuration
+# Single-product with 5 sectors: GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
+# ============================================
+sentinel:
+
+# ============================================
 # SENTINEL Advanced RAG Configuration
 # Based on cutting-edge research papers
 # ============================================
-sentinel:
   # RAGPart Defense (arXiv:2512.24268v1)
   # Corpus poisoning defense via document partitioning
   ragpart:
@@ -198,18 +203,16 @@ sentinel:
     trace-retention-hours: ${REASONING_RETENTION:24}
 
   # UI Theming Configuration
-  # Edition-aware theming for Enterprise, Professional, Research, and Community
+  # Sector-aware theming: GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
   ui:
-    # Default theme: DEFENSE, MEDICAL, LEGAL, CORPORATE, ACADEMIC, COMMUNITY, DARK
-    default-theme: ${SENTINEL_UI_THEME:DEFENSE}
-    # Product edition branding: ENTERPRISE, PROFESSIONAL, RESEARCH, COMMUNITY
-    edition: ${SENTINEL_EDITION:ENTERPRISE}
+    # Default sector theme (matches the 5 sectors)
+    default-sector: ${SENTINEL_DEFAULT_SECTOR:ENTERPRISE}
     # Custom branding (optional)
     brand-name: ${SENTINEL_BRAND_NAME:SENTINEL}
-    # Show classification banners (government deployments)
+    # Show classification banners (high-security sectors: GOVERNMENT, MEDICAL, FINANCE)
     show-classification: ${SENTINEL_SHOW_CLASSIFICATION:true}
-    # Allow users to switch themes
-    allow-theme-switching: ${SENTINEL_ALLOW_THEME_SWITCH:true}
+    # Allow users to switch sectors
+    allow-sector-switching: ${SENTINEL_ALLOW_SECTOR_SWITCH:true}
 
 # ============================================
 # Swagger/OpenAPI Configuration
@@ -263,7 +266,7 @@ app:
     local-jwks-path: ${OIDC_LOCAL_JWKS:}
     jwks-cache-ttl: ${OIDC_JWKS_CACHE_TTL:3600}
     allowed-algorithms: ${OIDC_ALGORITHMS:RS256,RS384,RS512,ES256}
-    clock-skew-seconds: ${OIDC_CLOCK_SKEW:60}
+    clock-skew-seconds: ${OIDC_CLOCK_SKEW:30}  # SECURITY: Reduced from 60s for tighter validation
     validate-issuer: ${OIDC_VALIDATE_ISSUER:true}
     validate-audience: ${OIDC_VALIDATE_AUDIENCE:true}
     auto-provision: ${OIDC_AUTO_PROVISION:true}

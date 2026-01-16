@@ -58,3 +58,7 @@ tmpclaude-*
 *_log*.txt
 build_*.txt
 QuCo-RAG/
+.agent/
+
+# Security assessment reports (internal only)
+SECURITY_STRATEGY_RECOMMENDATIONS.md

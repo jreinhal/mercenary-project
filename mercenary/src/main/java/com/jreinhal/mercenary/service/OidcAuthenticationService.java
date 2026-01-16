@@ -57,11 +57,20 @@ public class OidcAuthenticationService implements AuthenticationService {
     @Value("${app.oidc.auto-provision:true}")
     private boolean autoProvision;
 
+    @Value("${app.oidc.require-approval:false}")
+    private boolean requireApproval;
+
     @Value("${app.oidc.default-role:VIEWER}")
     private String defaultRole;
 
     @Value("${app.oidc.default-clearance:UNCLASSIFIED}")
     private String defaultClearance;
+
+    @Value("${app.oidc.max-default-clearance:CUI}")
+    private String maxDefaultClearance;
+
+    @Value("${app.oidc.max-default-role:ANALYST}")
+    private String maxDefaultRole;
 
     public OidcAuthenticationService(UserRepository userRepository, JwtValidator jwtValidator) {
         this.userRepository = userRepository;
@@ -102,6 +111,59 @@ public class OidcAuthenticationService implements AuthenticationService {
             log.info("  Issuer: {}", issuer);
             log.info("  Client ID: {}", clientId);
             log.info("  Auto-provision: {}", autoProvision);
+            log.info("  Require approval: {}", requireApproval);
+        }
+
+        // SECURITY: Validate default role/clearance don't exceed maximums
+        validateDefaultPermissions();
+    }
+
+    /**
+     * SECURITY: Ensure default permissions don't exceed configured maximums.
+     * Prevents misconfiguration from granting excessive access.
+     */
+    private void validateDefaultPermissions() {
+        // Validate role
+        try {
+            UserRole configuredRole = UserRole.valueOf(defaultRole.toUpperCase());
+            UserRole maxRole = UserRole.valueOf(maxDefaultRole.toUpperCase());
+
+            // ADMIN cannot be auto-provisioned via config
+            if (configuredRole == UserRole.ADMIN) {
+                log.error("==========================================================");
+                log.error("  SECURITY ERROR: Cannot auto-provision ADMIN role!");
+                log.error("  Change app.oidc.default-role to VIEWER or ANALYST");
+                log.error("==========================================================");
+                defaultRole = "VIEWER";
+            }
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid default-role '{}', falling back to VIEWER", defaultRole);
+            defaultRole = "VIEWER";
+        }
+
+        // Validate clearance
+        try {
+            ClearanceLevel configuredClearance = ClearanceLevel.valueOf(defaultClearance.toUpperCase());
+            ClearanceLevel maxClearance = ClearanceLevel.valueOf(maxDefaultClearance.toUpperCase());
+
+            // Don't allow auto-provisioning above max clearance
+            if (configuredClearance.ordinal() > maxClearance.ordinal()) {
+                log.warn("SECURITY: default-clearance {} exceeds max-default-clearance {}, capping",
+                        configuredClearance, maxClearance);
+                defaultClearance = maxDefaultClearance;
+            }
+
+            // Never auto-provision TOP_SECRET or SCI
+            if (configuredClearance == ClearanceLevel.TOP_SECRET || configuredClearance == ClearanceLevel.SCI) {
+                log.error("==========================================================");
+                log.error("  SECURITY ERROR: Cannot auto-provision {} clearance!", configuredClearance);
+                log.error("  Change app.oidc.default-clearance to UNCLASSIFIED, CUI, or SECRET");
+                log.error("==========================================================");
+                defaultClearance = "UNCLASSIFIED";
+            }
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid default-clearance '{}', falling back to UNCLASSIFIED", defaultClearance);
+            defaultClearance = "UNCLASSIFIED";
         }
     }
 
@@ -166,7 +228,7 @@ public class OidcAuthenticationService implements AuthenticationService {
                 user.setEmail(email);
                 user.setAuthProvider(AuthProvider.OIDC);
 
-                // Apply default role
+                // Apply default role (validated at startup)
                 UserRole role;
                 try {
                     role = UserRole.valueOf(defaultRole.toUpperCase());
@@ -175,7 +237,7 @@ public class OidcAuthenticationService implements AuthenticationService {
                 }
                 user.setRoles(Set.of(role));
 
-                // Apply default clearance
+                // Apply default clearance (validated at startup)
                 ClearanceLevel clearance;
                 try {
                     clearance = ClearanceLevel.valueOf(defaultClearance.toUpperCase());
@@ -184,13 +246,34 @@ public class OidcAuthenticationService implements AuthenticationService {
                 }
                 user.setClearance(clearance);
 
-                user.setAllowedSectors(Set.of(Department.OPERATIONS));
+                // Only grant ENTERPRISE sector by default (least privilege)
+                user.setAllowedSectors(Set.of(Department.ENTERPRISE));
                 user.setCreatedAt(Instant.now());
-                user.setActive(true);
-                user = userRepository.save(user);
 
-                log.info("Auto-provisioned new OIDC user: {} (role: {}, clearance: {})",
-                        user.getUsername(), role, clearance);
+                // SECURITY: If approval required, create user as inactive (pending approval)
+                if (requireApproval) {
+                    user.setActive(false);
+                    user.setPendingApproval(true);
+                    user = userRepository.save(user);
+
+                    log.info("New OIDC user '{}' created PENDING APPROVAL (role: {}, clearance: {})",
+                            user.getUsername(), role, clearance);
+
+                    // User cannot access system until admin approves
+                    return null;
+                } else {
+                    user.setActive(true);
+                    user = userRepository.save(user);
+
+                    log.info("Auto-provisioned new OIDC user: {} (role: {}, clearance: {})",
+                            user.getUsername(), role, clearance);
+                }
+            }
+
+            // SECURITY: Check if user is pending approval
+            if (user.isPendingApproval()) {
+                log.warn("OIDC user '{}' is pending admin approval", user.getUsername());
+                return null;
             }
 
             // Check if user is active
