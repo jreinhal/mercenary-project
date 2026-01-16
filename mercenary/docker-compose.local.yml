@@ -9,6 +9,13 @@
 #   - Uses local Ollama for AI inference
 #   - Enables CAC/PIV authentication mode
 #   - All data stays on-premises
+#
+# IMPORTANT: Volume permissions
+#   Before starting, ensure the host user has write permissions:
+#   mkdir -p ./data/mongo ./data/ollama
+#   chmod 755 ./data/mongo ./data/ollama
+#   # For SELinux environments:
+#   # chcon -Rt svirt_sandbox_file_t ./data
 
 services:
   # Local MongoDB for air-gapped environments

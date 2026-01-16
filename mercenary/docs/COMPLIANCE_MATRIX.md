@@ -43,6 +43,7 @@ This document maps SENTINEL features to NIST 800-53 security controls for ATO (A
 
 | Control | Description | SENTINEL Implementation | Status |
 |---------|-------------|------------------------|--------|
+| SC-5 | Denial of Service Protection | `RateLimitFilter` - Bucket4j rate limiting per user/IP (ADMIN: 200/min, ANALYST: 100/min, VIEWER: 60/min, Anonymous: 30/min) | ✅ Implemented |
 | SC-8 | Transmission Confidentiality | HTTPS enforced, secure headers (HSTS, CSP with nonces) | ✅ Implemented |
 | SC-13 | Cryptographic Protection | JWT validation, HMAC-SHA256 tokenization vault | ✅ Implemented |
 | SC-28 | Protection of Information at Rest | MongoDB encryption at rest (deployment config) | ⚠️ Deployment |

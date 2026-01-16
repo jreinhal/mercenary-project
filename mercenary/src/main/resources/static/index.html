@@ -13,8 +13,7 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
-    <!-- Sector configuration -->
-    <script src="/js/sector-config.js"></script>
+    <!-- Sector configuration loaded dynamically from /api/config/sectors -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -4790,13 +4789,15 @@
         const sectorSelect = document.getElementById('sector-select');
 
         // === SECTOR CONFIGURATION ===
-        // Populated from /js/sector-config.js
-        const SECTORS = window.SENTINEL_SECTORS || ['GOVERNMENT', 'MEDICAL', 'FINANCE', 'ACADEMIC', 'ENTERPRISE'];
-        const DEFAULT_SECTOR = window.SENTINEL_DEFAULT_SECTOR || 'ENTERPRISE';
+        // SECURITY: Sectors loaded dynamically from /api/config/sectors
+        // Only sectors the user is authorized to access are returned
+        let SECTORS = [];
+        let SECTOR_DATA = {};
+        const DEFAULT_SECTOR = 'ENTERPRISE';
 
         // === INITIALIZATION ===
         document.addEventListener('DOMContentLoaded', () => {
-            initSectors();
+            initSectorsFromAPI();
             initOperator();
             initKeyboardShortcuts();
             startStatusPolling();
@@ -4804,26 +4805,54 @@
             initSectorSelector();
         });
 
-        // Initialize sector-based UI (Palantir/Veeva-inspired)
-        function initSectors() {
+        // Initialize sectors from backend API (security-filtered)
+        async function initSectorsFromAPI() {
             const sectorSelect = document.getElementById('sector-select');
-            sectorSelect.innerHTML = '';
 
-            // Populate sector dropdown with config-driven labels
-            SECTORS.forEach(sector => {
-                const config = window.getSectorConfig ? window.getSectorConfig(sector) : {};
-                const option = document.createElement('option');
-                option.value = sector;
-                option.textContent = config.label || sector;
-                sectorSelect.appendChild(option);
-            });
+            try {
+                const response = await fetch(`${API_BASE}/config/sectors`, {
+                    credentials: 'include'
+                });
 
-            // Set default sector
-            const savedSector = localStorage.getItem('sentinel-sector');
-            if (savedSector && SECTORS.includes(savedSector)) {
-                sectorSelect.value = savedSector;
-            } else {
-                sectorSelect.value = DEFAULT_SECTOR;
+                if (response.ok) {
+                    const sectors = await response.json();
+                    SECTORS = sectors.map(s => s.id);
+
+                    // Build sector data lookup
+                    sectors.forEach(s => {
+                        SECTOR_DATA[s.id] = {
+                            label: s.label,
+                            icon: s.icon,
+                            description: s.description,
+                            theme: s.theme
+                        };
+                    });
+
+                    // Populate dropdown with authorized sectors only
+                    sectorSelect.innerHTML = '';
+                    sectors.forEach(sector => {
+                        const option = document.createElement('option');
+                        option.value = sector.id;
+                        option.textContent = sector.label || sector.id;
+                        sectorSelect.appendChild(option);
+                    });
+
+                    // Set saved or default sector
+                    const savedSector = localStorage.getItem('sentinel-sector');
+                    if (savedSector && SECTORS.includes(savedSector)) {
+                        sectorSelect.value = savedSector;
+                    } else if (SECTORS.length > 0) {
+                        sectorSelect.value = SECTORS.includes(DEFAULT_SECTOR) ? DEFAULT_SECTOR : SECTORS[0];
+                    }
+
+                    console.log(`SENTINEL loaded with ${SECTORS.length} authorized sectors`);
+                } else {
+                    console.warn('Failed to load sectors from API, using fallback');
+                    initSectorsFallback();
+                }
+            } catch (error) {
+                console.error('Error loading sectors:', error);
+                initSectorsFallback();
             }
 
             // Apply initial sector theme
@@ -4831,8 +4860,30 @@
 
             // Render splash content
             renderSplashContent();
+        }
 
-            console.log(`SENTINEL loaded with sectors: ${SECTORS.join(', ')}`);
+        // Fallback for when API is unavailable (dev mode)
+        function initSectorsFallback() {
+            SECTORS = ['ENTERPRISE', 'ACADEMIC'];
+            SECTOR_DATA = {
+                'ENTERPRISE': { label: 'Enterprise', icon: 'briefcase', description: 'General Business' },
+                'ACADEMIC': { label: 'Academic', icon: 'book', description: 'Research' }
+            };
+
+            const sectorSelect = document.getElementById('sector-select');
+            sectorSelect.innerHTML = '';
+            SECTORS.forEach(sector => {
+                const option = document.createElement('option');
+                option.value = sector;
+                option.textContent = SECTOR_DATA[sector]?.label || sector;
+                sectorSelect.appendChild(option);
+            });
+            sectorSelect.value = DEFAULT_SECTOR;
+        }
+
+        // Helper to get sector config (replaces window.getSectorConfig)
+        function getSectorConfig(sectorId) {
+            return SECTOR_DATA[sectorId] || { label: sectorId, icon: 'folder' };
         }
 
         // Feature icon SVG paths
