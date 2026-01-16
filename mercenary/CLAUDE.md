@@ -58,6 +58,16 @@ Build command: `./gradlew build -Pedition=government`
 - **Professional**: Law firms, finance, enterprise, academia
 - **Trial**: 30-day full-feature evaluation for all prospects
 
+## Documentation Index
+
+| Document | Purpose |
+|----------|---------|
+| `docs/MARKETING.md` | Sales messaging, competitive positioning, objection handling |
+| `docs/PRODUCT_LINE_STRATEGY.md` | Edition breakdown, pricing, go-to-market |
+| `docs/COMPLIANCE_MATRIX.md` | NIST 800-53, HIPAA, PCI-DSS control mapping |
+| `docs/AdaptiveRAG_Implementation_Report.md` | Technical architecture deep-dive |
+| `README.md` | Public-facing product description |
+
 ## Key Capabilities (Sales/Documentation Reference)
 
 ### Security & Compliance
@@ -82,3 +92,23 @@ Build command: `./gradlew build -Pedition=government`
 - **CAC/PIV Authentication**: Smart card support for government deployments
 - **Docker Hardened**: Pinned versions, resource limits, non-root containers
 - **Multi-Edition Builds**: Single codebase, compile-time feature isolation
+
+## Session Start Reminder
+
+**At the start of each session**, perform these checks:
+
+### 1. Skills Update Check
+Fetch updates from: https://github.com/sickn33/antigravity-awesome-skills
+- Review any new or updated skill definitions
+- Sync relevant changes to: `C:\Users\JRein\.claude\agents\HOW-TO-USE-AGENTS.md`
+
+### 2. Full Audit Macro Available
+Remind the user that the full audit macro is available:
+```
+Run: Read .agent/macros/run-audit.md and execute it
+```
+This launches 5 parallel agents (Security, Architecture, Development, Infrastructure, Strategy) to generate a comprehensive `RECOMMENDATIONS.md` report.
+
+**Macro location:** `.agent/macros/`
+- `full-audit-report.md` - Full documentation and agent prompts
+- `run-audit.md` - Executable instructions

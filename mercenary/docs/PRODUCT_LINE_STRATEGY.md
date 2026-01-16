@@ -47,7 +47,10 @@ SENTINEL is offered in four editions to serve different market segments:
 | Sector-Based Access Control | ✅ | ✅ | ❌ | ❌ |
 | PII Redaction Engine | ✅ | ✅ | Optional | ❌ |
 | STIG-Compliant Audit Logging | ✅ | ✅ | Basic | ❌ |
-| Prompt Injection Defense | ✅ | ✅ | ✅ | ✅ |
+| Prompt Injection Defense (3-Layer) | ✅ | ✅ | ✅ | ✅ |
+| Rate Limiting (Bucket4j) | ✅ | ✅ | ✅ | ❌ |
+| Magic Byte File Validation | ✅ | ✅ | ✅ | ✅ |
+| Fail-Closed Audit Mode | ✅ | ✅ | ❌ | ❌ |
 | **Infrastructure** |
 | Glass Box Reasoning | ✅ | ✅ | ✅ | ✅ |
 | Citation Enforcement | ✅ | ✅ | ✅ | ✅ |
@@ -59,6 +62,64 @@ SENTINEL is offered in four editions to serve different market segments:
 | Custom Integration | ✅ | ✅ | ❌ | ❌ |
 | Training | ✅ | Optional | ❌ | ❌ |
 | SLA | 99.9% | 99.5% | Best Effort | None |
+
+---
+
+## Security Differentiators
+
+### Multi-Layer Prompt Injection Defense
+
+SENTINEL implements a **3-layer defense** against prompt injection attacks - a key differentiator against "wrapper" competitors who rely solely on system prompts:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PROMPT INJECTION DEFENSE                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 1: PATTERN DETECTION                                      │
+│  ├── Regex-based suspicious pattern matching                    │
+│  ├── Known injection signatures                                  │
+│  └── Immediate blocking + audit logging                         │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 2: SEMANTIC ANALYSIS                                      │
+│  ├── Embedding-based similarity detection                       │
+│  ├── Context deviation scoring                                   │
+│  └── Anomaly flagging                                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 3: LLM GUARDRAILS (Optional)                              │
+│  ├── Secondary LLM review of suspicious prompts                 │
+│  ├── Intent classification                                       │
+│  └── Configurable: app.guardrails.llm-enabled=true              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Sales Messaging:**
+> "Unlike wrapper solutions that rely on hope, SENTINEL actively defends against prompt injection with pattern matching, semantic analysis, and optional LLM-based review. Every blocked attempt is audit-logged for compliance."
+
+### DoS Protection
+
+Role-based rate limiting protects the API from abuse:
+
+| Role | Requests/Minute | Use Case |
+|------|-----------------|----------|
+| ADMIN | 200 | System administration |
+| ANALYST | 100 | Power users, analysts |
+| VIEWER | 60 | Standard users |
+| Anonymous | 30 | Unauthenticated access |
+
+**Implementation:** Bucket4j with Caffeine cache backend (`RateLimitFilter.java`)
+
+### File Ingestion Security
+
+- **Magic byte detection** (Apache Tika) - blocks executables regardless of extension
+- **MIME type validation** - rejects dangerous file types
+- **Size limits** - prevents resource exhaustion
+- **Audit logging** - all ingestion attempts logged
+
+### Data Isolation
+
+- **Compound cache keys** (`sector:filename`) prevent cross-department data leaks
+- **Clearance-based filtering** - users only see sectors at or below their clearance
+- **API-driven sector config** - sector names not exposed to unauthorized users
 
 ---
 
