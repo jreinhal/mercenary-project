@@ -50,7 +50,6 @@ ext {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 
 	// Security - always included, features enabled via runtime config
 	implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -70,10 +69,9 @@ dependencies {
 		implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
 	}
 
-	// Tika for file reading
+	// Tika for file type detection and document parsing
 	implementation 'org.apache.tika:tika-core:2.9.2'
 	implementation 'org.apache.tika:tika-parsers-standard-package:2.9.2'
-	implementation 'org.apache.commons:commons-math3:3.6.1'
 	implementation 'org.springframework.ai:spring-ai-pdf-document-reader'
 
 	// Caffeine cache for bounded in-memory caching

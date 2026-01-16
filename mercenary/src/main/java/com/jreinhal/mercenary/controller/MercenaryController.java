@@ -215,30 +215,8 @@ public class MercenaryController {
                 user.hasRole(UserRole.ADMIN));
     }
 
-    /**
-     * Sector info response for frontend configuration.
-     */
-    public record SectorInfoResponse(
-            List<String> availableSectors,
-            List<String> highSecuritySectors,
-            List<String> enabledFeatures) {
-    }
-
-    /**
-     * Get the sector configuration.
-     * Used by frontend to determine available sectors and features.
-     * In single-product mode, all sectors are available; access is controlled via user permissions.
-     */
-    @GetMapping("/sectors")
-    public SectorInfoResponse getSectorInfo() {
-        return new SectorInfoResponse(
-                sectorConfig.getSectorNames(),
-                sectorConfig.getHighSecuritySectors().stream()
-                        .map(Enum::name)
-                        .sorted()
-                        .toList(),
-                List.of("cac", "oidc", "pii", "audit", "clearance", "airgap"));
-    }
+    // NOTE: Sector config endpoint moved to SectorConfigController (/api/config/sectors)
+    // for security-filtered response based on user clearance
 
     public record InspectResponse(String content, List<String> highlights) {
     }
