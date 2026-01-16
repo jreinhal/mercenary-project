@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.service;
+package com.jreinhal.mercenary.government.auth;
 
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.User.AuthProvider;
@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.model.ClearanceLevel;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.repository.UserRepository;
+import com.jreinhal.mercenary.service.AuthenticationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -19,11 +20,13 @@ import java.time.Instant;
 
 /**
  * CAC/PIV X.509 certificate authentication for government deployments.
- * 
+ *
+ * GOVERNMENT EDITION ONLY - This class is excluded from non-government builds.
+ *
  * Validates client certificates and extracts user identity from the DN.
- * 
+ *
  * Activated when: app.auth-mode=CAC
- * 
+ *
  * Requires:
  * - TLS mutual authentication configured on the server/load balancer
  * - Client certificate passed via X-Client-Cert header or request attribute

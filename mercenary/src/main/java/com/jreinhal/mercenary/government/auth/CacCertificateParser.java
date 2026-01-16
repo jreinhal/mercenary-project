@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.security;
+package com.jreinhal.mercenary.government.auth;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 
 /**
  * Parser for CAC (Common Access Card) and PIV (Personal Identity Verification) certificates.
+ *
+ * GOVERNMENT EDITION ONLY - This class is excluded from non-government builds.
  *
  * Extracts identity information from X.509 certificates used in DoD and federal environments.
  *

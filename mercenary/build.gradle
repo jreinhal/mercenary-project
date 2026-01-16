@@ -5,12 +5,35 @@ plugins {
 }
 
 group = 'com.jreinhal'
-version = '2.1.0'
+version = '2.2.0'
 description = 'SENTINEL Intelligence Platform'
+
+// Edition configuration - defaults to 'government' (full features)
+// Build with: ./gradlew bootJar -Pedition=professional
+def edition = project.hasProperty('edition') ? project.property('edition') : 'government'
 
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+// Edition-based source exclusions
+// CRITICAL: Sensitive code is excluded at compile time, not runtime
+sourceSets {
+	main {
+		java {
+			srcDirs = ['src/main/java']
+
+			// Exclude packages based on edition
+			if (edition == 'trial' || edition == 'professional') {
+				exclude '**/medical/**'
+				exclude '**/government/**'
+			} else if (edition == 'medical') {
+				exclude '**/government/**'
+			}
+			// 'government' edition includes everything (no excludes)
+		}
 	}
 }
 
@@ -35,16 +58,14 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 	testImplementation 'org.springframework.security:spring-security-test'
 
-	// The Local Brain
+	// The Local Brain - Ollama (SCIF compliant, no external APIs)
 	implementation 'org.springframework.ai:spring-ai-ollama-spring-boot-starter'
 	// The Vector Database
 	implementation 'org.springframework.ai:spring-ai-mongodb-atlas-store-spring-boot-starter'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-	// Swagger/OpenAPI - SECURITY: Disabled by default for production
-	// Enable only for development: -PincludeSwagger=true or set SWAGGER_ENABLED=true at runtime
-	// This dependency can be completely excluded from production builds
+	// Swagger/OpenAPI - SECURITY: Only for development builds
 	if (project.hasProperty('includeSwagger')) {
 		implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
 	}
@@ -54,6 +75,7 @@ dependencies {
 	implementation 'org.apache.tika:tika-parsers-standard-package:2.9.2'
 	implementation 'org.apache.commons:commons-math3:3.6.1'
 	implementation 'org.springframework.ai:spring-ai-pdf-document-reader'
+
 	// Caffeine cache for bounded in-memory caching
 	implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
 
@@ -75,15 +97,36 @@ tasks.named('bootRun') {
 	jvmArgs = ['--add-opens', 'java.base/java.nio.charset=ALL-UNNAMED']
 }
 
-// Simple resource processing - no edition complexity
 processResources {
 	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-// Standard JAR naming
+// Edition-aware JAR naming
 bootJar {
-	archiveBaseName = "sentinel"
+	archiveBaseName = "sentinel-${edition}"
 	archiveVersion = version
+}
+
+// Build all editions task
+task buildAllEditions {
+	group = 'build'
+	description = 'Build JAR files for all editions'
+	doLast {
+		['trial', 'professional', 'medical', 'government'].each { ed ->
+			exec {
+				commandLine './gradlew', 'bootJar', "-Pedition=${ed}", '--quiet'
+			}
+		}
+		println """
+=====================================
+Built all SENTINEL editions:
+  - sentinel-trial-${version}.jar
+  - sentinel-professional-${version}.jar
+  - sentinel-medical-${version}.jar
+  - sentinel-government-${version}.jar
+=====================================
+"""
+	}
 }
 
 // Print build info
@@ -96,18 +139,23 @@ task printBuildInfo {
 SENTINEL Intelligence Platform
 =====================================
 Version:  ${version}
-Sectors:  GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
-Features: Configured via application.yaml at runtime
+Edition:  ${edition.toUpperCase()}
 =====================================
 
-To run: ./gradlew bootRun
-To build: ./gradlew bootJar
+Edition capabilities:
+  TRIAL        -> core + professional (30-day limit)
+  PROFESSIONAL -> core + professional
+  MEDICAL      -> core + professional + medical (HIPAA)
+  GOVERNMENT   -> all packages (SCIF/CAC)
 
-Features are enabled via environment variables or application.yaml:
-  - AUTH_MODE: DEV, OIDC, or CAC
-  - PII_REDACTION: true/false
-  - AUDIT_LOGGING: true/false
-  - CLEARANCE_ENABLED: true/false
+Build commands:
+  ./gradlew bootJar                     # Default (government)
+  ./gradlew bootJar -Pedition=trial
+  ./gradlew bootJar -Pedition=professional
+  ./gradlew bootJar -Pedition=medical
+  ./gradlew bootJar -Pedition=government
+  ./gradlew buildAllEditions            # Build all
+
 =====================================
 """
 	}
