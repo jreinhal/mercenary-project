@@ -140,6 +140,10 @@ public class QuCoRagService {
     /**
      * Detect hallucination risk in generated text by checking entity co-occurrence.
      *
+     * The risk is calculated as the RATIO of flagged entities to total novel entities,
+     * not a raw sum. This prevents the score from being artificially inflated when
+     * responses contain many entities (which is expected for detailed responses).
+     *
      * @param generatedText The LLM's generated response
      * @param query         The original query for context
      * @return HallucinationResult with risk score and flagged content
@@ -163,45 +167,51 @@ public class QuCoRagService {
 
         // Check co-occurrence of novel entities with query entities
         List<String> flaggedEntities = new ArrayList<>();
-        double riskScore = 0.0;
+        int verifiedCount = 0;
 
         for (String novelEntity : novelEntities) {
             boolean hasCoOccurrence = false;
 
-            // Check if novel entity co-occurs with any query entity
+            // Check if novel entity co-occurs with any query entity in the corpus
             for (String queryEntity : queryEntities) {
                 long coOccurrence = checkCoOccurrence(novelEntity, queryEntity);
                 if (coOccurrence > 0) {
                     hasCoOccurrence = true;
+                    verifiedCount++;
                     break;
                 }
             }
 
             if (!hasCoOccurrence) {
                 flaggedEntities.add(novelEntity);
-                riskScore += zeroCoOccurrencePenalty;
             }
         }
 
-        // Normalize
-        riskScore = Math.min(1.0, riskScore);
-        boolean isHighRisk = riskScore >= uncertaintyThreshold;
+        // Calculate risk as RATIO of flagged entities to total novel entities
+        // This normalizes the score so it's not inflated by response length
+        double riskScore = novelEntities.isEmpty() ? 0.0 :
+                (double) flaggedEntities.size() / novelEntities.size();
+
+        // Apply a dampening factor - only flag as high risk if MAJORITY are unverified
+        // AND there are at least 3 flagged entities (to avoid false positives on short responses)
+        boolean isHighRisk = riskScore >= uncertaintyThreshold && flaggedEntities.size() >= 3;
 
         // Log reasoning
         long elapsed = System.currentTimeMillis() - startTime;
         reasoningTracer.addStep(StepType.UNCERTAINTY_ANALYSIS,
                 "QuCo-RAG Hallucination Check",
-                String.format("Checked %d novel entities, %d flagged, risk=%.3f",
-                        novelEntities.size(), flaggedEntities.size(), riskScore),
+                String.format("Checked %d novel entities: %d verified, %d unverified (ratio=%.2f)",
+                        novelEntities.size(), verifiedCount, flaggedEntities.size(), riskScore),
                 elapsed,
                 Map.of(
-                        "novelEntities", novelEntities,
+                        "novelEntities", novelEntities.size(),
+                        "verifiedEntities", verifiedCount,
                         "flaggedEntities", flaggedEntities,
                         "riskScore", riskScore,
                         "isHighRisk", isHighRisk));
 
-        log.info("QuCo-RAG: Hallucination risk={:.3f}, {} flagged entities",
-                riskScore, flaggedEntities.size());
+        log.info("QuCo-RAG: Hallucination check - {} novel entities, {} verified, {} flagged (risk={:.3f})",
+                novelEntities.size(), verifiedCount, flaggedEntities.size(), riskScore);
 
         return new HallucinationResult(riskScore, flaggedEntities, isHighRisk);
     }

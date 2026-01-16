@@ -38,6 +38,11 @@ public record ReasoningStep(
      */
     public enum StepType {
         /**
+         * AdaptiveRAG query routing decision.
+         */
+        QUERY_ROUTING,
+
+        /**
          * Initial query analysis and preprocessing.
          */
         QUERY_ANALYSIS,

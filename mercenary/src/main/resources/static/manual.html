@@ -3,1488 +3,1366 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>SENTINEL // OPERATOR MANUAL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL Documentation</title>
     <style>
+        /* === CSS VARIABLES (matches SENTINEL theme) === */
         :root {
-            --bg-color: #0f172a;
-            --panel-bg: #1e293b;
-            --border-color: #334155;
+            /* Dark mode (default) */
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --bg-elevated: #1e293b;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
+            --text-tertiary: #64748b;
+            --border-subtle: #334155;
+            --border-medium: #475569;
             --accent-primary: #38bdf8;
-            --alert: #ef4444;
+            --accent-muted: rgba(56, 189, 248, 0.15);
             --success: #10b981;
             --warning: #f59e0b;
-            --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+            --error: #ef4444;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 8px;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --bg-elevated: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #94a3b8;
+            --border-subtle: #e2e8f0;
+            --border-medium: #cbd5e1;
+            --accent-primary: #0284c7;
+            --accent-muted: rgba(2, 132, 199, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
-            background-color: var(--bg-color);
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
             color: var(--text-primary);
-            font-family: var(--font-ui);
             line-height: 1.6;
-            margin: 0;
-            padding: 0;
+            min-height: 100vh;
+            display: flex;
         }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 40px 20px;
+        /* === LAYOUT === */
+        .docs-layout {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
         }
 
-        h1, h2, h3 {
+        /* === SIDEBAR NAVIGATION (Palantir-style) === */
+        .docs-sidebar {
+            width: 280px;
+            min-width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-subtle);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
             color: var(--text-primary);
-            margin-top: 40px;
         }
 
-        h1 {
-            border-bottom: 2px solid var(--accent-primary);
-            padding-bottom: 10px;
-            font-size: 28px;
-            letter-spacing: 1px;
+        .sidebar-logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-primary), #06b6d4);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar-logo-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: white;
+        }
+
+        .sidebar-logo-text {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-version {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 0;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 8px;
+        }
+
+        .nav-section-title {
+            padding: 8px 20px;
+            font-size: 11px;
+            font-weight: 600;
             text-transform: uppercase;
-            margin-top: 0;
+            letter-spacing: 0.5px;
+            color: var(--text-tertiary);
+        }
+
+        .nav-item {
+            display: block;
+            padding: 10px 20px 10px 24px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.15s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--accent-muted);
+            color: var(--accent-primary);
+            border-left-color: var(--accent-primary);
+            font-weight: 500;
+        }
+
+        .nav-item-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            margin-left: 8px;
+        }
+
+        .nav-item-badge.new {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .back-to-app {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+
+        .back-to-app:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-medium);
+        }
+
+        .back-to-app svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* === MAIN CONTENT === */
+        .docs-main {
+            flex: 1;
+            margin-left: 280px;
+            min-height: 100vh;
+        }
+
+        .docs-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+
+        .breadcrumb a {
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--accent-primary);
+        }
+
+        .breadcrumb-separator {
+            color: var(--text-tertiary);
+        }
+
+        .breadcrumb-current {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .theme-toggle {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .theme-toggle svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* === CONTENT AREA === */
+        .docs-content {
+            max-width: 900px;
+            padding: 40px;
+        }
+
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .page-description {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            line-height: 1.7;
+        }
+
+        /* === SECTION STYLING === */
+        .content-section {
+            margin-bottom: 48px;
+        }
+
+        .section-anchor {
+            display: block;
+            position: relative;
+            top: -80px;
+            visibility: hidden;
         }
 
         h2 {
-            color: var(--accent-primary);
-            font-size: 20px;
-            border-left: 4px solid var(--accent-primary);
-            padding-left: 12px;
-            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-subtle);
         }
 
         h3 {
-            font-size: 16px;
-            color: var(--text-secondary);
-            margin-bottom: 10px;
-            margin-top: 25px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 32px 0 12px;
         }
 
-        p, li {
+        h4 {
             font-size: 15px;
-            color: #cbd5e1;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 24px 0 8px;
+        }
+
+        p {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.7;
+        }
+
+        ul, ol {
+            margin: 0 0 16px 24px;
+            color: var(--text-secondary);
+        }
+
+        li {
+            font-size: 15px;
+            margin-bottom: 8px;
+            line-height: 1.6;
         }
 
         strong {
             color: var(--text-primary);
+            font-weight: 600;
         }
 
-        .nav-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 30px;
+        a {
             color: var(--accent-primary);
             text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* === CODE STYLING === */
+        code {
             font-family: var(--font-mono);
             font-size: 13px;
-            font-weight: 700;
-            padding: 8px 16px;
-            background: rgba(56, 189, 248, 0.1);
-            border-radius: 4px;
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            transition: 0.2s;
-        }
-
-        .nav-link:hover {
-            background: rgba(56, 189, 248, 0.2);
-        }
-
-        code {
-            background: rgba(0, 0, 0, 0.3);
+            background: var(--bg-tertiary);
             padding: 2px 6px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.9em;
+            border-radius: var(--radius-sm);
             color: var(--accent-primary);
-            border: 1px solid var(--border-color);
         }
 
-        /* Tables */
+        pre {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            overflow-x: auto;
+            margin-bottom: 16px;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+
+        /* === INFO BOXES (Palantir-style callouts) === */
+        .callout {
+            padding: 16px 20px;
+            border-radius: var(--radius-md);
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+
+        .callout-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .callout-title svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .callout p {
+            margin: 0;
+            font-size: 14px;
+        }
+
+        .callout.info {
+            background: var(--accent-muted);
+            border-color: var(--accent-primary);
+        }
+
+        .callout.info .callout-title {
+            color: var(--accent-primary);
+        }
+
+        .callout.warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--warning);
+        }
+
+        .callout.warning .callout-title {
+            color: var(--warning);
+        }
+
+        .callout.error {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--error);
+        }
+
+        .callout.error .callout-title {
+            color: var(--error);
+        }
+
+        .callout.success {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--success);
+        }
+
+        .callout.success .callout-title {
+            color: var(--success);
+        }
+
+        /* === TABLES === */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 16px 0 24px;
             font-size: 14px;
         }
 
         th, td {
-            padding: 12px 15px;
+            padding: 12px 16px;
             text-align: left;
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--border-subtle);
         }
 
         th {
-            background: var(--panel-bg);
-            color: var(--text-primary);
+            background: var(--bg-secondary);
             font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 13px;
+            color: var(--text-primary);
         }
 
         td {
-            color: #cbd5e1;
+            color: var(--text-secondary);
         }
 
         tr:nth-child(even) {
-            background: rgba(30, 41, 59, 0.5);
+            background: var(--bg-secondary);
         }
 
-        /* Annotated Screenshot System */
-        .annotated-figure {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            margin: 30px 0;
-        }
-
-        .screenshot-wrapper {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-        }
-
-        .screenshot-wrapper img {
-            width: 100%;
-            border-radius: 6px;
-            border: 1px solid #000;
-            display: block;
-            min-height: 300px;
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            object-fit: cover;
-        }
-
-        /* Placeholder for missing images */
-        .screenshot-wrapper img[src$=".png"]:not([src^="data:"]) {
-            position: relative;
-        }
-
-        .screenshot-placeholder {
-            width: 100%;
-            min-height: 200px;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-secondary);
-            font-family: var(--font-mono);
-            font-size: 12px;
-        }
-
-        .screenshot-placeholder::before {
-            content: '📸';
-            font-size: 32px;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
-
-        .screenshot-placeholder-text {
-            text-align: center;
-            padding: 0 20px;
-        }
-
-        .screenshot-placeholder-hint {
-            font-size: 10px;
-            color: var(--text-tertiary);
-            margin-top: 8px;
-        }
-
-        .callout {
-            position: absolute;
-            width: 26px;
-            height: 26px;
-            background: var(--accent-primary);
-            border: 2px solid #fff;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: var(--font-mono);
-            font-size: 12px;
-            font-weight: 700;
-            color: #0f172a;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-            z-index: 10;
-            transform: translate(-50%, -50%);
-        }
-
-        .callout.alert { background: var(--alert); }
-        .callout.success { background: var(--success); }
-        .callout.warning { background: var(--warning); }
-
-        .figure-caption {
-            font-family: var(--font-mono);
-            font-size: 11px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            text-align: center;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .legend {
-            background: rgba(0,0,0,0.2);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 15px 20px;
-            margin-top: 20px;
-        }
-
-        .legend-title {
-            font-family: var(--font-mono);
-            font-size: 11px;
-            color: var(--accent-primary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .legend-title::before {
-            content: '';
-            width: 12px;
-            height: 2px;
-            background: var(--accent-primary);
-        }
-
-        .legend-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 12px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            font-size: 13px;
-            color: #cbd5e1;
-        }
-
-        .legend-marker {
-            width: 22px;
-            height: 22px;
-            min-width: 22px;
-            background: var(--accent-primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: var(--font-mono);
-            font-size: 11px;
-            font-weight: 700;
-            color: #0f172a;
-        }
-
-        .legend-marker.alert { background: var(--alert); }
-        .legend-marker.success { background: var(--success); }
-        .legend-marker.warning { background: var(--warning); }
-
-        .legend-text strong {
-            color: var(--text-primary);
-            display: block;
-            margin-bottom: 2px;
-        }
-
-        .legend-text span {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        /* Info Boxes */
-        .info-box {
-            padding: 15px 20px;
-            border-radius: 6px;
-            margin: 20px 0;
-        }
-
-        .info-box.security {
-            background: rgba(56, 189, 248, 0.1);
-            border: 1px solid rgba(56, 189, 248, 0.3);
-        }
-
-        .info-box.warning {
-            background: rgba(245, 158, 11, 0.1);
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        .info-box.critical {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .info-box-title {
-            font-family: var(--font-mono);
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-        }
-
-        .info-box.security .info-box-title { color: var(--accent-primary); }
-        .info-box.warning .info-box-title { color: var(--warning); }
-        .info-box.critical .info-box-title { color: var(--alert); }
-
-        .info-box p { margin: 0; font-size: 13px; }
-
-        /* Clearance Badges */
-        .clearance {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-family: var(--font-mono);
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .clearance.unclass {
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--success);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .clearance.cui {
-            background: rgba(56, 189, 248, 0.15);
-            color: var(--accent-primary);
-            border: 1px solid rgba(56, 189, 248, 0.3);
-        }
-
-        .clearance.secret {
-            background: rgba(239, 68, 68, 0.15);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .clearance.ts {
-            background: rgba(245, 158, 11, 0.15);
-            color: #f59e0b;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        /* Feature Cards (matching UI) */
+        /* === FEATURE CARDS === */
         .feature-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin: 20px 0;
+            gap: 16px;
+            margin: 24px 0;
         }
 
         .feature-card {
-            background: rgba(0,0,0,0.2);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            transition: all 0.15s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--border-medium);
+            transform: translateY(-2px);
+        }
+
+        .feature-card-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--accent-muted);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            font-size: 18px;
         }
 
         .feature-card h4 {
-            color: var(--text-primary);
-            font-size: 14px;
-            margin: 0 0 8px 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            font-size: 15px;
+            margin: 0 0 8px;
         }
 
         .feature-card p {
             font-size: 13px;
-            color: var(--text-secondary);
             margin: 0;
+            color: var(--text-tertiary);
         }
 
-        /* Keyboard Shortcut */
+        /* === KEYBOARD SHORTCUTS === */
         kbd {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 2px 6px;
+            display: inline-block;
+            padding: 3px 8px;
             font-family: var(--font-mono);
-            font-size: 11px;
+            font-size: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-medium);
+            border-radius: var(--radius-sm);
             color: var(--text-primary);
+            box-shadow: inset 0 -2px 0 var(--border-subtle);
         }
 
-        /* Flow Diagram Image */
-        .diagram-figure {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            margin: 30px 0;
-            text-align: center;
+        /* === CLEARANCE BADGES === */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
-        .diagram-figure img {
-            max-width: 100%;
-            border-radius: 6px;
+        .badge.unclass {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
         }
 
-        /* Table of Contents */
-        .toc {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px 25px;
-            margin: 30px 0;
+        .badge.cui {
+            background: var(--accent-muted);
+            color: var(--accent-primary);
+        }
+
+        .badge.secret {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+        }
+
+        .badge.ts {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+
+        .badge.sci {
+            background: rgba(250, 204, 21, 0.15);
+            color: #eab308;
+        }
+
+        /* === ON THIS PAGE (Right sidebar) === */
+        .docs-toc {
+            position: fixed;
+            top: 80px;
+            right: 40px;
+            width: 200px;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
         }
 
         .toc-title {
-            font-family: var(--font-mono);
             font-size: 11px;
-            color: var(--text-secondary);
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 15px;
+            letter-spacing: 0.5px;
+            color: var(--text-tertiary);
+            margin-bottom: 12px;
         }
 
-        .toc ul {
+        .toc-list {
             list-style: none;
-            padding: 0;
             margin: 0;
-            columns: 2;
-            column-gap: 30px;
+            padding: 0;
         }
 
-        .toc li { margin-bottom: 8px; }
+        .toc-list li {
+            margin-bottom: 8px;
+        }
 
-        .toc a {
-            color: var(--accent-primary);
+        .toc-list a {
+            font-size: 13px;
+            color: var(--text-tertiary);
             text-decoration: none;
-            font-size: 14px;
+            display: block;
+            padding-left: 12px;
+            border-left: 2px solid transparent;
+            transition: all 0.15s;
         }
 
-        .toc a:hover { text-decoration: underline; }
+        .toc-list a:hover,
+        .toc-list a.active {
+            color: var(--accent-primary);
+            border-left-color: var(--accent-primary);
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 1400px) {
+            .docs-toc {
+                display: none;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .docs-sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 1000;
+            }
+
+            .docs-sidebar.open {
+                transform: translateX(0);
+            }
+
+            .docs-main {
+                margin-left: 0;
+            }
+
+            .docs-content {
+                padding: 24px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* === SCROLL BEHAVIOR === */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* === HIDDEN SECTIONS (for sector-specific content) === */
+        .hidden-section {
+            display: none !important;
+        }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        
-        <a href="index.html" class="nav-link">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12"></line>
-                <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            RETURN TO DASHBOARD
-        </a>
+    <div class="docs-layout">
+        <!-- LEFT SIDEBAR -->
+        <aside class="docs-sidebar" id="docs-sidebar">
+            <div class="sidebar-header">
+                <a href="index.html" class="sidebar-logo">
+                    <div class="sidebar-logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="sidebar-logo-text">SENTINEL</div>
+                        <div class="sidebar-version">Documentation v2.1</div>
+                    </div>
+                </a>
+            </div>
 
-        <h1>SENTINEL // OPERATOR FIELD GUIDE</h1>
-        <p><strong>Version:</strong> 2.0.0 | <strong>Clearance Level:</strong> UNCLASSIFIED</p>
-        <p>This manual details the standard operating procedures for the Sentinel Intelligence Platform. Follow these protocols to ensure secure data ingestion and accurate intelligence retrieval.</p>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Getting Started</div>
+                    <a href="#overview" class="nav-item active">System Overview</a>
+                    <a href="#capabilities" class="nav-item">Core Capabilities</a>
+                    <a href="#keyboard" class="nav-item">Keyboard Shortcuts</a>
+                </div>
 
-        <!-- Table of Contents -->
-        <div class="toc">
-            <div class="toc-title">Contents</div>
-            <ul>
-                <li><a href="#overview">1. System Overview</a></li>
-                <li><a href="#security">2. Security Architecture</a></li>
-                <li><a href="#ingestion">3. Secure Ingestion Protocol</a></li>
-                <li><a href="#intelligence">4. Intelligence Gathering</a></li>
-                <li><a href="#evidence">5. Evidence Verification</a></li>
-                <li><a href="#sectors">6. Sector Reference</a></li>
-                <li><a href="#advanced-rag">7. Advanced RAG Features</a></li>
-                <li><a href="#troubleshooting">8. Troubleshooting</a></li>
-                <li><a href="#airgap">9. Air-Gap Deployment</a></li>
+                <div class="nav-section" data-sector="GOVERNMENT,MEDICAL">
+                    <div class="nav-section-title">Security</div>
+                    <a href="#security" class="nav-item">Architecture</a>
+                    <a href="#clearance" class="nav-item" data-sector="GOVERNMENT">Clearance Levels</a>
+                    <a href="#audit" class="nav-item">Audit Logging</a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Operations</div>
+                    <a href="#ingestion" class="nav-item">Document Ingestion</a>
+                    <a href="#querying" class="nav-item">Intelligence Queries</a>
+                    <a href="#evidence" class="nav-item">Evidence Verification</a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Advanced</div>
+                    <a href="#rag" class="nav-item">
+                        RAG Features
+                        <span class="nav-item-badge new">New</span>
+                    </a>
+                    <a href="#sectors" class="nav-item">Sector Reference</a>
+                    <a href="#airgap" class="nav-item" data-sector="GOVERNMENT">Air-Gap Deployment</a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Support</div>
+                    <a href="#troubleshooting" class="nav-item">Troubleshooting</a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="index.html" class="back-to-app">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"/>
+                        <polyline points="12 19 5 12 12 5"/>
+                    </svg>
+                    Back to Application
+                </a>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="docs-main">
+            <header class="docs-header">
+                <div class="breadcrumb">
+                    <a href="index.html">SENTINEL</a>
+                    <span class="breadcrumb-separator">/</span>
+                    <span class="breadcrumb-current">Documentation</span>
+                </div>
+                <div class="header-actions">
+                    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+                        <svg id="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <line x1="12" y1="1" x2="12" y2="3"/>
+                            <line x1="12" y1="21" x2="12" y2="23"/>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                            <line x1="1" y1="12" x2="3" y2="12"/>
+                            <line x1="21" y1="12" x2="23" y2="12"/>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                        </svg>
+                        <svg id="theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="docs-content">
+                <!-- OVERVIEW SECTION -->
+                <span class="section-anchor" id="overview"></span>
+                <div class="content-section">
+                    <h1 class="page-title">SENTINEL User Guide</h1>
+                    <p class="page-description">
+                        Complete documentation for the SENTINEL Intelligence Platform. Learn how to securely ingest documents,
+                        perform intelligence queries, and verify evidence with full audit trails.
+                    </p>
+
+                    <h2>System Overview</h2>
+                    <p>
+                        The SENTINEL Dashboard provides a unified interface for secure document ingestion, intelligence queries,
+                        and evidence verification. The interface follows a three-column layout: <strong>Conversations</strong> (left),
+                        <strong>Chat Interface</strong> (center), and <strong>Information Panel</strong> (right).
+                    </p>
+
+                    <span class="section-anchor" id="capabilities"></span>
+                    <h3>Core Capabilities</h3>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <div class="feature-card-icon">🔗</div>
+                            <h4>Citation Anchoring</h4>
+                            <p>Every fact is traceable. Click any citation to view the exact source passage.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card-icon">🔍</div>
+                            <h4>Glass Box Reasoning</h4>
+                            <p>Full retrieval chain visibility for auditability. See exactly how answers are generated.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card-icon">🏷️</div>
+                            <h4>Data Governance</h4>
+                            <p>Classification badges on all sources. Sector and clearance enforcement built-in.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card-icon">📊</div>
+                            <h4>Knowledge Graph</h4>
+                            <p>Interactive visualization of document relationships and extracted entities.</p>
+                        </div>
+                    </div>
+
+                    <span class="section-anchor" id="keyboard"></span>
+                    <h3>Keyboard Shortcuts</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Shortcut</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><kbd>/</kbd></td><td>Focus query input</td></tr>
+                            <tr><td><kbd>Ctrl</kbd> + <kbd>U</kbd></td><td>Open upload dialog</td></tr>
+                            <tr><td><kbd>Enter</kbd></td><td>Execute query (when input focused)</td></tr>
+                            <tr><td><kbd>Esc</kbd></td><td>Close settings panel</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- SECURITY SECTION (Government/Medical only) -->
+                <span class="section-anchor" id="security"></span>
+                <div class="content-section" data-sector="GOVERNMENT,MEDICAL">
+                    <h2>Security Architecture</h2>
+                    <p>
+                        SENTINEL enforces a <strong>Zero Trust</strong> security model with defense-in-depth controls.
+                        Access is validated through multiple phases before any data is returned.
+                    </p>
+
+                    <h3>Security Phases</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Phase</th><th>Component</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Phase 1</strong></td>
+                                <td>Transport Security</td>
+                                <td>TLS termination, client certificate validation</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Phase 2</strong></td>
+                                <td>Identity Verification</td>
+                                <td>X.509 DN parsing, user lookup/provisioning</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Phase 3</strong></td>
+                                <td>Authorization</td>
+                                <td>Role and clearance checks, audit logging</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="callout info" data-sector="GOVERNMENT">
+                        <div class="callout-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                <line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                            Auto-Provisioning
+                        </div>
+                        <p>
+                            New CAC users are auto-provisioned with <code>VIEWER</code> role and <code>UNCLASSIFIED</code> clearance.
+                            Administrators must manually upgrade clearance after verification.
+                        </p>
+                    </div>
+
+                    <!-- Clearance Hierarchy (Government only) -->
+                    <div data-sector="GOVERNMENT">
+                        <span class="section-anchor" id="clearance"></span>
+                        <h3>Clearance Hierarchy</h3>
+                        <p>
+                            Beyond standard RBAC, SENTINEL enforces <strong>Clearance-Based Access Control (CBAC)</strong>.
+                            Even an admin cannot access higher-clearance data without proper authorization.
+                        </p>
+                        <table>
+                            <thead>
+                                <tr><th>Level</th><th>Classification</th><th>Badge</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>4</td><td>Sensitive Compartmented Information</td><td><span class="badge sci">SCI</span></td></tr>
+                                <tr><td>3</td><td>Top Secret / Highly Restricted</td><td><span class="badge ts">TOP SECRET</span></td></tr>
+                                <tr><td>2</td><td>Secret / Restricted</td><td><span class="badge secret">SECRET</span></td></tr>
+                                <tr><td>1</td><td>Controlled Unclassified (CUI)</td><td><span class="badge cui">CUI</span></td></tr>
+                                <tr><td>0</td><td>Unclassified / Public</td><td><span class="badge unclass">UNCLASSIFIED</span></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <span class="section-anchor" id="audit"></span>
+                    <h3>Audit Logging</h3>
+                    <p>All security-relevant events are persisted to the audit log:</p>
+                    <ul>
+                        <li><strong>AUTH_FAILURE:</strong> Invalid credentials or certificates</li>
+                        <li><strong>ACCESS_DENIED:</strong> Insufficient clearance for requested data</li>
+                        <li><strong>PROMPT_INJECTION:</strong> Detected manipulation attempts</li>
+                        <li><strong>DATA_INGESTION:</strong> Document uploads</li>
+                        <li><strong>QUERY_EXECUTED:</strong> Every query with full context</li>
+                    </ul>
+                </div>
+
+                <!-- INGESTION SECTION -->
+                <span class="section-anchor" id="ingestion"></span>
+                <div class="content-section">
+                    <h2>Document Ingestion</h2>
+                    <p>
+                        Documents must be ingested into the vector store before they can be queried.
+                        Use the <strong>Files</strong> button in the menu bar or press <kbd>Ctrl</kbd> + <kbd>U</kbd>.
+                    </p>
+
+                    <h3>Ingestion Workflow</h3>
+                    <ol>
+                        <li><strong>Select Files:</strong> Click Files or drag-and-drop into the upload zone</li>
+                        <li><strong>Choose Sector:</strong> Documents inherit the currently active sector</li>
+                        <li><strong>Processing:</strong> System parses, chunks, vectorizes, and indexes content</li>
+                        <li><strong>Confirmation:</strong> Document appears in Sources panel when ready</li>
+                    </ol>
+
+                    <div class="callout warning">
+                        <div class="callout-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            Automatic PII Redaction
+                        </div>
+                        <p>
+                            SENTINEL automatically detects and redacts SSNs and email addresses during ingestion.
+                            Operators should still pre-screen for credentials and classified markings.
+                        </p>
+                    </div>
+
+                    <h3>Supported Formats</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Format</th><th>Extension</th><th>Max Size</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>PDF Documents</td><td><code>.pdf</code></td><td>50 MB</td></tr>
+                            <tr><td>Plain Text</td><td><code>.txt</code></td><td>50 MB</td></tr>
+                            <tr><td>Markdown</td><td><code>.md</code></td><td>50 MB</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- QUERYING SECTION -->
+                <span class="section-anchor" id="querying"></span>
+                <div class="content-section">
+                    <h2>Intelligence Queries</h2>
+                    <p>
+                        Once documents are ingested, use the chat interface to query the system.
+                        SENTINEL retrieves relevant document chunks and synthesizes responses with mandatory citations.
+                    </p>
+
+                    <h3>Query Behavior</h3>
+                    <ul>
+                        <li><strong>Context Aware:</strong> Answers are based strictly on ingested documents</li>
+                        <li><strong>Citation Required:</strong> Every fact includes a clickable source reference</li>
+                        <li><strong>Confidence Score:</strong> Shows retrieval quality (higher = more relevant sources)</li>
+                        <li><strong>Reasoning Chain:</strong> Expandable view of the full retrieval process</li>
+                    </ul>
+
+                    <h3>The ANALYZE → VERIFY → CITE Protocol</h3>
+                    <p>SENTINEL's response synthesis follows a strict three-phase protocol:</p>
+                    <ol>
+                        <li><strong>ANALYZE:</strong> Parse retrieved chunks and identify relevant facts</li>
+                        <li><strong>VERIFY:</strong> Cross-check facts against source metadata</li>
+                        <li><strong>CITE:</strong> Attach source attribution to every fact in the response</li>
+                    </ol>
+
+                    <div class="callout info">
+                        <div class="callout-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="16" x2="12" y2="12"/>
+                                <line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                            Compliance Note
+                        </div>
+                        <p>
+                            Glass Box reasoning provides the audit trail required by NIST AI RMF, DoD AI Ethics Principles,
+                            and FDA guidance on AI/ML-based software. Every query's reasoning chain can be exported.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- EVIDENCE SECTION -->
+                <span class="section-anchor" id="evidence"></span>
+                <div class="content-section">
+                    <h2>Evidence Verification</h2>
+                    <p>
+                        SENTINEL enforces strict auditability. Every fact is anchored to a specific source document.
+                        Click any citation badge to view the source in the Information Panel.
+                    </p>
+
+                    <h3>Information Panel</h3>
+                    <p>The right panel displays two tabs:</p>
+                    <ul>
+                        <li><strong>Plot:</strong> Interactive knowledge graph showing document relationships</li>
+                        <li><strong>Sources:</strong> List of retrieved documents with similarity scores</li>
+                    </ul>
+
+                    <div class="callout warning">
+                        <div class="callout-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            Recovery Limitations
+                        </div>
+                        <p>
+                            Deep Storage Recovery retrieves text chunks from the vector database, not original files.
+                            Recovered content may differ in formatting. Documents are marked with (ARCHIVE) status.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- RAG FEATURES SECTION -->
+                <span class="section-anchor" id="rag"></span>
+                <div class="content-section">
+                    <h2>Advanced RAG Features</h2>
+                    <p>
+                        SENTINEL implements cutting-edge RAG techniques from recent research to improve retrieval accuracy,
+                        security, and reasoning capabilities.
+                    </p>
+
+                    <h3>HiFi-RAG (High-Fidelity Retrieval)</h3>
+                    <p>Based on <a href="https://arxiv.org/abs/2512.22442">arXiv:2512.22442v1</a>, implements iterative two-pass retrieval:</p>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <div class="feature-card-icon">🔄</div>
+                            <h4>Two-Pass Retrieval</h4>
+                            <p>Initial broad retrieval followed by focused refinement.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card-icon">⚖️</div>
+                            <h4>Cross-Encoder Reranking</h4>
+                            <p>LLM-as-judge semantic scoring for precise relevance.</p>
+                        </div>
+                    </div>
+
+                    <h3>RAGPart (Corpus Poisoning Defense)</h3>
+                    <p>Based on <a href="https://arxiv.org/abs/2512.24268">arXiv:2512.24268v1</a>, defends against adversarial attacks:</p>
+                    <ul>
+                        <li><strong>Document Partitioning:</strong> SHA-256 based deterministic assignment</li>
+                        <li><strong>Consistency Scoring:</strong> Cross-partition agreement analysis</li>
+                        <li><strong>Suspicion Flagging:</strong> High-variance documents flagged for review</li>
+                    </ul>
+
+                    <h3>HGMem (Hypergraph Memory)</h3>
+                    <p>Based on <a href="https://arxiv.org/abs/2512.23959">arXiv:2512.23959v2</a>, enables multi-hop reasoning:</p>
+                    <ul>
+                        <li><strong>Entity Extraction:</strong> Pattern-based NER for key entities</li>
+                        <li><strong>Hypergraph Storage:</strong> MongoDB-backed relationship storage</li>
+                        <li><strong>Multi-hop Traversal:</strong> BFS exploration across documents</li>
+                    </ul>
+                </div>
+
+                <!-- SECTORS SECTION -->
+                <span class="section-anchor" id="sectors"></span>
+                <div class="content-section">
+                    <h2>Sector Reference</h2>
+                    <p>Sectors partition the document corpus by functional area with specific access requirements:</p>
+                    <table>
+                        <thead>
+                            <tr><th>Sector</th><th>Clearance</th><th>Use Case</th><th>Compliance</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>GOVERNMENT</code></td>
+                                <td><span class="badge secret">SECRET</span></td>
+                                <td>Defense / Intelligence</td>
+                                <td>ITAR / Classified</td>
+                            </tr>
+                            <tr>
+                                <td><code>MEDICAL</code></td>
+                                <td><span class="badge secret">SECRET</span></td>
+                                <td>Healthcare / Clinical</td>
+                                <td>HIPAA</td>
+                            </tr>
+                            <tr>
+                                <td><code>FINANCE</code></td>
+                                <td><span class="badge cui">CUI</span></td>
+                                <td>Banking / Financial</td>
+                                <td>PCI-DSS / SOX</td>
+                            </tr>
+                            <tr>
+                                <td><code>ACADEMIC</code></td>
+                                <td><span class="badge unclass">UNCLASS</span></td>
+                                <td>Research / Literature</td>
+                                <td>Research Data</td>
+                            </tr>
+                            <tr>
+                                <td><code>ENTERPRISE</code></td>
+                                <td><span class="badge unclass">UNCLASS</span></td>
+                                <td>Corporate / Legal</td>
+                                <td>General Business</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- AIR-GAP SECTION (Government only) -->
+                <span class="section-anchor" id="airgap"></span>
+                <div class="content-section" data-sector="GOVERNMENT">
+                    <h2>Air-Gap Deployment</h2>
+                    <p>For disconnected or SCIF environments, SENTINEL operates with zero external network dependencies:</p>
+                    <ul>
+                        <li><strong>Local Inference:</strong> All reasoning via Ollama on <code>localhost:11434</code></li>
+                        <li><strong>Local Vector Store:</strong> MongoDB on <code>localhost:27017</code></li>
+                        <li><strong>Local Embeddings:</strong> nomic-embed-text model via Ollama</li>
+                    </ul>
+
+                    <h3>Environment Variables</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Variable</th><th>Value</th><th>Purpose</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>APP_PROFILE</code></td>
+                                <td><code>govcloud</code></td>
+                                <td>CAC/PIV authentication</td>
+                            </tr>
+                            <tr>
+                                <td><code>OLLAMA_URL</code></td>
+                                <td><code>http://localhost:11434</code></td>
+                                <td>Local LLM endpoint</td>
+                            </tr>
+                            <tr>
+                                <td><code>MONGODB_URI</code></td>
+                                <td><code>mongodb://localhost:27017</code></td>
+                                <td>Local vector store</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>System Requirements</h3>
+                    <ul>
+                        <li><strong>RAM:</strong> 16 GB minimum (32 GB recommended)</li>
+                        <li><strong>Storage:</strong> 20 GB for application + models</li>
+                        <li><strong>Network:</strong> None required for air-gap</li>
+                        <li><strong>Ports:</strong> 8080, 11434, 27017</li>
+                    </ul>
+                </div>
+
+                <!-- TROUBLESHOOTING SECTION -->
+                <span class="section-anchor" id="troubleshooting"></span>
+                <div class="content-section">
+                    <h2>Troubleshooting</h2>
+
+                    <h3>Connection Issues</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Symptom</th><th>Cause</th><th>Resolution</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>SYSTEM OFFLINE</td>
+                                <td>Ollama not running</td>
+                                <td>Run <code>ollama serve</code></td>
+                            </tr>
+                            <tr>
+                                <td>Vector DB: Offline</td>
+                                <td>MongoDB not running</td>
+                                <td>Run <code>mongod</code></td>
+                            </tr>
+                            <tr>
+                                <td>High Latency (>5s)</td>
+                                <td>Insufficient memory</td>
+                                <td>Ensure 16GB+ RAM available</td>
+                            </tr>
+                            <tr>
+                                <td>ACCESS DENIED</td>
+                                <td>Clearance too low</td>
+                                <td>Contact administrator</td>
+                            </tr>
+                            <tr>
+                                <td>Upload fails</td>
+                                <td>File >50MB or protected</td>
+                                <td>Split file or remove protection</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Document Issues</h3>
+                    <ul>
+                        <li><strong>Password-protected PDFs:</strong> Remove protection before upload</li>
+                        <li><strong>Scanned PDFs:</strong> Limited OCR support, quality varies</li>
+                        <li><strong>Large files:</strong> Split into smaller documents (&lt;50MB)</li>
+                    </ul>
+
+                    <div class="callout error">
+                        <div class="callout-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                            Critical Error Support
+                        </div>
+                        <p>
+                            If issues persist, generate a system log and contact your Deployment Specialist.
+                            Include: error messages, timestamp, user ID, and reproduction steps.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- FOOTER -->
+                <div style="margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border-subtle); text-align: center;">
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin: 0;">
+                        SENTINEL Intelligence Platform v2.1.0 | Build 2026.01<br>
+                        Powered by 9 Research-Backed RAG Engines
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- ON THIS PAGE (TOC) -->
+        <nav class="docs-toc">
+            <div class="toc-title">On This Page</div>
+            <ul class="toc-list">
+                <li><a href="#overview">System Overview</a></li>
+                <li><a href="#capabilities">Core Capabilities</a></li>
+                <li data-sector="GOVERNMENT,MEDICAL"><a href="#security">Security Architecture</a></li>
+                <li><a href="#ingestion">Document Ingestion</a></li>
+                <li><a href="#querying">Intelligence Queries</a></li>
+                <li><a href="#evidence">Evidence Verification</a></li>
+                <li><a href="#rag">RAG Features</a></li>
+                <li><a href="#sectors">Sector Reference</a></li>
+                <li data-sector="GOVERNMENT"><a href="#airgap">Air-Gap Deployment</a></li>
+                <li><a href="#troubleshooting">Troubleshooting</a></li>
             </ul>
-        </div>
-
-        <!-- ============================================
-             SECTION 1: SYSTEM OVERVIEW
-             ============================================ -->
-        <h2 id="overview">1. System Overview</h2>
-        <p>The Sentinel Dashboard provides a unified interface for secure document ingestion, intelligence queries, and evidence verification. The interface is divided into three primary zones: <strong>Control Panel</strong> (document management), <strong>Intelligence Terminal</strong> (query interface), and <strong>Evidence Viewer</strong> (source verification).</p>
-
-        <!-- ANNOTATED SCREENSHOT: Dashboard Overview -->
-        <div class="annotated-figure">
-            <div class="screenshot-wrapper">
-                <div class="screenshot-placeholder">
-                    <div class="screenshot-placeholder-text">
-                        <strong>Dashboard Overview Screenshot</strong><br>
-                        Main workspace with Intelligence Terminal and Evidence Viewer
-                    </div>
-                    <div class="screenshot-placeholder-hint">
-                        See the live application at http://localhost:8080
-                    </div>
-                </div>
-            </div>
-
-            <div class="legend">
-                <div class="legend-title">Dashboard Interface Elements</div>
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <div class="legend-marker">1</div>
-                        <div class="legend-text">
-                            <strong>System Branding</strong>
-                            <span>SENTINEL // INTELLIGENCE — Platform identifier</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker success">2</div>
-                        <div class="legend-text">
-                            <strong>System Status</strong>
-                            <span><code style="color:var(--success)">SYSTEM ONLINE</code> — Connection to Neural Core active</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">3</div>
-                        <div class="legend-text">
-                            <strong>Telemetry Bar</strong>
-                            <span>Vector DB status, docs indexed, latency, query count</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">4</div>
-                        <div class="legend-text">
-                            <strong>Active Sector</strong>
-                            <span>Currently selected sector (e.g., DEFENSE)</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">5</div>
-                        <div class="legend-text">
-                            <strong>Control Panel Toggle</strong>
-                            <span>Hamburger menu — opens ingestion sidebar</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">6</div>
-                        <div class="legend-text">
-                            <strong>Intelligence Terminal</strong>
-                            <span>Main chat interface for queries and responses</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">7</div>
-                        <div class="legend-text">
-                            <strong>Evidence Viewer</strong>
-                            <span>Source document panel — opens when citations clicked</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">8</div>
-                        <div class="legend-text">
-                            <strong>Feature Cards</strong>
-                            <span>Platform capabilities: Citation Anchoring, Glass Box Reasoning, Data Governance, Context Control</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">9</div>
-                        <div class="legend-text">
-                            <strong>No Source Selected</strong>
-                            <span>Empty state — click citation badge to view source</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">10</div>
-                        <div class="legend-text">
-                            <strong>Query Input</strong>
-                            <span>Enter natural language intelligence queries</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">11</div>
-                        <div class="legend-text">
-                            <strong>Execute Button</strong>
-                            <span>Submit query (or press <kbd>/</kbd> to focus, <kbd>Enter</kbd> to submit)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="figure-caption">Fig 1.0: The Sentinel Command Dashboard — Default State</div>
-        </div>
-
-        <h3>1.1 Core Capabilities</h3>
-        <p>The welcome screen displays the four core capabilities of the platform:</p>
-
-        <div class="feature-grid">
-            <div class="feature-card">
-                <h4>🔗 Citation Anchoring</h4>
-                <p>Click any citation to jump to the exact source passage. Every fact is traceable.</p>
-            </div>
-            <div class="feature-card">
-                <h4>🔍 Glass Box Reasoning</h4>
-                <p>View the full retrieval chain for auditability. Expand "VIEW REASONING CHAIN" on any response.</p>
-            </div>
-            <div class="feature-card">
-                <h4>🏷️ Data Governance</h4>
-                <p>Classification badges on all retrieved sources. Sector and clearance enforced.</p>
-            </div>
-            <div class="feature-card">
-                <h4>📄 Context Control</h4>
-                <p>Toggle documents on/off to test scenarios. Control what the AI can see.</p>
-            </div>
-        </div>
-
-        <h3>1.2 Keyboard Shortcuts</h3>
-        <table>
-            <thead>
-                <tr><th>Shortcut</th><th>Action</th></tr>
-            </thead>
-            <tbody>
-                <tr><td><kbd>/</kbd></td><td>Focus query input</td></tr>
-                <tr><td><kbd>Ctrl</kbd> + <kbd>U</kbd></td><td>Open upload dialog</td></tr>
-                <tr><td><kbd>Enter</kbd></td><td>Execute query (when input focused)</td></tr>
-            </tbody>
-        </table>
-
-        <!-- ============================================
-             SECTION 2: SECURITY ARCHITECTURE
-             ============================================ -->
-        <h2 id="security">2. Security Architecture</h2>
-        <p>Sentinel enforces a <strong>Zero Trust</strong> security model with defense-in-depth controls. Access is validated through three phases before any data is returned.</p>
-
-        <h3>2.1 Access Control Flow</h3>
-        <p>The following diagram shows the complete authentication and authorization pipeline for CAC/PIV (GovCloud) deployments:</p>
-
-        <!-- ACCESS FLOW DIAGRAM -->
-        <div class="diagram-figure">
-            <div class="screenshot-placeholder" style="min-height:200px;">
-                <div class="screenshot-placeholder-text">
-                    <strong>Authentication Flow Diagram</strong><br>
-                    TLS → Certificate Validation → Identity Lookup → Authorization
-                </div>
-            </div>
-            <div class="figure-caption">Fig 2.0: CAC/PIV Authentication & Authorization Flow</div>
-        </div>
-
-        <h3>2.2 Security Phases</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Phase</th>
-                    <th>Component</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Phase 1</strong><br>Transport Security</td>
-                    <td>TLS-Terminator (Nginx/Envoy)</td>
-                    <td>Verify client certificate chain against Root CA. Extract X-Client-Cert header.</td>
-                </tr>
-                <tr>
-                    <td><strong>Phase 2</strong><br>Identity Verification</td>
-                    <td>CacAuthenticationService</td>
-                    <td>Parse X.509 DN (CN=Smith, OU=DoD). Look up or auto-provision user.</td>
-                </tr>
-                <tr>
-                    <td><strong>Phase 3</strong><br>Authorization & Audit</td>
-                    <td>SecurityFilter + AuditService</td>
-                    <td>Check Role (VIEWER vs ANALYST). Check Clearance (SECRET vs TOP_SECRET). Log access.</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <div class="info-box security">
-            <div class="info-box-title">Auto-Provisioning</div>
-            <p>When a new CAC user authenticates for the first time, the system auto-provisions their account with <code>VIEWER</code> role and <code>UNCLASSIFIED</code> clearance. An administrator must manually upgrade their clearance after verification.</p>
-        </div>
-
-        <h3>2.3 Deployment Profiles</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Profile</th>
-                    <th>Auth Mechanism</th>
-                    <th>Security Standard</th>
-                    <th>Use Case</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><code>govcloud</code></td>
-                    <td>X.509 Mutual TLS (CAC/PIV)</td>
-                    <td>FIPS 201 / DoDI 8520.02</td>
-                    <td>Government / Defense</td>
-                </tr>
-                <tr>
-                    <td><code>enterprise</code></td>
-                    <td>JWT Bearer Token (OIDC)</td>
-                    <td>NIST SP 800-63C</td>
-                    <td>Corporate SSO (Azure AD, Okta)</td>
-                </tr>
-                <tr>
-                    <td><code>standard</code></td>
-                    <td>Username/Password (BCrypt)</td>
-                    <td>—</td>
-                    <td>Standalone deployments</td>
-                </tr>
-                <tr>
-                    <td><code>dev</code></td>
-                    <td>Auto-provisioned DEMO_USER</td>
-                    <td>None (Local only)</td>
-                    <td>Development / Testing</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>2.4 Clearance Hierarchy</h3>
-        <p>Beyond standard RBAC, Sentinel enforces <strong>Clearance-Based Access Control (CBAC)</strong>. Even an <code>ADMIN</code> cannot access <code>SCI</code> data if their clearance is only <code>SECRET</code>.</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Level</th>
-                    <th>Government Label</th>
-                    <th>Commercial Label</th>
-                    <th>Badge</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>4</td>
-                    <td>SCI</td>
-                    <td>Sensitive Compartmented Information</td>
-                    <td><span class="clearance ts">SCI</span></td>
-                </tr>
-                <tr>
-                    <td>3</td>
-                    <td>Top Secret</td>
-                    <td>Highly Restricted</td>
-                    <td><span class="clearance ts">TOP SECRET</span></td>
-                </tr>
-                <tr>
-                    <td>2</td>
-                    <td>Secret</td>
-                    <td>Restricted (HIPAA, Privileged)</td>
-                    <td><span class="clearance secret">SECRET</span></td>
-                </tr>
-                <tr>
-                    <td>1</td>
-                    <td>Controlled Unclassified (CUI)</td>
-                    <td>Confidential / Internal</td>
-                    <td><span class="clearance cui">CUI</span></td>
-                </tr>
-                <tr>
-                    <td>0</td>
-                    <td>Unclassified</td>
-                    <td>Public</td>
-                    <td><span class="clearance unclass">UNCLASSIFIED</span></td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>2.5 Audit Logging</h3>
-        <p>All security-relevant events are persisted to the <code>audit_log</code> collection:</p>
-        <ul>
-            <li><strong>AUTH_FAILURE:</strong> Invalid credentials or missing certificates</li>
-            <li><strong>ACCESS_DENIED:</strong> Valid user attempting to access restricted data</li>
-            <li><strong>PROMPT_INJECTION:</strong> Detected manipulation attempt (e.g., "Ignore previous instructions")</li>
-            <li><strong>DATA_INGESTION:</strong> Upload of new intelligence dossiers</li>
-            <li><strong>QUERY_EXECUTED:</strong> Every query with sector, user, and response summary</li>
-        </ul>
-
-        <!-- ============================================
-             SECTION 3: SECURE INGESTION PROTOCOL
-             ============================================ -->
-        <h2 id="ingestion">3. Secure Ingestion Protocol</h2>
-        <p>Documents must be ingested into the vector store before they can be queried. Access the Control Panel by clicking the hamburger menu (☰) in the top-left corner.</p>
-
-        <!-- ANNOTATED SCREENSHOT: Control Panel -->
-        <div class="annotated-figure">
-            <div class="screenshot-wrapper" style="max-width: 350px; margin: 0 auto;">
-                <div class="screenshot-placeholder">
-                    <div class="screenshot-placeholder-text">
-                        <strong>Control Panel Screenshot</strong><br>
-                        Document upload zone, sector selection, and settings
-                    </div>
-                    <div class="screenshot-placeholder-hint">
-                        Click ☰ in the dashboard to open
-                    </div>
-                </div>
-            </div>
-
-            <div class="legend">
-                <div class="legend-title">Control Panel Elements</div>
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <div class="legend-marker">1</div>
-                        <div class="legend-text">
-                            <strong>Panel Title</strong>
-                            <span>CONTROL PANEL — Slide-out sidebar</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">2</div>
-                        <div class="legend-text">
-                            <strong>Close Button</strong>
-                            <span>Click X to collapse the panel</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">3</div>
-                        <div class="legend-text">
-                            <strong>Section Header</strong>
-                            <span>SECURE INGESTION — Document upload area</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">4</div>
-                        <div class="legend-text">
-                            <strong>Upload Zone</strong>
-                            <span>Click or drag-and-drop. Accepts PDF, TXT, MD (max 50MB)</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">5</div>
-                        <div class="legend-text">
-                            <strong>Sector Label</strong>
-                            <span>TARGET SECTOR — Classification for ingested documents</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">6</div>
-                        <div class="legend-text">
-                            <strong>Sector Dropdown</strong>
-                            <span>Select sector before uploading (Defense, Legal, Finance, etc.)</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">7</div>
-                        <div class="legend-text">
-                            <strong>Manual Link</strong>
-                            <span>OPERATOR MANUAL — Opens this documentation</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">8</div>
-                        <div class="legend-text">
-                            <strong>Version Info</strong>
-                            <span>Current build version and date</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="figure-caption">Fig 3.0: Control Panel — Secure Ingestion Interface</div>
-        </div>
-
-        <h3>3.1 Ingestion Workflow</h3>
-        <ol>
-            <li><strong>Open Control Panel:</strong> Click the hamburger menu (☰) or press <kbd>Ctrl</kbd> + <kbd>U</kbd>.</li>
-            <li><strong>Select Target Sector:</strong> Choose from the dropdown (e.g., <code>Defense / Military</code>). This determines the clearance required to access this document.</li>
-            <li><strong>Upload Document:</strong> Click the upload zone or drag-and-drop your file. Supported formats: <strong>PDF, TXT, MD</strong> (max 50MB).</li>
-            <li><strong>Wait for Processing:</strong> The system will parse, chunk, vectorize, and index the document. The telemetry bar will update to show the new document count.</li>
-        </ol>
-
-        <div class="info-box warning">
-            <div class="info-box-title">Automatic PII Redaction</div>
-            <p>During ingestion, Sentinel automatically detects and redacts: SSNs (<code>XXX-XX-XXXX</code> → <code>[REDACTED-SSN]</code>) and email addresses. Operators should still pre-screen documents for credentials, classified markings, or proprietary data.</p>
-        </div>
-
-        <!-- ============================================
-             SECTION 4: INTELLIGENCE GATHERING
-             ============================================ -->
-        <h2 id="intelligence">4. Intelligence Gathering</h2>
-        <p>Once documents are ingested, use the Intelligence Terminal to query the system. Sentinel retrieves relevant document chunks and synthesizes responses with mandatory citations.</p>
-
-        <!-- ANNOTATED SCREENSHOT: Chat Interface -->
-        <div class="annotated-figure">
-            <div class="screenshot-wrapper">
-                <div class="screenshot-placeholder">
-                    <div class="screenshot-placeholder-text">
-                        <strong>Intelligence Terminal Screenshot</strong><br>
-                        Query input, AI responses with citations, reasoning chain
-                    </div>
-                    <div class="screenshot-placeholder-hint">
-                        Enter a query in the main dashboard to see this in action
-                    </div>
-                </div>
-            </div>
-
-            <div class="legend">
-                <div class="legend-title">Intelligence Terminal Elements</div>
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <div class="legend-marker">1</div>
-                        <div class="legend-text">
-                            <strong>Header</strong>
-                            <span>SENTINEL // INTELLIGENCE — Platform identifier</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">2</div>
-                        <div class="legend-text">
-                            <strong>Telemetry Bar</strong>
-                            <span>Vector DB status, docs indexed, avg latency, query count</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">3</div>
-                        <div class="legend-text">
-                            <strong>Active Context</strong>
-                            <span>Documents loaded for this session with sector badges</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">4</div>
-                        <div class="legend-text">
-                            <strong>Document Count</strong>
-                            <span>"5 documents loaded" — Total active context</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">5</div>
-                        <div class="legend-text">
-                            <strong>User Query</strong>
-                            <span>Your question with timestamp</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">6</div>
-                        <div class="legend-text">
-                            <strong>Reasoning Chain</strong>
-                            <span>Expand to see retrieval steps (Glass Box)</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">7</div>
-                        <div class="legend-text">
-                            <strong>Response Header</strong>
-                            <span>SENTINEL RESPONSE — AI-generated answer</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">8</div>
-                        <div class="legend-text">
-                            <strong>Sector Badge</strong>
-                            <span>Response scoped to DEFENSE sector</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker warning">9</div>
-                        <div class="legend-text">
-                            <strong>Citation Badge</strong>
-                            <span>Click <code>[agent_47_medical.txt]</code> to open source</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">10</div>
-                        <div class="legend-text">
-                            <strong>Confidence Score</strong>
-                            <span>Sources: 1, Confidence: 77% — Retrieval quality</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">11</div>
-                        <div class="legend-text">
-                            <strong>Feedback Buttons</strong>
-                            <span>Thumbs up/down for response quality</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">12</div>
-                        <div class="legend-text">
-                            <strong>Query Input</strong>
-                            <span>Enter intelligence query</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">13</div>
-                        <div class="legend-text">
-                            <strong>Execute Button</strong>
-                            <span>Submit query to Sentinel Core</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="figure-caption">Fig 4.0: Intelligence Terminal — Active Query Session</div>
-        </div>
-
-        <h3>4.1 Query Behavior</h3>
-        <ul>
-            <li><strong>Context Aware:</strong> The AI answers based <em>strictly</em> on documents in the Active Context.</li>
-            <li><strong>Citation Required:</strong> Every fact includes a clickable <code>[filename.ext]</code> badge linking to the source.</li>
-            <li><strong>Confidence Score:</strong> Shows retrieval quality (higher = more relevant sources found).</li>
-            <li><strong>Reasoning Chain:</strong> Click "VIEW REASONING CHAIN (N STEPS)" to see the full retrieval process.</li>
-        </ul>
-
-        <h3>4.2 Glass Box Reasoning</h3>
-        <p>Unlike traditional "black box" AI systems, Sentinel exposes its complete reasoning pipeline. Click <strong>"VIEW REASONING CHAIN"</strong> on any response to see exactly how the answer was generated.</p>
-
-        <!-- ANNOTATED SCREENSHOT: Reasoning Chain -->
-        <div class="annotated-figure">
-            <div class="screenshot-wrapper">
-                <div class="screenshot-placeholder">
-                    <div class="screenshot-placeholder-text">
-                        <strong>Glass Box Reasoning Chain Screenshot</strong><br>
-                        Step-by-step retrieval transparency with timing metrics
-                    </div>
-                    <div class="screenshot-placeholder-hint">
-                        Expand "VIEW REASONING CHAIN" on any response
-                    </div>
-                </div>
-            </div>
-
-            <div class="legend">
-                <div class="legend-title">Reasoning Chain Steps</div>
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <div class="legend-marker">1</div>
-                        <div class="legend-text">
-                            <strong>Chain Header</strong>
-                            <span>Expandable panel showing step count (e.g., "4 STEPS")</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">2</div>
-                        <div class="legend-text">
-                            <strong>Step 1: Query Analysis</strong>
-                            <span>Shows how the system parsed your natural language query</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">3</div>
-                        <div class="legend-text">
-                            <strong>Step 2: Vector Search</strong>
-                            <span>Sector searched and similarity threshold used (e.g., 0.7)</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker success">4</div>
-                        <div class="legend-text">
-                            <strong>Step 3: Document Retrieval</strong>
-                            <span>Number of relevant documents found via HiFi-RAG</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">5</div>
-                        <div class="legend-text">
-                            <strong>Step 4: Response Synthesis</strong>
-                            <span>ANALYZE → VERIFY → CITE protocol applied</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="figure-caption">Fig 4.1: Glass Box Reasoning Chain — Full Retrieval Transparency</div>
-        </div>
-
-        <h4>Why Glass Box Matters</h4>
-        <p>Most enterprise AI systems operate as "black boxes" — you ask a question, you get an answer, but you have no visibility into <em>how</em> that answer was generated. This creates three critical problems:</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Problem</th>
-                    <th>Black Box Risk</th>
-                    <th>Sentinel's Glass Box Solution</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Compliance Audits</strong></td>
-                    <td>Cannot prove how answers were derived</td>
-                    <td>Full chain logged and displayable per response</td>
-                </tr>
-                <tr>
-                    <td><strong>Hallucination Detection</strong></td>
-                    <td>No way to verify if AI fabricated information</td>
-                    <td>See exactly which documents were retrieved and cited</td>
-                </tr>
-                <tr>
-                    <td><strong>Trust & Adoption</strong></td>
-                    <td>Users distrust opaque systems</td>
-                    <td>Operators can verify every step of the reasoning</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h4>The ANALYZE → VERIFY → CITE Protocol</h4>
-        <p>Sentinel's response synthesis follows a strict three-phase protocol:</p>
-        <ol>
-            <li><strong>ANALYZE:</strong> Parse the retrieved document chunks and identify relevant facts.</li>
-            <li><strong>VERIFY:</strong> Cross-check facts against source metadata. Reject unsupported claims.</li>
-            <li><strong>CITE:</strong> Attach source attribution <code>[filename.ext]</code> to every fact in the response.</li>
-        </ol>
-
-        <div class="info-box security">
-            <div class="info-box-title">Compliance Note</div>
-            <p>For regulated industries (DoD, Finance, Healthcare), Glass Box reasoning provides the audit trail required by frameworks like NIST AI RMF, DoD AI Ethics Principles, and FDA guidance on AI/ML-based software. Every query's reasoning chain can be exported for compliance review.</p>
-        </div>
-
-        <h3>4.3 Security Enforcement</h3>
-        <p>Every query passes through validation:</p>
-        <ol>
-            <li><strong>Authentication:</strong> User must be logged in (or have valid CAC certificate).</li>
-            <li><strong>Permission Check:</strong> User role must include <code>QUERY</code> permission.</li>
-            <li><strong>Clearance Check:</strong> User clearance must meet or exceed sector requirement.</li>
-            <li><strong>Prompt Injection Detection:</strong> Queries containing attack patterns are blocked.</li>
-        </ol>
-
-        <!-- ============================================
-             SECTION 5: EVIDENCE VERIFICATION
-             ============================================ -->
-        <h2 id="evidence">5. Evidence Verification</h2>
-        <p>Sentinel enforces strict auditability. Every fact generated by the AI is anchored to a specific source document. Click any citation badge to open the Evidence Viewer.</p>
-
-        <!-- ANNOTATED SCREENSHOT: Evidence Viewer -->
-        <div class="annotated-figure">
-            <div class="screenshot-wrapper">
-                <div class="screenshot-placeholder">
-                    <div class="screenshot-placeholder-text">
-                        <strong>Evidence Viewer Screenshot</strong><br>
-                        Source document display with metadata and classification badges
-                    </div>
-                    <div class="screenshot-placeholder-hint">
-                        Click any [citation] badge to view source
-                    </div>
-                </div>
-            </div>
-
-            <div class="legend">
-                <div class="legend-title">Evidence Viewer Elements</div>
-                <div class="legend-grid">
-                    <div class="legend-item">
-                        <div class="legend-marker">1</div>
-                        <div class="legend-text">
-                            <strong>Operator ID</strong>
-                            <span>Current authenticated user (DEMO_USER in dev mode)</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker success">2</div>
-                        <div class="legend-text">
-                            <strong>System Status</strong>
-                            <span><code style="color:var(--success)">SYSTEM ONLINE</code> — Connected to backend</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">3</div>
-                        <div class="legend-text">
-                            <strong>Active Sector</strong>
-                            <span>Currently selected sector (DEFENSE)</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">4</div>
-                        <div class="legend-text">
-                            <strong>Viewer Header</strong>
-                            <span>EVIDENCE VIEWER — Source verification panel</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">5</div>
-                        <div class="legend-text">
-                            <strong>Close Button</strong>
-                            <span>Click X to close the viewer</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">6</div>
-                        <div class="legend-text">
-                            <strong>Document Tab</strong>
-                            <span>Open documents appear as tabs (closable)</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">7</div>
-                        <div class="legend-text">
-                            <strong>Metadata Bar</strong>
-                            <span>Source filename, Sector, Document type</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker warning">8</div>
-                        <div class="legend-text">
-                            <strong>Archive Banner</strong>
-                            <span>SECURE DOCUMENT VIEWER (ARCHIVE) — Reconstructed from vector store</span>
-                        </div>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-marker">9</div>
-                        <div class="legend-text">
-                            <strong>Document Content</strong>
-                            <span>Full text of the source document</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="figure-caption">Fig 5.0: Evidence Viewer — Source Document Verification</div>
-        </div>
-
-        <h3>5.1 Deep Storage Recovery</h3>
-        <p>Notice the banner in the screenshot: <code>STATUS: RECONSTRUCTED FROM VECTOR STORE</code>. This indicates the original file was not in cache, so Sentinel reconstructed the content from the vector database.</p>
-
-        <div class="info-box warning">
-            <div class="info-box-title">Recovery Limitations</div>
-            <p>Deep Storage Recovery retrieves the <em>text chunks</em> stored during ingestion, not the original file. Recovered content may differ from the source in formatting, structure, and completeness. Documents recovered this way are marked with an <code>(ARCHIVE)</code> banner.</p>
-        </div>
-
-        <!-- ============================================
-             SECTION 6: SECTOR REFERENCE
-             ============================================ -->
-        <h2 id="sectors">6. Sector Reference</h2>
-        <p>Sectors partition the document corpus by functional area. Each sector has a minimum clearance requirement:</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Sector</th>
-                    <th>Required Clearance</th>
-                    <th>Government Context</th>
-                    <th>Commercial Context</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><code>OPERATIONS</code></td>
-                    <td><span class="clearance unclass">UNCLASSIFIED</span></td>
-                    <td>General Operations</td>
-                    <td>Public</td>
-                </tr>
-                <tr>
-                    <td><code>FINANCE</code></td>
-                    <td><span class="clearance cui">CUI</span></td>
-                    <td>Financial Intelligence</td>
-                    <td>PCI-DSS</td>
-                </tr>
-                <tr>
-                    <td><code>LEGAL</code></td>
-                    <td><span class="clearance cui">CUI</span></td>
-                    <td>Legal / Contracts</td>
-                    <td>Attorney-Client</td>
-                </tr>
-                <tr>
-                    <td><code>ENTERPRISE</code></td>
-                    <td><span class="clearance cui">CUI</span></td>
-                    <td>Enterprise</td>
-                    <td>Confidential</td>
-                </tr>
-                <tr>
-                    <td><code>MEDICAL</code></td>
-                    <td><span class="clearance secret">SECRET</span></td>
-                    <td>Medical / Clinical</td>
-                    <td>HIPAA</td>
-                </tr>
-                <tr>
-                    <td><code>DEFENSE</code></td>
-                    <td><span class="clearance secret">SECRET</span></td>
-                    <td>Defense / Military</td>
-                    <td>CLASSIFIED</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <!-- ============================================
-             SECTION 7: ADVANCED RAG FEATURES
-             ============================================ -->
-        <h2 id="advanced-rag">7. Advanced RAG Features</h2>
-        <p>Sentinel implements three cutting-edge RAG techniques from recent research to improve retrieval accuracy, security, and reasoning capabilities.</p>
-
-        <h3>7.1 HiFi-RAG (High-Fidelity Retrieval)</h3>
-        <p>Based on <a href="https://arxiv.org/abs/2512.22442" style="color: var(--accent-primary);">arXiv:2512.22442v1</a>, HiFi-RAG implements iterative two-pass retrieval with cross-encoder reranking:</p>
-
-        <div class="feature-grid">
-            <div class="feature-card">
-                <h4>🔄 Two-Pass Retrieval</h4>
-                <p>Initial broad retrieval followed by focused refinement based on identified gaps.</p>
-            </div>
-            <div class="feature-card">
-                <h4>⚖️ Cross-Encoder Reranking</h4>
-                <p>LLM-as-judge semantic scoring via Ollama for precise relevance ranking.</p>
-            </div>
-            <div class="feature-card">
-                <h4>🔍 Gap Detection</h4>
-                <p>Identifies missing concepts and retrieves additional documents to fill knowledge gaps.</p>
-            </div>
-            <div class="feature-card">
-                <h4>✈️ Air-Gap Safe</h4>
-                <p>Falls back to keyword-based scoring when LLM is unavailable.</p>
-            </div>
-        </div>
-
-        <h3>7.2 RAGPart (Corpus Poisoning Defense)</h3>
-        <p>Based on <a href="https://arxiv.org/abs/2512.24268" style="color: var(--accent-primary);">arXiv:2512.24268v1</a>, RAGPart defends against corpus poisoning attacks:</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Feature</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Document Partitioning</strong></td>
-                    <td>SHA-256 based deterministic assignment to multiple partitions</td>
-                </tr>
-                <tr>
-                    <td><strong>Consistency Scoring</strong></td>
-                    <td>Detects anomalous documents via cross-partition agreement analysis</td>
-                </tr>
-                <tr>
-                    <td><strong>Suspicion Flagging</strong></td>
-                    <td>Documents with high variance scores are flagged for security review</td>
-                </tr>
-                <tr>
-                    <td><strong>Combinatorial Retrieval</strong></td>
-                    <td>Queries multiple partition combinations for robustness</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <div class="info-box security">
-            <div class="info-box-title">Corpus Poisoning Protection</div>
-            <p>RAGPart automatically detects when an adversary has injected malicious documents into the corpus. Documents that appear inconsistent across partition combinations are flagged with a suspicion score, alerting operators to potential security threats.</p>
-        </div>
-
-        <h3>7.3 HGMem (Hypergraph Memory)</h3>
-        <p>Based on <a href="https://arxiv.org/abs/2512.23959" style="color: var(--accent-primary);">arXiv:2512.23959v2</a>, HGMem enables multi-hop reasoning across documents:</p>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Component</th>
-                    <th>Function</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>Entity Extraction</strong></td>
-                    <td>Pattern-based NER identifies PERSON, ORG, LOCATION, DATE, TECHNICAL entities</td>
-                </tr>
-                <tr>
-                    <td><strong>Hypergraph Storage</strong></td>
-                    <td>MongoDB-backed node and hyperedge collections for relationship storage</td>
-                </tr>
-                <tr>
-                    <td><strong>Multi-hop Traversal</strong></td>
-                    <td>BFS graph exploration discovers relationships across multiple documents</td>
-                </tr>
-                <tr>
-                    <td><strong>Hybrid Query</strong></td>
-                    <td>Combines vector similarity with graph context for comprehensive retrieval</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <p>Example use case: "What is the relationship between Project X and Contractor Y?" — HGMem can traverse the hypergraph to find connections across multiple documents even if they don't directly mention each other.</p>
-
-        <!-- ============================================
-             SECTION 8: TROUBLESHOOTING
-             ============================================ -->
-        <h2 id="troubleshooting">8. Troubleshooting</h2>
-
-        <h3>8.1 Connection Issues</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Symptom</th>
-                    <th>Likely Cause</th>
-                    <th>Resolution</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>SYSTEM OFFLINE (red badge)</td>
-                    <td>Ollama not running</td>
-                    <td>Start Ollama: <code>ollama serve</code></td>
-                </tr>
-                <tr>
-                    <td>Vector DB: Offline</td>
-                    <td>MongoDB not running</td>
-                    <td>Start MongoDB: <code>mongod</code></td>
-                </tr>
-                <tr>
-                    <td>High AVG LATENCY (>5000ms)</td>
-                    <td>Insufficient memory</td>
-                    <td>Close other apps; ensure 16GB+ RAM</td>
-                </tr>
-                <tr>
-                    <td>ACCESS DENIED on queries</td>
-                    <td>User clearance too low</td>
-                    <td>Contact administrator to verify clearance</td>
-                </tr>
-                <tr>
-                    <td>Upload fails</td>
-                    <td>File >50MB or password-protected</td>
-                    <td>Split file or remove PDF protection</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>8.2 Document Issues</h3>
-        <ul>
-            <li><strong>Password-protected PDFs:</strong> Not supported. Remove protection before ingestion.</li>
-            <li><strong>Scanned PDFs (image-only):</strong> Limited support. OCR quality varies.</li>
-            <li><strong>Large files (>50MB):</strong> Will be rejected. Split into smaller documents.</li>
-        </ul>
-
-        <div class="info-box critical">
-            <div class="info-box-title">Critical Error Support</div>
-            <p>If issues persist after troubleshooting, generate a system log and contact your Deployment Specialist. Include: error messages, timestamp, user ID, and steps to reproduce.</p>
-        </div>
-
-        <!-- ============================================
-             SECTION 9: AIR-GAP DEPLOYMENT
-             ============================================ -->
-        <h2 id="airgap">9. Air-Gap Deployment</h2>
-        <p>For disconnected or SCIF environments, Sentinel operates with zero external network dependencies:</p>
-
-        <ul>
-            <li><strong>Local Inference:</strong> All reasoning is performed by Ollama on <code>localhost:11434</code>. No data leaves the perimeter.</li>
-            <li><strong>Local Vector Store:</strong> All document embeddings stored in MongoDB on <code>localhost:27017</code>.</li>
-            <li><strong>Local Embeddings:</strong> Embedding model (nomic-embed-text) runs via Ollama.</li>
-        </ul>
-
-        <h3>9.1 Required Environment Variables</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Variable</th>
-                    <th>Value</th>
-                    <th>Purpose</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><code>APP_PROFILE</code></td>
-                    <td><code>govcloud</code></td>
-                    <td>Activates CAC/PIV authentication</td>
-                </tr>
-                <tr>
-                    <td><code>OLLAMA_URL</code></td>
-                    <td><code>http://localhost:11434</code></td>
-                    <td>Local LLM inference endpoint</td>
-                </tr>
-                <tr>
-                    <td><code>MONGODB_URI</code></td>
-                    <td><code>mongodb://localhost:27017/mercenary</code></td>
-                    <td>Local vector store</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>9.2 System Requirements</h3>
-        <ul>
-            <li><strong>Minimum RAM:</strong> 16 GB (32 GB recommended for large models)</li>
-            <li><strong>Storage:</strong> 20 GB for application + model storage</li>
-            <li><strong>Network:</strong> None required for air-gap deployment</li>
-            <li><strong>Ports:</strong> 8080 (application), 11434 (Ollama), 27017 (MongoDB)</li>
-        </ul>
-
-        <!-- Footer -->
-        <hr style="border: none; border-top: 1px solid var(--border-color); margin: 50px 0 30px;">
-        <p style="text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);">
-            SENTINEL INTELLIGENCE PLATFORM v2.0.0 | BUILD 2026.01<br>
-            Powered by HiFi-RAG, RAGPart & HyperGraph Memory<br>
-            © 2026 Project Mercenary — UNCLASSIFIED // FOUO
-        </p>
-
+        </nav>
     </div>
+
+    <script>
+        // Theme management
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('sentinel-theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const darkIcon = document.getElementById('theme-icon-dark');
+            const lightIcon = document.getElementById('theme-icon-light');
+            if (theme === 'dark') {
+                darkIcon.style.display = '';
+                lightIcon.style.display = 'none';
+            } else {
+                darkIcon.style.display = 'none';
+                lightIcon.style.display = '';
+            }
+        }
+
+        // Initialize theme
+        function initTheme() {
+            const savedTheme = localStorage.getItem('sentinel-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+        }
+
+        // Navigation active state
+        function updateActiveNav() {
+            const sections = document.querySelectorAll('.section-anchor');
+            const navItems = document.querySelectorAll('.nav-item');
+            const tocItems = document.querySelectorAll('.toc-list a');
+
+            let currentSection = '';
+            sections.forEach(section => {
+                const rect = section.getBoundingClientRect();
+                if (rect.top <= 100) {
+                    currentSection = section.id;
+                }
+            });
+
+            navItems.forEach(item => {
+                const href = item.getAttribute('href');
+                if (href === '#' + currentSection) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+
+            tocItems.forEach(item => {
+                const href = item.getAttribute('href');
+                if (href === '#' + currentSection) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        // Mobile sidebar toggle
+        function toggleSidebar() {
+            document.getElementById('docs-sidebar').classList.toggle('open');
+        }
+
+        // Sector-based content filtering
+        function getActiveSector() {
+            // Try to get sector from URL parameter first
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlSector = urlParams.get('sector');
+            if (urlSector) return urlSector.toUpperCase();
+
+            // Fall back to localStorage (synced with main app)
+            const savedSector = localStorage.getItem('sentinel-sector');
+            if (savedSector) return savedSector.toUpperCase();
+
+            // Default to ENTERPRISE (most permissive)
+            return 'ENTERPRISE';
+        }
+
+        function applySectorFilter() {
+            const activeSector = getActiveSector();
+
+            // Update page title/subtitle based on sector
+            const sectorNames = {
+                'GOVERNMENT': 'Government & Defense',
+                'MEDICAL': 'Healthcare & Medical',
+                'FINANCE': 'Financial Services',
+                'ACADEMIC': 'Academic & Research',
+                'ENTERPRISE': 'Enterprise'
+            };
+
+            // Find all elements with data-sector attribute
+            document.querySelectorAll('[data-sector]').forEach(el => {
+                const allowedSectors = el.getAttribute('data-sector').split(',').map(s => s.trim().toUpperCase());
+
+                if (allowedSectors.includes(activeSector)) {
+                    el.style.display = '';
+                    el.classList.remove('sector-hidden');
+                } else {
+                    el.style.display = 'none';
+                    el.classList.add('sector-hidden');
+                }
+            });
+
+            // Update version subtitle to show active sector
+            const versionEl = document.querySelector('.sidebar-version');
+            if (versionEl) {
+                versionEl.textContent = `${sectorNames[activeSector] || activeSector} Edition`;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            applySectorFilter();
+            updateActiveNav();
+            window.addEventListener('scroll', updateActiveNav);
+        });
+    </script>
 </body>
 </html>

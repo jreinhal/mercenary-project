@@ -84,7 +84,7 @@ public class CacAuthenticationService implements AuthenticationService {
             user.setAuthProvider(AuthProvider.CAC);
             user.setRoles(Set.of(UserRole.VIEWER)); // Require admin to upgrade
             user.setClearance(ClearanceLevel.UNCLASSIFIED); // Require verification
-            user.setAllowedSectors(Set.of(Department.OPERATIONS));
+            user.setAllowedSectors(Set.of(Department.GOVERNMENT));
             user.setCreatedAt(Instant.now());
             user.setActive(true);
             user = userRepository.save(user);
