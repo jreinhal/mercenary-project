@@ -17,6 +17,7 @@ import com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService.RoutingDecision
 import com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService.RoutingResult;
 import com.jreinhal.mercenary.service.PromptGuardrailService;
 import com.jreinhal.mercenary.service.PromptGuardrailService.GuardrailResult;
+import com.jreinhal.mercenary.service.PiiRedactionService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -56,6 +57,7 @@ public class MercenaryController {
     private final AdaptiveRagService adaptiveRagService;
     private final SectorConfig sectorConfig;
     private final PromptGuardrailService guardrailService;
+    private final PiiRedactionService piiRedactionService;
 
     // METRICS
     private final AtomicInteger docCount = new AtomicInteger(0);
@@ -100,17 +102,23 @@ public class MercenaryController {
             // Output manipulation
             Pattern.compile("(start|begin)\\s+(your\\s+)?response\\s+with", Pattern.CASE_INSENSITIVE),
             // Prompt extraction attempts - target system/AI context specifically
-            Pattern.compile("(what|tell|show|reveal|repeat|print|display).{0,15}(your|system|internal|hidden).{0,10}(prompt|instructions?|directives?|rules|guidelines)", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("(what|how).{0,10}(are|were).{0,10}you.{0,10}(programmed|instructed|told|prompted)", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("(ignore|forget|disregard).{0,20}(previous|above|prior|all).{0,20}(instructions?|prompt|rules|context)", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("(repeat|echo|output).{0,15}(everything|all).{0,10}(above|before|prior)", Pattern.CASE_INSENSITIVE));
+            Pattern.compile(
+                    "(what|tell|show|reveal|repeat|print|display).{0,15}(your|system|internal|hidden).{0,10}(prompt|instructions?|directives?|rules|guidelines)",
+                    Pattern.CASE_INSENSITIVE),
+            Pattern.compile("(what|how).{0,10}(are|were).{0,10}you.{0,10}(programmed|instructed|told|prompted)",
+                    Pattern.CASE_INSENSITIVE),
+            Pattern.compile(
+                    "(ignore|forget|disregard).{0,20}(previous|above|prior|all).{0,20}(instructions?|prompt|rules|context)",
+                    Pattern.CASE_INSENSITIVE),
+            Pattern.compile("(repeat|echo|output).{0,15}(everything|all).{0,10}(above|before|prior)",
+                    Pattern.CASE_INSENSITIVE));
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore,
             SecureIngestionService ingestionService, MongoTemplate mongoTemplate,
             AuditService auditService,
             QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer,
             QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, SectorConfig sectorConfig,
-            PromptGuardrailService guardrailService) {
+            PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService) {
         this.chatClient = builder.build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;
@@ -122,6 +130,7 @@ public class MercenaryController {
         this.quCoRagService = quCoRagService;
         this.adaptiveRagService = adaptiveRagService;
         this.guardrailService = guardrailService;
+        this.piiRedactionService = piiRedactionService;
 
         // Initialize doc count from DB
         try {
@@ -148,7 +157,8 @@ public class MercenaryController {
                 avgLat + "ms", "queriesToday", qCount, "systemStatus", "NOMINAL");
     }
 
-    public record TelemetryResponse(int documentCount, int queryCount, long avgLatencyMs, boolean dbOnline, boolean llmOnline) {
+    public record TelemetryResponse(int documentCount, int queryCount, long avgLatencyMs, boolean dbOnline,
+            boolean llmOnline) {
     }
 
     @GetMapping("/telemetry")
@@ -215,7 +225,8 @@ public class MercenaryController {
                 user.hasRole(UserRole.ADMIN));
     }
 
-    // NOTE: Sector config endpoint moved to SectorConfigController (/api/config/sectors)
+    // NOTE: Sector config endpoint moved to SectorConfigController
+    // (/api/config/sectors)
     // for security-filtered response based on user clearance
 
     public record InspectResponse(String content, List<String> highlights) {
@@ -234,6 +245,39 @@ public class MercenaryController {
             return new InspectResponse("ERROR: Invalid sector.", List.of());
         }
 
+        // --- SECURITY HOTFIX P0.1 START ---
+        User user = SecurityContext.getCurrentUser();
+        Department department = Department.valueOf(dept);
+
+        // 1. Authentication Check
+        if (user == null) {
+            // Note: We pass null to auditService in this patch as we don't have convenient
+            // access to HttpServletRequest here without signature change
+            // Ideally we would inject HttpServletRequest into the method
+            auditService.logAccessDenied(null, "/api/inspect", "Unauthenticated access attempt", null);
+            return new InspectResponse("ACCESS DENIED: Authentication required.", List.of());
+        }
+
+        // 2. Permission Check (QUERY or INSPECT)
+        if (!user.hasPermission(UserRole.Permission.QUERY)) {
+            auditService.logAccessDenied(user, "/api/inspect", "Missing QUERY permission", null);
+            return new InspectResponse("ACCESS DENIED: Insufficient permissions.", List.of());
+        }
+
+        // 3. Clearance Check
+        if (sectorConfig.requiresElevatedClearance(department)
+                && !user.canAccessClassification(department.getRequiredClearance())) {
+            auditService.logAccessDenied(user, "/api/inspect", "Insufficient clearance for " + dept, null);
+            return new InspectResponse("ACCESS DENIED: Insufficient clearance for " + dept, List.of());
+        }
+
+        // 4. Sector Access Check
+        if (!user.canAccessSector(department)) {
+            auditService.logAccessDenied(user, "/api/inspect", "Not authorized for sector " + dept, null);
+            return new InspectResponse("ACCESS DENIED: Unauthorized sector access.", List.of());
+        }
+        // --- SECURITY HOTFIX P0.1 END ---
+
         // Normalize filename - strip common prefixes that LLMs sometimes add
         String normalizedFileName = fileName
                 .replaceFirst("(?i)^filename:\\s*", "")
@@ -243,8 +287,8 @@ public class MercenaryController {
 
         // SECURITY: Validate filename to prevent path traversal attacks
         if (normalizedFileName.contains("..") || normalizedFileName.contains("/") ||
-            normalizedFileName.contains("\\") || normalizedFileName.contains("\0") ||
-            !normalizedFileName.matches("^[a-zA-Z0-9._\\-\\s]+$")) {
+                normalizedFileName.contains("\\") || normalizedFileName.contains("\0") ||
+                !normalizedFileName.matches("^[a-zA-Z0-9._\\-\\s]+$")) {
             log.warn("SECURITY: Path traversal attempt detected in filename: {}", fileName);
             return new InspectResponse("ERROR: Invalid filename. Path traversal not allowed.", List.of());
         }
@@ -260,11 +304,12 @@ public class MercenaryController {
                     + cachedContent;
         } else {
             try {
-                // FALLBACK: Manual filtering if VectorStore doesn't support metadata filters
-                // 1. Retrieve a broader set of documents using the normalized filename as
-                // context
+                // SECURITY HOTFIX P0.2: Add sector filter to prevent cross-sector document leakage
+                // The vector query MUST include filterExpression to prevent returning docs from other sectors
                 List<Document> potentialDocs = vectorStore.similaritySearch(
-                        SearchRequest.query(normalizedFileName).withTopK(20));
+                        SearchRequest.query(normalizedFileName)
+                                .withTopK(20)
+                                .withFilterExpression("dept == '" + dept + "'"));
 
                 log.info("INSPECT DEBUG: Searching for '{}'. Found {} potential candidates.", normalizedFileName,
                         potentialDocs.size());
@@ -278,7 +323,7 @@ public class MercenaryController {
 
                 if (match.isPresent()) {
                     String recoveredContent = match.get().getContent();
-                    secureDocCache.put(cacheKey, recoveredContent);  // Use compound key
+                    secureDocCache.put(cacheKey, recoveredContent); // Use compound key
                     content = "--- SECURE DOCUMENT VIEWER (ARCHIVE) ---\nFILE: " + normalizedFileName
                             + "\nSECTOR: " + dept
                             + "\nSTATUS: RECONSTRUCTED FROM VECTOR STORE\n----------------------------------\n\n"
@@ -291,7 +336,9 @@ public class MercenaryController {
             } catch (Exception e) {
                 // SECURITY: Log detailed error server-side only, return generic message to user
                 log.error(">> RECOVERY FAILED: {}", e.getMessage(), e);
-                return new InspectResponse("ERROR: Document recovery failed. Please contact support if this persists. [ERR-1001]", List.of());
+                return new InspectResponse(
+                        "ERROR: Document recovery failed. Please contact support if this persists. [ERR-1001]",
+                        List.of());
             }
         }
 
@@ -354,7 +401,8 @@ public class MercenaryController {
         }
 
         // CLEARANCE CHECK: High-security sectors require elevated clearance
-        if (sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
+        if (sectorConfig.requiresElevatedClearance(department)
+                && !user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/ingest/file",
                     "Insufficient clearance for " + department.name(), request);
             return "ACCESS DENIED: Insufficient clearance for " + department.name() + " sector.";
@@ -382,9 +430,12 @@ public class MercenaryController {
 
             // 2. ALWAYS Update In-Memory Cache (Gold Master Failover)
             // SECURITY: Use compound key to prevent cross-sector data leakage
+            // SECURITY FIX PR-3: Redact PII BEFORE caching to prevent data leakage via cache
             String rawContent = new String(file.getBytes(), StandardCharsets.UTF_8);
+            PiiRedactionService.RedactionResult redactionResult = piiRedactionService.redact(rawContent);
+            String redactedContent = redactionResult.getRedactedContent();
             String cacheKey = dept.toUpperCase() + ":" + filename;
-            secureDocCache.put(cacheKey, rawContent);
+            secureDocCache.put(cacheKey, redactedContent);
             docCount.incrementAndGet();
             long duration = System.currentTimeMillis() - startTime;
 
@@ -405,7 +456,7 @@ public class MercenaryController {
      * SECURITY: POST is recommended to prevent query logging in server access logs,
      * browser history, and proxy logs.
      */
-    @RequestMapping(value = "/ask", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/ask", method = { RequestMethod.GET, RequestMethod.POST })
     public String ask(@RequestParam("q") String query, @RequestParam("dept") String dept,
             HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
@@ -430,7 +481,8 @@ public class MercenaryController {
         }
 
         // CLEARANCE CHECK: High-security sectors require elevated clearance
-        if (sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
+        if (sectorConfig.requiresElevatedClearance(department)
+                && !user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/ask",
                     "Insufficient clearance for " + department.name(), request);
             return "ACCESS DENIED: Insufficient clearance for " + department.name() + " sector.";
@@ -561,8 +613,10 @@ public class MercenaryController {
 
             // QuCo-RAG: Post-generation hallucination detection (arXiv:2512.19134)
             // Check for novel entities with zero co-occurrence - potential hallucinations
-            // NOTE: Results are logged for debugging only, NOT appended to user-visible response
-            QuCoRagService.HallucinationResult hallucinationResult = quCoRagService.detectHallucinationRisk(response, query);
+            // NOTE: Results are logged for debugging only, NOT appended to user-visible
+            // response
+            QuCoRagService.HallucinationResult hallucinationResult = quCoRagService.detectHallucinationRisk(response,
+                    query);
             if (hallucinationResult.isHighRisk()) {
                 log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}",
                         hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
@@ -603,7 +657,7 @@ public class MercenaryController {
      * SECURITY: Accepts both GET (legacy) and POST (recommended) to prevent
      * query logging in server access logs, browser history, and proxy logs.
      */
-    @RequestMapping(value = "/ask/enhanced", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/ask/enhanced", method = { RequestMethod.GET, RequestMethod.POST })
     public EnhancedAskResponse askEnhanced(@RequestParam("q") String query, @RequestParam("dept") String dept,
             HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
@@ -629,7 +683,8 @@ public class MercenaryController {
         }
 
         // CLEARANCE CHECK: High-security sectors require elevated clearance
-        if (sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
+        if (sectorConfig.requiresElevatedClearance(department)
+                && !user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/ask/enhanced",
                     "Insufficient clearance for " + department.name(), request);
             return new EnhancedAskResponse("ACCESS DENIED: Insufficient clearance.", List.of(), List.of(), Map.of(),
@@ -696,7 +751,7 @@ public class MercenaryController {
                 return new EnhancedAskResponse(
                         directResponse,
                         completedTrace != null ? completedTrace.getStepsAsMaps() : List.of(),
-                        List.of(),  // No sources for direct responses
+                        List.of(), // No sources for direct responses
                         Map.of(
                                 "latencyMs", timeTaken,
                                 "routingDecision", "NO_RETRIEVAL",
@@ -733,10 +788,11 @@ public class MercenaryController {
 
                 reasoningTracer.addStep(StepType.VECTOR_SEARCH,
                         "Vector Search" + (isCompoundQuery ? " [" + (i + 1) + "/" + subQueries.size() + "]" : ""),
-                        "Found " + subResults.size() + " candidates, kept " + limited.size() + " (" + granularityMode + ")",
+                        "Found " + subResults.size() + " candidates, kept " + limited.size() + " (" + granularityMode
+                                + ")",
                         System.currentTimeMillis() - stepStart,
                         Map.of("query", subQuery, "candidateCount", subResults.size(), "keptCount", limited.size(),
-                               "granularity", routingDecision.name(), "adaptiveTopK", adaptiveTopK));
+                                "granularity", routingDecision.name(), "adaptiveTopK", adaptiveTopK));
             }
             List<Document> rawDocs = new ArrayList<>(allDocs);
 
@@ -837,24 +893,29 @@ public class MercenaryController {
                     Map.of("success", llmSuccess, "responseLength", response.length()));
 
             // Step 7: QuCo-RAG Post-generation Hallucination Detection (arXiv:2512.19134)
-            // NOTE: Results are captured in reasoning trace for transparency, but NOT appended to response
+            // NOTE: Results are captured in reasoning trace for transparency, but NOT
+            // appended to response
             stepStart = System.currentTimeMillis();
-            QuCoRagService.HallucinationResult hallucinationResult = quCoRagService.detectHallucinationRisk(response, query);
+            QuCoRagService.HallucinationResult hallucinationResult = quCoRagService.detectHallucinationRisk(response,
+                    query);
             boolean hasHallucinationRisk = hallucinationResult.isHighRisk();
             if (hasHallucinationRisk) {
                 log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}",
                         hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
-                // Internal diagnostic only - captured in reasoning trace for Glass Box transparency
+                // Internal diagnostic only - captured in reasoning trace for Glass Box
+                // transparency
                 // Do NOT append to user-visible response text
             }
             reasoningTracer.addStep(StepType.UNCERTAINTY_ANALYSIS, "Hallucination Check",
                     hasHallucinationRisk
-                        ? "Review recommended: " + hallucinationResult.flaggedEntities().size() + " novel entities (risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")"
-                        : "Passed (risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")",
+                            ? "Review recommended: " + hallucinationResult.flaggedEntities().size()
+                                    + " novel entities (risk=" + String.format("%.2f", hallucinationResult.riskScore())
+                                    + ")"
+                            : "Passed (risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")",
                     System.currentTimeMillis() - stepStart,
                     Map.of("riskScore", hallucinationResult.riskScore(),
-                           "flaggedEntities", hallucinationResult.flaggedEntities(),
-                           "isHighRisk", hasHallucinationRisk));
+                            "flaggedEntities", hallucinationResult.flaggedEntities(),
+                            "isHighRisk", hasHallucinationRisk));
 
             // Complete trace
             long timeTaken = System.currentTimeMillis() - start;
@@ -959,7 +1020,8 @@ public class MercenaryController {
             // SECURITY: Log detailed error server-side only, return generic message to user
             log.error("Error in /ask/enhanced endpoint", e);
             ReasoningTrace errorTrace = reasoningTracer.endTrace();
-            return new EnhancedAskResponse("An error occurred processing your query. Please try again or contact support. [ERR-1002]",
+            return new EnhancedAskResponse(
+                    "An error occurred processing your query. Please try again or contact support. [ERR-1002]",
                     errorTrace != null ? errorTrace.getStepsAsMaps() : List.of(), List.of(),
                     Map.of("errorCode", "ERR-1002"),
                     errorTrace != null ? errorTrace.getTraceId() : null);
@@ -968,13 +1030,34 @@ public class MercenaryController {
 
     /**
      * Retrieve a reasoning trace by ID for debugging/audit.
+     * SECURITY HOTFIX P1.1: Owner-scoped access - only trace owner or admin can retrieve.
      */
     @GetMapping("/reasoning/{traceId}")
     public Map<String, Object> getReasoningTrace(@PathVariable String traceId) {
+        User user = SecurityContext.getCurrentUser();
+
+        // Authentication required
+        if (user == null) {
+            auditService.logAccessDenied(null, "/api/reasoning/" + traceId, "Unauthenticated access", null);
+            return Map.of("error", "Authentication required", "traceId", traceId);
+        }
+
         ReasoningTrace trace = reasoningTracer.getTrace(traceId);
         if (trace == null) {
             return Map.of("error", "Trace not found", "traceId", traceId);
         }
+
+        // SECURITY: Only owner or admin can access the trace
+        String traceOwnerId = trace.getUserId();
+        boolean isOwner = traceOwnerId != null && traceOwnerId.equals(user.getId());
+        boolean isAdmin = user.hasRole(UserRole.ADMIN);
+
+        if (!isOwner && !isAdmin) {
+            auditService.logAccessDenied(user, "/api/reasoning/" + traceId,
+                    "Attempted access to another user's trace", null);
+            return Map.of("error", "Access denied - not trace owner", "traceId", traceId);
+        }
+
         return trace.toMap();
     }
 
@@ -982,7 +1065,7 @@ public class MercenaryController {
      * Hybrid retrieval with tracing support (default threshold).
      */
     private List<Document> performHybridRerankingTracked(String query, String dept) {
-        return performHybridReranking(query, dept, 0.15);  // Default threshold
+        return performHybridReranking(query, dept, 0.15); // Default threshold
     }
 
     /**
@@ -998,13 +1081,15 @@ public class MercenaryController {
      * 2. Filtering (Precision) via Keyword Density
      * reduces hallucination by discarding low-confidence vectors.
      *
-     * @param query The search query
-     * @param dept Department filter
-     * @param threshold AdaptiveRAG-provided similarity threshold (higher = more precise, lower = more recall)
+     * @param query     The search query
+     * @param dept      Department filter
+     * @param threshold AdaptiveRAG-provided similarity threshold (higher = more
+     *                  precise, lower = more recall)
      */
     private List<Document> performHybridReranking(String query, String dept, double threshold) {
         // SECURITY: Validate dept is a known enum value to prevent filter injection
-        // Even though dept comes from enum, defense in depth protects against future bugs
+        // Even though dept comes from enum, defense in depth protects against future
+        // bugs
         if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
             log.warn("SECURITY: Invalid department value in filter: {}", dept);
             return List.of();
@@ -1083,7 +1168,8 @@ public class MercenaryController {
      *
      * Security:
      * - Requires at least 30% of query terms to match OR minimum 2 matches
-     * - CRITICAL: Only returns documents from the requested sector (compound key filtering)
+     * - CRITICAL: Only returns documents from the requested sector (compound key
+     * filtering)
      */
     private List<Document> searchInMemoryCache(String query, String dept) {
         List<Document> results = new ArrayList<>();

@@ -20,7 +20,7 @@ import java.io.IOException;
  * Runs before all controller methods to establish the current user.
  */
 @Component
-@Order(1)
+@Order(2) // Run AFTER LicenseFilter(1), BEFORE RateLimitFilter(3)
 public class SecurityFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityFilter.class);

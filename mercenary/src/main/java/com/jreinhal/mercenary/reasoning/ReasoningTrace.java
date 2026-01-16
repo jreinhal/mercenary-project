@@ -15,20 +15,33 @@ public class ReasoningTrace {
     private final Instant timestamp;
     private final String query;
     private final String department;
+    private final String userId;  // SECURITY: Owner binding for access control
     private final List<ReasoningStep> steps;
     private final Map<String, Object> metrics;
     private long totalDurationMs;
     private boolean completed;
 
     public ReasoningTrace(String query, String department) {
+        this(query, department, null);
+    }
+
+    public ReasoningTrace(String query, String department, String userId) {
         this.traceId = UUID.randomUUID().toString().substring(0, 8);
         this.timestamp = Instant.now();
         this.query = query;
         this.department = department;
+        this.userId = userId;
         this.steps = new ArrayList<>();
         this.metrics = new LinkedHashMap<>();
         this.totalDurationMs = 0;
         this.completed = false;
+    }
+
+    /**
+     * Get the user ID who created this trace (for access control).
+     */
+    public String getUserId() {
+        return userId;
     }
 
     /**

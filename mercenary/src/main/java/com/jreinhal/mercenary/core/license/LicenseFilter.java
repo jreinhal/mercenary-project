@@ -15,7 +15,7 @@ import java.io.IOException;
  * Static resources and the license status endpoint remain accessible.
  */
 @Component
-@Order(1)
+@Order(1) // Run AFTER CspNonceFilter(0), BEFORE SecurityFilter(2)
 public class LicenseFilter extends OncePerRequestFilter {
 
     private final LicenseService licenseService;

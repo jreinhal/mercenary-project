@@ -10,8 +10,11 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.Cipher;
 import javax.crypto.Mac;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -23,7 +26,9 @@ import java.util.Optional;
  *
  * SECURITY: Implements proper tokenization with:
  * - HMAC-SHA256 for deterministic token generation (same input = same token)
- * - Encrypted storage of original values in MongoDB
+ * - AES-256-GCM encrypted storage of original values in MongoDB (PR-5)
+ * - 96-bit random IV per encryption operation
+ * - 128-bit authentication tag for integrity verification
  * - Configurable token prefix for type identification
  * - Audit trail of tokenization operations
  *
@@ -31,10 +36,11 @@ import java.util.Optional;
  * - PCI-DSS: Meets tokenization requirements for PANs
  * - HIPAA: Supports de-identification of PHI
  * - GDPR: Enables pseudonymization of personal data
+ * - NIST 800-38D: AES-GCM authenticated encryption
  *
  * Configuration:
  * - app.tokenization.enabled: Enable/disable tokenization
- * - app.tokenization.secret-key: HMAC secret (must be set in production!)
+ * - app.tokenization.secret-key: 256-bit AES key, Base64 encoded (must be set in production!)
  * - app.tokenization.store-originals: Whether to store original values for detokenization
  */
 @Service
@@ -211,30 +217,82 @@ public class TokenizationVault {
         return "<<TOK:" + piiType + ":" + shortHash + ">>";
     }
 
+    // AES-GCM constants
+    private static final String AES_GCM_ALGORITHM = "AES/GCM/NoPadding";
+    private static final int GCM_IV_LENGTH = 12;  // 96 bits - NIST recommended
+    private static final int GCM_TAG_LENGTH = 128; // 128 bits - full authentication tag
+
     /**
      * Encrypt a value for storage using AES-256-GCM.
-     * For simplicity, this implementation uses Base64 encoding.
-     * In production, use proper AES-256-GCM encryption with a separate encryption key.
+     *
+     * SECURITY: Implements authenticated encryption with:
+     * - 256-bit AES key (derived from HMAC key)
+     * - 96-bit random IV (unique per encryption)
+     * - 128-bit authentication tag (integrity verification)
+     *
+     * Format: Base64(IV || ciphertext || tag)
      */
     private String encryptValue(String value) {
-        // TODO: Implement proper AES-256-GCM encryption
-        // For now, use Base64 encoding (NOT secure for production!)
-        // This should be replaced with:
-        // - Generate random IV
-        // - AES-256-GCM encrypt with separate encryption key
-        // - Store IV + ciphertext
+        try {
+            // Generate random IV for each encryption
+            byte[] iv = new byte[GCM_IV_LENGTH];
+            new SecureRandom().nextBytes(iv);
 
-        // Base64 encoding as placeholder (NOT SECURE)
-        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+            // Initialize cipher with AES-GCM
+            Cipher cipher = Cipher.getInstance(AES_GCM_ALGORITHM);
+            SecretKeySpec keySpec = new SecretKeySpec(secretKey, "AES");
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
+
+            // Encrypt
+            byte[] plaintext = value.getBytes(StandardCharsets.UTF_8);
+            byte[] ciphertext = cipher.doFinal(plaintext);
+
+            // Combine IV + ciphertext (tag is appended by GCM mode)
+            ByteBuffer buffer = ByteBuffer.allocate(iv.length + ciphertext.length);
+            buffer.put(iv);
+            buffer.put(ciphertext);
+
+            return Base64.getEncoder().encodeToString(buffer.array());
+
+        } catch (Exception e) {
+            log.error("AES-256-GCM encryption failed: {}", e.getMessage());
+            throw new RuntimeException("Encryption failed", e);
+        }
     }
 
     /**
-     * Decrypt a stored value.
+     * Decrypt a stored value using AES-256-GCM.
+     *
+     * SECURITY: Verifies authentication tag before returning plaintext.
+     * Will throw exception if data has been tampered with.
      */
     private String decryptValue(String encrypted) {
-        // TODO: Implement proper AES-256-GCM decryption
-        // Base64 decoding as placeholder (NOT SECURE)
-        return new String(Base64.getDecoder().decode(encrypted), StandardCharsets.UTF_8);
+        try {
+            byte[] encryptedBytes = Base64.getDecoder().decode(encrypted);
+
+            // Extract IV and ciphertext
+            ByteBuffer buffer = ByteBuffer.wrap(encryptedBytes);
+            byte[] iv = new byte[GCM_IV_LENGTH];
+            buffer.get(iv);
+            byte[] ciphertext = new byte[buffer.remaining()];
+            buffer.get(ciphertext);
+
+            // Initialize cipher for decryption
+            Cipher cipher = Cipher.getInstance(AES_GCM_ALGORITHM);
+            SecretKeySpec keySpec = new SecretKeySpec(secretKey, "AES");
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
+
+            // Decrypt (will verify authentication tag)
+            byte[] plaintext = cipher.doFinal(ciphertext);
+
+            return new String(plaintext, StandardCharsets.UTF_8);
+
+        } catch (Exception e) {
+            log.error("AES-256-GCM decryption failed (possible tampering): {}", e.getMessage());
+            throw new RuntimeException("Decryption failed - data may have been tampered with", e);
+        }
     }
 
     /**

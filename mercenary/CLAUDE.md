@@ -25,6 +25,39 @@ src/main/java/com/jreinhal/mercenary/
 
 Build command: `./gradlew build -Pedition=government`
 
+## Security Audit Checklist
+
+**When reviewing security, Claude MUST check for gaps, not just verify what exists.**
+
+### Endpoint Authorization Audit
+For EVERY `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`:
+- [ ] Does it have `@PreAuthorize` or explicit auth check?
+- [ ] If it accepts a `dept`/`sector` parameter, does it verify user has access to that sector?
+- [ ] If it accepts a `userId` or resource ID, does it verify ownership or admin role?
+- [ ] If it queries the database/vector store, does the query include sector filtering?
+
+### Data Flow Audit
+- [ ] Trace data from input to storage - is it redacted/sanitized before caching?
+- [ ] Trace data from storage to output - is sector filtering applied at query time, not just in-memory?
+- [ ] Are cache keys compound (include sector) to prevent cross-tenant leakage?
+
+### Filter/Interceptor Audit
+- [ ] List all `@Order` values - are there conflicts (same order = undefined execution)?
+- [ ] Do filters that need auth context run AFTER authentication?
+- [ ] Is `X-Forwarded-For` only trusted behind known proxies?
+
+### Frontend Security Audit
+- [ ] Do CSP policies match actual inline script/style usage?
+- [ ] Are nonce attributes present on inline scripts if CSP requires them?
+- [ ] Does the frontend expose data the backend should filter?
+
+### Missing vs Existing
+- [ ] Audit what's MISSING, not just what EXISTS
+- [ ] List all endpoints and check each one - don't assume "if /ask is secure, /inspect must be too"
+- [ ] Check for orphaned endpoints that bypass security patterns
+
+---
+
 ## Critical Constraints
 
 1. **SCIF/Air-Gap Compliance is Paramount**
@@ -95,20 +128,54 @@ Build command: `./gradlew build -Pedition=government`
 
 ## Session Start Reminder
 
-**At the start of each session**, perform these checks:
+**At the start of each session**, Claude should:
 
-### 1. Skills Update Check
-Fetch updates from: https://github.com/sickn33/antigravity-awesome-skills
-- Review any new or updated skill definitions
-- Sync relevant changes to: `C:\Users\JRein\.claude\agents\HOW-TO-USE-AGENTS.md`
+### 1. Read Key Status Files
+```
+Read: RECOMMENDATIONS.md (current security posture)
+Read: SECURITY_GATES.md (audit checklist)
+```
 
-### 2. Full Audit Macro Available
-Remind the user that the full audit macro is available:
+### 2. Current Architecture Context
+
+**Filter Execution Order:**
+```
+CspNonceFilter(0) → LicenseFilter(1) → SecurityFilter(2) → RateLimitFilter(3)
+```
+
+**Key Security Services:**
+| Service | Purpose |
+|---------|---------|
+| `SecurityFilter` | Authentication, sets `SecurityContext` |
+| `RateLimitFilter` | Role-based rate limiting (bucket4j) |
+| `PromptGuardrailService` | 3-layer injection defense |
+| `PiiRedactionService` | SSN/CC/Email redaction |
+| `TokenizationVault` | AES-256-GCM encrypted PII storage |
+| `AuditService` | STIG-compliant logging, fail-closed mode |
+
+**Critical Controller Endpoints:**
+| Endpoint | Security | Notes |
+|----------|----------|-------|
+| `/api/ask` | Auth + Sector + Clearance | Main RAG query |
+| `/api/inspect` | Auth + Sector filter on vector query | Document viewer |
+| `/api/ingest/file` | Auth + INGEST permission + Clearance | Upload |
+| `/api/reasoning/{id}` | Auth + Owner-scoped | Trace viewer |
+
+### 3. Recent Security Hardening (2026-01-15)
+All fixes verified and implemented:
+- PR-1: `/api/inspect` sector filter + `/api/reasoning` owner scope
+- PR-2: Filter ordering (0,1,2,3 sequence)
+- PR-3: Ingest cache redacts PII before storage
+- PR-4: Externalized JS to `js/sentinel-app.js` for CSP
+- PR-5: `TokenizationVault` uses AES-256-GCM (not Base64)
+
+### 4. Full Audit Macro Available
 ```
 Run: Read .agent/macros/run-audit.md and execute it
 ```
-This launches 5 parallel agents (Security, Architecture, Development, Infrastructure, Strategy) to generate a comprehensive `RECOMMENDATIONS.md` report.
+Launches 5 parallel agents to generate `RECOMMENDATIONS.md`.
+
+### 5. Skills Update Check
+Fetch updates from: https://github.com/sickn33/antigravity-awesome-skills
 
 **Macro location:** `.agent/macros/`
-- `full-audit-report.md` - Full documentation and agent prompts
-- `run-audit.md` - Executable instructions

@@ -62,13 +62,26 @@ public class ReasoningTracer {
      * @return The new trace, or null if tracing is disabled
      */
     public ReasoningTrace startTrace(String query, String department) {
+        return startTrace(query, department, null);
+    }
+
+    /**
+     * Start a new reasoning trace with owner binding for access control.
+     * SECURITY: The userId is stored with the trace to enable owner-scoped retrieval.
+     *
+     * @param query The user's query
+     * @param department The department being queried
+     * @param userId The ID of the user making the request (for access control)
+     * @return The new trace, or null if tracing is disabled
+     */
+    public ReasoningTrace startTrace(String query, String department, String userId) {
         if (!enabled) {
             return null;
         }
 
-        ReasoningTrace trace = new ReasoningTrace(query, department);
+        ReasoningTrace trace = new ReasoningTrace(query, department, userId);
         currentTrace.set(trace);
-        log.debug("Started reasoning trace: {}", trace.getTraceId());
+        log.debug("Started reasoning trace: {} for user: {}", trace.getTraceId(), userId);
         return trace;
     }
 

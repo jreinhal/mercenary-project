@@ -28,7 +28,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * Rate limiting filter to prevent abuse and DoS attacks.
  *
- * SECURITY: Implements token bucket algorithm per user/IP with configurable limits.
+ * SECURITY: Implements token bucket algorithm per user/IP with configurable
+ * limits.
  *
  * Rate limits (per minute):
  * - ADMIN: 200 requests (higher for administrative tasks)
@@ -44,7 +45,7 @@ import java.util.concurrent.TimeUnit;
  * - app.rate-limit.anonymous-rpm: Requests per minute for unauthenticated
  */
 @Component
-@Order(1) // Run before SecurityFilter
+@Order(3) // Run AFTER SecurityFilter(2) to use RBAC limits
 public class RateLimitFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
@@ -129,9 +130,8 @@ public class RateLimitFilter implements Filter {
 
             httpResponse.getWriter().write(
                     "{\"error\": \"Rate limit exceeded. Please wait before making more requests.\", " +
-                    "\"errorCode\": \"ERR-429\", " +
-                    "\"retryAfter\": 60}"
-            );
+                            "\"errorCode\": \"ERR-429\", " +
+                            "\"retryAfter\": 60}");
         }
     }
 
@@ -141,8 +141,7 @@ public class RateLimitFilter implements Filter {
     private Bucket createBucket(int requestsPerMinute) {
         Bandwidth limit = Bandwidth.classic(
                 requestsPerMinute,
-                Refill.greedy(requestsPerMinute, Duration.ofMinutes(1))
-        );
+                Refill.greedy(requestsPerMinute, Duration.ofMinutes(1)));
         return Bucket.builder().addLimit(limit).build();
     }
 
@@ -196,12 +195,12 @@ public class RateLimitFilter implements Filter {
      */
     private boolean isExemptPath(String path) {
         return path.startsWith("/css/") ||
-               path.startsWith("/js/") ||
-               path.startsWith("/images/") ||
-               path.equals("/favicon.ico") ||
-               path.equals("/api/health") ||
-               path.equals("/api/status") ||
-               path.startsWith("/swagger-ui") ||
-               path.startsWith("/v3/api-docs");
+                path.startsWith("/js/") ||
+                path.startsWith("/images/") ||
+                path.equals("/favicon.ico") ||
+                path.equals("/api/health") ||
+                path.equals("/api/status") ||
+                path.startsWith("/swagger-ui") ||
+                path.startsWith("/v3/api-docs");
     }
 }
