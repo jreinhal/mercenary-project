@@ -57,3 +57,28 @@ Build command: `./gradlew build -Pedition=government`
 - **Medical**: Hospitals, research institutions, pharma (requires HIPAA)
 - **Professional**: Law firms, finance, enterprise, academia
 - **Trial**: 30-day full-feature evaluation for all prospects
+
+## Key Capabilities (Sales/Documentation Reference)
+
+### Security & Compliance
+- **Fail-Closed Auditing**: STIG-compliant audit logging that halts operations on failure (govcloud profile)
+- **Magic Byte File Detection**: Apache Tika-based content analysis blocks executables regardless of extension
+- **Prompt Injection Defense**: Multi-layer detection with suspicious pattern blocking and audit logging
+- **PII/PHI Redaction**: Automatic detection and redaction of sensitive data (SSN, credit cards, emails)
+- **NIST 800-53 Compliance**: Documented control mapping for ATO packages (see docs/COMPLIANCE_MATRIX.md)
+- **HIPAA Ready**: PHI handling, audit trails, access controls for medical deployments
+- **FedRAMP Path**: Architecture supports eventual FedRAMP authorization
+
+### RAG Intelligence Features
+- **Self-Reflective RAG**: AI self-critique and refinement for improved answer quality
+- **Citation Verification**: Automatic source verification with confidence scoring
+- **Query Decomposition**: Complex questions broken into sub-queries for comprehensive answers
+- **Hybrid Search**: Combines vector similarity with BM25 keyword search (RRF fusion)
+- **Conversation Memory**: Context-aware follow-up questions with session persistence
+- **Multi-Sector Support**: Department-based document isolation with clearance enforcement
+
+### Deployment Options
+- **Air-Gapped/SCIF**: Full functionality without internet (local Ollama + MongoDB)
+- **CAC/PIV Authentication**: Smart card support for government deployments
+- **Docker Hardened**: Pinned versions, resource limits, non-root containers
+- **Multi-Edition Builds**: Single codebase, compile-time feature isolation

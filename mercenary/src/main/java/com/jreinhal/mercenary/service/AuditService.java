@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.model.AuditEvent.Outcome;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.Department;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -16,10 +17,13 @@ import java.util.List;
 
 /**
  * Service for STIG-compliant audit logging.
- * 
+ *
  * All security-relevant events are persisted to MongoDB for compliance
  * auditing.
  * Supports both synchronous logging and async batch operations.
+ *
+ * SECURITY: In govcloud profile, audit failures cause operations to halt (fail-closed).
+ * This is required for STIG compliance - losing audit trails is a critical finding.
  */
 @Service
 public class AuditService {
@@ -27,12 +31,22 @@ public class AuditService {
     private static final Logger log = LoggerFactory.getLogger(AuditService.class);
     private final MongoTemplate mongoTemplate;
 
+    /**
+     * When true, audit failures throw exceptions (fail-closed).
+     * Required for government/high-assurance deployments.
+     * Default: false for dev, should be true in govcloud profile.
+     */
+    @Value("${app.audit.fail-closed:false}")
+    private boolean failClosed;
+
     public AuditService(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
     }
 
     /**
      * Log an audit event.
+     *
+     * @throws AuditFailureException if failClosed=true and audit write fails
      */
     public void log(AuditEvent event) {
         try {
@@ -40,10 +54,25 @@ public class AuditService {
             log.debug("Audit event logged: {} - {} - {}",
                     event.getEventType(), event.getUserId(), event.getAction());
         } catch (Exception e) {
-            // Audit logging failures should not break the application
-            // but MUST be logged for security review
             log.error("CRITICAL: Failed to persist audit event: {} - {}",
                     event.getEventType(), e.getMessage());
+
+            if (failClosed) {
+                // In high-assurance mode, halt operations on audit failure
+                throw new AuditFailureException(
+                    "Audit logging failed - operation halted for compliance. Event: " +
+                    event.getEventType() + ", Error: " + e.getMessage(), e);
+            }
+            // In non-critical mode, log but continue (for dev/test environments)
+        }
+    }
+
+    /**
+     * Exception thrown when audit logging fails in fail-closed mode.
+     */
+    public static class AuditFailureException extends RuntimeException {
+        public AuditFailureException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 

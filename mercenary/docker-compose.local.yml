@@ -13,7 +13,8 @@
 services:
   # Local MongoDB for air-gapped environments
   mongodb:
-    image: mongo:7
+    # SECURITY: Pinned version - do not use 'latest' in production
+    image: mongo:7.0.14
     container_name: sentinel-mongodb
     ports:
       - "27017:27017"
@@ -24,10 +25,17 @@ services:
     networks:
       - sentinel-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
 
   # Local Ollama for AI inference (no internet required)
   ollama:
-    image: ollama/ollama:latest
+    # SECURITY: Pinned version - do not use 'latest' in production
+    image: ollama/ollama:0.3.14
     container_name: sentinel-ollama
     ports:
       - "11434:11434"
@@ -36,6 +44,12 @@ services:
     networks:
       - sentinel-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 4G
     # Pre-load models before going air-gapped:
     # docker exec sentinel-ollama ollama pull llama3
     # docker exec sentinel-ollama ollama pull nomic-embed-text
@@ -53,12 +67,20 @@ services:
       - OLLAMA_URL=http://ollama:11434
       - LLM_MODEL=llama3
       - EMBEDDING_MODEL=nomic-embed-text
+      # SECURITY: Enable fail-closed auditing for government deployments
+      - APP_AUDIT_FAIL_CLOSED=true
     depends_on:
       - mongodb
       - ollama
     networks:
       - sentinel-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
 
 networks:
   sentinel-network:
