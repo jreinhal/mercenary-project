@@ -23,6 +23,11 @@ public enum UserRole {
     VIEWER(Set.of(Permission.QUERY)),
 
     /**
+     * Medical access role for PHI reveal workflows.
+     */
+    PHI_ACCESS(Set.of(Permission.QUERY)),
+
+    /**
      * Compliance/security role - read-only access to audit logs.
      */
     AUDITOR(Set.of(Permission.QUERY, Permission.VIEW_AUDIT));

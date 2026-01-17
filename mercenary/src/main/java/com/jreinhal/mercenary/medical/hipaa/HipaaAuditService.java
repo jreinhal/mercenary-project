@@ -115,6 +115,57 @@ public class HipaaAuditService {
     }
 
     /**
+     * Log PHI access by user ID (for PII reveal operations).
+     * Overload that accepts String parameters for controller use.
+     */
+    public void logPhiAccess(String userId, String action, String resourceId,
+                             String reason, boolean breakTheGlass) {
+        HipaaAuditEvent event = new HipaaAuditEvent(
+            AuditEventType.PHI_ACCESS,
+            userId,
+            null,
+            null,
+            Map.of(
+                "action", action,
+                "resourceId", resourceId,
+                "reason", reason,
+                "breakTheGlass", breakTheGlass
+            )
+        );
+        saveEvent(event);
+
+        if (breakTheGlass) {
+            log.warn("BREAK-THE-GLASS: PHI access by {} for resource {} - Reason: {}",
+                     userId, resourceId, reason);
+        }
+    }
+
+    /**
+     * Log a break-the-glass emergency access event.
+     * These events require enhanced logging and review.
+     */
+    public void logBreakTheGlass(String userId, String resourceId,
+                                  String patientId, String emergencyReason) {
+        HipaaAuditEvent event = new HipaaAuditEvent(
+            AuditEventType.PHI_ACCESS,
+            userId,
+            null,
+            null,
+            Map.of(
+                "action", "BREAK_THE_GLASS",
+                "resourceId", resourceId,
+                "patientId", patientId,
+                "emergencyReason", emergencyReason,
+                "requiresReview", true
+            )
+        );
+        saveEvent(event);
+
+        log.error("!!! BREAK-THE-GLASS EMERGENCY ACCESS !!!");
+        log.error("User: {}, Patient: {}, Reason: {}", userId, patientId, emergencyReason);
+    }
+
+    /**
      * Core event logging method.
      */
     private void logEvent(AuditEventType type, User user, Map<String, Object> details) {

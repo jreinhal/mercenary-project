@@ -20,9 +20,11 @@ import com.jreinhal.mercenary.service.PromptGuardrailService.GuardrailResult;
 import com.jreinhal.mercenary.service.PiiRedactionService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.web.bind.annotation.*;
+import com.jreinhal.mercenary.rag.crag.RewriteService;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -35,6 +37,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
@@ -55,6 +60,7 @@ public class MercenaryController {
     private final ReasoningTracer reasoningTracer;
     private final QuCoRagService quCoRagService;
     private final AdaptiveRagService adaptiveRagService;
+    private final RewriteService rewriteService;
     private final SectorConfig sectorConfig;
     private final PromptGuardrailService guardrailService;
     private final PiiRedactionService piiRedactionService;
@@ -71,6 +77,26 @@ public class MercenaryController {
             .maximumSize(MAX_CACHE_ENTRIES)
             .expireAfterWrite(CACHE_TTL)
             .build();
+
+    // LLM OPTIONS - Explicit settings to guarantee token cap takes effect
+    // Spring AI YAML binding for num-predict may not work in all versions
+    // FAST MODE: llama3.2, temp 0.2, 256 tokens - optimized for speed
+    private static final OllamaOptions LLM_OPTIONS_FAST = OllamaOptions.create()
+            .withModel("llama3.2:latest")
+            .withTemperature(0.2f)
+            .withNumPredict(256);
+
+    // QUALITY MODE: llama3, temp 0.3, 512 tokens - better for complex queries
+    private static final OllamaOptions LLM_OPTIONS_QUALITY = OllamaOptions.create()
+            .withModel("llama3:latest")
+            .withTemperature(0.3f)
+            .withNumPredict(512);
+
+    // Default to FAST mode
+    private static final OllamaOptions LLM_OPTIONS = LLM_OPTIONS_FAST;
+
+    // LLM timeout to prevent "Failed to fetch" on slow responses
+    private static final int LLM_TIMEOUT_SECONDS = 30;
 
     // PROMPT INJECTION DETECTION - Defense-in-depth patterns
     // Note: This is a heuristic layer, not a complete solution. Consider
@@ -117,9 +143,12 @@ public class MercenaryController {
             SecureIngestionService ingestionService, MongoTemplate mongoTemplate,
             AuditService auditService,
             QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer,
-            QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, SectorConfig sectorConfig,
+            QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService,
+            SectorConfig sectorConfig,
             PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService) {
-        this.chatClient = builder.build();
+        this.chatClient = builder
+                .defaultFunctions("calculator", "currentDate")
+                .build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;
         this.sectorConfig = sectorConfig;
@@ -129,6 +158,7 @@ public class MercenaryController {
         this.reasoningTracer = reasoningTracer;
         this.quCoRagService = quCoRagService;
         this.adaptiveRagService = adaptiveRagService;
+        this.rewriteService = rewriteService;
         this.guardrailService = guardrailService;
         this.piiRedactionService = piiRedactionService;
 
@@ -139,6 +169,14 @@ public class MercenaryController {
         } catch (Exception e) {
             log.error("Failed to initialize doc count", e);
         }
+
+        // Log effective LLM settings on startup to prevent silent config drift
+        log.info("=== LLM Configuration ===");
+        log.info("  Model: {}", LLM_OPTIONS.getModel());
+        log.info("  Temperature: {}", LLM_OPTIONS.getTemperature());
+        log.info("  Max Tokens (num_predict): {}", LLM_OPTIONS.getNumPredict());
+        log.info("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
+        log.info("=========================");
     }
 
     @GetMapping("/status")
@@ -304,8 +342,10 @@ public class MercenaryController {
                     + cachedContent;
         } else {
             try {
-                // SECURITY HOTFIX P0.2: Add sector filter to prevent cross-sector document leakage
-                // The vector query MUST include filterExpression to prevent returning docs from other sectors
+                // SECURITY HOTFIX P0.2: Add sector filter to prevent cross-sector document
+                // leakage
+                // The vector query MUST include filterExpression to prevent returning docs from
+                // other sectors
                 List<Document> potentialDocs = vectorStore.similaritySearch(
                         SearchRequest.query(normalizedFileName)
                                 .withTopK(20)
@@ -430,7 +470,8 @@ public class MercenaryController {
 
             // 2. ALWAYS Update In-Memory Cache (Gold Master Failover)
             // SECURITY: Use compound key to prevent cross-sector data leakage
-            // SECURITY FIX PR-3: Redact PII BEFORE caching to prevent data leakage via cache
+            // SECURITY FIX PR-3: Redact PII BEFORE caching to prevent data leakage via
+            // cache
             String rawContent = new String(file.getBytes(), StandardCharsets.UTF_8);
             PiiRedactionService.RedactionResult redactionResult = piiRedactionService.redact(rawContent);
             String redactedContent = redactionResult.getRedactedContent();
@@ -526,6 +567,19 @@ public class MercenaryController {
             Set<Document> allDocs = new LinkedHashSet<>();
             for (String subQuery : subQueries) {
                 List<Document> subResults = performHybridRerankingTracked(subQuery, dept);
+
+                // CRAG: Corrective RAG Loop
+                // If retrieval yields poor results (empty), attempt to rewrite the query using
+                // LLM and retry.
+                if (subResults.isEmpty()) {
+                    log.info("CRAG: Retrieval failed for '{}'. Initiating Corrective Loop.", subQuery);
+                    String rewritten = rewriteService.rewriteQuery(subQuery);
+                    if (!rewritten.equals(subQuery)) {
+                        subResults = performHybridRerankingTracked(rewritten, dept);
+                        log.info("CRAG: Retry with '{}' found {} docs.", rewritten, subResults.size());
+                    }
+                }
+
                 // Limit contribution from each sub-query to prevent flooding
                 allDocs.addAll(subResults.stream().limit(5).toList());
             }
@@ -588,11 +642,20 @@ public class MercenaryController {
 
             String response;
             try {
-                response = chatClient.prompt()
-                        .system(systemMessage)
-                        .user(query)
-                        .call()
-                        .content();
+                // Wrap LLM call with timeout to prevent hung requests
+                final String sysMsg = systemMessage;
+                final String userQuery = query;
+                response = CompletableFuture.supplyAsync(() ->
+                        chatClient.prompt()
+                                .system(sysMsg)
+                                .user(userQuery)
+                                .options(LLM_OPTIONS)
+                                .call()
+                                .content()
+                ).get(LLM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (TimeoutException te) {
+                log.warn("LLM response timed out after {}s for query: {}", LLM_TIMEOUT_SECONDS, query.substring(0, Math.min(50, query.length())));
+                response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try:\n- Simplifying your question\n- Asking about a more specific topic\n- Trying again in a moment";
             } catch (Exception llmError) {
                 log.error("LLM Generation Failed (Offline/Misconfigured). Generating Simulation Response.", llmError);
                 // Fallback: Construct a response from the retrieved documents directly
@@ -732,11 +795,18 @@ public class MercenaryController {
 
                 String directResponse;
                 try {
-                    directResponse = chatClient.prompt()
-                            .system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.")
-                            .user(query)
-                            .call()
-                            .content();
+                    final String userQuery = query;
+                    directResponse = CompletableFuture.supplyAsync(() ->
+                            chatClient.prompt()
+                                    .system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.")
+                                    .user(userQuery)
+                                    .options(LLM_OPTIONS)
+                                    .call()
+                                    .content()
+                    ).get(LLM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                } catch (TimeoutException te) {
+                    log.warn("LLM response timed out after {}s for ZeroHop query", LLM_TIMEOUT_SECONDS);
+                    directResponse = "**Response Timeout**\n\nThe system is taking longer than expected. Please try again.";
                 } catch (Exception llmError) {
                     directResponse = "I apologize, but I'm unable to process your request at the moment. Please try rephrasing your question.";
                 }
@@ -866,11 +936,20 @@ public class MercenaryController {
             String response;
             boolean llmSuccess = true;
             try {
-                response = chatClient.prompt()
-                        .system(systemMessage)
-                        .user(query)
-                        .call()
-                        .content();
+                final String sysMsg = systemMessage;
+                final String userQuery = query;
+                response = CompletableFuture.supplyAsync(() ->
+                        chatClient.prompt()
+                                .system(sysMsg)
+                                .user(userQuery)
+                                .options(LLM_OPTIONS)
+                                .call()
+                                .content()
+                ).get(LLM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (TimeoutException te) {
+                llmSuccess = false;
+                log.warn("LLM response timed out after {}s", LLM_TIMEOUT_SECONDS);
+                response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try:\n- Simplifying your question\n- Asking about a more specific topic\n- Trying again in a moment";
             } catch (Exception llmError) {
                 llmSuccess = false;
                 log.error("LLM Generation Failed", llmError);
@@ -996,12 +1075,14 @@ public class MercenaryController {
                 }
             }
 
-            // FALLBACK: If LLM didn't cite sources, use the retrieved document sources
-            // This ensures users always see which documents were consulted
-            if (sources.isEmpty() && !docSources.isEmpty()) {
-                sources.addAll(docSources);
-                log.info("LLM response lacked citations - using retrieved document sources: {}", docSources);
+            // Always include ALL retrieved documents as sources
+            // Users should see every document that was consulted, not just what LLM cited
+            for (String docSource : docSources) {
+                if (!sources.contains(docSource)) {
+                    sources.add(docSource);
+                }
             }
+            log.debug("Final sources list (LLM cited + retrieved): {}", sources);
 
             return new EnhancedAskResponse(
                     response,
@@ -1030,7 +1111,8 @@ public class MercenaryController {
 
     /**
      * Retrieve a reasoning trace by ID for debugging/audit.
-     * SECURITY HOTFIX P1.1: Owner-scoped access - only trace owner or admin can retrieve.
+     * SECURITY HOTFIX P1.1: Owner-scoped access - only trace owner or admin can
+     * retrieve.
      */
     @GetMapping("/reasoning/{traceId}")
     public Map<String, Object> getReasoningTrace(@PathVariable String traceId) {

@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jakarta.annotation.PostConstruct;
+import java.util.Arrays;
 import java.util.List;
 
 @SpringBootApplication
@@ -42,7 +43,9 @@ public class MercenaryApplication {
 		String mongoUri = environment.getProperty("spring.data.mongodb.uri", "");
 
 		// CRITICAL: Detect DEV mode with production MongoDB
-		boolean isDevMode = "DEV".equalsIgnoreCase(authMode) || activeProfile.contains("dev");
+		boolean isDevProfile = Arrays.stream(environment.getActiveProfiles())
+				.anyMatch(profile -> "dev".equalsIgnoreCase(profile));
+		boolean isDevMode = "DEV".equalsIgnoreCase(authMode) || isDevProfile;
 		boolean isProductionDb = mongoUri.contains("mongodb+srv://") ||
 				mongoUri.contains("mongodb.net") ||
 				mongoUri.contains("atlas");
@@ -73,6 +76,35 @@ public class MercenaryApplication {
 						"Set AUTH_MODE=OIDC or AUTH_MODE=CAC for production deployments.");
 			} else {
 				log.warn("!!! DEV MODE OVERRIDE ACTIVE - THIS IS EXTREMELY DANGEROUS !!!");
+			}
+		}
+
+		// CRITICAL: Prevent DEV auth mode outside dev profile
+		if ("DEV".equalsIgnoreCase(authMode) && !isDevProfile) {
+			log.error("=================================================================");
+			log.error("  CRITICAL SECURITY ERROR: DEV AUTH MODE OUTSIDE DEV PROFILE");
+			log.error("=================================================================");
+			log.error("  Auth Mode: {}", authMode);
+			log.error("  Profile: {}", activeProfile);
+			log.error("");
+			log.error("  DEV mode auto-provisions ADMIN users with TOP_SECRET clearance!");
+			log.error("  This is a critical misconfiguration for non-dev environments.");
+			log.error("");
+			log.error("  To fix:");
+			log.error("    - Set APP_PROFILE=standard/enterprise/govcloud");
+			log.error("    - Set AUTH_MODE=STANDARD/OIDC/CAC");
+			log.error("");
+			log.error("  To override (NOT RECOMMENDED):");
+			log.error("    - Set ALLOW_DEV_AUTH=true");
+			log.error("=================================================================");
+
+			String allowOverride = environment.getProperty("ALLOW_DEV_AUTH", "false");
+			if (!"true".equalsIgnoreCase(allowOverride)) {
+				throw new SecurityException(
+						"DEV auth mode is not allowed outside the dev profile. " +
+						"Set AUTH_MODE=STANDARD/OIDC/CAC for non-dev deployments.");
+			} else {
+				log.warn("!!! DEV AUTH OVERRIDE ACTIVE - THIS IS EXTREMELY DANGEROUS !!!");
 			}
 		}
 
