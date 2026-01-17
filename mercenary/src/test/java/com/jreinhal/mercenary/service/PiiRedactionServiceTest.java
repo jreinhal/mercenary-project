@@ -3,6 +3,9 @@ package com.jreinhal.mercenary.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -10,13 +13,17 @@ import static org.junit.jupiter.api.Assertions.*;
  * Comprehensive tests for PII Redaction Service.
  * Covers all industry-standard PII patterns.
  */
+@ExtendWith(MockitoExtension.class)
 class PiiRedactionServiceTest {
+
+    @Mock
+    private TokenizationVault tokenizationVault;
 
     private PiiRedactionService service;
 
     @BeforeEach
     void setUp() {
-        service = new PiiRedactionService();
+        service = new PiiRedactionService(tokenizationVault);
         // Enable service and all patterns
         org.springframework.test.util.ReflectionTestUtils.setField(service, "enabled", true);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "mode", "MASK");
