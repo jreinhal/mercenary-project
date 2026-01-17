@@ -158,9 +158,19 @@ public record ReasoningStep(
         EXPERIENCE_VALIDATION,
 
         /**
+         * Validation step for CragGrader.
+         */
+        VALIDATION,
+
+        /**
          * MCTS graph reasoning (Graph-O1).
          */
         MCTS_REASONING,
+
+        /**
+         * Agentic RAG orchestration step.
+         */
+        ORCHESTRATION,
 
         /**
          * Visual asset analysis (MegaRAG).

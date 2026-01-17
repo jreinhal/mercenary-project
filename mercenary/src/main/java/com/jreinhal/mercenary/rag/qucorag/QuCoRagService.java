@@ -41,6 +41,13 @@ public class QuCoRagService {
     private final VectorStore vectorStore;
     private final ReasoningTracer reasoningTracer;
 
+    // Performance guardrails (avoid N*M vectorStore calls on long responses)
+    private static final int MAX_QUERY_ENTITIES_FOR_COOC = 8;
+    private static final int MAX_NOVEL_ENTITIES_FOR_COOC = 12;
+    private static final int COOC_TOP_K = 20;
+    private static final double COOC_SIMILARITY_THRESHOLD = 0.40;
+    private static final int MAX_COOC_DOC_CHARS = 20000;
+
     @Value("${sentinel.qucorag.enabled:true}")
     private boolean enabled;
 
@@ -165,21 +172,66 @@ public class QuCoRagService {
             return new HallucinationResult(0.0, List.of(), false);
         }
 
+        // If we don't have query entities, we can't do a meaningful co-occurrence check (skip for speed)
+        if (queryEntities.isEmpty()) {
+            return new HallucinationResult(0.0, List.of(), false);
+        }
+
         // Check co-occurrence of novel entities with query entities
+        // Optimization: do at most ONE vector search per novel entity (instead of per novel*query pair)
         List<String> flaggedEntities = new ArrayList<>();
         int verifiedCount = 0;
 
-        for (String novelEntity : novelEntities) {
-            boolean hasCoOccurrence = false;
+        // Cap entity lists to prevent runaway latency
+        var queryEntityList = new ArrayList<>(queryEntities);
+        queryEntityList.sort((a, b) -> Integer.compare(b.length(), a.length()));  // Prefer longer entities
+        if (queryEntityList.size() > MAX_QUERY_ENTITIES_FOR_COOC) {
+            queryEntityList = new ArrayList<>(queryEntityList.subList(0, MAX_QUERY_ENTITIES_FOR_COOC));
+        }
 
-            // Check if novel entity co-occurs with any query entity in the corpus
-            for (String queryEntity : queryEntities) {
-                long coOccurrence = checkCoOccurrence(novelEntity, queryEntity);
-                if (coOccurrence > 0) {
-                    hasCoOccurrence = true;
-                    verifiedCount++;
-                    break;
+        var novelEntityList = new ArrayList<>(novelEntities);
+        novelEntityList.sort((a, b) -> Integer.compare(b.length(), a.length()));
+        if (novelEntityList.size() > MAX_NOVEL_ENTITIES_FOR_COOC) {
+            novelEntityList = new ArrayList<>(novelEntityList.subList(0, MAX_NOVEL_ENTITIES_FOR_COOC));
+        }
+
+        for (String novelEntity : novelEntityList) {
+            boolean hasCoOccurrence = false;
+            String novelLower = novelEntity.toLowerCase();
+
+            // One semantic lookup per novel entity (instead of N*M lookups)
+            try {
+                var entityDocs = vectorStore.similaritySearch(
+                        SearchRequest.query(novelEntity)
+                                .withTopK(COOC_TOP_K)
+                                .withSimilarityThreshold(COOC_SIMILARITY_THRESHOLD));
+
+                for (var doc : entityDocs) {
+                    String content = doc.getContent() == null ? "" : doc.getContent();
+                    if (content.length() > MAX_COOC_DOC_CHARS) {
+                        content = content.substring(0, MAX_COOC_DOC_CHARS);
+                    }
+                    String contentLower = content.toLowerCase();
+
+                    // Require the novel entity to actually be present in the evidence text
+                    if (!contentLower.contains(novelLower)) {
+                        continue;
+                    }
+
+                    for (String queryEntity : queryEntityList) {
+                        if (contentLower.contains(queryEntity.toLowerCase())) {
+                            hasCoOccurrence = true;
+                            verifiedCount++;
+                            break;
+                        }
+                    }
+
+                    if (hasCoOccurrence) {
+                        break;
+                    }
                 }
+            } catch (Exception e) {
+                log.warn("Co-occurrence check failed for novel entity '{}': {}", novelEntity, e.getMessage());
             }
 
             if (!hasCoOccurrence) {

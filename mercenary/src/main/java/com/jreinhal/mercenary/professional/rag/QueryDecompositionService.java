@@ -23,7 +23,7 @@ import java.util.*;
  * - Comparative: Questions comparing multiple entities
  * - Temporal: Questions spanning time periods
  */
-@Service
+@Service("professionalQueryDecompositionService")
 public class QueryDecompositionService {
 
     private static final Logger log = LoggerFactory.getLogger(QueryDecompositionService.class);

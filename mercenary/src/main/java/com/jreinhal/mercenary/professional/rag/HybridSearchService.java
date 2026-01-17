@@ -13,7 +13,8 @@ import java.util.stream.Collectors;
 /**
  * Hybrid search service combining BM25 keyword search with vector similarity.
  *
- * PROFESSIONAL EDITION - Available in professional, medical, and government builds.
+ * PROFESSIONAL EDITION - Available in professional, medical, and government
+ * builds.
  *
  * Implements Reciprocal Rank Fusion (RRF) to combine:
  * - BM25/TF-IDF keyword matching (good for exact terms, acronyms, names)
@@ -47,13 +48,13 @@ public class HybridSearchService {
      * Search result with combined score.
      */
     public record HybridResult(
-        Document document,
-        double combinedScore,
-        double vectorScore,
-        double bm25Score,
-        int vectorRank,
-        int bm25Rank
-    ) {}
+            Document document,
+            double combinedScore,
+            double vectorScore,
+            double bm25Score,
+            int vectorRank,
+            int bm25Rank) {
+    }
 
     /**
      * Perform hybrid search with default weights.
@@ -65,14 +66,14 @@ public class HybridSearchService {
     /**
      * Perform hybrid search with custom weights.
      *
-     * @param query The search query
-     * @param topK Number of results to return
+     * @param query        The search query
+     * @param topK         Number of results to return
      * @param vectorWeight Weight for vector search results (0-1)
-     * @param bm25Weight Weight for BM25 results (0-1)
+     * @param bm25Weight   Weight for BM25 results (0-1)
      */
     public List<HybridResult> search(String query, int topK, double vectorWeight, double bm25Weight) {
         log.debug("Hybrid search: query='{}', topK={}, weights=[vector={}, bm25={}]",
-            truncate(query, 50), topK, vectorWeight, bm25Weight);
+                truncate(query, 50), topK, vectorWeight, bm25Weight);
 
         // Perform vector search
         List<Document> vectorResults = performVectorSearch(query, topK * 2);
@@ -85,8 +86,8 @@ public class HybridSearchService {
 
         // Return top K
         return fusedResults.stream()
-            .limit(topK)
-            .toList();
+                .limit(topK)
+                .toList();
     }
 
     /**
@@ -94,10 +95,8 @@ public class HybridSearchService {
      */
     private List<Document> performVectorSearch(String query, int limit) {
         try {
-            SearchRequest request = SearchRequest.builder()
-                .query(query)
-                .topK(limit)
-                .build();
+            SearchRequest request = SearchRequest.query(query)
+                    .withTopK(limit);
 
             return vectorStore.similaritySearch(request);
         } catch (Exception e) {
@@ -127,9 +126,9 @@ public class HybridSearchService {
             scored.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
 
             return scored.stream()
-                .limit(limit)
-                .map(Map.Entry::getKey)
-                .toList();
+                    .limit(limit)
+                    .map(Map.Entry::getKey)
+                    .toList();
         } catch (Exception e) {
             log.error("BM25 search failed: {}", e.getMessage());
             return List.of();
@@ -142,8 +141,8 @@ public class HybridSearchService {
      */
     private double calculateBm25Score(String query, String document) {
         // BM25 parameters
-        double k1 = 1.2;  // Term frequency saturation
-        double b = 0.75;  // Document length normalization
+        double k1 = 1.2; // Term frequency saturation
+        double b = 0.75; // Document length normalization
 
         // Average document length (estimate)
         double avgDocLength = 500.0;
@@ -159,7 +158,8 @@ public class HybridSearchService {
             // Term frequency in document
             long tf = docTerms.stream().filter(t -> t.equals(term)).count();
 
-            if (tf == 0) continue;
+            if (tf == 0)
+                continue;
 
             // Simplified IDF (would be pre-computed in production)
             double idf = Math.log(1 + 1); // Simplified - assume term is rare
@@ -177,20 +177,21 @@ public class HybridSearchService {
      * Tokenize text into terms.
      */
     private Set<String> tokenize(String text) {
-        if (text == null) return Set.of();
+        if (text == null)
+            return Set.of();
 
         return Arrays.stream(text.toLowerCase()
-            .replaceAll("[^a-z0-9\\s]", " ")
-            .split("\\s+"))
-            .filter(t -> t.length() > 2)
-            .collect(Collectors.toSet());
+                .replaceAll("[^a-z0-9\\s]", " ")
+                .split("\\s+"))
+                .filter(t -> t.length() > 2)
+                .collect(Collectors.toSet());
     }
 
     /**
      * Fuse vector and BM25 results using Reciprocal Rank Fusion.
      */
     private List<HybridResult> fuseResults(List<Document> vectorResults, List<Document> bm25Results,
-                                          double vectorWeight, double bm25Weight) {
+            double vectorWeight, double bm25Weight) {
 
         // Create document ID to rank maps
         Map<String, Integer> vectorRanks = new HashMap<>();
@@ -298,18 +299,19 @@ public class HybridSearchService {
         }
 
         if (query.contains("?") || query.toLowerCase().startsWith("how") ||
-            query.toLowerCase().startsWith("what") || query.toLowerCase().startsWith("why")) {
+                query.toLowerCase().startsWith("what") || query.toLowerCase().startsWith("why")) {
             vectorWeight += 0.1;
             bm25Weight -= 0.1;
         }
 
         // Normalize to ensure they sum to 1
         double total = vectorWeight + bm25Weight;
-        return new double[]{vectorWeight / total, bm25Weight / total};
+        return new double[] { vectorWeight / total, bm25Weight / total };
     }
 
     private String truncate(String str, int maxLen) {
-        if (str == null) return "";
+        if (str == null)
+            return "";
         return str.length() <= maxLen ? str : str.substring(0, maxLen) + "...";
     }
 }
