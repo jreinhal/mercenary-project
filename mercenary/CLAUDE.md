@@ -119,6 +119,15 @@ For EVERY `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`:
 - **Hybrid Search**: Combines vector similarity with BM25 keyword search (RRF fusion)
 - **Conversation Memory**: Context-aware follow-up questions with session persistence
 - **Multi-Sector Support**: Department-based document isolation with clearance enforcement
+- **User Feedback System**: Thumbs up/down collection with RLHF training data export
+
+### Quality Improvement & Analytics
+- **Feedback Collection**: Users can rate responses with thumbs up/down
+- **Categorized Issues**: Negative feedback includes category (hallucination, inaccurate citation, outdated info, wrong sources, too slow)
+- **RAG Metadata Capture**: Each feedback includes routing decision, sources, signals, response time for debugging
+- **Training Data Export**: Export query/response pairs with reward signals for model fine-tuning
+- **Admin Dashboard**: Satisfaction metrics, category breakdown, issue triage queue
+- **Hallucination Reports**: Priority queue for high-risk issues requiring review
 
 ### Deployment Options
 - **Air-Gapped/SCIF**: Full functionality without internet (local Ollama + MongoDB)
@@ -160,6 +169,10 @@ CspNonceFilter(0) → LicenseFilter(1) → SecurityFilter(2) → RateLimitFilter
 | `/api/inspect` | Auth + Sector filter on vector query | Document viewer |
 | `/api/ingest/file` | Auth + INGEST permission + Clearance | Upload |
 | `/api/reasoning/{id}` | Auth + Owner-scoped | Trace viewer |
+| `/api/feedback/positive` | Auth | Submit thumbs up |
+| `/api/feedback/negative` | Auth | Submit thumbs down with category |
+| `/api/feedback/analytics` | Auth + ADMIN/ANALYST | Dashboard metrics |
+| `/api/feedback/export/training` | Auth + ADMIN | RLHF training data |
 
 ### 3. Recent Security Hardening (2026-01-15)
 All fixes verified and implemented:

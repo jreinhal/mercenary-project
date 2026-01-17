@@ -236,6 +236,34 @@ This document consolidates all marketing messaging, competitive positioning, and
 
 ---
 
+### 6. User Feedback & Continuous Improvement
+
+**The Problem:** RAG systems deployed without feedback loops cannot improve over time.
+
+**Our Solution:** Built-in feedback collection with RLHF-ready export:
+- Thumbs up/down on every response
+- Categorized negative feedback (hallucination, inaccurate citation, outdated info, wrong sources)
+- Full RAG metadata captured for debugging
+- Training data export for model fine-tuning
+- Admin dashboard for quality metrics and issue triage
+
+**Technical Features:**
+- MongoDB persistence for all feedback
+- Sector-scoped analytics (satisfaction rates by department)
+- Hallucination report queue for high-priority review
+- Export to RLHF training format (query/response/reward)
+- Issue resolution tracking (open → in_progress → resolved)
+
+**Compliance Value:**
+- Audit trail of user feedback
+- Evidence of continuous improvement process
+- Documented issue resolution workflow
+
+**Sales Line:**
+> "Every thumbs down becomes training data. Your users teach the system to be better."
+
+---
+
 ## Reference Documents
 
 | Document | Location | Purpose |

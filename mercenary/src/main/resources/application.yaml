@@ -3,6 +3,13 @@ spring:
     name: mercenary-ai
   profiles:
     active: ${APP_PROFILE:dev}
+  # Disable static resource caching for development
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+          no-store: true
 
   # =================================================================
   # CRITICAL SECURITY WARNING
@@ -36,7 +43,18 @@ spring:
       chat:
         options:
           model: ${LLM_MODEL:llama3}
-          temperature: 0.7
+          # Lower temperature for more focused, grounded responses (reduces hallucinations)
+          temperature: ${LLM_TEMPERATURE:0.2}
+          # Cap output tokens aggressively to prevent runaway generation
+          num-predict: ${LLM_NUM_PREDICT:256}
+          # Context window size (reduce for speed if needed)
+          num-ctx: ${LLM_NUM_CTX:4096}
+          # Stop sequences to prevent rambling past the answer
+          stop:
+            - "\n\nSources:"
+            - "\n\n---"
+            - "\n\nNote:"
+            - "\n\nAdditional"
       embedding:
         model: ${EMBEDDING_MODEL:nomic-embed-text}
     vectorstore:
@@ -46,6 +64,15 @@ spring:
           initialize-schema: true
           path-name: embedding
           index-name: vector_index
+
+# ============================================
+# Server/Cookie Security
+# ============================================
+server:
+  servlet:
+    session:
+      cookie:
+        same-site: Lax
 
 # ============================================
 # Custom App Config
@@ -75,15 +102,18 @@ sentinel:
 
   # HGMem - HyperGraph Memory (arXiv:2512.23959v2)
   # Multi-step RAG with complex relational modeling
+  # WARNING: HGMem is very slow with large document sets (5+ min per query)
+  # Disable by default - enable only for small corpora or demo environments
   hgmem:
-    enabled: ${HGMEM_ENABLED:true}
+    enabled: ${HGMEM_ENABLED:false}
     max-memory-points: ${HGMEM_MAX_POINTS:50}
     merge-similarity-threshold: ${HGMEM_MERGE_THRESHOLD:0.7}
 
   # HiFi-RAG Pipeline (arXiv:2512.22442v1)
   # Hierarchical filtering + two-pass generation
+  # NOTE: Disabled by default - LLM reranking adds significant latency
   hifirag:
-    enabled: ${HIFIRAG_ENABLED:true}
+    enabled: ${HIFIRAG_ENABLED:false}
     initial-retrieval-k: ${HIFIRAG_INITIAL_K:20}
     filtered-top-k: ${HIFIRAG_FILTERED_K:5}
     relevance-threshold: ${HIFIRAG_RELEVANCE_THRESHOLD:0.5}
@@ -163,8 +193,9 @@ sentinel:
 
   # Graph-O1: MCTS Graph Reasoning (arXiv:2512.17912)
   # Monte Carlo Tree Search for knowledge graph traversal
+  # NOTE: Disabled by default - MCTS iterations are slow
   grapho1:
-    enabled: ${GRAPHO1_ENABLED:true}
+    enabled: ${GRAPHO1_ENABLED:false}
     # Maximum MCTS iterations
     max-iterations: ${GRAPHO1_MAX_ITER:50}
     # UCB1 exploration constant (sqrt(2) is common)
@@ -175,6 +206,58 @@ sentinel:
     simulation-count: ${GRAPHO1_SIM_COUNT:3}
     # Minimum confidence for early termination
     min-confidence: ${GRAPHO1_MIN_CONF:0.6}
+
+  # AdaptiveRAG: Intelligent Query Routing (arXiv:2504.20734)
+  # Routes queries to optimal retrieval strategy based on complexity
+  adaptiverag:
+    enabled: ${ADAPTIVERAG_ENABLED:true}
+    # Use LLM for semantic routing (higher accuracy, +3-5s latency)
+    # Default false: uses fast heuristics only to avoid per-query LLM overhead
+    semantic-router-enabled: ${ADAPTIVERAG_SEMANTIC_ROUTER:false}
+    chunk-top-k: ${ADAPTIVERAG_CHUNK_K:5}
+    document-top-k: ${ADAPTIVERAG_DOCUMENT_K:3}
+
+  # CRAG: Corrective RAG (Document Grading)
+  # Validates retrieved documents before generation to reduce hallucinations
+  # NOTE: LLM grading disabled by default for speed - use keyword-based grading
+  crag:
+    enabled: ${CRAG_ENABLED:true}
+    # Minimum ratio of CORRECT documents to proceed with generation
+    min-correct-threshold: ${CRAG_MIN_CORRECT:0.5}
+    # Use LLM for document grading (higher accuracy, higher latency)
+    use-llm-grading: ${CRAG_LLM_GRADING:false}
+    # Confidence threshold for accepting retrieval results
+    confidence-threshold: ${CRAG_CONFIDENCE:0.6}
+
+  # HyDE: Hypothetical Document Embeddings
+  # Improves retrieval for vague/conceptual queries
+  # NOTE: Disabled - requires LLM call for hypothetical doc generation
+  hyde:
+    enabled: ${HYDE_ENABLED:false}
+    top-k: ${HYDE_TOP_K:10}
+    similarity-threshold: ${HYDE_THRESHOLD:0.25}
+    # Maximum length of hypothetical document
+    hypothetical-length: ${HYDE_LENGTH:150}
+
+  # Self-RAG: Self-Reflective Generation
+  # Model critiques its own claims for maximum factual accuracy
+  # NOTE: Disabled by default - adds 2-3 LLM calls per query
+  selfrag:
+    enabled: ${SELFRAG_ENABLED:false}
+    # Max uncertain claims before triggering re-retrieval
+    max-uncertain-claims: ${SELFRAG_MAX_UNCERTAIN:2}
+    # Re-retrieve when too many uncertain claims detected
+    re-retrieve-on-uncertain: ${SELFRAG_RE_RETRIEVE:true}
+
+  # Agentic RAG Orchestrator
+  # Full pipeline coordination for complex queries (Government edition)
+  agentic:
+    # DISABLED BY DEFAULT - enable for government edition
+    enabled: ${AGENTIC_ENABLED:false}
+    max-iterations: ${AGENTIC_MAX_ITER:3}
+    use-hyde: ${AGENTIC_USE_HYDE:true}
+    use-selfrag: ${AGENTIC_USE_SELFRAG:true}
+    confidence-threshold: ${AGENTIC_CONFIDENCE:0.6}
 
   # PII Redaction Engine
   # Industry-standard compliance: NIST 800-122, GDPR, HIPAA Safe Harbor, PCI-DSS
