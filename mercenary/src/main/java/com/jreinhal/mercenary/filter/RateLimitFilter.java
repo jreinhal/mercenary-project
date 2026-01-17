@@ -197,6 +197,7 @@ public class RateLimitFilter implements Filter {
         return path.startsWith("/css/") ||
                 path.startsWith("/js/") ||
                 path.startsWith("/images/") ||
+                path.startsWith("/fonts/") ||
                 path.equals("/favicon.ico") ||
                 path.equals("/api/health") ||
                 path.equals("/api/status") ||

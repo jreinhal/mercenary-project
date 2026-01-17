@@ -1,12 +1,22 @@
 package com.jreinhal.mercenary.config;
 
+import com.jreinhal.mercenary.filter.PreAuthRateLimitFilter;
+import com.jreinhal.mercenary.filter.RateLimitFilter;
+import com.jreinhal.mercenary.filter.SecurityFilter;
 import com.jreinhal.mercenary.security.CacUserDetailsService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 /**
  * Security configuration with profile-based behavior.
@@ -16,12 +26,46 @@ import org.springframework.security.web.SecurityFilterChain;
  * - !govcloud: Development/standard mode with relaxed security
  */
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final CacUserDetailsService cacUserDetailsService;
+    private final SecurityFilter securityFilter;
+    private final RateLimitFilter rateLimitFilter;
+    private final PreAuthRateLimitFilter preAuthRateLimitFilter;
 
-    public SecurityConfig(CacUserDetailsService cacUserDetailsService) {
+    @Value("${app.auth-mode:DEV}")
+    private String authMode;
+
+    public SecurityConfig(CacUserDetailsService cacUserDetailsService,
+                          SecurityFilter securityFilter,
+                          RateLimitFilter rateLimitFilter,
+                          PreAuthRateLimitFilter preAuthRateLimitFilter) {
         this.cacUserDetailsService = cacUserDetailsService;
+        this.securityFilter = securityFilter;
+        this.rateLimitFilter = rateLimitFilter;
+        this.preAuthRateLimitFilter = preAuthRateLimitFilter;
+    }
+
+    @Bean
+    public FilterRegistrationBean<SecurityFilter> securityFilterRegistration(SecurityFilter filter) {
+        FilterRegistrationBean<SecurityFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
+        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<PreAuthRateLimitFilter> preAuthRateLimitFilterRegistration(PreAuthRateLimitFilter filter) {
+        FilterRegistrationBean<PreAuthRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     /**
@@ -38,58 +82,59 @@ public class SecurityConfig {
     @Profile("govcloud")
     public SecurityFilterChain govSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            // X.509 Certificate Authentication (CAC/PIV)
-            .x509(x509 -> x509
-                .subjectPrincipalRegex("CN=(.*?)(?:,|$)")
-                .userDetailsService(cacUserDetailsService)
-            )
+                .addFilterBefore(preAuthRateLimitFilter, SecurityContextHolderFilter.class)
+                .addFilterBefore(securityFilter, AnonymousAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, AuthorizationFilter.class)
 
-            // HTTPS Enforcement - Required for government environments
-            .requiresChannel(channel -> channel
-                .anyRequest().requiresSecure()
-            )
+                // X.509 Certificate Authentication (CAC/PIV)
+                .x509(x509 -> x509
+                        .subjectPrincipalRegex("CN=(.*?)(?:,|$)")
+                        .userDetailsService(cacUserDetailsService))
 
-            // CSRF Protection with cookie-based token (for SPA compatibility)
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers("/api/health", "/api/status")
-            )
+                // HTTPS Enforcement - Required for government environments
+                .requiresChannel(channel -> channel
+                        .anyRequest().requiresSecure())
 
-            // Security Headers (HSTS, X-Frame-Options, etc.)
-            .headers(headers -> headers
-                .httpStrictTransportSecurity(hsts -> hsts
-                    .maxAgeInSeconds(31536000)
-                    .includeSubDomains(true)
-                    .preload(true)
+                // CSRF Protection with cookie-based token (for SPA compatibility)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(
+                                org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .ignoringRequestMatchers("/api/health", "/api/status"))
+
+                // Security Headers (HSTS, X-Frame-Options, etc.)
+                .headers(headers -> headers
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .maxAgeInSeconds(31536000)
+                                .includeSubDomains(true)
+                                .preload(true))
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                        .contentTypeOptions(contentType -> {
+                        })
+                        .xssProtection(xss -> xss.disable()) // Modern browsers don't need this
                 )
-                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
-                .contentTypeOptions(contentType -> {})
-                .xssProtection(xss -> xss.disable()) // Modern browsers don't need this
-            )
 
-            // Authorization Rules
-            .authorizeHttpRequests(auth -> auth
-                // Public endpoints (health checks, static assets)
-                .requestMatchers("/api/health", "/api/status").permitAll()
-                .requestMatchers("/", "/index.html", "/manual.html").permitAll()
-                .requestMatchers("/css/**", "/js/**", "/favicon.ico").permitAll()
-                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                // Authorization Rules
+                .authorizeHttpRequests(auth -> auth
+                        // Public endpoints (health checks, static assets)
+                        .requestMatchers("/api/health", "/api/status").permitAll()
+                        .requestMatchers("/", "/index.html", "/manual.html").permitAll()
+                        .requestMatchers("/css/**", "/js/**", "/favicon.ico").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
-                // Admin endpoints require ADMIN role
-                .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+                        // Admin endpoints require ADMIN role
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
 
-                // Ingest endpoints require OPERATOR or ADMIN role
-                .requestMatchers("/api/ingest/**").hasAnyAuthority("OPERATOR", "ADMIN")
+                        // Ingest endpoints require OPERATOR or ADMIN role
+                        .requestMatchers("/api/ingest/**").hasAnyAuthority("OPERATOR", "ADMIN")
 
-                // Query endpoints require authenticated user
-                .requestMatchers("/api/ask/**", "/api/reasoning/**").authenticated()
+                        // Query endpoints require authenticated user
+                        .requestMatchers("/api/ask/**", "/api/reasoning/**").authenticated()
 
-                // All other API endpoints require authentication
-                .requestMatchers("/api/**").authenticated()
+                        // All other API endpoints require authentication
+                        .requestMatchers("/api/**").authenticated()
 
-                // Any other request requires authentication
-                .anyRequest().authenticated()
-            );
+                        // Any other request requires authentication
+                        .anyRequest().authenticated());
 
         return http.build();
     }
@@ -106,27 +151,29 @@ public class SecurityConfig {
     @Profile("dev")
     public SecurityFilterChain devSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Disable CSRF for dev mode (simpler testing)
-            .csrf(csrf -> csrf.disable())
+                .addFilterBefore(preAuthRateLimitFilter, SecurityContextHolderFilter.class)
+                .addFilterBefore(securityFilter, AnonymousAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, AuthorizationFilter.class)
 
-            // Security Headers (CSP handled by CspNonceFilter)
-            .headers(headers -> headers
-                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
-                .contentTypeOptions(contentType -> {})
-                // Additional security headers
-                .referrerPolicy(referrer -> referrer
-                    .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
-                )
-                .permissionsPolicy(permissions -> permissions
-                    .policy("geolocation=(), microphone=(), camera=()")
-                )
+                // Disable CSRF for dev mode (simpler testing)
+                .csrf(csrf -> csrf.disable())
+
+                // Security Headers (CSP handled by CspNonceFilter)
+                .headers(headers -> headers
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                        .contentTypeOptions(contentType -> {
+                        })
+                        // Additional security headers
+                        .referrerPolicy(referrer -> referrer
+                                .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .permissionsPolicy(permissions -> permissions
+                                .policy("geolocation=(), microphone=(), camera=()"))
                 // CSP is set dynamically by CspNonceFilter - don't set static CSP here
-            )
+                )
 
-            // Permit all requests - custom SecurityFilter handles auth
-            .authorizeHttpRequests(auth -> auth
-                .anyRequest().permitAll()
-            );
+                // Permit all requests - custom SecurityFilter handles auth
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll());
 
         return http.build();
     }
@@ -136,61 +183,58 @@ public class SecurityConfig {
      *
      * Provides baseline security for non-government deployments:
      * - CSRF protection enabled
-     * - Security headers (X-Frame-Options, Content-Type, Referrer-Policy, Permissions-Policy)
+     * - Security headers (X-Frame-Options, Content-Type, Referrer-Policy,
+     * Permissions-Policy)
      * - Public endpoints for static assets and health checks
      * - All API endpoints require authentication
      *
      * NOTE: CSP is handled by CspNonceFilter which generates dynamic nonces.
      */
     @Bean
-    @Profile({"enterprise", "standard"})
+    @Profile({ "enterprise", "standard" })
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            // CSRF Protection with cookie-based token (for SPA compatibility)
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers("/api/health", "/api/status")
-            )
+                .addFilterBefore(preAuthRateLimitFilter, SecurityContextHolderFilter.class)
+                .addFilterBefore(securityFilter, AnonymousAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, AuthorizationFilter.class)
 
-            // Security Headers (CSP handled by CspNonceFilter)
-            .headers(headers -> headers
-                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
-                .contentTypeOptions(contentType -> {})
-                // Additional security headers
-                .referrerPolicy(referrer -> referrer
-                    .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
-                )
-                .permissionsPolicy(permissions -> permissions
-                    .policy("geolocation=(), microphone=(), camera=()")
-                )
-                .cacheControl(cache -> {})
+                // CSRF Protection with cookie-based token (for SPA compatibility)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(
+                                org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .ignoringRequestMatchers("/api/health", "/api/status"))
+
+                // Security Headers (CSP handled by CspNonceFilter)
+                .headers(headers -> headers
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                        .contentTypeOptions(contentType -> {
+                        })
+                        // Additional security headers
+                        .referrerPolicy(referrer -> referrer
+                                .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .permissionsPolicy(permissions -> permissions
+                                .policy("geolocation=(), microphone=(), camera=()"))
+                // .cacheControl(cache -> {})
                 // CSP is set dynamically by CspNonceFilter - don't set static CSP here
-            )
+                )
 
-            // Authorization Rules
-            .authorizeHttpRequests(auth -> auth
-                // Public endpoints (health checks, static assets)
-                .requestMatchers("/api/health", "/api/status").permitAll()
-                .requestMatchers("/", "/index.html", "/manual.html").permitAll()
-                .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
-                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                // Authorization Rules
+                .authorizeHttpRequests(auth -> auth
+                        // Public endpoints (health checks, static assets)
+                        .requestMatchers("/api/health", "/api/status").permitAll()
+                        .requestMatchers("/", "/index.html", "/manual.html").permitAll()
+                        .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
 
-                // All API endpoints require authentication
-                .requestMatchers("/api/**").authenticated()
+                        // All API endpoints require authentication
+                        .requestMatchers("/api/**").authenticated()
 
-                // Static pages are public
-                .anyRequest().permitAll()
-            )
+                        // Static pages are public
+                        .anyRequest().permitAll())
 
-            // Form login for standard deployments
-            .formLogin(form -> form
-                .loginPage("/login")
-                .permitAll()
-            )
-            .logout(logout -> logout
-                .logoutSuccessUrl("/")
-                .permitAll()
-            );
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable);
 
         return http.build();
     }

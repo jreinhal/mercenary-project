@@ -99,21 +99,6 @@ public class StandardAuthenticationService implements AuthenticationService {
                 return user;
             }
 
-            // Legacy fallback: Check externalId for backwards compatibility
-            // (for existing deployments that used externalId as password)
-            if (user.getPasswordHash() == null && password.equals(user.getExternalId())) {
-                log.warn("User '{}' authenticated via legacy externalId field - migration recommended", username);
-
-                // Auto-migrate: Hash the password and save
-                user.setPasswordHash(passwordEncoder.encode(password));
-                user.setExternalId(null); // Clear legacy field
-                user.setLastLoginAt(Instant.now());
-                userRepository.save(user);
-
-                log.info("User '{}' password migrated to BCrypt hash", username);
-                return user;
-            }
-
             log.warn("Authentication failed: Invalid password for user '{}'", username);
             return null;
 

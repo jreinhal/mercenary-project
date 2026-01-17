@@ -106,25 +106,18 @@ public class CspNonceFilter implements Filter {
             if (cspHeaderSet) return;
             cspHeaderSet = true;
 
-            // Hash for the theme-flash-prevention inline script in index.html
-            // This script must run before CSS loads to prevent theme flash
-            // Hash computed: sha256(script.trim())
-            String themeScriptHash = "sha256-4jUmbS2PWE4rlTnD7L+eiI8k9L1Vy0cUeG/KZehQ8mU=";
-
-            // Build CSP with nonce for scripts and styles
-            // PR-4: Externalized main app JS, only small theme script remains inline (hash-allowed)
-            String csp = String.format(
+            // HARDENED CSP - Inline CSS/JS removed, no unsafe-eval/unsafe-inline.
+            String csp =
                 "default-src 'self'; " +
-                "script-src 'self' 'nonce-%s' '%s'; " +
-                "style-src 'self' 'nonce-%s' https://fonts.googleapis.com; " +
-                "font-src 'self' https://fonts.gstatic.com; " +
-                "img-src 'self' data: https:; " +
+                "script-src 'self'; " +
+                "style-src 'self'; " +
+                "font-src 'self'; " +
+                "img-src 'self' data:; " +
                 "connect-src 'self'; " +
+                "object-src 'none'; " +
                 "frame-ancestors 'none'; " +
                 "base-uri 'self'; " +
-                "form-action 'self'",
-                nonce, themeScriptHash, nonce
-            );
+                "form-action 'self'";
 
             setHeader("Content-Security-Policy", csp);
         }
