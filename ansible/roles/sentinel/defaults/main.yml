@@ -1,0 +1,76 @@
+# Sentinel role defaults
+---
+
+# Application
+sentinel_version: "1.0.0"
+sentinel_edition: "professional"  # trial, professional, medical, government
+sentinel_user: sentinel
+sentinel_group: sentinel
+sentinel_home: /opt/sentinel
+sentinel_jar_name: "mercenary-{{ sentinel_version }}.jar"
+
+# Directories
+sentinel_config_dir: "{{ sentinel_home }}/config"
+sentinel_log_dir: /var/log/sentinel
+sentinel_data_dir: /var/lib/sentinel
+sentinel_backup_dir: /var/backup/sentinel
+
+# Java settings
+java_home: /usr/lib/jvm/java-21-openjdk
+sentinel_max_heap: "4g"
+sentinel_min_heap: "2g"
+sentinel_gc_options: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+# Network
+sentinel_host: "0.0.0.0"
+sentinel_port: 8080
+sentinel_context_path: "/"
+
+# Database
+mongodb_uri: "mongodb://{{ mongodb_host }}:{{ mongodb_port }}/{{ mongodb_database }}"
+mongodb_host: "127.0.0.1"
+mongodb_port: 27017
+mongodb_database: sentinel
+
+# Ollama
+ollama_base_url: "http://{{ ollama_host }}:{{ ollama_port }}"
+ollama_host: "127.0.0.1"
+ollama_port: 11434
+ollama_model: "llama3:8b"
+ollama_embedding_model: "nomic-embed-text:latest"
+
+# Security
+auth_mode: "STANDARD"  # DEV, STANDARD, OIDC, CAC
+admin_password: "{{ vault_admin_password | default('changeme') }}"
+jwt_secret: "{{ vault_jwt_secret | default(lookup('password', '/dev/null length=64 chars=ascii_letters,digits')) }}"
+encryption_key: "{{ vault_encryption_key | default(lookup('password', '/dev/null length=32 chars=ascii_letters,digits')) }}"
+
+# TLS
+enable_tls: false
+tls_cert_path: "{{ sentinel_config_dir }}/tls/cert.pem"
+tls_key_path: "{{ sentinel_config_dir }}/tls/key.pem"
+tls_keystore_path: "{{ sentinel_config_dir }}/tls/keystore.p12"
+tls_keystore_password: "{{ vault_keystore_password | default('changeme') }}"
+
+# Rate limiting
+rate_limit_enabled: true
+rate_limit_requests_per_minute: 60
+
+# Audit
+audit_enabled: true
+audit_fail_closed: false  # Set true for government edition
+
+# Features
+feedback_enabled: true
+graph_visualization_enabled: true
+pii_redaction_enabled: true
+
+# Profiles
+spring_profiles:
+  - "{{ sentinel_edition }}"
+  - "{{ 'govcloud' if sentinel_edition == 'government' else 'standard' }}"
+
+# Systemd
+sentinel_service_name: sentinel
+sentinel_restart_policy: always
+sentinel_restart_sec: 10

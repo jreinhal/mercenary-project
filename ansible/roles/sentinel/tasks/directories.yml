@@ -1,0 +1,26 @@
+# Create sentinel directories
+---
+
+- name: Create application directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    mode: "0750"
+  loop:
+    - "{{ sentinel_home }}"
+    - "{{ sentinel_home }}/bin"
+    - "{{ sentinel_home }}/lib"
+    - "{{ sentinel_config_dir }}"
+    - "{{ sentinel_config_dir }}/tls"
+    - "{{ sentinel_log_dir }}"
+    - "{{ sentinel_data_dir }}"
+    - "{{ sentinel_data_dir }}/documents"
+    - "{{ sentinel_data_dir }}/cache"
+    - "{{ sentinel_backup_dir }}"
+
+- name: Set restrictive permissions on config directory
+  ansible.builtin.file:
+    path: "{{ sentinel_config_dir }}"
+    mode: "0700"

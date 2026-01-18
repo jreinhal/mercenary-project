@@ -1,0 +1,52 @@
+# Deploy sentinel application
+---
+
+- name: Check if JAR exists locally (offline mode)
+  ansible.builtin.stat:
+    path: "{{ package_source | default('/tmp') }}/{{ sentinel_jar_name }}"
+  register: local_jar
+  delegate_to: localhost
+  become: false
+  when: offline_mode | default(false) | bool
+
+- name: Copy JAR from local package source (offline mode)
+  ansible.builtin.copy:
+    src: "{{ package_source }}/{{ sentinel_jar_name }}"
+    dest: "{{ sentinel_home }}/lib/{{ sentinel_jar_name }}"
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    mode: "0640"
+  when:
+    - offline_mode | default(false) | bool
+    - local_jar.stat.exists | default(false)
+  notify: Restart sentinel
+
+- name: Download JAR from artifact repository (online mode)
+  ansible.builtin.get_url:
+    url: "{{ artifact_repository_url | default('https://artifacts.company.com') }}/sentinel/{{ sentinel_version }}/{{ sentinel_jar_name }}"
+    dest: "{{ sentinel_home }}/lib/{{ sentinel_jar_name }}"
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    mode: "0640"
+    checksum: "{{ sentinel_jar_checksum | default(omit) }}"
+  when: not (offline_mode | default(false) | bool)
+  notify: Restart sentinel
+
+- name: Copy static resources
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ sentinel_home }}/static/"
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    mode: "0644"
+  loop: "{{ sentinel_static_files | default([]) }}"
+  when: sentinel_static_files is defined
+
+- name: Create symlink to current version
+  ansible.builtin.file:
+    src: "{{ sentinel_home }}/lib/{{ sentinel_jar_name }}"
+    dest: "{{ sentinel_home }}/lib/sentinel.jar"
+    state: link
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+  notify: Restart sentinel

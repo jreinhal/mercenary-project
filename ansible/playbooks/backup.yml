@@ -1,0 +1,68 @@
+# SENTINEL Backup Playbook
+# Creates backups of MongoDB and configuration
+---
+
+- name: Backup SENTINEL
+  hosts: sentinel_servers:mongodb_servers
+  become: true
+
+  vars:
+    backup_timestamp: "{{ ansible_date_time.date }}_{{ ansible_date_time.hour }}{{ ansible_date_time.minute }}"
+    backup_base_path: /var/backup/sentinel
+
+  tasks:
+    - name: Create backup directory
+      ansible.builtin.file:
+        path: "{{ backup_base_path }}/{{ backup_timestamp }}"
+        state: directory
+        mode: "0750"
+
+    - name: Backup MongoDB (on mongodb servers)
+      ansible.builtin.command: >
+        mongodump
+        --uri="mongodb://{{ mongodb_host }}:{{ mongodb_port }}/{{ mongodb_database }}"
+        --out="{{ backup_base_path }}/{{ backup_timestamp }}/mongodb"
+      when: "'mongodb_servers' in group_names"
+
+    - name: Backup SENTINEL configuration
+      ansible.builtin.archive:
+        path: "{{ sentinel_config_dir }}"
+        dest: "{{ backup_base_path }}/{{ backup_timestamp }}/config.tar.gz"
+      when: "'sentinel_servers' in group_names"
+
+    - name: Backup SENTINEL data
+      ansible.builtin.archive:
+        path: "{{ sentinel_data_dir }}"
+        dest: "{{ backup_base_path }}/{{ backup_timestamp }}/data.tar.gz"
+      when: "'sentinel_servers' in group_names"
+
+    - name: Create backup manifest
+      ansible.builtin.copy:
+        content: |
+          Backup Timestamp: {{ backup_timestamp }}
+          Host: {{ inventory_hostname }}
+          SENTINEL Version: {{ sentinel_version }}
+          MongoDB: {{ mongodb_host }}:{{ mongodb_port }}
+          Contents:
+            - mongodb/ (database dump)
+            - config.tar.gz (application configuration)
+            - data.tar.gz (application data)
+        dest: "{{ backup_base_path }}/{{ backup_timestamp }}/MANIFEST.txt"
+        mode: "0644"
+
+    - name: Cleanup old backups
+      ansible.builtin.find:
+        paths: "{{ backup_base_path }}"
+        file_type: directory
+        age: "{{ backup_retention_days | default(7) }}d"
+      register: old_backups
+
+    - name: Remove old backups
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"
+
+    - name: Display backup location
+      ansible.builtin.debug:
+        msg: "Backup created at {{ backup_base_path }}/{{ backup_timestamp }}"

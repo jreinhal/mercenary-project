@@ -1,0 +1,45 @@
+# Sentinel role main tasks
+---
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family | lower }}.yml"
+  failed_when: false
+  tags: [sentinel, always]
+
+- name: Install dependencies
+  ansible.builtin.include_tasks: dependencies.yml
+  tags: [sentinel, dependencies]
+
+- name: Create sentinel user and group
+  ansible.builtin.include_tasks: user.yml
+  tags: [sentinel, user]
+
+- name: Create directories
+  ansible.builtin.include_tasks: directories.yml
+  tags: [sentinel, directories]
+
+- name: Deploy application
+  ansible.builtin.include_tasks: deploy.yml
+  tags: [sentinel, deploy]
+
+- name: Configure application
+  ansible.builtin.include_tasks: configure.yml
+  tags: [sentinel, configure]
+
+- name: Setup TLS
+  ansible.builtin.include_tasks: tls.yml
+  when: enable_tls | bool
+  tags: [sentinel, tls]
+
+- name: Configure systemd service
+  ansible.builtin.include_tasks: service.yml
+  tags: [sentinel, service]
+
+- name: Apply STIG hardening
+  ansible.builtin.include_tasks: stig.yml
+  when: stig_hardening | default(false) | bool
+  tags: [sentinel, stig, security]
+
+- name: Verify deployment
+  ansible.builtin.include_tasks: verify.yml
+  tags: [sentinel, verify]

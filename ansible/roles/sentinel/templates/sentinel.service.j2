@@ -1,0 +1,56 @@
+[Unit]
+Description=SENTINEL Intelligence Platform
+Documentation=https://github.com/jreinhal/mercenary
+After=network.target mongodb.service ollama.service
+Wants=mongodb.service ollama.service
+
+[Service]
+Type=simple
+User={{ sentinel_user }}
+Group={{ sentinel_group }}
+WorkingDirectory={{ sentinel_home }}
+
+# Environment
+EnvironmentFile={{ sentinel_config_dir }}/sentinel.env
+
+# Java options
+Environment="JAVA_HOME={{ java_home }}"
+Environment="JAVA_OPTS=-Xms{{ sentinel_min_heap }} -Xmx{{ sentinel_max_heap }} {{ sentinel_gc_options }}"
+
+# Application
+ExecStart={{ java_home }}/bin/java \
+    $JAVA_OPTS \
+    -Dspring.config.location={{ sentinel_config_dir }}/application.yml \
+    -Dlogging.config={{ sentinel_config_dir }}/logback-spring.xml \
+    -jar {{ sentinel_home }}/lib/sentinel.jar
+
+# Restart policy
+Restart={{ sentinel_restart_policy }}
+RestartSec={{ sentinel_restart_sec }}
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths={{ sentinel_log_dir }} {{ sentinel_data_dir }} {{ sentinel_config_dir }}
+{% if stig_hardening | default(false) %}
+# STIG hardening
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+SecureBits=keep-caps
+{% endif %}
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sentinel
+
+[Install]
+WantedBy=multi-user.target

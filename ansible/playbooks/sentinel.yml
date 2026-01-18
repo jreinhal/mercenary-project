@@ -1,0 +1,25 @@
+# SENTINEL Application Only Playbook
+# Use when MongoDB and Ollama are already deployed
+---
+
+- name: Deploy SENTINEL Application
+  hosts: sentinel_servers
+  become: true
+  roles:
+    - role: sentinel
+      tags: [sentinel]
+
+  post_tasks:
+    - name: Health check
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ sentinel_port }}/actuator/health"
+        method: GET
+        return_content: true
+      register: health_check
+      failed_when: "'UP' not in health_check.content"
+      tags: [verify]
+
+    - name: Display status
+      ansible.builtin.debug:
+        msg: "SENTINEL {{ sentinel_version }} deployed successfully ({{ sentinel_edition }} edition)"
+      tags: [verify]

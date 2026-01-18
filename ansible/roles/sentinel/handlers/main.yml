@@ -1,0 +1,26 @@
+# Sentinel handlers
+---
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart sentinel
+  ansible.builtin.systemd:
+    name: "{{ sentinel_service_name }}"
+    state: restarted
+  when: sentinel_service_name is defined
+
+- name: Stop sentinel
+  ansible.builtin.systemd:
+    name: "{{ sentinel_service_name }}"
+    state: stopped
+
+- name: Apply SELinux contexts
+  ansible.builtin.command: restorecon -Rv {{ sentinel_home }} {{ sentinel_log_dir }} {{ sentinel_data_dir }}
+  when: ansible_selinux.status == "enabled"
+
+- name: Restart auditd
+  ansible.builtin.systemd:
+    name: auditd
+    state: restarted

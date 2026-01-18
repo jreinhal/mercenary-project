@@ -1,0 +1,33 @@
+# Install sentinel dependencies
+---
+
+- name: Install Java 21 (RedHat/CentOS)
+  ansible.builtin.dnf:
+    name:
+      - java-21-openjdk
+      - java-21-openjdk-devel
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Install Java 21 (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - openjdk-21-jdk
+      - openjdk-21-jre
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install common utilities
+  ansible.builtin.package:
+    name:
+      - curl
+      - jq
+      - unzip
+    state: present
+
+- name: Verify Java installation
+  ansible.builtin.command: java -version
+  register: java_check
+  changed_when: false
+  failed_when: "'21' not in java_check.stderr"

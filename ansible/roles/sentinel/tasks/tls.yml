@@ -1,0 +1,66 @@
+# Configure TLS for sentinel
+---
+
+- name: Check for existing certificates (local source)
+  ansible.builtin.stat:
+    path: "{{ package_source | default('/tmp') }}/tls/cert.pem"
+  register: local_cert
+  delegate_to: localhost
+  become: false
+  when: tls_cert_source | default('generate') == 'local'
+
+- name: Copy pre-generated certificates (local source)
+  ansible.builtin.copy:
+    src: "{{ package_source }}/tls/{{ item }}"
+    dest: "{{ sentinel_config_dir }}/tls/{{ item }}"
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    mode: "0600"
+  loop:
+    - cert.pem
+    - key.pem
+  when:
+    - tls_cert_source | default('generate') == 'local'
+    - local_cert.stat.exists | default(false)
+  notify: Restart sentinel
+
+- name: Generate self-signed certificate
+  ansible.builtin.command: >
+    openssl req -x509 -nodes -days 365
+    -newkey rsa:2048
+    -keyout {{ tls_key_path }}
+    -out {{ tls_cert_path }}
+    -subj "/CN={{ sentinel_domain }}/O=SENTINEL/C=US"
+  args:
+    creates: "{{ tls_cert_path }}"
+  when: tls_cert_source | default('generate') == 'generate'
+  notify: Restart sentinel
+
+- name: Set certificate permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    mode: "0600"
+  loop:
+    - "{{ tls_cert_path }}"
+    - "{{ tls_key_path }}"
+
+- name: Create PKCS12 keystore
+  ansible.builtin.command: >
+    openssl pkcs12 -export
+    -in {{ tls_cert_path }}
+    -inkey {{ tls_key_path }}
+    -out {{ tls_keystore_path }}
+    -name sentinel
+    -password pass:{{ tls_keystore_password }}
+  args:
+    creates: "{{ tls_keystore_path }}"
+  notify: Restart sentinel
+
+- name: Set keystore permissions
+  ansible.builtin.file:
+    path: "{{ tls_keystore_path }}"
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    mode: "0600"

@@ -1,0 +1,48 @@
+# Common variables for all environments
+---
+
+# Application
+sentinel_version: "1.0.0"
+sentinel_user: sentinel
+sentinel_group: sentinel
+sentinel_home: /opt/sentinel
+sentinel_log_dir: /var/log/sentinel
+sentinel_data_dir: /var/lib/sentinel
+
+# Java
+java_version: "21"
+java_home: /usr/lib/jvm/java-21-openjdk
+
+# Ollama
+ollama_version: "latest"
+ollama_host: "127.0.0.1"
+ollama_port: 11434
+ollama_models:
+  - llama3:8b
+  - nomic-embed-text:latest
+
+# MongoDB
+mongodb_version: "7.0"
+mongodb_host: "127.0.0.1"
+mongodb_port: 27017
+mongodb_database: sentinel
+mongodb_user: sentinel
+
+# Application settings
+sentinel_port: 8080
+sentinel_max_heap: "4g"
+sentinel_min_heap: "2g"
+
+# Security defaults
+enable_tls: false
+rate_limit_enabled: true
+rate_limit_requests_per_minute: 60
+session_timeout_minutes: 30
+
+# Audit
+audit_enabled: true
+audit_log_path: "{{ sentinel_log_dir }}/audit.log"
+
+# Feature flags
+feedback_enabled: true
+graph_visualization_enabled: true

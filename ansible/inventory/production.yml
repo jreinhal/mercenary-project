@@ -1,0 +1,48 @@
+# SENTINEL Production Environment
+all:
+  children:
+    sentinel_servers:
+      hosts:
+        sentinel-prod-01:
+          ansible_host: 10.0.1.10
+          sentinel_port: 8080
+        sentinel-prod-02:
+          ansible_host: 10.0.1.11
+          sentinel_port: 8080
+
+    ollama_servers:
+      hosts:
+        ollama-prod-01:
+          ansible_host: 10.0.2.10
+          ollama_gpu: true
+          ollama_models:
+            - llama3:70b
+            - mistral:latest
+
+    mongodb_servers:
+      hosts:
+        mongo-prod-01:
+          ansible_host: 10.0.3.10
+          mongodb_role: primary
+        mongo-prod-02:
+          ansible_host: 10.0.3.11
+          mongodb_role: secondary
+        mongo-prod-03:
+          ansible_host: 10.0.3.12
+          mongodb_role: secondary
+
+    load_balancers:
+      hosts:
+        lb-prod-01:
+          ansible_host: 10.0.0.10
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    environment_name: production
+    sentinel_edition: professional
+    sentinel_domain: sentinel.company.com
+    enable_tls: true
+    debug_mode: false
+    mongodb_replica_set: sentinel-rs
+    backup_enabled: true
+    backup_retention_days: 30

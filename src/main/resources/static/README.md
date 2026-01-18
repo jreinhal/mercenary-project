@@ -57,8 +57,6 @@ Sentinel implements defense-in-depth security with four enforcement layers:
 Authentication → Role (RBAC) → Clearance → Sector → Audit Log
 ```
 
-For a full walkthrough of auth modes, RBAC, clearance, and operational steps, see `docs/security/SECURITY_GUIDE.md`.
-
 ### Authentication Modes
 
 | Profile | Auth Mechanism | Security Standard | Use Case |
@@ -551,6 +549,13 @@ openssl req -new -key client.key -out client.csr \
 openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key \
   -set_serial 01 -out client.crt
 ```
+
+---
+
+## Troubleshooting
+
+**"Edge Extension in Chrome"**
+- If you are using the Microsoft Edge extension in Chrome, disable "Headless mode" in the extension settings for full functionality.
 
 ---
 

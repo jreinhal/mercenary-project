@@ -1,0 +1,18 @@
+# Create sentinel user and group
+---
+
+- name: Create sentinel group
+  ansible.builtin.group:
+    name: "{{ sentinel_group }}"
+    state: present
+    system: true
+
+- name: Create sentinel user
+  ansible.builtin.user:
+    name: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    home: "{{ sentinel_home }}"
+    shell: /sbin/nologin
+    system: true
+    create_home: false
+    comment: "SENTINEL service account"

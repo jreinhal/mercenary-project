@@ -1,0 +1,74 @@
+# SENTINEL Rolling Upgrade Playbook
+# Performs zero-downtime upgrade across sentinel servers
+---
+
+- name: Rolling Upgrade SENTINEL
+  hosts: sentinel_servers
+  become: true
+  serial: 1  # One server at a time
+  max_fail_percentage: 0
+
+  pre_tasks:
+    - name: Check current version
+      ansible.builtin.command: "cat {{ sentinel_home }}/VERSION"
+      register: current_version
+      changed_when: false
+      failed_when: false
+
+    - name: Display upgrade plan
+      ansible.builtin.debug:
+        msg: "Upgrading {{ inventory_hostname }} from {{ current_version.stdout | default('unknown') }} to {{ sentinel_version }}"
+
+    - name: Health check before upgrade
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ sentinel_port }}/actuator/health"
+        method: GET
+      register: pre_health
+      failed_when: pre_health.status != 200
+
+    - name: Remove from load balancer (if configured)
+      ansible.builtin.uri:
+        url: "{{ lb_api_url }}/servers/{{ inventory_hostname }}/disable"
+        method: POST
+      when: lb_api_url is defined
+      delegate_to: localhost
+      become: false
+
+    - name: Wait for connections to drain
+      ansible.builtin.pause:
+        seconds: 30
+      when: lb_api_url is defined
+
+  roles:
+    - role: sentinel
+      tags: [sentinel, upgrade]
+
+  post_tasks:
+    - name: Health check after upgrade
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ sentinel_port }}/actuator/health"
+        method: GET
+      register: post_health
+      until: post_health.status == 200
+      retries: 30
+      delay: 5
+
+    - name: Add back to load balancer (if configured)
+      ansible.builtin.uri:
+        url: "{{ lb_api_url }}/servers/{{ inventory_hostname }}/enable"
+        method: POST
+      when: lb_api_url is defined
+      delegate_to: localhost
+      become: false
+
+    - name: Record version
+      ansible.builtin.copy:
+        content: "{{ sentinel_version }}"
+        dest: "{{ sentinel_home }}/VERSION"
+        owner: "{{ sentinel_user }}"
+        group: "{{ sentinel_group }}"
+        mode: "0644"
+
+    - name: Log upgrade completion
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} upgraded to {{ sentinel_version }} successfully"

@@ -1,0 +1,102 @@
+# Ollama role main tasks
+---
+
+- name: Create ollama user
+  ansible.builtin.user:
+    name: "{{ ollama_user }}"
+    group: "{{ ollama_group }}"
+    home: "{{ ollama_home }}"
+    shell: /sbin/nologin
+    system: true
+    create_home: true
+  tags: [ollama, user]
+
+- name: Create ollama directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ollama_user }}"
+    group: "{{ ollama_group }}"
+    mode: "0755"
+  loop:
+    - "{{ ollama_home }}"
+    - "{{ ollama_data_dir }}"
+    - "{{ ollama_data_dir }}/models"
+  tags: [ollama, directories]
+
+- name: Install Ollama (online)
+  ansible.builtin.shell: |
+    curl -fsSL https://ollama.ai/install.sh | sh
+  args:
+    creates: /usr/local/bin/ollama
+  when: not (offline_mode | default(false) | bool)
+  tags: [ollama, install]
+
+- name: Copy Ollama binary (offline)
+  ansible.builtin.copy:
+    src: "{{ package_source }}/ollama"
+    dest: /usr/local/bin/ollama
+    owner: root
+    group: root
+    mode: "0755"
+  when: offline_mode | default(false) | bool
+  tags: [ollama, install]
+
+- name: Deploy Ollama systemd service
+  ansible.builtin.template:
+    src: ollama.service.j2
+    dest: /etc/systemd/system/ollama.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart ollama
+  tags: [ollama, service]
+
+- name: Enable and start Ollama service
+  ansible.builtin.systemd:
+    name: ollama
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [ollama, service]
+
+- name: Wait for Ollama to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/tags"
+    method: GET
+  register: ollama_ready
+  until: ollama_ready.status == 200
+  retries: 30
+  delay: 5
+  tags: [ollama, verify]
+
+- name: Pull models (online)
+  ansible.builtin.command: ollama pull {{ item }}
+  loop: "{{ ollama_models }}"
+  when: not (offline_mode | default(false) | bool)
+  register: model_pull
+  changed_when: "'downloading' in model_pull.stdout"
+  tags: [ollama, models]
+
+- name: Copy pre-downloaded models (offline)
+  ansible.builtin.copy:
+    src: "{{ package_source }}/ollama-models/"
+    dest: "{{ ollama_data_dir }}/models/"
+    owner: "{{ ollama_user }}"
+    group: "{{ ollama_group }}"
+  when: offline_mode | default(false) | bool
+  notify: Restart ollama
+  tags: [ollama, models]
+
+- name: Verify models available
+  ansible.builtin.command: ollama list
+  register: ollama_list
+  changed_when: false
+  tags: [ollama, verify]
+
+- name: Display available models
+  ansible.builtin.debug:
+    var: ollama_list.stdout_lines
+  tags: [ollama, verify]

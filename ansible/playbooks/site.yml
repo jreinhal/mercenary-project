@@ -1,0 +1,54 @@
+# SENTINEL Full Deployment Playbook
+# Deploys MongoDB, Ollama, and SENTINEL application
+---
+
+- name: Deploy MongoDB
+  hosts: mongodb_servers
+  become: true
+  roles:
+    - role: mongodb
+      tags: [mongodb]
+
+- name: Deploy Ollama
+  hosts: ollama_servers
+  become: true
+  roles:
+    - role: ollama
+      tags: [ollama]
+
+- name: Deploy SENTINEL Application
+  hosts: sentinel_servers
+  become: true
+  roles:
+    - role: sentinel
+      tags: [sentinel]
+
+- name: Post-deployment verification
+  hosts: sentinel_servers
+  become: true
+  tasks:
+    - name: Final health check
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ sentinel_port }}/actuator/health"
+        method: GET
+        return_content: true
+      register: final_health
+      failed_when: "'UP' not in final_health.content"
+
+    - name: Display deployment summary
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          SENTINEL Deployment Complete
+          ========================================
+          Environment: {{ environment_name }}
+          Edition: {{ sentinel_edition }}
+          Version: {{ sentinel_version }}
+
+          Application URL: http{% if enable_tls %}s{% endif %}://{{ sentinel_domain }}:{{ sentinel_port }}
+          Health Status: {{ 'HEALTHY' if 'UP' in final_health.content else 'UNHEALTHY' }}
+
+          MongoDB: {{ mongodb_host }}:{{ mongodb_port }}
+          Ollama: {{ ollama_host }}:{{ ollama_port }}
+          ========================================
+      tags: [always]

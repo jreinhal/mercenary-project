@@ -1,0 +1,26 @@
+# SENTINEL Staging Environment
+all:
+  children:
+    sentinel_servers:
+      hosts:
+        sentinel-staging-01:
+          ansible_host: 192.168.1.10
+          sentinel_port: 8080
+
+    ollama_servers:
+      hosts:
+        sentinel-staging-01:
+          ollama_gpu: false  # Set true if GPU available
+
+    mongodb_servers:
+      hosts:
+        sentinel-staging-01:
+          mongodb_port: 27017
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    environment_name: staging
+    sentinel_edition: professional
+    sentinel_domain: sentinel-staging.local
+    enable_tls: false
+    debug_mode: true

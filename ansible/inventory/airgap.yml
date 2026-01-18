@@ -1,0 +1,49 @@
+# SENTINEL Air-Gapped / SCIF Environment
+# No external network access - all packages pre-staged
+all:
+  children:
+    sentinel_servers:
+      hosts:
+        sentinel-scif-01:
+          ansible_host: 172.16.0.10
+          sentinel_port: 8080
+
+    ollama_servers:
+      hosts:
+        sentinel-scif-01:
+          ollama_gpu: true
+          # Models must be pre-loaded via sneakernet
+          ollama_models:
+            - llama3:8b
+            - mistral:7b
+
+    mongodb_servers:
+      hosts:
+        sentinel-scif-01:
+          mongodb_port: 27017
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    environment_name: airgap
+    sentinel_edition: government
+    sentinel_domain: sentinel.scif.local
+
+    # Air-gap specific settings
+    offline_mode: true
+    package_source: /opt/sentinel-packages  # Pre-staged packages
+    enable_tls: true
+    tls_cert_source: local  # Pre-generated certificates
+
+    # Government/SCIF hardening
+    stig_hardening: true
+    fips_mode: true
+    audit_fail_closed: true
+    cac_auth_enabled: true
+
+    # No external connections
+    telemetry_enabled: false
+    update_check_enabled: false
+
+    # Clearance levels
+    max_clearance_level: TOP_SECRET
+    default_clearance_level: SECRET

@@ -1,0 +1,68 @@
+# STIG hardening for government deployments
+---
+
+- name: Set strict file permissions
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+  loop:
+    - { path: "{{ sentinel_home }}", mode: "0750" }
+    - { path: "{{ sentinel_config_dir }}", mode: "0700" }
+    - { path: "{{ sentinel_log_dir }}", mode: "0750" }
+    - { path: "{{ sentinel_data_dir }}", mode: "0750" }
+
+- name: Ensure audit logging is fail-closed
+  ansible.builtin.lineinfile:
+    path: "{{ sentinel_config_dir }}/application.yml"
+    regexp: "^.*audit.fail-closed:.*$"
+    line: "  audit.fail-closed: true"
+    insertafter: "^sentinel:"
+  notify: Restart sentinel
+
+- name: Configure SELinux context for sentinel directories
+  community.general.sefcontext:
+    target: "{{ item }}(/.*)?"
+    setype: var_log_t
+    state: present
+  loop:
+    - "{{ sentinel_log_dir }}"
+  when: ansible_selinux.status == "enabled"
+  notify: Apply SELinux contexts
+
+- name: Enable FIPS mode in Java
+  ansible.builtin.lineinfile:
+    path: "{{ sentinel_config_dir }}/sentinel.env"
+    regexp: "^JAVA_OPTS=.*"
+    line: 'JAVA_OPTS="${JAVA_OPTS} -Dcom.sun.net.ssl.rsaPreMasterSecretFix=true -Djdk.tls.ephemeralDHKeySize=2048"'
+  when: fips_mode | default(false) | bool
+  notify: Restart sentinel
+
+- name: Restrict network listeners
+  ansible.builtin.lineinfile:
+    path: "{{ sentinel_config_dir }}/application.yml"
+    regexp: "^server.address:.*$"
+    line: "server.address: 127.0.0.1"
+  when: sentinel_localhost_only | default(false) | bool
+  notify: Restart sentinel
+
+- name: Configure audit log permissions
+  ansible.builtin.file:
+    path: "{{ audit_log_path }}"
+    owner: "{{ sentinel_user }}"
+    group: "{{ sentinel_group }}"
+    mode: "0640"
+    state: touch
+    modification_time: preserve
+    access_time: preserve
+
+- name: Install auditd rules for sentinel
+  ansible.builtin.template:
+    src: sentinel-audit.rules.j2
+    dest: /etc/audit/rules.d/sentinel.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Restart auditd
+  when: ansible_os_family == "RedHat"

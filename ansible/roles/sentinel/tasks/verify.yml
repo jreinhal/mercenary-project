@@ -1,0 +1,55 @@
+# Verify sentinel deployment
+---
+
+- name: Check sentinel service status
+  ansible.builtin.systemd:
+    name: "{{ sentinel_service_name }}"
+  register: sentinel_service
+
+- name: Verify sentinel is running
+  ansible.builtin.assert:
+    that:
+      - sentinel_service.status.ActiveState == "active"
+    fail_msg: "Sentinel service is not running"
+    success_msg: "Sentinel service is active"
+
+- name: Check sentinel health endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ sentinel_port }}/actuator/health"
+    method: GET
+    return_content: true
+  register: health_response
+  failed_when: health_response.status != 200
+
+- name: Verify health status
+  ansible.builtin.assert:
+    that:
+      - "'UP' in health_response.content"
+    fail_msg: "Sentinel health check failed"
+    success_msg: "Sentinel is healthy"
+
+- name: Check sentinel connectivity to MongoDB
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ sentinel_port }}/actuator/health/mongo"
+    method: GET
+    return_content: true
+  register: mongo_health
+  failed_when: false
+
+- name: Check sentinel connectivity to Ollama
+  ansible.builtin.uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/tags"
+    method: GET
+  register: ollama_check
+  failed_when: false
+
+- name: Report deployment status
+  ansible.builtin.debug:
+    msg: |
+      Sentinel Deployment Status:
+      - Service: {{ sentinel_service.status.ActiveState }}
+      - Health: {{ 'UP' if 'UP' in health_response.content else 'DOWN' }}
+      - MongoDB: {{ 'Connected' if mongo_health.status == 200 else 'Not Connected' }}
+      - Ollama: {{ 'Available' if ollama_check.status == 200 else 'Not Available' }}
+      - Edition: {{ sentinel_edition }}
+      - Version: {{ sentinel_version }}

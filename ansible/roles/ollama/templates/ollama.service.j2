@@ -1,0 +1,38 @@
+[Unit]
+Description=Ollama LLM Service
+Documentation=https://ollama.ai
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ ollama_user }}
+Group={{ ollama_group }}
+ExecStart=/usr/local/bin/ollama serve
+Restart=always
+RestartSec=10
+
+# Environment
+Environment="OLLAMA_HOST={{ ollama_host }}:{{ ollama_port }}"
+Environment="OLLAMA_MODELS={{ ollama_data_dir }}/models"
+{% if ollama_gpu %}
+Environment="OLLAMA_GPU=1"
+{% if ollama_gpu_layers > 0 %}
+Environment="OLLAMA_GPU_LAYERS={{ ollama_gpu_layers }}"
+{% endif %}
+{% endif %}
+Environment="OLLAMA_MAX_LOADED_MODELS={{ ollama_max_loaded_models }}"
+Environment="OLLAMA_NUM_PARALLEL={{ ollama_num_parallel }}"
+
+# Resource limits
+LimitNOFILE=65535
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths={{ ollama_data_dir }}
+
+[Install]
+WantedBy=multi-user.target

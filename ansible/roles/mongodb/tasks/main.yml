@@ -1,0 +1,128 @@
+# MongoDB role main tasks
+---
+
+- name: Add MongoDB repository (RedHat)
+  ansible.builtin.yum_repository:
+    name: mongodb-org-{{ mongodb_version }}
+    description: MongoDB Repository
+    baseurl: https://repo.mongodb.org/yum/redhat/$releasever/mongodb-org/{{ mongodb_version }}/x86_64/
+    gpgcheck: true
+    enabled: true
+    gpgkey: https://www.mongodb.org/static/pgp/server-{{ mongodb_version }}.asc
+  when:
+    - ansible_os_family == "RedHat"
+    - not (offline_mode | default(false) | bool)
+  tags: [mongodb, repo]
+
+- name: Add MongoDB repository (Debian)
+  block:
+    - name: Add MongoDB GPG key
+      ansible.builtin.apt_key:
+        url: https://www.mongodb.org/static/pgp/server-{{ mongodb_version }}.asc
+        state: present
+
+    - name: Add MongoDB repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ mongodb_version }} multiverse"
+        state: present
+  when:
+    - ansible_os_family == "Debian"
+    - not (offline_mode | default(false) | bool)
+  tags: [mongodb, repo]
+
+- name: Install MongoDB
+  ansible.builtin.package:
+    name: mongodb-org
+    state: present
+  when: not (offline_mode | default(false) | bool)
+  tags: [mongodb, install]
+
+- name: Create MongoDB directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ mongodb_user }}"
+    group: "{{ mongodb_group }}"
+    mode: "0755"
+  loop:
+    - "{{ mongodb_data_dir }}"
+    - "{{ mongodb_log_dir }}"
+    - "{{ backup_path }}"
+  tags: [mongodb, directories]
+
+- name: Deploy MongoDB configuration
+  ansible.builtin.template:
+    src: mongod.conf.j2
+    dest: /etc/mongod.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart mongodb
+  tags: [mongodb, configure]
+
+- name: Enable and start MongoDB
+  ansible.builtin.systemd:
+    name: mongod
+    enabled: true
+    state: started
+  tags: [mongodb, service]
+
+- name: Wait for MongoDB to be ready
+  ansible.builtin.wait_for:
+    port: "{{ mongodb_port }}"
+    host: "{{ mongodb_host }}"
+    delay: 5
+    timeout: 60
+  tags: [mongodb, verify]
+
+- name: Create admin user
+  community.mongodb.mongodb_user:
+    login_host: "{{ mongodb_host }}"
+    login_port: "{{ mongodb_port }}"
+    database: admin
+    name: "{{ mongodb_admin_user }}"
+    password: "{{ vault_mongodb_admin_password }}"
+    roles:
+      - { db: admin, role: root }
+    state: present
+  when: vault_mongodb_admin_password is defined
+  tags: [mongodb, users]
+
+- name: Create application user
+  community.mongodb.mongodb_user:
+    login_host: "{{ mongodb_host }}"
+    login_port: "{{ mongodb_port }}"
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+    database: "{{ mongodb_database }}"
+    name: "{{ mongodb_app_user }}"
+    password: "{{ vault_mongodb_password }}"
+    roles:
+      - { db: "{{ mongodb_database }}", role: readWrite }
+    state: present
+  when:
+    - vault_mongodb_admin_password is defined
+    - vault_mongodb_password is defined
+  tags: [mongodb, users]
+
+- name: Setup backup cron job
+  ansible.builtin.cron:
+    name: "MongoDB backup"
+    minute: "0"
+    hour: "2"
+    job: "mongodump --uri='mongodb://{{ mongodb_host }}:{{ mongodb_port }}/{{ mongodb_database }}' --out={{ backup_path }}/$(date +\\%Y\\%m\\%d) && find {{ backup_path }} -type d -mtime +{{ backup_retention_days }} -exec rm -rf {} +"
+    user: root
+  when: backup_enabled | bool
+  tags: [mongodb, backup]
+
+- name: Verify MongoDB is running
+  community.mongodb.mongodb_status:
+    login_host: "{{ mongodb_host }}"
+    login_port: "{{ mongodb_port }}"
+  register: mongodb_status
+  tags: [mongodb, verify]
+
+- name: Display MongoDB status
+  ansible.builtin.debug:
+    var: mongodb_status
+  tags: [mongodb, verify]

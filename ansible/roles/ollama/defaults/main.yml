@@ -1,0 +1,29 @@
+# Ollama role defaults
+---
+
+ollama_version: "latest"
+ollama_user: ollama
+ollama_group: ollama
+ollama_home: /opt/ollama
+ollama_data_dir: /var/lib/ollama
+
+# Network
+ollama_host: "127.0.0.1"
+ollama_port: 11434
+
+# Models to download
+ollama_models:
+  - llama3:8b
+  - nomic-embed-text:latest
+
+# GPU settings
+ollama_gpu: false
+ollama_gpu_layers: 0  # 0 = auto
+
+# Resource limits
+ollama_max_loaded_models: 1
+ollama_num_parallel: 1
+
+# Offline mode
+offline_mode: false
+package_source: /opt/sentinel-packages

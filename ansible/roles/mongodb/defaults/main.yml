@@ -1,0 +1,37 @@
+# MongoDB role defaults
+---
+
+mongodb_version: "7.0"
+mongodb_user: mongod
+mongodb_group: mongod
+
+# Network
+mongodb_host: "127.0.0.1"
+mongodb_port: 27017
+
+# Storage
+mongodb_data_dir: /var/lib/mongodb
+mongodb_log_dir: /var/log/mongodb
+
+# Database
+mongodb_database: sentinel
+mongodb_admin_user: admin
+# mongodb_admin_password: set in vault
+
+# Application user
+mongodb_app_user: sentinel
+# mongodb_app_password: set in vault
+
+# Replica set (optional)
+mongodb_replica_set: ""  # Empty = standalone
+
+# Security
+mongodb_auth_enabled: true
+
+# Performance
+mongodb_wired_tiger_cache_size_gb: 1
+
+# Backup
+backup_enabled: false
+backup_retention_days: 7
+backup_path: /var/backup/mongodb
