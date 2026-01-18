@@ -100,9 +100,24 @@ For EVERY `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`:
 | `ansible/README.md` | Ansible deployment automation |
 | `README.md` | Public-facing product description |
 
-**Sales documents** (not in repo - see `Desktop\Sales\`):
-- `SALES_PLAYBOOK.md` - Messaging, positioning, objection handling, go-to-market
-- `PRODUCT_LINE_STRATEGY.md` - Edition breakdown, pricing
+## External Documentation
+
+Project documentation outside the repo is located at `D:\Projects\Project Documentation\Mercenary\`:
+
+| Folder | Contents |
+|--------|----------|
+| `Agent_Reports/` | Claude-generated audit reports (RECOMMENDATIONS.md, SECURITY_STRATEGY_RECOMMENDATIONS.md, CODEBASE_RECOMMENDATIONS.md) |
+| `Sales/` | Sales playbook and product line strategy |
+| `Testing/` | Test logs, results, RAG test questions |
+| `RAG Papers/` | Research papers and references |
+| `App Upgrade Ideas/` | Feature proposals and enhancement notes |
+| `Archived App Docs/` | Deprecated documentation versions |
+
+Key files:
+- `Sales/SALES_PLAYBOOK.md` - Messaging, positioning, objection handling, go-to-market
+- `Sales/PRODUCT_LINE_STRATEGY.md` - Edition breakdown, pricing
+- `Mercenary_Login_Profiles.txt` - Auth mode quick reference
+- `Run test.txt` - Test execution notes
 
 ## Key Capabilities (Sales/Documentation Reference)
 
@@ -148,7 +163,7 @@ Read: docs/security/SECURITY_GATES.md (audit checklist)
 Read: docs/security/SECURITY_GUIDE.md (security reference)
 ```
 
-**Audit reports** (not in repo - see `Desktop\Agent_Reports\`):
+**Audit reports** (see `D:\Projects\Project Documentation\Mercenary\Agent_Reports\`):
 - `RECOMMENDATIONS.md`, `SECURITY_STRATEGY_RECOMMENDATIONS.md`, `CODEBASE_RECOMMENDATIONS.md`
 
 ### 2. Current Architecture Context
