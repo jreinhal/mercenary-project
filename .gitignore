@@ -1,0 +1,41 @@
+# Gradle
+.gradle/
+build/
+!build/libs/*.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Logs
+*.log
+logs/
+
+# Temp
+tmp/
+temp/
+*.tmp
+
+# Secrets - NEVER commit these
+.env
+.env.local
+*.pem
+*.key
+credentials*.json
+secrets*.json
+
+# Decompiler artifacts
+cfr.jar
+
+# Extracted JAR contents (for restoration)
+mercenary-extracted/

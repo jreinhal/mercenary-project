@@ -1548,8 +1548,14 @@
 
             setHidden(placeholder, true);
 
-            const viewBoxMin = -12.0;
-            const viewBoxMax = 12.0;
+            // Dynamic viewBox scaling based on graph complexity
+            // Base size for small graphs (1-5 nodes), scales up for larger graphs
+            const totalNodes = Math.min(sourceCount, MAX_SOURCES) + entities.length + 1; // +1 for query node
+            const baseViewBox = 10.0;
+            const scaleFactor = Math.max(1.0, 1.0 + (totalNodes - 5) * 0.08); // Scale up 8% per node beyond 5
+            const scaledViewBox = baseViewBox * Math.min(scaleFactor, 1.6); // Cap at 1.6x expansion
+            const viewBoxMin = -scaledViewBox;
+            const viewBoxMax = scaledViewBox;
             const viewBoxSize = viewBoxMax - viewBoxMin;
             const labelBounds = {
                 min: viewBoxMin + 0.3,
@@ -1630,7 +1636,7 @@
                 tooltipRows: queryRows,
                 x: 0,
                 y: 0,
-                radius: 0.28,
+                radius: 3.2,  // Large central query node
                 textPos: 'bottom center'
             });
 
@@ -1673,7 +1679,7 @@
                     filename,
                     x: pos.x,
                     y: pos.y,
-                    radius: 0.24,
+                    radius: 2.4,  // Medium-sized source nodes
                     textPos: pos.textPos
                 });
             }
@@ -1719,7 +1725,7 @@
                     entityName: entity.name,
                     x: pos.x,
                     y: pos.y,
-                    radius: 0.2,
+                    radius: 1.8,  // Smaller entity nodes
                     textPos: pos.textPos
                 });
             });
@@ -1735,6 +1741,12 @@
             });
 
             graphDiv.innerHTML = '';
+
+            // Set container size class based on node count for dynamic sizing
+            if (container) {
+                container.dataset.nodeCount = totalNodes > 6 ? 'large' : 'normal';
+            }
+
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('class', 'graph-svg');
             svg.setAttribute('viewBox', `${viewBoxMin} ${viewBoxMin} ${viewBoxSize} ${viewBoxSize}`);

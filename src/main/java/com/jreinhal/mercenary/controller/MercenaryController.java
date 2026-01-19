@@ -155,7 +155,9 @@ public class MercenaryController {
     private static final Pattern NUMERIC_PATTERN = Pattern.compile("\\d");
     private static final Pattern RELATIONSHIP_PATTERN = Pattern.compile("\\b(relationship|relate|comparison|compare|versus|between|difference|differ|impact|effect|align|alignment|correlat|dependency|tradeoff|link)\\b", 2);
     private static final List<Pattern> NO_INFO_PATTERNS = List.of(Pattern.compile("no relevant records found", 2), Pattern.compile("no relevant (?:information|data|documents)", 2), Pattern.compile("no specific (?:information|data|metrics)", 2), Pattern.compile("no internal records", 2), Pattern.compile("no information (?:available|found)", 2), Pattern.compile("unable to find", 2), Pattern.compile("couldn'?t find", 2), Pattern.compile("do not contain any (?:information|data|metrics)", 2), Pattern.compile("not mentioned in (?:the )?documents", 2));
-    private static final int LLM_TIMEOUT_SECONDS = 30;
+    // LLM timeout - configurable for complex queries (default 60s)
+    @org.springframework.beans.factory.annotation.Value("${sentinel.llm.timeout-seconds:60}")
+    private int llmTimeoutSeconds;
     private static final List<Pattern> INJECTION_PATTERNS = List.of(Pattern.compile("ignore\\s+(all\\s+)?(previous|prior|above)\\s+(instructions?|prompts?|rules?)", 2), Pattern.compile("disregard\\s+(all\\s+)?(previous|prior|above)", 2), Pattern.compile("forget\\s+(all\\s+)?(previous|prior|your)\\s+(instructions?|context|rules?)", 2), Pattern.compile("(show|reveal|display|print|output)\\s+(me\\s+)?(the\\s+)?(system|initial)\\s+prompt", 2), Pattern.compile("what\\s+(is|are)\\s+your\\s+(system\\s+)?(instructions?|rules?|prompt)", 2), Pattern.compile("you\\s+are\\s+now\\s+(a|an|in)\\s+", 2), Pattern.compile("act\\s+as\\s+(if|though)\\s+you", 2), Pattern.compile("pretend\\s+(to\\s+be|you\\s+are)", 2), Pattern.compile("roleplay\\s+as", 2), Pattern.compile("\\bDAN\\b.*mode", 2), Pattern.compile("developer\\s+mode\\s+(enabled|on|activated)", 2), Pattern.compile("bypass\\s+(your\\s+)?(safety|security|restrictions?|filters?)", 2), Pattern.compile("```\\s*(system|assistant)\\s*:", 2), Pattern.compile("\\[INST\\]|\\[/INST\\]|<<SYS>>|<</SYS>>", 2), Pattern.compile("(start|begin)\\s+(your\\s+)?response\\s+with", 2), Pattern.compile("(what|tell|show|reveal|repeat|print|display).{0,15}(your|system|internal|hidden).{0,10}(prompt|instructions?|directives?|rules|guidelines)", 2), Pattern.compile("(what|how).{0,10}(are|were).{0,10}you.{0,10}(programmed|instructed|told|prompted)", 2), Pattern.compile("(ignore|forget|disregard).{0,20}(previous|above|prior|all).{0,20}(instructions?|prompt|rules|context)", 2), Pattern.compile("(repeat|echo|output).{0,15}(everything|all).{0,10}(above|before|prior)", 2));
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService) {
@@ -469,7 +471,7 @@ public class MercenaryController {
             try {
                 String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
                 String userQuery = query.replace("{", "[").replace("}", "]");
-                response = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(30L, TimeUnit.SECONDS);
+                response = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(this.llmTimeoutSeconds, TimeUnit.SECONDS);
             }
             catch (TimeoutException te) {
                 llmSuccess = false;
@@ -625,7 +627,7 @@ public class MercenaryController {
                 log.info("AdaptiveRAG: ZeroHop path - skipping retrieval for conversational query");
                 try {
                     String userQuery = query.replace("{", "[").replace("}", "]");
-                    directResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.").user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(30L, TimeUnit.SECONDS);
+                    directResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.").user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(this.llmTimeoutSeconds, TimeUnit.SECONDS);
                 }
                 catch (TimeoutException te) {
                     log.warn("LLM response timed out after {}s for ZeroHop query", (Object)30);
@@ -693,7 +695,7 @@ public class MercenaryController {
             try {
                 String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
                 String userQuery = query.replace("{", "[").replace("}", "]");
-                response = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(30L, TimeUnit.SECONDS);
+                response = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(this.llmTimeoutSeconds, TimeUnit.SECONDS);
             }
             catch (TimeoutException te) {
                 llmSuccess = false;
