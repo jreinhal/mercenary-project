@@ -1,0 +1,2 @@
+Summary for D:/Projects/mercenary/build/libs/sentinel-government-2.2.0.jar
+Decompiled with CFR 0.152

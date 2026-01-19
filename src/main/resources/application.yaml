@@ -1,0 +1,401 @@
+spring:
+  application:
+    name: mercenary-ai
+  profiles:
+    active: ${APP_PROFILE:dev}
+  # Disable static resource caching for development
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+          no-store: true
+
+  # =================================================================
+  # CRITICAL SECURITY WARNING
+  # =================================================================
+  # DO NOT COMMIT REAL CREDENTIALS TO THIS FILE.
+  # THIS FILE IS PUBLICLY VISIBLE IN GIT HISTORY.
+  #
+  # USE ENVIRONMENT VARIABLES FOR ALL SECRETS.
+  # 
+  # MONGODB_URI should be set in your run configuration or OS environment.
+  # Example: MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/mercenary
+  # =================================================================
+
+  # --- THE BAN HAMMER ---
+  # This tells Spring: "Do NOT load your default MongoDB Vector Store logic. I have my own."
+  autoconfigure:
+    exclude: org.springframework.ai.autoconfigure.vectorstore.mongo.MongoDBAtlasVectorStoreAutoConfiguration
+
+  data:
+    mongodb:
+      # SECURE DEFAULT: Localhost (No Auth) - Safe for dev
+      # PRODUCTION: WE WILL READ 'MONGODB_URI' FROM ENVIRONMENT
+      uri: ${MONGODB_URI:mongodb://localhost:27017/mercenary}
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  ai:
+    ollama:
+      base-url: ${OLLAMA_URL:http://localhost:11434}
+      chat:
+        options:
+          model: ${LLM_MODEL:llama3}
+          # Lower temperature for more focused, grounded responses (reduces hallucinations)
+          temperature: ${LLM_TEMPERATURE:0.0}
+          # Cap output tokens aggressively to prevent runaway generation
+          num-predict: ${LLM_NUM_PREDICT:256}
+          # Context window size (reduce for speed if needed)
+          num-ctx: ${LLM_NUM_CTX:4096}
+          # Stop sequences to prevent rambling past the answer
+          stop:
+            - "\n\nSources:"
+            - "\n\n---"
+            - "\n\nNote:"
+            - "\n\nAdditional"
+      embedding:
+        model: ${EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      mongodb:
+        atlas:
+          collection-name: vector_store
+          initialize-schema: true
+          path-name: embedding
+          index-name: vector_index
+
+# ============================================
+# Server/Cookie Security
+# ============================================
+server:
+  servlet:
+    session:
+      cookie:
+        same-site: Lax
+        http-only: true
+        secure: ${COOKIE_SECURE:false}  # Set true for HTTPS deployments
+
+# ============================================
+# Custom App Config
+# ============================================
+app:
+  db-init: true
+  # Authentication mode: DEV, OIDC, or CAC
+  auth-mode: ${AUTH_MODE:DEV}
+
+# ============================================
+# SENTINEL Configuration
+# Single-product with 5 sectors: GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
+# ============================================
+sentinel:
+
+# ============================================
+# SENTINEL Advanced RAG Configuration
+# Based on cutting-edge research papers
+# ============================================
+  # RAGPart Defense (arXiv:2512.24268v1)
+  # Corpus poisoning defense via document partitioning
+  ragpart:
+    enabled: ${RAGPART_ENABLED:true}
+    partitions: ${RAGPART_PARTITIONS:4}
+    combination-size: ${RAGPART_COMBINATION_SIZE:3}
+    suspicion-threshold: ${RAGPART_SUSPICION_THRESHOLD:0.4}
+
+  # HGMem - HyperGraph Memory (arXiv:2512.23959v2)
+  # Multi-step RAG with complex relational modeling
+  # WARNING: HGMem is very slow with large document sets (5+ min per query)
+  # Disable by default - enable only for small corpora or demo environments
+  hgmem:
+    enabled: ${HGMEM_ENABLED:false}
+    max-memory-points: ${HGMEM_MAX_POINTS:50}
+    merge-similarity-threshold: ${HGMEM_MERGE_THRESHOLD:0.7}
+
+  # HiFi-RAG Pipeline (arXiv:2512.22442v1)
+  # Hierarchical filtering + two-pass generation
+  # NOTE: Disabled by default - LLM reranking adds significant latency
+  hifirag:
+    enabled: ${HIFIRAG_ENABLED:false}
+    initial-retrieval-k: ${HIFIRAG_INITIAL_K:20}
+    filtered-top-k: ${HIFIRAG_FILTERED_K:5}
+    relevance-threshold: ${HIFIRAG_RELEVANCE_THRESHOLD:0.5}
+    max-iterations: ${HIFIRAG_MAX_ITERATIONS:2}
+    reranker:
+      batch-size: ${HIFIRAG_RERANKER_BATCH:5}
+      timeout-seconds: ${HIFIRAG_RERANKER_TIMEOUT:30}
+      use-llm: ${HIFIRAG_USE_LLM:true}
+
+  # QuCo-RAG: Uncertainty Quantification (arXiv:2512.19134)
+  # Detects hallucination risk by analyzing entity frequency
+  qucorag:
+    enabled: ${QUCORAG_ENABLED:true}
+    uncertainty-threshold: ${QUCORAG_THRESHOLD:0.7}
+    low-frequency-threshold: ${QUCORAG_LOW_FREQ:1000}
+    zero-cooccurrence-penalty: ${QUCORAG_ZERO_PENALTY:0.3}
+    # Infini-gram API (optional, requires internet)
+    infini-gram-enabled: ${QUCORAG_INFINI_GRAM:false}
+    infini-gram-timeout-ms: ${QUCORAG_TIMEOUT:5000}
+    infini-gram-index: ${QUCORAG_INDEX:v4_olmo-2-0325-32b-instruct_llama}
+    # LLM-based entity extraction (higher accuracy, adds ~200-500ms latency)
+    llm-extraction-enabled: ${QUCORAG_LLM_EXTRACTION:false}
+    llm-extraction-timeout-ms: ${QUCORAG_LLM_TIMEOUT:3000}
+
+  # MegaRAG: Multimodal Knowledge Graph (arXiv:2512.20626)
+  # Cross-modal retrieval for images, charts, and text
+  megarag:
+    enabled: ${MEGARAG_ENABLED:true}
+    # Visual retrieval weight vs text (0.0-1.0)
+    visual-weight: ${MEGARAG_VISUAL_WEIGHT:0.3}
+    # Minimum confidence for cross-modal links
+    link-threshold: ${MEGARAG_LINK_THRESHOLD:0.7}
+    # Enable chart data extraction
+    chart-extraction: ${MEGARAG_CHART_EXTRACTION:true}
+    # Enable OCR for image text
+    ocr-enabled: ${MEGARAG_OCR:true}
+
+  # MiA-RAG: Mindscape-Aware Retrieval (arXiv:2512.17220)
+  # Hierarchical summaries for long-document coherence
+  miarag:
+    enabled: ${MIARAG_ENABLED:true}
+    # Minimum chunks to trigger mindscape building
+    min-chunks-for-mindscape: ${MIARAG_MIN_CHUNKS:10}
+    # Summarization levels (chunk -> paragraph -> section -> document)
+    levels: ${MIARAG_LEVELS:4}
+    # Context window for global conditioning
+    global-context-tokens: ${MIARAG_CONTEXT_TOKENS:500}
+
+  # Bidirectional RAG: Experience Store (arXiv:2512.22199)
+  # Self-improving RAG with grounding verification
+  birag:
+    enabled: ${BIRAG_ENABLED:true}
+    # Minimum grounding score for auto-validation
+    grounding-threshold: ${BIRAG_GROUNDING_THRESHOLD:0.8}
+    # Novelty detection threshold
+    novelty-threshold: ${BIRAG_NOVELTY_THRESHOLD:0.7}
+    # Require admin approval for pending experiences
+    require-approval: ${BIRAG_REQUIRE_APPROVAL:true}
+    # Max experiences to retrieve per query
+    max-experiences: ${BIRAG_MAX_EXPERIENCES:5}
+
+  # Hybrid RAG: Reciprocal Rank Fusion (arXiv:2512.12694)
+  # Combines semantic and keyword retrieval with OCR tolerance
+  hybridrag:
+    enabled: ${HYBRIDRAG_ENABLED:true}
+    # RRF k parameter (higher = more emphasis on top ranks)
+    rrf-k: ${HYBRIDRAG_RRF_K:60}
+    # Weight for semantic retrieval (keyword weight = 1 - semantic)
+    semantic-weight: ${HYBRIDRAG_SEMANTIC_WEIGHT:0.6}
+    keyword-weight: ${HYBRIDRAG_KEYWORD_WEIGHT:0.4}
+    # Number of query variants for multi-query retrieval
+    multi-query-count: ${HYBRIDRAG_MULTI_QUERY:3}
+    # OCR error tolerance (common character substitutions)
+    ocr-tolerance: ${HYBRIDRAG_OCR_TOLERANCE:true}
+    # LLM-based query expansion (higher quality, adds latency)
+    llm-expansion: ${HYBRIDRAG_LLM_EXPANSION:false}
+
+  # Graph-O1: MCTS Graph Reasoning (arXiv:2512.17912)
+  # Monte Carlo Tree Search for knowledge graph traversal
+  # NOTE: Disabled by default - MCTS iterations are slow
+  grapho1:
+    enabled: ${GRAPHO1_ENABLED:false}
+    # Maximum MCTS iterations
+    max-iterations: ${GRAPHO1_MAX_ITER:50}
+    # UCB1 exploration constant (sqrt(2) is common)
+    exploration-constant: ${GRAPHO1_EXPLORE_C:1.414}
+    # Maximum reasoning depth in graph
+    max-depth: ${GRAPHO1_MAX_DEPTH:5}
+    # Simulations per node evaluation
+    simulation-count: ${GRAPHO1_SIM_COUNT:3}
+    # Minimum confidence for early termination
+    min-confidence: ${GRAPHO1_MIN_CONF:0.6}
+
+  # AdaptiveRAG: Intelligent Query Routing (arXiv:2504.20734)
+  # Routes queries to optimal retrieval strategy based on complexity
+  adaptiverag:
+    enabled: ${ADAPTIVERAG_ENABLED:true}
+    # Use LLM for semantic routing (higher accuracy, +3-5s latency)
+    # Default false: uses fast heuristics only to avoid per-query LLM overhead
+    semantic-router-enabled: ${ADAPTIVERAG_SEMANTIC_ROUTER:false}
+    chunk-top-k: ${ADAPTIVERAG_CHUNK_K:5}
+    document-top-k: ${ADAPTIVERAG_DOCUMENT_K:3}
+
+  # CRAG: Corrective RAG (Document Grading)
+  # Validates retrieved documents before generation to reduce hallucinations
+  # NOTE: LLM grading disabled by default for speed - use keyword-based grading
+  crag:
+    enabled: ${CRAG_ENABLED:true}
+    # Minimum ratio of CORRECT documents to proceed with generation
+    min-correct-threshold: ${CRAG_MIN_CORRECT:0.5}
+    # Use LLM for document grading (higher accuracy, higher latency)
+    use-llm-grading: ${CRAG_LLM_GRADING:false}
+    # Confidence threshold for accepting retrieval results
+    confidence-threshold: ${CRAG_CONFIDENCE:0.6}
+
+  # HyDE: Hypothetical Document Embeddings
+  # Improves retrieval for vague/conceptual queries
+  # NOTE: Disabled - requires LLM call for hypothetical doc generation
+  hyde:
+    enabled: ${HYDE_ENABLED:false}
+    top-k: ${HYDE_TOP_K:10}
+    similarity-threshold: ${HYDE_THRESHOLD:0.25}
+    # Maximum length of hypothetical document
+    hypothetical-length: ${HYDE_LENGTH:150}
+
+  # Self-RAG: Self-Reflective Generation
+  # Model critiques its own claims for maximum factual accuracy
+  # NOTE: Disabled by default - adds 2-3 LLM calls per query
+  selfrag:
+    enabled: ${SELFRAG_ENABLED:false}
+    # Max uncertain claims before triggering re-retrieval
+    max-uncertain-claims: ${SELFRAG_MAX_UNCERTAIN:2}
+    # Re-retrieve when too many uncertain claims detected
+    re-retrieve-on-uncertain: ${SELFRAG_RE_RETRIEVE:true}
+
+  # Agentic RAG Orchestrator
+  # Full pipeline coordination for complex queries (Government edition)
+  agentic:
+    # DISABLED BY DEFAULT - enable for government edition
+    enabled: ${AGENTIC_ENABLED:false}
+    max-iterations: ${AGENTIC_MAX_ITER:3}
+    use-hyde: ${AGENTIC_USE_HYDE:true}
+    use-selfrag: ${AGENTIC_USE_SELFRAG:true}
+    confidence-threshold: ${AGENTIC_CONFIDENCE:0.6}
+
+  # PII Redaction Engine
+  # Industry-standard compliance: NIST 800-122, GDPR, HIPAA Safe Harbor, PCI-DSS
+  pii:
+    enabled: ${PII_ENABLED:true}
+    mode: ${PII_MODE:MASK}  # MASK, TOKENIZE, or REMOVE
+    audit-redactions: ${PII_AUDIT:true}
+    patterns:
+      ssn: ${PII_SSN:true}
+      email: ${PII_EMAIL:true}
+      phone: ${PII_PHONE:true}
+      credit-card: ${PII_CREDIT_CARD:true}
+      dob: ${PII_DOB:true}
+      ip-address: ${PII_IP:true}
+      passport: ${PII_PASSPORT:true}
+      drivers-license: ${PII_DL:true}
+      names: ${PII_NAMES:true}
+      address: ${PII_ADDRESS:true}
+      medical-id: ${PII_MEDICAL:true}
+
+  # Glass Box Reasoning Engine
+  # Real-time pipeline transparency
+  reasoning:
+    enabled: ${REASONING_ENABLED:true}
+    detailed-traces: ${REASONING_DETAILED:false}
+    trace-retention-hours: ${REASONING_RETENTION:24}
+
+  # UI Theming Configuration
+  # Sector-aware theming: GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
+  ui:
+    # Default sector theme (matches the 5 sectors)
+    default-sector: ${SENTINEL_DEFAULT_SECTOR:ENTERPRISE}
+    # Custom branding (optional)
+    brand-name: ${SENTINEL_BRAND_NAME:SENTINEL}
+    # Show classification banners (high-security sectors: GOVERNMENT, MEDICAL, FINANCE)
+    show-classification: ${SENTINEL_SHOW_CLASSIFICATION:true}
+    # Allow users to switch sectors
+    allow-sector-switching: ${SENTINEL_ALLOW_SECTOR_SWITCH:true}
+
+# ============================================
+# Swagger/OpenAPI Configuration
+# ============================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    # SECURITY: Disabled by default in production. Enable only for dev.
+    enabled: ${SWAGGER_ENABLED:false}
+    operationsSorter: method
+    tagsSorter: alpha
+    filter: true
+    showExtensions: true
+    showCommonExtensions: true
+  show-actuator: false
+
+# ============================================
+# Profile-specific configurations
+# ============================================
+
+---
+# DEVELOPMENT PROFILE (default)
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+app:
+  auth-mode: DEV
+
+# Enable Swagger UI for development
+springdoc:
+  swagger-ui:
+    enabled: true
+
+---
+# ENTERPRISE PROFILE (Azure AD / Okta)
+spring:
+  config:
+    activate:
+      on-profile: enterprise
+
+app:
+  auth-mode: OIDC
+  oidc:
+    issuer: ${OIDC_ISSUER}
+    client-id: ${OIDC_CLIENT_ID}
+    jwks-uri: ${OIDC_JWKS_URI:}
+    local-jwks-path: ${OIDC_LOCAL_JWKS:}
+    jwks-cache-ttl: ${OIDC_JWKS_CACHE_TTL:3600}
+    allowed-algorithms: ${OIDC_ALGORITHMS:RS256,RS384,RS512,ES256}
+    clock-skew-seconds: ${OIDC_CLOCK_SKEW:30}  # SECURITY: Reduced from 60s for tighter validation
+    validate-issuer: ${OIDC_VALIDATE_ISSUER:true}
+    validate-audience: ${OIDC_VALIDATE_AUDIENCE:true}
+    auto-provision: ${OIDC_AUTO_PROVISION:true}
+    default-role: ${OIDC_DEFAULT_ROLE:VIEWER}
+    default-clearance: ${OIDC_DEFAULT_CLEARANCE:UNCLASSIFIED}
+
+---
+# GOVERNMENT/GOVCLOUD PROFILE (CAC/PIV)
+spring:
+  config:
+    activate:
+      on-profile: govcloud
+
+app:
+  auth-mode: CAC
+  cac:
+    # SECURITY: Disable auto-provisioning by default in govcloud
+    # New CAC users must be pre-registered by an administrator
+    auto-provision: ${CAC_AUTO_PROVISION:false}
+    # Least-privilege defaults if auto-provision is enabled
+    default-role: ${CAC_DEFAULT_ROLE:VIEWER}
+    default-clearance: ${CAC_DEFAULT_CLEARANCE:UNCLASSIFIED}
+
+# Disable Swagger UI in government deployments
+springdoc:
+  swagger-ui:
+    enabled: false
+
+# For air-gapped deployments, override MongoDB URI:
+# MONGODB_URI=mongodb://localhost:27017/mercenary
+
+---
+# COMMERCIAL/STANDARD PROFILE (Username/Password)
+spring:
+  config:
+    activate:
+      on-profile: standard
+
+app:
+  auth-mode: STANDARD
+  standard:
+    allow-basic: false
+
+sentinel:
+  bootstrap:
+    enabled: false
+    admin-password: ${SENTINEL_ADMIN_PASSWORD:}

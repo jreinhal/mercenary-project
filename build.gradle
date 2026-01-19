@@ -1,0 +1,101 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.4'
+}
+
+group = 'com.jreinhal'
+version = '2.2.0'
+
+// Edition selection via -Pedition=xxx (default: government)
+def edition = project.hasProperty('edition') ? project.property('edition') : 'government'
+ext.edition = edition
+
+java {
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://repo.spring.io/milestone' }
+}
+
+dependencies {
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+    // Spring AI for Ollama
+    implementation 'org.springframework.ai:spring-ai-ollama-spring-boot-starter:1.0.0-M4'
+    implementation 'org.springframework.ai:spring-ai-mongodb-atlas-store-spring-boot-starter:1.0.0-M4'
+
+    // Apache Tika for file type detection
+    implementation 'org.apache.tika:tika-core:2.9.1'
+    implementation 'org.apache.tika:tika-parsers-standard-package:2.9.1'
+
+    // Caffeine cache
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+
+    // Rate limiting
+    implementation 'com.bucket4j:bucket4j-core:8.7.0'
+
+    // OpenAPI/Swagger
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+
+    // JWT validation for OIDC
+    implementation 'com.nimbusds:nimbus-jose-jwt:9.37.3'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.ai:spring-ai-bom:1.0.0-M4'
+    }
+}
+
+// Edition-specific source sets
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+            if (edition in ['trial', 'professional', 'medical', 'government']) {
+                // Professional package included in all paid editions
+            }
+            if (edition in ['medical', 'government']) {
+                // Medical package for HIPAA compliance
+            }
+            if (edition == 'government') {
+                // Government package for SCIF/CAC
+            }
+        }
+    }
+}
+
+tasks.named('bootRun') {
+    jvmArgs = ['--add-opens', 'java.base/java.nio.charset=ALL-UNNAMED']
+}
+
+processResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Edition-aware JAR naming
+bootJar {
+    archiveBaseName = "sentinel-${edition}"
+    archiveVersion = version
+}
+
+test {
+    useJUnitPlatform()
+}

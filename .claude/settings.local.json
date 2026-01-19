@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /d/Projects/mercenary status)",
+      "Bash(# Check if there''s a .git directory backup or git config anywhere find /d/Projects -name \"\".git\"\" -type d)",
+      "Bash(# Check git global config for any remote URLs git config --global --list)",
+      "Bash(jar xf:*)",
+      "Bash(# Check for any git objects that might be recoverable find /d/Projects -name \"\"objects\"\" -type d)",
+      "Bash(# Check Windows shadow copies / restore points # And check if VSCode has any backups ls -la \"\"/c/Users/JRein/AppData/Roaming/Code/User/History/\"\")",
+      "Bash(# Search VSCode history for mercenary files find \"\"/c/Users/JRein/AppData/Roaming/Code/User/History/\"\" -name \"\"*.json\"\" -exec grep -l \"\"mercenary\"\" {} \\\\;)",
+      "Bash(# Check if there''s a remote repository configured in git global cat /c/Users/JRein/.gitconfig # Check for any GitHub CLI credentials that might indicate repos cat /c/Users/JRein/.config/gh/hosts.yml)",
+      "Bash(# Check GitHub for any mercenary repos under this user gh repo list jreinhal)",
+      "Bash(# Search entire D drive for any mercenary java files find /d -name \"\"MercenaryController.java\"\")",
+      "Bash(# Check if there''s a cloud sync folder ls -la \"\"/c/Users/JRein/OneDrive/\"\")",
+      "Bash(# Try different approach - check if Windows has System Restore # Also check for any file history wmic shadowcopy list brief)",
+      "Bash(# Search more thoroughly for mercenary source find /c/Users/JRein -name \"\"MercenaryController.java\"\")",
+      "Bash(# Check if there''s a git repo that might have mercenary as origin find /d -maxdepth 4 -name \"\".git\"\" -type d)",
+      "Bash(# Check if there''s any git repository anywhere on D drive find /d -maxdepth 5 -name \"\".git\"\" -type d)",
+      "Bash(# Check what was created find /d/Projects/mercenary/src/main/java -type f -name \"\"*.java\"\")"
+    ]
+  }
+}

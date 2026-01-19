@@ -1,0 +1,230 @@
+/* === GitHub-style README rendering === */
+        :root {
+            --color-canvas-default: #0d1117;
+            --color-canvas-subtle: #161b22;
+            --color-border-default: #30363d;
+            --color-border-muted: #21262d;
+            --color-fg-default: #e6edf3;
+            --color-fg-muted: #8b949e;
+            --color-fg-subtle: #6e7681;
+            --color-accent-fg: #58a6ff;
+            --color-accent-emphasis: #1f6feb;
+            --color-success-fg: #3fb950;
+            --color-attention-fg: #d29922;
+            --color-danger-fg: #f85149;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.5;
+            background: var(--color-canvas-default);
+            color: var(--color-fg-default);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1012px;
+            margin: 0 auto;
+            padding: 32px 32px 64px;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--color-accent-fg);
+            text-decoration: none;
+            font-size: 14px;
+            margin-bottom: 24px;
+            padding: 8px 16px;
+            background: var(--color-canvas-subtle);
+            border-radius: 6px;
+            border: 1px solid var(--color-border-default);
+            transition: background 0.15s;
+        }
+
+        .back-link:hover {
+            background: var(--color-border-muted);
+            text-decoration: none;
+        }
+
+        /* GitHub Markdown Body Styles */
+        .markdown-body {
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .markdown-body h1 {
+            font-size: 2em;
+            font-weight: 600;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid var(--color-border-muted);
+            margin-top: 24px;
+            margin-bottom: 16px;
+        }
+
+        .markdown-body h1:first-child {
+            margin-top: 0;
+        }
+
+        .markdown-body h2 {
+            font-size: 1.5em;
+            font-weight: 600;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid var(--color-border-muted);
+            margin-top: 24px;
+            margin-bottom: 16px;
+        }
+
+        .markdown-body h3 {
+            font-size: 1.25em;
+            font-weight: 600;
+            margin-top: 24px;
+            margin-bottom: 16px;
+        }
+
+        .markdown-body h4 {
+            font-size: 1em;
+            font-weight: 600;
+            margin-top: 24px;
+            margin-bottom: 16px;
+        }
+
+        .markdown-body p {
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+
+        .markdown-body a {
+            color: var(--color-accent-fg);
+            text-decoration: none;
+        }
+
+        .markdown-body a:hover {
+            text-decoration: underline;
+        }
+
+        .markdown-body strong {
+            font-weight: 600;
+        }
+
+        .markdown-body code {
+            font-family: var(--font-mono);
+            font-size: 85%;
+            padding: 0.2em 0.4em;
+            margin: 0;
+            background: rgba(110, 118, 129, 0.4);
+            border-radius: 6px;
+        }
+
+        .markdown-body pre {
+            font-family: var(--font-mono);
+            font-size: 85%;
+            padding: 16px;
+            overflow: auto;
+            line-height: 1.45;
+            background: var(--color-canvas-subtle);
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .markdown-body pre code {
+            padding: 0;
+            margin: 0;
+            background: transparent;
+            border: 0;
+            font-size: 100%;
+            white-space: pre;
+        }
+
+        .markdown-body ul,
+        .markdown-body ol {
+            padding-left: 2em;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+
+        .markdown-body li {
+            margin-top: 0.25em;
+        }
+
+        .markdown-body li + li {
+            margin-top: 0.25em;
+        }
+
+        .markdown-body hr {
+            height: 0.25em;
+            padding: 0;
+            margin: 24px 0;
+            background-color: var(--color-border-muted);
+            border: 0;
+        }
+
+        .markdown-body blockquote {
+            padding: 0 1em;
+            color: var(--color-fg-muted);
+            border-left: 0.25em solid var(--color-border-default);
+            margin-bottom: 16px;
+        }
+
+        /* Tables - GitHub style */
+        .markdown-body table {
+            border-spacing: 0;
+            border-collapse: collapse;
+            display: block;
+            width: max-content;
+            max-width: 100%;
+            overflow: auto;
+            margin-bottom: 16px;
+        }
+
+        .markdown-body table th {
+            font-weight: 600;
+            padding: 6px 13px;
+            border: 1px solid var(--color-border-default);
+            background: var(--color-canvas-subtle);
+        }
+
+        .markdown-body table td {
+            padding: 6px 13px;
+            border: 1px solid var(--color-border-default);
+        }
+
+        .markdown-body table tr {
+            background-color: var(--color-canvas-default);
+            border-top: 1px solid var(--color-border-muted);
+        }
+
+        .markdown-body table tr:nth-child(2n) {
+            background-color: var(--color-canvas-subtle);
+        }
+
+        .markdown-body img {
+            max-width: 100%;
+            box-sizing: content-box;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: var(--color-fg-muted);
+        }
+
+        .error {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid var(--color-danger-fg);
+            border-radius: 6px;
+            padding: 16px;
+            color: var(--color-danger-fg);
+        }

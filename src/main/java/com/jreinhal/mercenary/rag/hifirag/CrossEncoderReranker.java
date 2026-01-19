@@ -1,0 +1,162 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  com.jreinhal.mercenary.rag.hifirag.CrossEncoderReranker
+ *  com.jreinhal.mercenary.rag.hifirag.HiFiRagService$ScoredDocument
+ *  jakarta.annotation.PostConstruct
+ *  org.slf4j.Logger
+ *  org.slf4j.LoggerFactory
+ *  org.springframework.ai.chat.client.ChatClient
+ *  org.springframework.ai.chat.client.ChatClient$Builder
+ *  org.springframework.ai.document.Document
+ *  org.springframework.beans.factory.annotation.Value
+ *  org.springframework.stereotype.Component
+ */
+package com.jreinhal.mercenary.rag.hifirag;
+
+import com.jreinhal.mercenary.rag.hifirag.HiFiRagService;
+import jakarta.annotation.PostConstruct;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CrossEncoderReranker {
+    private static final Logger log = LoggerFactory.getLogger(CrossEncoderReranker.class);
+    private static final int THREAD_POOL_SIZE = 4;
+    private final ChatClient chatClient;
+    private final ExecutorService executor;
+    @Value(value="${sentinel.hifirag.reranker.batch-size:5}")
+    private int batchSize;
+    @Value(value="${sentinel.hifirag.reranker.timeout-seconds:30}")
+    private int timeoutSeconds;
+    @Value(value="${sentinel.hifirag.reranker.use-llm:true}")
+    private boolean useLlm;
+
+    public CrossEncoderReranker(ChatClient.Builder builder) {
+        this.chatClient = builder.build();
+        this.executor = Executors.newFixedThreadPool(4);
+    }
+
+    @PostConstruct
+    public void init() {
+        log.info("Cross-Encoder Reranker initialized (useLlm={})", (Object)this.useLlm);
+    }
+
+    public List<HiFiRagService.ScoredDocument> rerank(String query, List<Document> documents) {
+        if (documents.isEmpty()) {
+            return List.of();
+        }
+        log.debug("Cross-encoder reranking {} documents", (Object)documents.size());
+        long startTime = System.currentTimeMillis();
+        List scored = this.useLlm ? this.rerankWithLlm(query, documents) : this.rerankWithKeywords(query, documents);
+        log.debug("Reranking completed in {}ms", (Object)(System.currentTimeMillis() - startTime));
+        return scored.stream().sorted((a, b) -> Double.compare(b.score(), a.score())).collect(Collectors.toList());
+    }
+
+    private List<HiFiRagService.ScoredDocument> rerankWithLlm(String query, List<Document> documents) {
+        ArrayList<HiFiRagService.ScoredDocument> results = new ArrayList<HiFiRagService.ScoredDocument>();
+        for (int i = 0; i < documents.size(); i += this.batchSize) {
+            int end = Math.min(i + this.batchSize, documents.size());
+            List<Document> batch = documents.subList(i, end);
+            ArrayList<Future<HiFiRagService.ScoredDocument>> futures = new ArrayList<Future<HiFiRagService.ScoredDocument>>();
+            for (Document document : batch) {
+                futures.add(this.executor.submit(() -> this.scoreDocument(query, doc)));
+            }
+            for (Future future : futures) {
+                try {
+                    HiFiRagService.ScoredDocument sd = (HiFiRagService.ScoredDocument)future.get(this.timeoutSeconds, TimeUnit.SECONDS);
+                    if (sd == null) continue;
+                    results.add(sd);
+                }
+                catch (TimeoutException e) {
+                    log.warn("Cross-encoder scoring timed out");
+                }
+                catch (Exception e) {
+                    log.warn("Cross-encoder scoring failed: {}", (Object)e.getMessage());
+                }
+            }
+        }
+        return results;
+    }
+
+    private HiFiRagService.ScoredDocument scoreDocument(String query, Document doc) {
+        try {
+            Object content = doc.getContent();
+            if (((String)content).length() > 1000) {
+                content = ((String)content).substring(0, 1000) + "...";
+            }
+            String promptText = String.format("Rate the relevance of this document to the query on a scale of 0.0 to 1.0.\n\nQUERY: %s\n\nDOCUMENT:\n%s\n\nRespond with ONLY a number between 0.0 and 1.0, nothing else.\n0.0 = completely irrelevant\n0.5 = somewhat relevant\n1.0 = highly relevant\n\nScore:", query, content);
+            String response = this.chatClient.prompt().user(promptText).call().content();
+            double score = this.parseScore(response);
+            return new HiFiRagService.ScoredDocument(doc, score);
+        }
+        catch (Exception e) {
+            log.debug("LLM scoring failed for document, using fallback: {}", (Object)e.getMessage());
+            return this.scoreWithKeywords(query, doc);
+        }
+    }
+
+    private double parseScore(String response) {
+        if (response == null || response.isEmpty()) {
+            return 0.5;
+        }
+        Pattern pattern = Pattern.compile("(0\\.\\d+|1\\.0|0|1)");
+        Matcher matcher = pattern.matcher(response.trim());
+        if (matcher.find()) {
+            try {
+                double score = Double.parseDouble(matcher.group(1));
+                return Math.max(0.0, Math.min(1.0, score));
+            }
+            catch (NumberFormatException numberFormatException) {
+                // empty catch block
+            }
+        }
+        return 0.5;
+    }
+
+    private List<HiFiRagService.ScoredDocument> rerankWithKeywords(String query, List<Document> documents) {
+        return documents.stream().map(doc -> this.scoreWithKeywords(query, doc)).collect(Collectors.toList());
+    }
+
+    private HiFiRagService.ScoredDocument scoreWithKeywords(String query, Document doc) {
+        String lowerQuery = query.toLowerCase();
+        String lowerContent = doc.getContent().toLowerCase();
+        Set<String> stopWords = Set.of("the", "a", "an", "is", "are", "was", "were", "what", "where", "when", "who", "how", "why", "which", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with");
+        String[] queryTerms = lowerQuery.split("\\W+");
+        int totalTerms = 0;
+        int matchedTerms = 0;
+        for (String term : queryTerms) {
+            if (term.length() <= 2 || stopWords.contains(term)) continue;
+            ++totalTerms;
+            if (!lowerContent.contains(term)) continue;
+            ++matchedTerms;
+        }
+        double score = totalTerms > 0 ? (double)matchedTerms / (double)totalTerms : 0.0;
+        Object source = doc.getMetadata().get("source");
+        if (source != null) {
+            String lowerSource = source.toString().toLowerCase();
+            for (String term : queryTerms) {
+                if (term.length() <= 2 || !lowerSource.contains(term)) continue;
+                score = Math.min(1.0, score + 0.1);
+            }
+        }
+        return new HiFiRagService.ScoredDocument(doc, score);
+    }
+}
+

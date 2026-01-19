@@ -1,0 +1,244 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  com.jreinhal.mercenary.Department
+ *  com.jreinhal.mercenary.controller.SessionController
+ *  com.jreinhal.mercenary.controller.SessionController$SessionResponse
+ *  com.jreinhal.mercenary.filter.SecurityContext
+ *  com.jreinhal.mercenary.model.User
+ *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService
+ *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService$ConversationContext
+ *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService
+ *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService$ActiveSession
+ *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService$PersistedTrace
+ *  com.jreinhal.mercenary.service.AuditService
+ *  jakarta.servlet.http.HttpServletRequest
+ *  org.slf4j.Logger
+ *  org.slf4j.LoggerFactory
+ *  org.springframework.http.HttpStatus
+ *  org.springframework.http.HttpStatusCode
+ *  org.springframework.http.ResponseEntity
+ *  org.springframework.web.bind.annotation.DeleteMapping
+ *  org.springframework.web.bind.annotation.GetMapping
+ *  org.springframework.web.bind.annotation.PathVariable
+ *  org.springframework.web.bind.annotation.PostMapping
+ *  org.springframework.web.bind.annotation.RequestMapping
+ *  org.springframework.web.bind.annotation.RequestParam
+ *  org.springframework.web.bind.annotation.RestController
+ */
+package com.jreinhal.mercenary.controller;
+
+import com.jreinhal.mercenary.Department;
+import com.jreinhal.mercenary.controller.SessionController;
+import com.jreinhal.mercenary.filter.SecurityContext;
+import com.jreinhal.mercenary.model.User;
+import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
+import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
+import com.jreinhal.mercenary.service.AuditService;
+import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(value={"/api/sessions"})
+public class SessionController {
+    private static final Logger log = LoggerFactory.getLogger(SessionController.class);
+    private final SessionPersistenceService sessionPersistenceService;
+    private final ConversationMemoryService conversationMemoryService;
+    private final AuditService auditService;
+
+    public SessionController(SessionPersistenceService sessionPersistenceService, ConversationMemoryService conversationMemoryService, AuditService auditService) {
+        this.sessionPersistenceService = sessionPersistenceService;
+        this.conversationMemoryService = conversationMemoryService;
+        this.auditService = auditService;
+    }
+
+    @PostMapping(value={"/create"})
+    public ResponseEntity<SessionResponse> createSession(@RequestParam(required=false) String department, HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        String dept = department != null ? department : Department.ENTERPRISE.name();
+        String sessionId = this.sessionPersistenceService.generateSessionId();
+        SessionPersistenceService.ActiveSession session = this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
+        Department sector = Department.valueOf((String)dept);
+        this.auditService.logQuery(user, "session_create: " + sessionId, sector, "Session created", request);
+        return ResponseEntity.ok((Object)new SessionResponse(session.sessionId(), session.department(), session.createdAt().toString(), "Session created successfully"));
+    }
+
+    @GetMapping(value={"/{sessionId}"})
+    public ResponseEntity<SessionPersistenceService.ActiveSession> getSession(@PathVariable String sessionId, HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        Optional session = this.sessionPersistenceService.getSession(sessionId);
+        if (session.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!((SessionPersistenceService.ActiveSession)session.get()).userId().equals(user.getId())) {
+            this.auditService.logQuery(user, "session_access_denied: " + sessionId, Department.ENTERPRISE, "Access denied", request);
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok((Object)((SessionPersistenceService.ActiveSession)session.get()));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<SessionPersistenceService.ActiveSession>> listSessions() {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        List sessions = this.sessionPersistenceService.getUserSessions(user.getId());
+        return ResponseEntity.ok((Object)sessions);
+    }
+
+    @PostMapping(value={"/{sessionId}/touch"})
+    public ResponseEntity<SessionPersistenceService.ActiveSession> touchSession(@PathVariable String sessionId, @RequestParam(required=false) String department) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        String dept = department != null ? department : Department.ENTERPRISE.name();
+        SessionPersistenceService.ActiveSession session = this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
+        return ResponseEntity.ok((Object)session);
+    }
+
+    @DeleteMapping(value={"/{sessionId}/history"})
+    public ResponseEntity<Map<String, String>> clearSessionHistory(@PathVariable String sessionId, HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        Optional session = this.sessionPersistenceService.getSession(sessionId);
+        if (session.isEmpty() || !((SessionPersistenceService.ActiveSession)session.get()).userId().equals(user.getId())) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
+        this.conversationMemoryService.clearSession(user.getId(), sessionId);
+        this.auditService.logQuery(user, "session_clear: " + sessionId, Department.ENTERPRISE, "Session cleared", request);
+        return ResponseEntity.ok(Map.of("status", "cleared", "sessionId", sessionId));
+    }
+
+    @GetMapping(value={"/{sessionId}/context"})
+    public ResponseEntity<ConversationMemoryService.ConversationContext> getConversationContext(@PathVariable String sessionId) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        Optional session = this.sessionPersistenceService.getSession(sessionId);
+        if (session.isEmpty() || !((SessionPersistenceService.ActiveSession)session.get()).userId().equals(user.getId())) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
+        ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
+        return ResponseEntity.ok((Object)context);
+    }
+
+    @GetMapping(value={"/{sessionId}/traces"})
+    public ResponseEntity<List<SessionPersistenceService.PersistedTrace>> getSessionTraces(@PathVariable String sessionId) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        Optional session = this.sessionPersistenceService.getSession(sessionId);
+        if (session.isEmpty() || !((SessionPersistenceService.ActiveSession)session.get()).userId().equals(user.getId())) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
+        List traces = this.sessionPersistenceService.getSessionTraces(sessionId);
+        return ResponseEntity.ok((Object)traces);
+    }
+
+    @GetMapping(value={"/traces/{traceId}"})
+    public ResponseEntity<SessionPersistenceService.PersistedTrace> getTrace(@PathVariable String traceId, HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        Optional trace = this.sessionPersistenceService.getPersistedTrace(traceId);
+        if (trace.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!((SessionPersistenceService.PersistedTrace)trace.get()).userId().equals(user.getId())) {
+            this.auditService.logQuery(user, "trace_access_denied: " + traceId, Department.ENTERPRISE, "Access denied", request);
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok((Object)((SessionPersistenceService.PersistedTrace)trace.get()));
+    }
+
+    @GetMapping(value={"/{sessionId}/export"}, produces={"application/json"})
+    public ResponseEntity<String> exportSession(@PathVariable String sessionId, HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            String json = this.sessionPersistenceService.exportSessionToJson(sessionId, user.getId());
+            this.auditService.logQuery(user, "session_export: " + sessionId, Department.ENTERPRISE, "Session exported", request);
+            return ResponseEntity.ok((Object)json);
+        }
+        catch (SecurityException e) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body((Object)"{\"error\": \"Access denied\"}");
+        }
+        catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+        catch (IOException e) {
+            log.error("Failed to export session {}: {}", (Object)sessionId, (Object)e.getMessage());
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body((Object)"{\"error\": \"Export failed\"}");
+        }
+    }
+
+    @PostMapping(value={"/{sessionId}/export/file"})
+    public ResponseEntity<Map<String, String>> exportSessionToFile(@PathVariable String sessionId, HttpServletRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            Path exportPath = this.sessionPersistenceService.exportSession(sessionId, user.getId());
+            this.auditService.logQuery(user, "session_export_file: " + sessionId, Department.ENTERPRISE, "Session exported to file", request);
+            return ResponseEntity.ok(Map.of("status", "exported", "path", exportPath.toString(), "sessionId", sessionId));
+        }
+        catch (SecurityException e) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied"));
+        }
+        catch (IllegalArgumentException e) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_FOUND).body(Map.of("error", "Session not found"));
+        }
+        catch (IOException e) {
+            log.error("Failed to export session to file {}: {}", (Object)sessionId, (Object)e.getMessage());
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Export failed: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping(value={"/stats"})
+    public ResponseEntity<Map<String, Object>> getStatistics() {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        Map stats = this.sessionPersistenceService.getStatistics();
+        List userSessions = this.sessionPersistenceService.getUserSessions(user.getId());
+        stats.put("userActiveSessions", userSessions.size());
+        stats.put("userTotalMessages", userSessions.stream().mapToInt(SessionPersistenceService.ActiveSession::messageCount).sum());
+        stats.put("userTotalTraces", userSessions.stream().mapToInt(SessionPersistenceService.ActiveSession::traceCount).sum());
+        return ResponseEntity.ok((Object)stats);
+    }
+}
+

@@ -1,0 +1,331 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  com.fasterxml.jackson.databind.Module
+ *  com.fasterxml.jackson.databind.ObjectMapper
+ *  com.fasterxml.jackson.databind.SerializationFeature
+ *  com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+ *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService
+ *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService$ConversationContext
+ *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService
+ *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService$ActiveSession
+ *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService$PersistedTrace
+ *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService$SessionExport
+ *  com.jreinhal.mercenary.reasoning.ReasoningTrace
+ *  com.mongodb.client.result.DeleteResult
+ *  jakarta.annotation.PostConstruct
+ *  org.slf4j.Logger
+ *  org.slf4j.LoggerFactory
+ *  org.springframework.beans.factory.annotation.Value
+ *  org.springframework.data.domain.Sort
+ *  org.springframework.data.domain.Sort$Direction
+ *  org.springframework.data.mongodb.core.MongoTemplate
+ *  org.springframework.data.mongodb.core.query.Criteria
+ *  org.springframework.data.mongodb.core.query.CriteriaDefinition
+ *  org.springframework.data.mongodb.core.query.Query
+ *  org.springframework.scheduling.annotation.Scheduled
+ *  org.springframework.stereotype.Service
+ */
+package com.jreinhal.mercenary.professional.memory;
+
+import com.fasterxml.jackson.databind.Module;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
+import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
+import com.jreinhal.mercenary.reasoning.ReasoningTrace;
+import com.mongodb.client.result.DeleteResult;
+import jakarta.annotation.PostConstruct;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.CriteriaDefinition;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+@Service
+public class SessionPersistenceService {
+    private static final Logger log = LoggerFactory.getLogger(SessionPersistenceService.class);
+    private static final String TRACES_COLLECTION = "reasoning_traces";
+    private static final String SESSIONS_COLLECTION = "active_sessions";
+    private static final DateTimeFormatter FILE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss").withZone(ZoneId.systemDefault());
+    private final MongoTemplate mongoTemplate;
+    private final ConversationMemoryService conversationMemoryService;
+    private final ObjectMapper objectMapper;
+    @Value(value="${sentinel.sessions.data-dir:${user.home}/.sentinel/sessions}")
+    private String sessionDataDir;
+    @Value(value="${sentinel.sessions.file-backup-enabled:true}")
+    private boolean fileBackupEnabled;
+    @Value(value="${sentinel.sessions.trace-retention-hours:24}")
+    private int traceRetentionHours;
+    @Value(value="${sentinel.sessions.session-timeout-minutes:60}")
+    private int sessionTimeoutMinutes;
+    @Value(value="${sentinel.sessions.max-traces-per-session:100}")
+    private int maxTracesPerSession;
+
+    public SessionPersistenceService(MongoTemplate mongoTemplate, ConversationMemoryService conversationMemoryService) {
+        this.mongoTemplate = mongoTemplate;
+        this.conversationMemoryService = conversationMemoryService;
+        this.objectMapper = new ObjectMapper().registerModule((Module)new JavaTimeModule()).enable(SerializationFeature.INDENT_OUTPUT).disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    }
+
+    @PostConstruct
+    public void init() {
+        if (this.fileBackupEnabled) {
+            try {
+                Path dataPath = Paths.get(this.sessionDataDir, new String[0]);
+                Files.createDirectories(dataPath, new FileAttribute[0]);
+                Files.createDirectories(dataPath.resolve("traces"), new FileAttribute[0]);
+                Files.createDirectories(dataPath.resolve("sessions"), new FileAttribute[0]);
+                Files.createDirectories(dataPath.resolve("exports"), new FileAttribute[0]);
+                log.info("Session persistence initialized: {}", (Object)this.sessionDataDir);
+            }
+            catch (IOException e) {
+                log.error("Failed to create session data directories: {}", (Object)e.getMessage());
+            }
+        }
+    }
+
+    public ActiveSession touchSession(String userId, String sessionId, String department) {
+        ActiveSession session;
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is((Object)sessionId));
+        ActiveSession existing = (ActiveSession)this.mongoTemplate.findOne(query, ActiveSession.class, SESSIONS_COLLECTION);
+        if (existing == null) {
+            session = new ActiveSession(sessionId, userId, department, Instant.now(), Instant.now(), 0, 0, new ArrayList(), new HashMap());
+            log.info("Created new session: {} for user: {}", (Object)sessionId, (Object)userId);
+        } else {
+            session = new ActiveSession(existing.sessionId(), existing.userId(), existing.department(), existing.createdAt(), Instant.now(), existing.messageCount(), existing.traceCount(), existing.traceIds(), existing.metadata());
+        }
+        this.mongoTemplate.save((Object)session, SESSIONS_COLLECTION);
+        return session;
+    }
+
+    public String generateSessionId() {
+        return UUID.randomUUID().toString().substring(0, 12);
+    }
+
+    public Optional<ActiveSession> getSession(String sessionId) {
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is((Object)sessionId));
+        ActiveSession session = (ActiveSession)this.mongoTemplate.findOne(query, ActiveSession.class, SESSIONS_COLLECTION);
+        return Optional.ofNullable(session);
+    }
+
+    public List<ActiveSession> getUserSessions(String userId) {
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"userId").is((Object)userId));
+        return this.mongoTemplate.find(query, ActiveSession.class, SESSIONS_COLLECTION);
+    }
+
+    public void incrementMessageCount(String sessionId) {
+        this.getSession(sessionId).ifPresent(session -> {
+            ActiveSession updated = new ActiveSession(session.sessionId(), session.userId(), session.department(), session.createdAt(), Instant.now(), session.messageCount() + 1, session.traceCount(), session.traceIds(), session.metadata());
+            this.mongoTemplate.save((Object)updated, SESSIONS_COLLECTION);
+        });
+    }
+
+    public void persistTrace(ReasoningTrace trace, String sessionId) {
+        if (trace == null) {
+            return;
+        }
+        PersistedTrace persisted = new PersistedTrace(trace.getTraceId(), sessionId, trace.getUserId(), trace.getDepartment(), trace.getQuery(), trace.getTimestamp(), trace.getTotalDurationMs(), trace.getSteps().size(), trace.getSteps().stream().map(step -> Map.of("type", step.type().name(), "label", step.label(), "detail", step.detail() != null ? step.detail() : "", "durationMs", step.durationMs(), "data", step.data() != null ? step.data() : Map.of())).toList(), trace.getMetrics(), trace.isCompleted());
+        try {
+            this.mongoTemplate.save((Object)persisted, TRACES_COLLECTION);
+            log.debug("Persisted trace {} to MongoDB", (Object)trace.getTraceId());
+        }
+        catch (Exception e) {
+            log.error("Failed to persist trace to MongoDB: {}", (Object)e.getMessage());
+        }
+        this.updateSessionTraceCount(sessionId, trace.getTraceId());
+        if (this.fileBackupEnabled) {
+            this.writeTraceToFile(persisted);
+        }
+    }
+
+    private void updateSessionTraceCount(String sessionId, String traceId) {
+        this.getSession(sessionId).ifPresent(session -> {
+            List traceIds = new ArrayList<String>(session.traceIds());
+            traceIds.add(traceId);
+            if (traceIds.size() > this.maxTracesPerSession) {
+                traceIds = traceIds.subList(traceIds.size() - this.maxTracesPerSession, traceIds.size());
+            }
+            ActiveSession updated = new ActiveSession(session.sessionId(), session.userId(), session.department(), session.createdAt(), Instant.now(), session.messageCount(), traceIds.size(), traceIds, session.metadata());
+            this.mongoTemplate.save((Object)updated, SESSIONS_COLLECTION);
+        });
+    }
+
+    private void writeTraceToFile(PersistedTrace trace) {
+        try {
+            String datePrefix = FILE_DATE_FORMAT.format(trace.timestamp());
+            String filename = String.format("%s_%s.json", datePrefix, trace.traceId());
+            Path filePath = Paths.get(this.sessionDataDir, "traces", filename);
+            String json = this.objectMapper.writeValueAsString((Object)trace);
+            Files.writeString(filePath, (CharSequence)json, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            log.debug("Wrote trace to file: {}", (Object)filePath);
+        }
+        catch (IOException e) {
+            log.warn("Failed to write trace to file: {}", (Object)e.getMessage());
+        }
+    }
+
+    public Optional<PersistedTrace> getPersistedTrace(String traceId) {
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"traceId").is((Object)traceId));
+        PersistedTrace trace = (PersistedTrace)this.mongoTemplate.findOne(query, PersistedTrace.class, TRACES_COLLECTION);
+        return Optional.ofNullable(trace);
+    }
+
+    public List<PersistedTrace> getSessionTraces(String sessionId) {
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is((Object)sessionId));
+        query.with(Sort.by((Sort.Direction)Sort.Direction.ASC, (String[])new String[]{"timestamp"}));
+        return this.mongoTemplate.find(query, PersistedTrace.class, TRACES_COLLECTION);
+    }
+
+    public Path exportSession(String sessionId, String userId) throws IOException {
+        Optional sessionOpt = this.getSession(sessionId);
+        if (sessionOpt.isEmpty()) {
+            throw new IllegalArgumentException("Session not found: " + sessionId);
+        }
+        ActiveSession session = (ActiveSession)sessionOpt.get();
+        if (!session.userId().equals(userId)) {
+            throw new SecurityException("User does not own this session");
+        }
+        ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(userId, sessionId);
+        List traces = this.getSessionTraces(sessionId);
+        HashMap<String, Object> summary = new HashMap<String, Object>();
+        summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
+        summary.put("averageResponseTime", traces.isEmpty() ? 0.0 : traces.stream().mapToLong(PersistedTrace::durationMs).average().orElse(0.0));
+        summary.put("topicsDiscussed", context.activeTopics());
+        SessionExport export = new SessionExport(sessionId, userId, session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary);
+        String filename = String.format("session_%s_%s.json", sessionId, FILE_DATE_FORMAT.format(Instant.now()));
+        Path exportPath = Paths.get(this.sessionDataDir, "exports", filename);
+        String json = this.objectMapper.writeValueAsString((Object)export);
+        Files.writeString(exportPath, (CharSequence)json, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        log.info("Exported session {} to {}", (Object)sessionId, (Object)exportPath);
+        return exportPath;
+    }
+
+    public String exportSessionToJson(String sessionId, String userId) throws IOException {
+        Optional sessionOpt = this.getSession(sessionId);
+        if (sessionOpt.isEmpty()) {
+            throw new IllegalArgumentException("Session not found: " + sessionId);
+        }
+        ActiveSession session = (ActiveSession)sessionOpt.get();
+        if (!session.userId().equals(userId)) {
+            throw new SecurityException("User does not own this session");
+        }
+        ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(userId, sessionId);
+        List traces = this.getSessionTraces(sessionId);
+        HashMap<String, Object> summary = new HashMap<String, Object>();
+        summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
+        summary.put("topicsDiscussed", context.activeTopics());
+        SessionExport export = new SessionExport(sessionId, userId, session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary);
+        return this.objectMapper.writeValueAsString((Object)export);
+    }
+
+    @Scheduled(fixedRate=3600000L)
+    public void archiveInactiveSessions() {
+        Instant cutoff = Instant.now().minusSeconds((long)this.sessionTimeoutMinutes * 60L);
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"lastActivityAt").lt((Object)cutoff));
+        List inactiveSessions = this.mongoTemplate.find(query, ActiveSession.class, SESSIONS_COLLECTION);
+        for (ActiveSession session : inactiveSessions) {
+            try {
+                if (this.fileBackupEnabled) {
+                    this.exportSession(session.sessionId(), session.userId());
+                }
+                this.mongoTemplate.remove(new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is((Object)session.sessionId())), SESSIONS_COLLECTION);
+                log.info("Archived inactive session: {}", (Object)session.sessionId());
+            }
+            catch (Exception e) {
+                log.error("Failed to archive session {}: {}", (Object)session.sessionId(), (Object)e.getMessage());
+            }
+        }
+        if (!inactiveSessions.isEmpty()) {
+            log.info("Archived {} inactive sessions", (Object)inactiveSessions.size());
+        }
+    }
+
+    @Scheduled(cron="0 0 2 * * *")
+    public void purgeOldTraces() {
+        Instant cutoff = Instant.now().minusSeconds((long)this.traceRetentionHours * 3600L);
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"timestamp").lt((Object)cutoff));
+        try {
+            DeleteResult result = this.mongoTemplate.remove(query, TRACES_COLLECTION);
+            long deleted = result.getDeletedCount();
+            if (deleted > 0L) {
+                log.info("Purged {} old reasoning traces (older than {} hours)", (Object)deleted, (Object)this.traceRetentionHours);
+            }
+        }
+        catch (Exception e) {
+            log.error("Failed to purge old traces: {}", (Object)e.getMessage());
+        }
+        this.conversationMemoryService.purgeOldConversations(this.traceRetentionHours / 24);
+        if (this.fileBackupEnabled) {
+            this.purgeOldTraceFiles(cutoff);
+        }
+    }
+
+    private void purgeOldTraceFiles(Instant cutoff) {
+        Path tracesDir = Paths.get(this.sessionDataDir, "traces");
+        try (Stream<Path> files = Files.list(tracesDir);){
+            files.filter(x$0 -> Files.isRegularFile(x$0, new LinkOption[0])).filter(path -> {
+                try {
+                    return Files.getLastModifiedTime(path, new LinkOption[0]).toInstant().isBefore(cutoff);
+                }
+                catch (IOException e) {
+                    return false;
+                }
+            }).forEach(path -> {
+                try {
+                    Files.delete(path);
+                    log.debug("Deleted old trace file: {}", (Object)path.getFileName());
+                }
+                catch (IOException e) {
+                    log.warn("Failed to delete trace file: {}", (Object)e.getMessage());
+                }
+            });
+        }
+        catch (IOException e) {
+            log.warn("Failed to list trace files for cleanup: {}", (Object)e.getMessage());
+        }
+    }
+
+    public Map<String, Object> getStatistics() {
+        HashMap<String, Object> stats = new HashMap<String, Object>();
+        try {
+            long activeSessions = this.mongoTemplate.count(new Query(), SESSIONS_COLLECTION);
+            long totalTraces = this.mongoTemplate.count(new Query(), TRACES_COLLECTION);
+            stats.put("activeSessions", activeSessions);
+            stats.put("totalPersistedTraces", totalTraces);
+            stats.put("traceRetentionHours", this.traceRetentionHours);
+            stats.put("sessionTimeoutMinutes", this.sessionTimeoutMinutes);
+            stats.put("fileBackupEnabled", this.fileBackupEnabled);
+            stats.put("dataDirectory", this.sessionDataDir);
+        }
+        catch (Exception e) {
+            stats.put("error", e.getMessage());
+        }
+        return stats;
+    }
+}
+
