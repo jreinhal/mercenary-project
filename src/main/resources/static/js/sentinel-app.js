@@ -1548,14 +1548,11 @@
 
             setHidden(placeholder, true);
 
-            // Dynamic viewBox scaling based on graph complexity
-            // Base size for small graphs (1-5 nodes), scales up for larger graphs
-            const totalNodes = Math.min(sourceCount, MAX_SOURCES) + entities.length + 1; // +1 for query node
-            const baseViewBox = 10.0;
-            const scaleFactor = Math.max(1.0, 1.0 + (totalNodes - 5) * 0.08); // Scale up 8% per node beyond 5
-            const scaledViewBox = baseViewBox * Math.min(scaleFactor, 1.6); // Cap at 1.6x expansion
-            const viewBoxMin = -scaledViewBox;
-            const viewBoxMax = scaledViewBox;
+            // Calculate source count early (needed for viewBox scaling)
+            const sourceCount = Math.min(sources.length, 4);
+
+            const viewBoxMin = -14.0;
+            const viewBoxMax = 14.0;
             const viewBoxSize = viewBoxMax - viewBoxMin;
             const labelBounds = {
                 min: viewBoxMin + 0.3,
@@ -1594,12 +1591,11 @@
                 return result || clean.substring(0, max - 1);
             }
 
-            const sourceCount = Math.min(sources.length, 4);
             const fixedPositions = [
-                { x: 0, y: 7.5, textPos: 'top center' },
-                { x: 7.5, y: 0, textPos: 'right center' },
-                { x: 0, y: -7.5, textPos: 'bottom center' },
-                { x: -7.5, y: 0, textPos: 'left center' }
+                { x: 0, y: 8.5, textPos: 'top center' },
+                { x: 8.5, y: 0, textPos: 'right center' },
+                { x: 0, y: -8.5, textPos: 'bottom center' },
+                { x: -8.5, y: 0, textPos: 'left center' }
             ];
 
             const nodes = [];
@@ -1636,7 +1632,7 @@
                 tooltipRows: queryRows,
                 x: 0,
                 y: 0,
-                radius: 3.2,  // Large central query node
+                radius: 1.0,
                 textPos: 'bottom center'
             });
 
@@ -1679,14 +1675,14 @@
                     filename,
                     x: pos.x,
                     y: pos.y,
-                    radius: 2.4,  // Medium-sized source nodes
+                    radius: 0.65,
                     textPos: pos.textPos
                 });
             }
 
             const entityPositions = [
-                { x: 4.5, y: 4.5, textPos: 'top right' },
-                { x: -4.5, y: -4.5, textPos: 'bottom left' }
+                { x: 5.5, y: 5.5, textPos: 'top right' },
+                { x: -5.5, y: -5.5, textPos: 'bottom left' }
             ];
 
             const preferredEntities = entities.filter(e =>
@@ -1725,7 +1721,7 @@
                     entityName: entity.name,
                     x: pos.x,
                     y: pos.y,
-                    radius: 1.8,  // Smaller entity nodes
+                    radius: 0.35,
                     textPos: pos.textPos
                 });
             });
@@ -1741,11 +1737,6 @@
             });
 
             graphDiv.innerHTML = '';
-
-            // Set container size class based on node count for dynamic sizing
-            if (container) {
-                container.dataset.nodeCount = totalNodes > 6 ? 'large' : 'normal';
-            }
 
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('class', 'graph-svg');
@@ -1915,7 +1906,23 @@
                 if (tryPlace(false)) return;
                 if (tryPlace(true)) return;
 
-                labelEl.style.display = 'none';
+                // Force-place labels for query and source nodes even if they overlap
+                // Only hide labels for entity nodes when placement fails
+                if (node.type === 'entity') {
+                    labelEl.style.display = 'none';
+                } else {
+                    // Force place at preferred position for query/source nodes
+                    const offset = textOffsets[preferredKey] || textOffsets['bottom center'];
+                    const labelX = node.x + offset.dx;
+                    const labelY = node.y + offset.dy;
+                    labelEl.setAttribute('x', labelX);
+                    labelEl.setAttribute('y', labelY);
+                    labelEl.setAttribute('text-anchor', offset.anchor);
+                    labelEl.setAttribute('dominant-baseline', offset.baseline);
+                    // Truncate to fit
+                    const maxWidth = getMaxLabelWidth(labelX, offset.anchor) - 0.1;
+                    fitLabelTextToWidth(labelEl, maxWidth, true);
+                }
             }
 
             function buildTooltipHtmlForNode(node, snippet) {
