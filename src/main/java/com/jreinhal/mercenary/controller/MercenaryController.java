@@ -113,7 +113,7 @@ public class MercenaryController {
     private static final int MAX_CACHE_ENTRIES = 100;
     private static final Duration CACHE_TTL = Duration.ofHours(1L);
     private final Cache<String, String> secureDocCache = Caffeine.newBuilder().maximumSize(100L).expireAfterWrite(CACHE_TTL).build();
-    private static final OllamaOptions LLM_OPTIONS = OllamaOptions.create().withModel("llama3:latest").withTemperature(0.0).withNumPredict(Integer.valueOf(512));
+    private static final OllamaOptions LLM_OPTIONS = OllamaOptions.create().withModel("llama3.1:8b").withTemperature(0.0).withNumPredict(Integer.valueOf(512));
     private static final String NO_RELEVANT_RECORDS = "No relevant records found.";
     private static final Pattern STRICT_CITATION_PATTERN = Pattern.compile("\\[(?:Citation:\\s*)?[^\\]]+\\.(pdf|txt|md)\\]", 2);
     private static final Pattern METRIC_HINT_PATTERN = Pattern.compile("\\b(metric|metrics|performance|availability|uptime|latency|sla|kpi|mttd|mttr|throughput|error rate|response time|accuracy|precision|recall|f1|cost|risk)\\b", 2);

@@ -42,7 +42,7 @@ spring:
       base-url: ${OLLAMA_URL:http://localhost:11434}
       chat:
         options:
-          model: ${LLM_MODEL:llama3}
+          model: ${LLM_MODEL:llama3.1:8b}
           # Lower temperature for more focused, grounded responses (reduces hallucinations)
           temperature: ${LLM_TEMPERATURE:0.0}
           # Cap output tokens aggressively to prevent runaway generation
