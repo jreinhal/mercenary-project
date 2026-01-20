@@ -1,12 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.medical.hipaa;
 
 import com.jreinhal.mercenary.model.User;

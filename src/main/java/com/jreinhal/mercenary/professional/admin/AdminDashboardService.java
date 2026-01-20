@@ -1,17 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.bson.Document
- *  org.bson.conversions.Bson
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.data.mongodb.core.query.Criteria
- *  org.springframework.data.mongodb.core.query.CriteriaDefinition
- *  org.springframework.data.mongodb.core.query.Query
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.professional.admin;
 
 import com.jreinhal.mercenary.model.User;

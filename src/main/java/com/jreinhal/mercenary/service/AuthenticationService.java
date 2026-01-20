@@ -1,9 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.servlet.http.HttpServletRequest
- */
 package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.Department;

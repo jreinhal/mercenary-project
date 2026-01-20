@@ -65,7 +65,15 @@
       "Bash(ollama pull:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(dir \"C:\\\\Users\\\\JRein\\\\OneDrive\\\\Desktop\\\\Testing\\\\Results\"\" 2>nul || echo \"Directory does not exist \")"
+      "Bash(dir \"C:\\\\Users\\\\JRein\\\\OneDrive\\\\Desktop\\\\Testing\\\\Results\"\" 2>nul || echo \"Directory does not exist \")",
+      "Bash(git push)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(find:*)",
+      "Bash(python tools/remove_decompile_headers.py:*)",
+      "Bash(cmd //c:*)",
+      "Bash(ls:*)",
+      "Bash(tee:*)"
     ]
   }
 }

@@ -1,20 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.apache.tika.Tika
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.document.Document
- *  org.springframework.ai.reader.TextReader
- *  org.springframework.ai.reader.pdf.PagePdfDocumentReader
- *  org.springframework.ai.transformer.splitter.TokenTextSplitter
- *  org.springframework.ai.vectorstore.VectorStore
- *  org.springframework.core.io.InputStreamResource
- *  org.springframework.core.io.Resource
- *  org.springframework.stereotype.Service
- *  org.springframework.web.multipart.MultipartFile
- */
 package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.Department;

@@ -1,22 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.nimbusds.jose.JOSEException
- *  com.nimbusds.jose.JWSAlgorithm
- *  com.nimbusds.jose.jwk.source.JWKSource
- *  com.nimbusds.jose.proc.BadJOSEException
- *  com.nimbusds.jose.proc.JWSKeySelector
- *  com.nimbusds.jose.proc.JWSVerificationKeySelector
- *  com.nimbusds.jose.proc.SecurityContext
- *  com.nimbusds.jwt.JWTClaimsSet
- *  com.nimbusds.jwt.SignedJWT
- *  com.nimbusds.jwt.proc.DefaultJWTProcessor
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.stereotype.Component
- */
 package com.jreinhal.mercenary.security;
 
 import com.jreinhal.mercenary.security.JwksKeyProvider;

@@ -1,16 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.servlet.http.HttpServletRequest
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.web.bind.annotation.CrossOrigin
- *  org.springframework.web.bind.annotation.GetMapping
- *  org.springframework.web.bind.annotation.RequestMapping
- *  org.springframework.web.bind.annotation.RequestParam
- *  org.springframework.web.bind.annotation.RestController
- */
 package com.jreinhal.mercenary.controller;
 
 import com.jreinhal.mercenary.filter.SecurityContext;

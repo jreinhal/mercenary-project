@@ -1,12 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.springframework.security.core.userdetails.UserDetails
- *  org.springframework.security.core.userdetails.UserDetailsService
- *  org.springframework.security.core.userdetails.UsernameNotFoundException
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.security;
 
 import org.springframework.security.core.userdetails.UserDetails;

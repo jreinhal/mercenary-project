@@ -1,16 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.boot.CommandLineRunner
- *  org.springframework.context.annotation.Bean
- *  org.springframework.context.annotation.Configuration
- *  org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
- *  org.springframework.security.crypto.password.PasswordEncoder
- */
 package com.jreinhal.mercenary.config;
 
 import com.jreinhal.mercenary.Department;

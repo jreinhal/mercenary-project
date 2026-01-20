@@ -1,29 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.github.benmanes.caffeine.cache.Cache
- *  com.github.benmanes.caffeine.cache.Caffeine
- *  jakarta.servlet.http.HttpServletRequest
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.chat.client.ChatClient
- *  org.springframework.ai.chat.client.ChatClient$Builder
- *  org.springframework.ai.chat.prompt.ChatOptions
- *  org.springframework.ai.document.Document
- *  org.springframework.ai.ollama.api.OllamaOptions
- *  org.springframework.ai.vectorstore.SearchRequest
- *  org.springframework.ai.vectorstore.VectorStore
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.web.bind.annotation.GetMapping
- *  org.springframework.web.bind.annotation.PathVariable
- *  org.springframework.web.bind.annotation.PostMapping
- *  org.springframework.web.bind.annotation.RequestMapping
- *  org.springframework.web.bind.annotation.RequestMethod
- *  org.springframework.web.bind.annotation.RequestParam
- *  org.springframework.web.bind.annotation.RestController
- *  org.springframework.web.multipart.MultipartFile
- */
 package com.jreinhal.mercenary.controller;
 
 import com.github.benmanes.caffeine.cache.Cache;

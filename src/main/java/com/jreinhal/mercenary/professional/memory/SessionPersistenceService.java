@@ -1,25 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.fasterxml.jackson.databind.Module
- *  com.fasterxml.jackson.databind.ObjectMapper
- *  com.fasterxml.jackson.databind.SerializationFeature
- *  com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
- *  com.mongodb.client.result.DeleteResult
- *  jakarta.annotation.PostConstruct
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.data.domain.Sort
- *  org.springframework.data.domain.Sort$Direction
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.data.mongodb.core.query.Criteria
- *  org.springframework.data.mongodb.core.query.CriteriaDefinition
- *  org.springframework.data.mongodb.core.query.Query
- *  org.springframework.scheduling.annotation.Scheduled
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.professional.memory;
 
 import com.fasterxml.jackson.databind.Module;

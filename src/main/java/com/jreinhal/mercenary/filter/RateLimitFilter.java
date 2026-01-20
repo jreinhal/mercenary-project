@@ -1,25 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.github.benmanes.caffeine.cache.Cache
- *  com.github.benmanes.caffeine.cache.Caffeine
- *  io.github.bucket4j.Bandwidth
- *  io.github.bucket4j.Bucket
- *  io.github.bucket4j.Refill
- *  jakarta.servlet.Filter
- *  jakarta.servlet.FilterChain
- *  jakarta.servlet.ServletException
- *  jakarta.servlet.ServletRequest
- *  jakarta.servlet.ServletResponse
- *  jakarta.servlet.http.HttpServletRequest
- *  jakarta.servlet.http.HttpServletResponse
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.core.annotation.Order
- *  org.springframework.stereotype.Component
- */
 package com.jreinhal.mercenary.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;

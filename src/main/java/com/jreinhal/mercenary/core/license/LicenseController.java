@@ -1,12 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.springframework.http.ResponseEntity
- *  org.springframework.web.bind.annotation.GetMapping
- *  org.springframework.web.bind.annotation.RequestMapping
- *  org.springframework.web.bind.annotation.RestController
- */
 package com.jreinhal.mercenary.core.license;
 
 import com.jreinhal.mercenary.core.license.LicenseService;

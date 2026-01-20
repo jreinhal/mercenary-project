@@ -1,18 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.annotation.PostConstruct
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.document.Document
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.data.mongodb.core.query.Criteria
- *  org.springframework.data.mongodb.core.query.CriteriaDefinition
- *  org.springframework.data.mongodb.core.query.Query
- *  org.springframework.stereotype.Component
- */
 package com.jreinhal.mercenary.rag.hgmem;
 
 import com.jreinhal.mercenary.rag.hgmem.EntityExtractor;

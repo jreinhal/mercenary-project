@@ -1,21 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.annotation.PostConstruct
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.embedding.EmbeddingModel
- *  org.springframework.ai.vectorstore.MongoDBAtlasVectorStore
- *  org.springframework.ai.vectorstore.MongoDBAtlasVectorStore$MongoDBVectorStoreConfig
- *  org.springframework.ai.vectorstore.VectorStore
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.boot.SpringApplication
- *  org.springframework.boot.autoconfigure.SpringBootApplication
- *  org.springframework.context.annotation.Bean
- *  org.springframework.core.env.Environment
- *  org.springframework.data.mongodb.core.MongoTemplate
- */
 package com.jreinhal.mercenary;
 
 import com.jreinhal.mercenary.vector.LocalMongoVectorStore;

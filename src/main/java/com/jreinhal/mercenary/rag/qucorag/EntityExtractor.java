@@ -1,11 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.stereotype.Component
- */
 package com.jreinhal.mercenary.rag.qucorag;
 
 import java.util.ArrayList;

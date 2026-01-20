@@ -1,18 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.mongodb.client.result.DeleteResult
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.data.domain.Sort
- *  org.springframework.data.domain.Sort$Direction
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.data.mongodb.core.query.Criteria
- *  org.springframework.data.mongodb.core.query.CriteriaDefinition
- *  org.springframework.data.mongodb.core.query.Query
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.professional.memory;
 
 import com.mongodb.client.result.DeleteResult;

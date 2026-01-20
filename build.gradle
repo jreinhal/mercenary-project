@@ -11,6 +11,9 @@ version = '2.2.0'
 def edition = project.hasProperty('edition') ? project.property('edition') : 'government'
 ext.edition = edition
 
+// Log the edition being built
+println ">>> Building SENTINEL edition: ${edition} <<<"
+
 java {
     sourceCompatibility = '21'
     targetCompatibility = '21'
@@ -65,20 +68,31 @@ dependencyManagement {
     }
 }
 
-// Edition-specific source sets
+// Edition-specific source sets with actual exclusion logic
 sourceSets {
     main {
         java {
             srcDirs = ['src/main/java']
-            if (edition in ['trial', 'professional', 'medical', 'government']) {
-                // Professional package included in all paid editions
+
+            // Apply exclusions based on edition
+            if (!(edition in ['trial', 'professional', 'medical', 'government'])) {
+                // Unknown edition - exclude all premium packages
+                exclude '**/professional/**'
+                exclude '**/medical/**'
+                exclude '**/government/**'
+            } else if (edition == 'trial') {
+                // Trial: Include professional, exclude medical and government
+                exclude '**/medical/**'
+                exclude '**/government/**'
+            } else if (edition == 'professional') {
+                // Professional: Include professional, exclude medical and government
+                exclude '**/medical/**'
+                exclude '**/government/**'
+            } else if (edition == 'medical') {
+                // Medical: Include professional and medical, exclude government
+                exclude '**/government/**'
             }
-            if (edition in ['medical', 'government']) {
-                // Medical package for HIPAA compliance
-            }
-            if (edition == 'government') {
-                // Government package for SCIF/CAC
-            }
+            // Government edition includes all packages (no exclusions)
         }
     }
 }

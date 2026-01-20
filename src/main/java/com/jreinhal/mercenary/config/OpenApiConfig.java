@@ -1,22 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  io.swagger.v3.oas.models.Components
- *  io.swagger.v3.oas.models.OpenAPI
- *  io.swagger.v3.oas.models.info.Contact
- *  io.swagger.v3.oas.models.info.Info
- *  io.swagger.v3.oas.models.info.License
- *  io.swagger.v3.oas.models.security.SecurityRequirement
- *  io.swagger.v3.oas.models.security.SecurityScheme
- *  io.swagger.v3.oas.models.security.SecurityScheme$In
- *  io.swagger.v3.oas.models.security.SecurityScheme$Type
- *  io.swagger.v3.oas.models.servers.Server
- *  io.swagger.v3.oas.models.tags.Tag
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.context.annotation.Bean
- *  org.springframework.context.annotation.Configuration
- */
 package com.jreinhal.mercenary.config;
 
 import io.swagger.v3.oas.models.Components;

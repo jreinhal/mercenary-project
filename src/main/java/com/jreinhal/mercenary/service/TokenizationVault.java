@@ -1,18 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.data.annotation.Id
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.data.mongodb.core.mapping.Document
- *  org.springframework.data.mongodb.core.query.Criteria
- *  org.springframework.data.mongodb.core.query.CriteriaDefinition
- *  org.springframework.data.mongodb.core.query.Query
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.service;
 
 import java.nio.ByteBuffer;

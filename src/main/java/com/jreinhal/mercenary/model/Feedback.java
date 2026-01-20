@@ -1,13 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.springframework.data.annotation.Id
- *  org.springframework.data.mongodb.core.index.CompoundIndex
- *  org.springframework.data.mongodb.core.index.CompoundIndexes
- *  org.springframework.data.mongodb.core.index.Indexed
- *  org.springframework.data.mongodb.core.mapping.Document
- */
 package com.jreinhal.mercenary.model;
 
 import java.time.Instant;

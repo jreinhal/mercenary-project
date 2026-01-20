@@ -1,0 +1,116 @@
+# SENTINEL Intelligence Platform - Production Docker Compose
+# Hardened configuration for enterprise/government deployments
+
+version: '3.8'
+
+services:
+  # SENTINEL Application - Production settings
+  sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        EDITION: ${EDITION:-government}
+    container_name: sentinel-app
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_PROFILE=${APP_PROFILE:-standard}
+      - AUTH_MODE=${AUTH_MODE:-STANDARD}
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sentinel
+      - SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
+      - JAVA_OPTS=-Xms1g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - sentinel-network
+    # Strict resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 6G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # MongoDB - Production settings
+  mongo:
+    image: mongo:7.0
+    container_name: sentinel-mongo
+    restart: always
+    ports:
+      - "127.0.0.1:27017:27017"  # Bind to localhost only
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    environment:
+      - MONGO_INITDB_DATABASE=sentinel
+    networks:
+      - sentinel-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Ollama - Production settings
+  ollama:
+    image: ollama/ollama:0.5.4
+    container_name: sentinel-ollama
+    restart: always
+    ports:
+      - "127.0.0.1:11434:11434"  # Bind to localhost only
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - sentinel-network
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 16G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+
+networks:
+  sentinel-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+
+volumes:
+  mongo_data:
+    driver: local
+  mongo_config:
+    driver: local
+  ollama_data:
+    driver: local

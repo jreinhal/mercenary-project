@@ -1,19 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.servlet.Filter
- *  jakarta.servlet.FilterChain
- *  jakarta.servlet.ServletException
- *  jakarta.servlet.ServletOutputStream
- *  jakarta.servlet.ServletRequest
- *  jakarta.servlet.ServletResponse
- *  jakarta.servlet.http.HttpServletRequest
- *  jakarta.servlet.http.HttpServletResponse
- *  jakarta.servlet.http.HttpServletResponseWrapper
- *  org.springframework.core.annotation.Order
- *  org.springframework.stereotype.Component
- */
 package com.jreinhal.mercenary.filter;
 
 import jakarta.servlet.Filter;

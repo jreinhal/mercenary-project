@@ -1,13 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.document.Document
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.stereotype.Component
- */
 package com.jreinhal.mercenary.rag.ragpart;
 
 import java.nio.charset.StandardCharsets;

@@ -1,0 +1,114 @@
+# SENTINEL Intelligence Platform - Docker Compose
+# Air-gap compatible deployment with local LLM and database
+
+version: '3.8'
+
+services:
+  # SENTINEL Application
+  sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        EDITION: ${EDITION:-government}
+    container_name: sentinel-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_PROFILE=${APP_PROFILE:-dev}
+      - AUTH_MODE=${AUTH_MODE:-DEV}
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sentinel
+      - SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
+      - JAVA_OPTS=-Xms512m -Xmx2g -XX:+UseG1GC
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - sentinel-network
+    # Resource limits for stability
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # MongoDB - Vector store and data persistence
+  mongo:
+    image: mongo:7.0
+    container_name: sentinel-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    environment:
+      - MONGO_INITDB_DATABASE=sentinel
+    networks:
+      - sentinel-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Ollama - Local LLM (Air-gap compatible)
+  ollama:
+    image: ollama/ollama:0.5.4
+    container_name: sentinel-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - sentinel-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    # GPU support (uncomment if available)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+networks:
+  sentinel-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
+    driver: local
+  mongo_config:
+    driver: local
+  ollama_data:
+    driver: local

@@ -1,15 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.annotation.PostConstruct
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.chat.client.ChatClient
- *  org.springframework.ai.chat.client.ChatClient$Builder
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.rag.adaptiverag;
 
 import com.jreinhal.mercenary.reasoning.ReasoningStep;

@@ -1,0 +1,19 @@
+spring:
+  profiles:
+    active: test
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/sentinel_test
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: llama3.1:8b
+
+app:
+  auth-mode: DEV
+  profile: dev
+
+logging:
+  level:
+    com.jreinhal.mercenary: DEBUG

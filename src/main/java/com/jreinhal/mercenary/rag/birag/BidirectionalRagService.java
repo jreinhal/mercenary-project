@@ -1,24 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.annotation.PostConstruct
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.chat.client.ChatClient
- *  org.springframework.ai.chat.client.ChatClient$Builder
- *  org.springframework.ai.document.Document
- *  org.springframework.ai.vectorstore.SearchRequest
- *  org.springframework.ai.vectorstore.VectorStore
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.data.mongodb.core.query.Criteria
- *  org.springframework.data.mongodb.core.query.CriteriaDefinition
- *  org.springframework.data.mongodb.core.query.Query
- *  org.springframework.data.mongodb.core.query.Update
- *  org.springframework.data.mongodb.core.query.UpdateDefinition
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.rag.birag;
 
 import com.jreinhal.mercenary.rag.birag.GroundingVerifier;

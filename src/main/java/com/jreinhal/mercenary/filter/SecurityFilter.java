@@ -1,25 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.servlet.FilterChain
- *  jakarta.servlet.ServletException
- *  jakarta.servlet.ServletRequest
- *  jakarta.servlet.ServletResponse
- *  jakarta.servlet.http.HttpServletRequest
- *  jakarta.servlet.http.HttpServletResponse
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.core.annotation.Order
- *  org.springframework.security.authentication.UsernamePasswordAuthenticationToken
- *  org.springframework.security.core.Authentication
- *  org.springframework.security.core.GrantedAuthority
- *  org.springframework.security.core.authority.SimpleGrantedAuthority
- *  org.springframework.security.core.context.SecurityContext
- *  org.springframework.security.core.context.SecurityContextHolder
- *  org.springframework.stereotype.Component
- *  org.springframework.web.filter.OncePerRequestFilter
- */
 package com.jreinhal.mercenary.filter;
 
 import com.jreinhal.mercenary.filter.SecurityContext;

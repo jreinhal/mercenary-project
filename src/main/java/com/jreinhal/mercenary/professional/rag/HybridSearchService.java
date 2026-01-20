@@ -1,14 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.document.Document
- *  org.springframework.ai.vectorstore.SearchRequest
- *  org.springframework.ai.vectorstore.VectorStore
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.professional.rag;
 
 import java.util.ArrayList;

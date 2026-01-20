@@ -1,15 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.annotation.PostConstruct
- *  jakarta.servlet.http.HttpServletRequest
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.Department;

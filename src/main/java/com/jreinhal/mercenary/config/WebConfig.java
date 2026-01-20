@@ -1,15 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.annotation.PostConstruct
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.context.annotation.Configuration
- *  org.springframework.web.servlet.config.annotation.CorsRegistry
- *  org.springframework.web.servlet.config.annotation.WebMvcConfigurer
- */
 package com.jreinhal.mercenary.config;
 
 import jakarta.annotation.PostConstruct;

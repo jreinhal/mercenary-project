@@ -1,6 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- */
 package com.jreinhal.mercenary.filter;
 
 import com.jreinhal.mercenary.model.User;

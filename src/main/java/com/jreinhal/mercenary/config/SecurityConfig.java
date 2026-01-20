@@ -1,29 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.servlet.Filter
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.boot.web.servlet.FilterRegistrationBean
- *  org.springframework.boot.web.servlet.ServletRegistrationBean
- *  org.springframework.context.annotation.Bean
- *  org.springframework.context.annotation.Configuration
- *  org.springframework.context.annotation.Profile
- *  org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
- *  org.springframework.security.config.annotation.web.builders.HttpSecurity
- *  org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer
- *  org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer$AuthorizedUrl
- *  org.springframework.security.config.annotation.web.configurers.ChannelSecurityConfigurer$RequiresChannelUrl
- *  org.springframework.security.config.annotation.web.configurers.HeadersConfigurer$FrameOptionsConfig
- *  org.springframework.security.core.userdetails.UserDetailsService
- *  org.springframework.security.web.SecurityFilterChain
- *  org.springframework.security.web.access.intercept.AuthorizationFilter
- *  org.springframework.security.web.authentication.AnonymousAuthenticationFilter
- *  org.springframework.security.web.context.SecurityContextHolderFilter
- *  org.springframework.security.web.csrf.CookieCsrfTokenRepository
- *  org.springframework.security.web.csrf.CsrfTokenRepository
- *  org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter$ReferrerPolicy
- */
 package com.jreinhal.mercenary.config;
 
 import com.jreinhal.mercenary.filter.PreAuthRateLimitFilter;

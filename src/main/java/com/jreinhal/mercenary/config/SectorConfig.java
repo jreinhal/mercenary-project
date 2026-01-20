@@ -1,9 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.springframework.stereotype.Component
- */
 package com.jreinhal.mercenary.config;
 
 import com.jreinhal.mercenary.Department;

@@ -1,16 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.data.domain.Page
- *  org.springframework.data.domain.PageRequest
- *  org.springframework.data.domain.Pageable
- *  org.springframework.data.domain.Sort
- *  org.springframework.data.domain.Sort$Direction
- *  org.springframework.stereotype.Service
- */
 package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.model.Feedback;

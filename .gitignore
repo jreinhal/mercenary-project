@@ -34,8 +34,16 @@ temp/
 credentials*.json
 secrets*.json
 
-# Decompiler artifacts
-cfr.jar
+# Decompiler artifacts (moved to tools/)
+tools/cfr.jar
 
 # Extracted JAR contents (for restoration)
 mercenary-extracted/
+
+# Temporary directories
+temp_inner/
+bin/
+
+# Build artifacts in root
+*.jar
+!build/libs/*.jar

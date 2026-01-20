@@ -1,18 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.nimbusds.jose.JOSEException
- *  com.nimbusds.jose.jwk.JWK
- *  com.nimbusds.jose.jwk.JWKSet
- *  com.nimbusds.jose.jwk.source.ImmutableJWKSet
- *  com.nimbusds.jose.jwk.source.JWKSource
- *  com.nimbusds.jose.proc.SecurityContext
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.beans.factory.annotation.Value
- *  org.springframework.stereotype.Component
- */
 package com.jreinhal.mercenary.security;
 
 import com.nimbusds.jose.JOSEException;

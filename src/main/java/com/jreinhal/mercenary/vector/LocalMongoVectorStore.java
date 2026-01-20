@@ -1,20 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.mongodb.client.result.DeleteResult
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.ai.document.Document
- *  org.springframework.ai.embedding.EmbeddingModel
- *  org.springframework.ai.vectorstore.SearchRequest
- *  org.springframework.ai.vectorstore.VectorStore
- *  org.springframework.data.annotation.Id
- *  org.springframework.data.mongodb.core.MongoTemplate
- *  org.springframework.data.mongodb.core.query.Criteria
- *  org.springframework.data.mongodb.core.query.CriteriaDefinition
- *  org.springframework.data.mongodb.core.query.Query
- */
 package com.jreinhal.mercenary.vector;
 
 import com.mongodb.client.result.DeleteResult;

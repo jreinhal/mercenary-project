@@ -1,20 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  jakarta.servlet.http.HttpServletRequest
- *  jakarta.servlet.http.HttpSession
- *  org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
- *  org.springframework.http.HttpStatus
- *  org.springframework.http.HttpStatusCode
- *  org.springframework.http.ResponseEntity
- *  org.springframework.security.web.csrf.CsrfToken
- *  org.springframework.web.bind.annotation.GetMapping
- *  org.springframework.web.bind.annotation.PostMapping
- *  org.springframework.web.bind.annotation.RequestBody
- *  org.springframework.web.bind.annotation.RequestMapping
- *  org.springframework.web.bind.annotation.RestController
- */
 package com.jreinhal.mercenary.controller;
 
 import com.jreinhal.mercenary.model.User;

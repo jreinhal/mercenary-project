@@ -1,11 +1,3 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  org.springframework.data.domain.Page
- *  org.springframework.data.domain.Pageable
- *  org.springframework.data.mongodb.repository.MongoRepository
- */
 package com.jreinhal.mercenary.repository;
 
 import com.jreinhal.mercenary.model.Feedback;
