@@ -2,9 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.professional.rag.CitationVerificationService
- *  com.jreinhal.mercenary.professional.rag.CitationVerificationService$CitationResult
- *  com.jreinhal.mercenary.professional.rag.CitationVerificationService$VerificationReport
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -14,8 +11,6 @@
  */
 package com.jreinhal.mercenary.professional.rag;
 
-import com.jreinhal.mercenary.professional.rag.CitationVerificationService;
-import java.lang.invoke.CallSite;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -38,9 +33,9 @@ public class CitationVerificationService {
     }
 
     public VerificationReport verifyResponse(String response, List<Document> documents) {
-        log.debug("Verifying citations in response ({} chars) against {} documents", (Object)response.length(), (Object)documents.size());
+        log.debug("Verifying citations in response ({} chars) against {} documents", response.length(), documents.size());
         ArrayList<CitationResult> citations = new ArrayList<CitationResult>();
-        ArrayList<CallSite> warnings = new ArrayList<CallSite>();
+        ArrayList<String> warnings = new ArrayList<String>();
         Matcher matcher = CITATION_PATTERN.matcher(response);
         while (matcher.find()) {
             String citation = matcher.group();
@@ -55,11 +50,11 @@ public class CitationVerificationService {
             CitationResult result = this.verifyCitation(citation, docIndex, surroundingText, documents);
             citations.add(result);
             if (result.verified()) continue;
-            warnings.add((CallSite)((Object)("Citation " + citation + " could not be verified: " + result.explanation())));
+            warnings.add("Citation " + citation + " could not be verified: " + result.explanation());
         }
-        List uncitedClaims = this.findUncitedClaims(response, documents);
+        List<String> uncitedClaims = this.findUncitedClaims(response, documents);
         if (!uncitedClaims.isEmpty()) {
-            warnings.add((CallSite)((Object)("Found " + uncitedClaims.size() + " claims without citations")));
+            warnings.add("Found " + uncitedClaims.size() + " claims without citations");
         }
         int verifiedCount = (int)citations.stream().filter(CitationResult::verified).count();
         double overallAccuracy = citations.isEmpty() ? 0.0 : citations.stream().mapToDouble(CitationResult::accuracy).average().orElse(0.0);
@@ -73,14 +68,14 @@ public class CitationVerificationService {
         }
         Document doc = documents.get(docIndex);
         String docContent = doc.getContent();
-        String docSource = (String)((Object)doc.getMetadata().getOrDefault("source", "Document " + (docIndex + 1)));
+        String docSource = (String)(doc.getMetadata().getOrDefault("source", "Document " + (docIndex + 1)));
         String prompt = "Verify if this claim is accurately represented in the source document.\n\nCLAIM (from response):\n\"%s\"\n\nSOURCE DOCUMENT:\n%s\n\nRespond in this exact format:\nVERIFIED: [yes/no/partial]\nACCURACY: [0.0-1.0]\nMATCHING_TEXT: [quote the relevant text from the source, or \"none\"]\nEXPLANATION: [brief explanation]\n".formatted(surroundingText, this.truncate(docContent, 2000));
         try {
             String llmResponse = this.chatClient.prompt().user(prompt).call().content();
             return this.parseCitationVerification(citation, docIndex, docSource, llmResponse);
         }
         catch (Exception e) {
-            log.warn("Error verifying citation: {}", (Object)e.getMessage());
+            log.warn("Error verifying citation: {}", e.getMessage());
             return new CitationResult(citation, docIndex, docSource, false, 0.0, null, "Verification error: " + e.getMessage());
         }
     }
@@ -159,7 +154,7 @@ public class CitationVerificationService {
 
     private int findDocumentBySource(List<Document> documents, String sourceName) {
         for (int i = 0; i < documents.size(); ++i) {
-            String docSource = documents.get(i).getMetadata().getOrDefault("source", "");
+            String docSource = String.valueOf(documents.get(i).getMetadata().getOrDefault("source", ""));
             if (!docSource.toLowerCase().contains(sourceName.toLowerCase())) continue;
             return i;
         }
@@ -189,7 +184,7 @@ public class CitationVerificationService {
             return this.chatClient.prompt().user(prompt).call().content();
         }
         catch (Exception e) {
-            log.error("Error adding citations: {}", (Object)e.getMessage());
+            log.error("Error adding citations: {}", e.getMessage());
             return response;
         }
     }
@@ -198,7 +193,7 @@ public class CitationVerificationService {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < documents.size(); ++i) {
             Document doc = documents.get(i);
-            String source = doc.getMetadata().getOrDefault("source", "Unknown");
+            String source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown"));
             sb.append("Document ").append(i + 1).append(" (").append(source).append("):\n");
             sb.append(this.truncate(doc.getContent(), 500)).append("\n\n");
         }
@@ -211,5 +206,10 @@ public class CitationVerificationService {
         }
         return str.length() <= maxLen ? str : str.substring(0, maxLen) + "...";
     }
-}
 
+    public record CitationResult(String citationText, int documentIndex, String documentSource, boolean verified, double accuracy, String quotedText, String explanation) {
+    }
+
+    public record VerificationReport(String originalResponse, String annotatedResponse, List<CitationResult> citations, int totalCitations, int verifiedCitations, double overallAccuracy, List<String> uncitedClaims, List<String> warnings) {
+    }
+}

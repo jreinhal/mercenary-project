@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.config.WebConfig
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -42,7 +41,7 @@ implements WebMvcConfigurer {
             log.error("=================================================================");
             log.error("  SECURITY WARNING: CORS wildcard (*) in production!");
             log.error("=================================================================");
-            log.error("  Allowed Origins: {}", (Object)Arrays.toString(this.allowedOrigins));
+            log.error("  Allowed Origins: {}", Arrays.toString(this.allowedOrigins));
             log.error("  This allows ANY website to make requests to your API.");
             log.error("");
             log.error("  To fix: Set app.cors.allowed-origins to explicit domains");
@@ -58,12 +57,11 @@ implements WebMvcConfigurer {
             log.error("=================================================================");
         }
         log.info("CORS Configuration:");
-        log.info("  Allowed Origins: {}", (Object)Arrays.toString(this.allowedOrigins));
-        log.info("  Allow Credentials: {}", (Object)this.allowCredentials);
+        log.info("  Allowed Origins: {}", Arrays.toString(this.allowedOrigins));
+        log.info("  Allow Credentials: {}", this.allowCredentials);
     }
 
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**").allowedOrigins(this.allowedOrigins).allowedMethods(new String[]{"GET", "POST", "PUT", "DELETE", "OPTIONS"}).allowedHeaders(new String[]{"Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "X-CSRF-Token"}).exposedHeaders(new String[]{"X-Total-Count", "X-Request-Id"}).allowCredentials(this.allowCredentials).maxAge(3600L);
     }
 }
-

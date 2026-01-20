@@ -1,18 +1,8 @@
 /*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.jreinhal.mercenary.tools.AgenticToolsConfig
- *  com.jreinhal.mercenary.tools.AgenticToolsConfig$CalculatorRequest
- *  org.slf4j.Logger
- *  org.slf4j.LoggerFactory
- *  org.springframework.context.annotation.Bean
- *  org.springframework.context.annotation.Configuration
- *  org.springframework.context.annotation.Description
+ * Reconstructed from decompiled source
  */
 package com.jreinhal.mercenary.tools;
 
-import com.jreinhal.mercenary.tools.AgenticToolsConfig;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.function.Function;
@@ -31,7 +21,7 @@ public class AgenticToolsConfig {
     public Function<Void, String> currentDate() {
         return unused -> {
             String now = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-            log.info("Agent Tool Invoked: currentDate() -> {}", (Object)now);
+            log.info("Agent Tool Invoked: currentDate() -> {}", now);
             return now;
         };
     }
@@ -40,20 +30,111 @@ public class AgenticToolsConfig {
     @Description(value="Evaluate a mathematical expression. Supports basic arithmetic (+, -, *, /) and parentheses. Use for calculations.")
     public Function<CalculatorRequest, String> calculator() {
         return request -> {
-            String expr = request.expression();
-            log.info("Agent Tool Invoked: calculator({})", (Object)expr);
+            final String expr = request.expression();
+            log.info("Agent Tool Invoked: calculator({})", expr);
             try {
                 if (!expr.matches("[0-9+\\-*/().\\s]+")) {
                     return "Error: Invalid characters in expression.";
                 }
-                double result = new /* Unavailable Anonymous Inner Class!! */.parse();
+                double result = evaluateExpression(expr);
                 return String.valueOf(result);
             }
             catch (Exception e) {
-                log.warn("Calculator error: {}", (Object)e.getMessage());
+                log.warn("Calculator error: {}", e.getMessage());
                 return "Error: " + e.getMessage();
             }
         };
     }
-}
 
+    private double evaluateExpression(String expr) {
+        return new ExpressionParser(expr).parse();
+    }
+
+    private static class ExpressionParser {
+        private final String expr;
+        private int pos = -1;
+        private int ch;
+
+        ExpressionParser(String expr) {
+            this.expr = expr;
+        }
+
+        void nextChar() {
+            ch = ++pos < expr.length() ? expr.charAt(pos) : -1;
+        }
+
+        boolean eat(int charToEat) {
+            while (ch == ' ') {
+                nextChar();
+            }
+            if (ch == charToEat) {
+                nextChar();
+                return true;
+            }
+            return false;
+        }
+
+        double parse() {
+            nextChar();
+            double x = parseExpression();
+            if (pos < expr.length()) {
+                throw new RuntimeException("Unexpected: " + (char)ch);
+            }
+            return x;
+        }
+
+        double parseExpression() {
+            double x = parseTerm();
+            while (true) {
+                if (eat('+')) {
+                    x += parseTerm();
+                } else if (eat('-')) {
+                    x -= parseTerm();
+                } else {
+                    break;
+                }
+            }
+            return x;
+        }
+
+        double parseTerm() {
+            double x = parseFactor();
+            while (true) {
+                if (eat('*')) {
+                    x *= parseFactor();
+                } else if (eat('/')) {
+                    x /= parseFactor();
+                } else {
+                    break;
+                }
+            }
+            return x;
+        }
+
+        double parseFactor() {
+            if (eat('+')) {
+                return parseFactor();
+            }
+            if (eat('-')) {
+                return -parseFactor();
+            }
+            double x;
+            int startPos = pos;
+            if (eat('(')) {
+                x = parseExpression();
+                eat(')');
+            } else if ((ch >= '0' && ch <= '9') || ch == '.') {
+                while ((ch >= '0' && ch <= '9') || ch == '.') {
+                    nextChar();
+                }
+                x = Double.parseDouble(expr.substring(startPos, pos));
+            } else {
+                throw new RuntimeException("Unexpected: " + (char)ch);
+            }
+            return x;
+        }
+    }
+
+    public record CalculatorRequest(String expression) {
+    }
+}

@@ -2,12 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.model.ClearanceLevel
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.User$AuthProvider
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.model.UserRole$Permission
  *  org.springframework.data.annotation.Id
  *  org.springframework.data.mongodb.core.mapping.Document
  */
@@ -15,7 +9,6 @@ package com.jreinhal.mercenary.model;
 
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.model.ClearanceLevel;
-import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import java.time.Instant;
 import java.util.HashSet;
@@ -30,9 +23,9 @@ public class User {
     private String username;
     private String displayName;
     private String email;
-    private Set<UserRole> roles = new HashSet();
+    private Set<UserRole> roles = new HashSet<UserRole>();
     private ClearanceLevel clearance = ClearanceLevel.UNCLASSIFIED;
-    private Set<Department> allowedSectors = new HashSet();
+    private Set<Department> allowedSectors = new HashSet<Department>();
     private AuthProvider authProvider = AuthProvider.LOCAL;
     private String externalId;
     private String passwordHash;
@@ -182,5 +175,11 @@ public class User {
     public boolean canAccessClassification(ClearanceLevel required) {
         return this.clearance.canAccess(required);
     }
-}
 
+    public static enum AuthProvider {
+        LOCAL,
+        OIDC,
+        CAC;
+
+    }
+}

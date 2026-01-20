@@ -2,9 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.qucorag.EntityExtractor
- *  com.jreinhal.mercenary.rag.qucorag.LlmEntityExtractor
- *  com.jreinhal.mercenary.rag.qucorag.LlmEntityExtractor$ExtractedEntity
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -15,7 +12,6 @@
 package com.jreinhal.mercenary.rag.qucorag;
 
 import com.jreinhal.mercenary.rag.qucorag.EntityExtractor;
-import com.jreinhal.mercenary.rag.qucorag.LlmEntityExtractor;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -58,15 +54,15 @@ public class LlmEntityExtractor {
             String truncatedText = text.length() > 2000 ? text.substring(0, 2000) + "..." : text;
             String prompt = EXTRACTION_PROMPT.formatted(truncatedText);
             String response = this.chatClient.prompt().user(prompt).call().content();
-            Set entities = this.parseEntityResponse(response);
+            Set<String> entities = this.parseEntityResponse(response);
             long elapsed = System.currentTimeMillis() - startTime;
-            log.debug("LLM entity extraction: {} entities in {}ms", (Object)entities.size(), (Object)elapsed);
-            Set patternEntities = this.patternExtractor.extractEntityStrings(text);
+            log.debug("LLM entity extraction: {} entities in {}ms", entities.size(), elapsed);
+            Set<String> patternEntities = this.patternExtractor.extractEntityStrings(text);
             entities.addAll(patternEntities);
             return entities;
         }
         catch (Exception e) {
-            log.warn("LLM entity extraction failed, falling back to patterns: {}", (Object)e.getMessage());
+            log.warn("LLM entity extraction failed, falling back to patterns: {}", e.getMessage());
             return this.patternExtractor.extractEntityStrings(text);
         }
     }
@@ -82,7 +78,7 @@ public class LlmEntityExtractor {
             return this.parseEntityResponseWithTypes(response);
         }
         catch (Exception ex) {
-            log.warn("LLM entity extraction failed: {}", (Object)ex.getMessage());
+            log.warn("LLM entity extraction failed: {}", ex.getMessage());
             return this.patternExtractor.extractEntities(text).stream().map(ent -> new ExtractedEntity(ent.text(), ent.type().name())).toList();
         }
     }
@@ -128,5 +124,11 @@ public class LlmEntityExtractor {
         }
         return entities;
     }
-}
 
+    public record ExtractedEntity(String name, String type) {
+        @Override
+        public String toString() {
+            return this.name + " [" + this.type + "]";
+        }
+    }
+}

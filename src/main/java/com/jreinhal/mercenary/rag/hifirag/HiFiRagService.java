@@ -2,12 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hifirag.CrossEncoderReranker
- *  com.jreinhal.mercenary.rag.hifirag.GapDetector
- *  com.jreinhal.mercenary.rag.hifirag.HiFiRagService
- *  com.jreinhal.mercenary.rag.hifirag.HiFiRagService$ScoredDocument
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -21,7 +15,6 @@ package com.jreinhal.mercenary.rag.hifirag;
 
 import com.jreinhal.mercenary.rag.hifirag.CrossEncoderReranker;
 import com.jreinhal.mercenary.rag.hifirag.GapDetector;
-import com.jreinhal.mercenary.rag.hifirag.HiFiRagService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -77,23 +70,23 @@ public class HiFiRagService {
             return this.standardRetrieval(query, department);
         }
         long startTime = System.currentTimeMillis();
-        log.info("HiFi-RAG: Starting iterative retrieval for query: {}", (Object)query);
+        log.info("HiFi-RAG: Starting iterative retrieval for query: {}", query);
         LinkedHashMap<String, ScoredDocument> allDocuments = new LinkedHashMap<String, ScoredDocument>();
-        HashSet coveredConcepts = new HashSet();
-        List queryConcepts = this.gapDetector.extractConcepts(query);
-        log.debug("HiFi-RAG: Extracted {} concepts from query", (Object)queryConcepts.size());
+        HashSet<String> coveredConcepts = new HashSet<String>();
+        List<String> queryConcepts = this.gapDetector.extractConcepts(query);
+        log.debug("HiFi-RAG: Extracted {} concepts from query", queryConcepts.size());
         String currentQuery = query;
         for (int iteration = 0; iteration < this.maxIterations; ++iteration) {
-            log.info("HiFi-RAG: Iteration {}/{}", (Object)(iteration + 1), (Object)this.maxIterations);
+            log.info("HiFi-RAG: Iteration {}/{}", (iteration + 1), this.maxIterations);
             long iterStart = System.currentTimeMillis();
-            List candidates = this.broadRetrieval(currentQuery, department, this.initialK);
-            log.debug("HiFi-RAG: Pass 1 retrieved {} candidates", (Object)candidates.size());
+            List<Document> candidates = this.broadRetrieval(currentQuery, department, this.initialK);
+            log.debug("HiFi-RAG: Pass 1 retrieved {} candidates", candidates.size());
             if (candidates.isEmpty()) {
-                log.warn("HiFi-RAG: No candidates found in iteration {}", (Object)(iteration + 1));
+                log.warn("HiFi-RAG: No candidates found in iteration {}", (iteration + 1));
                 break;
             }
-            List scoredDocs = this.reranker.rerank(currentQuery, candidates);
-            log.debug("HiFi-RAG: Scored {} documents", (Object)scoredDocs.size());
+            List<ScoredDocument> scoredDocs = this.reranker.rerank(currentQuery, candidates);
+            log.debug("HiFi-RAG: Scored {} documents", scoredDocs.size());
             for (ScoredDocument sd : scoredDocs) {
                 String docId;
                 if (!(sd.score() >= this.relevanceThreshold) || allDocuments.containsKey(docId = this.getDocumentId(sd.document())) && !(((ScoredDocument)allDocuments.get(docId)).score() < sd.score())) continue;
@@ -103,18 +96,18 @@ public class HiFiRagService {
                 if (!(sd.score() >= this.relevanceThreshold)) continue;
                 coveredConcepts.addAll(this.gapDetector.extractConcepts(sd.document().getContent()));
             }
-            List gaps = this.gapDetector.findGaps(queryConcepts, coveredConcepts);
+            List<String> gaps = this.gapDetector.findGaps(queryConcepts, coveredConcepts);
             this.reasoningTracer.addStep(ReasoningStep.StepType.RETRIEVAL, "HiFi-RAG Pass " + (iteration + 1), String.format("Retrieved %d candidates, %d passed threshold (%.2f), %d concepts covered, %d gaps remaining", candidates.size(), (int)scoredDocs.stream().filter(s -> s.score() >= this.relevanceThreshold).count(), this.relevanceThreshold, coveredConcepts.size(), gaps.size()), System.currentTimeMillis() - iterStart, Map.of("iteration", iteration + 1, "candidates", candidates.size(), "passedThreshold", scoredDocs.stream().filter(s -> s.score() >= this.relevanceThreshold).count(), "coveredConcepts", coveredConcepts.size(), "gaps", gaps));
             if (gaps.isEmpty() || iteration == this.maxIterations - 1) {
                 log.info("HiFi-RAG: No gaps remaining or max iterations reached");
                 break;
             }
             currentQuery = this.gapDetector.generateGapQuery(query, gaps);
-            log.debug("HiFi-RAG: Generated gap query: {}", (Object)currentQuery);
+            log.debug("HiFi-RAG: Generated gap query: {}", currentQuery);
         }
         List<Document> finalDocs = allDocuments.values().stream().sorted((a, b) -> Double.compare(b.score(), a.score())).limit(this.filteredK).map(ScoredDocument::document).collect(Collectors.toList());
         long totalTime = System.currentTimeMillis() - startTime;
-        log.info("HiFi-RAG: Completed in {}ms, returning {} documents", (Object)totalTime, (Object)finalDocs.size());
+        log.info("HiFi-RAG: Completed in {}ms, returning {} documents", totalTime, finalDocs.size());
         return finalDocs;
     }
 
@@ -149,5 +142,7 @@ public class HiFiRagService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record ScoredDocument(Document document, double score) {
+    }
+}

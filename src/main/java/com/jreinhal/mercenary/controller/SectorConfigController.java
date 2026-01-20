@@ -2,13 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.controller.SectorConfigController
- *  com.jreinhal.mercenary.controller.SectorConfigController$1
- *  com.jreinhal.mercenary.controller.SectorConfigController$SectorInfo
- *  com.jreinhal.mercenary.filter.SecurityContext
- *  com.jreinhal.mercenary.model.ClearanceLevel
- *  com.jreinhal.mercenary.model.User
  *  org.springframework.http.ResponseEntity
  *  org.springframework.web.bind.annotation.GetMapping
  *  org.springframework.web.bind.annotation.RequestMapping
@@ -17,7 +10,6 @@
 package com.jreinhal.mercenary.controller;
 
 import com.jreinhal.mercenary.Department;
-import com.jreinhal.mercenary.controller.SectorConfigController;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.ClearanceLevel;
 import com.jreinhal.mercenary.model.User;
@@ -43,7 +35,7 @@ public class SectorConfigController {
             }
         } else {
             ClearanceLevel userClearance = user.getClearance();
-            Set allowedSectors = user.getAllowedSectors();
+            Set<Department> allowedSectors = user.getAllowedSectors();
             for (Department dept : Department.values()) {
                 boolean isAllowed;
                 boolean hasClearance = userClearance.ordinal() >= dept.getRequiredClearance().ordinal();
@@ -59,11 +51,11 @@ public class SectorConfigController {
     public ResponseEntity<SectorInfo> getCurrentSector() {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
-            return ResponseEntity.ok((Object)this.toSectorInfo(Department.ENTERPRISE, false));
+            return ResponseEntity.ok(this.toSectorInfo(Department.ENTERPRISE, false));
         }
-        Set allowed = user.getAllowedSectors();
-        Department current = allowed != null && !allowed.isEmpty() ? (Department)allowed.iterator().next() : Department.ENTERPRISE;
-        return ResponseEntity.ok((Object)this.toSectorInfo(current, true));
+        Set<Department> allowed = user.getAllowedSectors();
+        Department current = allowed != null && !allowed.isEmpty() ? allowed.iterator().next() : Department.ENTERPRISE;
+        return ResponseEntity.ok(this.toSectorInfo(current, true));
     }
 
     private SectorInfo toSectorInfo(Department dept, boolean includeDetails) {
@@ -71,25 +63,27 @@ public class SectorConfigController {
     }
 
     private String getIcon(Department dept) {
-        return switch (1.$SwitchMap$com$jreinhal$mercenary$Department[dept.ordinal()]) {
+        return switch (dept) {
             default -> throw new MatchException(null, null);
-            case 1 -> "shield";
-            case 2 -> "heart";
-            case 3 -> "dollar-sign";
-            case 4 -> "book";
-            case 5 -> "briefcase";
+            case Department.GOVERNMENT -> "shield";
+            case Department.MEDICAL -> "heart";
+            case Department.FINANCE -> "dollar-sign";
+            case Department.ACADEMIC -> "book";
+            case Department.ENTERPRISE -> "briefcase";
         };
     }
 
     private String getDescription(Department dept) {
-        return switch (1.$SwitchMap$com$jreinhal$mercenary$Department[dept.ordinal()]) {
+        return switch (dept) {
             default -> throw new MatchException(null, null);
-            case 1 -> "Defense and Intelligence";
-            case 2 -> "Healthcare and Clinical";
-            case 3 -> "Financial Services";
-            case 4 -> "Research and Academia";
-            case 5 -> "General Business";
+            case Department.GOVERNMENT -> "Defense and Intelligence";
+            case Department.MEDICAL -> "Healthcare and Clinical";
+            case Department.FINANCE -> "Financial Services";
+            case Department.ACADEMIC -> "Research and Academia";
+            case Department.ENTERPRISE -> "General Business";
         };
     }
-}
 
+    public record SectorInfo(String id, String label, String theme, String icon, String description) {
+    }
+}

@@ -2,16 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.model.ClearanceLevel
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.User$AuthProvider
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.repository.UserRepository
- *  com.jreinhal.mercenary.security.JwtValidator
- *  com.jreinhal.mercenary.security.JwtValidator$ValidationResult
- *  com.jreinhal.mercenary.service.AuthenticationService
- *  com.jreinhal.mercenary.service.OidcAuthenticationService
  *  jakarta.annotation.PostConstruct
  *  jakarta.servlet.http.HttpServletRequest
  *  org.slf4j.Logger
@@ -92,18 +82,18 @@ implements AuthenticationService {
             log.error("==========================================================");
         } else {
             log.info("OIDC Configuration validated:");
-            log.info("  Issuer: {}", (Object)this.issuer);
-            log.info("  Client ID: {}", (Object)this.clientId);
-            log.info("  Auto-provision: {}", (Object)this.autoProvision);
-            log.info("  Require approval: {}", (Object)this.requireApproval);
+            log.info("  Issuer: {}", this.issuer);
+            log.info("  Client ID: {}", this.clientId);
+            log.info("  Auto-provision: {}", this.autoProvision);
+            log.info("  Require approval: {}", this.requireApproval);
         }
         this.validateDefaultPermissions();
     }
 
     private void validateDefaultPermissions() {
         try {
-            UserRole configuredRole = UserRole.valueOf((String)this.defaultRole.toUpperCase());
-            UserRole maxRole = UserRole.valueOf((String)this.maxDefaultRole.toUpperCase());
+            UserRole configuredRole = UserRole.valueOf(this.defaultRole.toUpperCase());
+            UserRole maxRole = UserRole.valueOf(this.maxDefaultRole.toUpperCase());
             if (configuredRole == UserRole.ADMIN) {
                 log.error("==========================================================");
                 log.error("  SECURITY ERROR: Cannot auto-provision ADMIN role!");
@@ -113,30 +103,31 @@ implements AuthenticationService {
             }
         }
         catch (IllegalArgumentException e) {
-            log.warn("Invalid default-role '{}', falling back to VIEWER", (Object)this.defaultRole);
+            log.warn("Invalid default-role '{}', falling back to VIEWER", this.defaultRole);
             this.defaultRole = "VIEWER";
         }
         try {
-            ClearanceLevel configuredClearance = ClearanceLevel.valueOf((String)this.defaultClearance.toUpperCase());
-            ClearanceLevel maxClearance = ClearanceLevel.valueOf((String)this.maxDefaultClearance.toUpperCase());
+            ClearanceLevel configuredClearance = ClearanceLevel.valueOf(this.defaultClearance.toUpperCase());
+            ClearanceLevel maxClearance = ClearanceLevel.valueOf(this.maxDefaultClearance.toUpperCase());
             if (configuredClearance.ordinal() > maxClearance.ordinal()) {
-                log.warn("SECURITY: default-clearance {} exceeds max-default-clearance {}, capping", (Object)configuredClearance, (Object)maxClearance);
+                log.warn("SECURITY: default-clearance {} exceeds max-default-clearance {}, capping", configuredClearance, maxClearance);
                 this.defaultClearance = this.maxDefaultClearance;
             }
             if (configuredClearance == ClearanceLevel.TOP_SECRET || configuredClearance == ClearanceLevel.SCI) {
                 log.error("==========================================================");
-                log.error("  SECURITY ERROR: Cannot auto-provision {} clearance!", (Object)configuredClearance);
+                log.error("  SECURITY ERROR: Cannot auto-provision {} clearance!", configuredClearance);
                 log.error("  Change app.oidc.default-clearance to UNCLASSIFIED, CUI, or SECRET");
                 log.error("==========================================================");
                 this.defaultClearance = "UNCLASSIFIED";
             }
         }
         catch (IllegalArgumentException e) {
-            log.warn("Invalid default-clearance '{}', falling back to UNCLASSIFIED", (Object)this.defaultClearance);
+            log.warn("Invalid default-clearance '{}', falling back to UNCLASSIFIED", this.defaultClearance);
             this.defaultClearance = "UNCLASSIFIED";
         }
     }
 
+    @Override
     public User authenticate(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -146,7 +137,7 @@ implements AuthenticationService {
         String token = authHeader.substring(7);
         JwtValidator.ValidationResult result = this.jwtValidator.validate(token);
         if (!result.isValid()) {
-            log.warn("JWT validation failed: {}", (Object)result.getError());
+            log.warn("JWT validation failed: {}", result.getError());
             return null;
         }
         try {
@@ -167,13 +158,13 @@ implements AuthenticationService {
                 log.warn("No subject in validated JWT");
                 return null;
             }
-            log.debug("JWT validated for subject: {}, email: {}", (Object)subject, (Object)email);
+            log.debug("JWT validated for subject: {}, email: {}", subject, email);
             User user = this.userRepository.findByExternalId(subject).orElse(null);
             if (user == null) {
                 ClearanceLevel clearance;
                 UserRole role;
                 if (!this.autoProvision) {
-                    log.warn("User '{}' not found and auto-provisioning disabled", (Object)subject);
+                    log.warn("User '{}' not found and auto-provisioning disabled", subject);
                     return null;
                 }
                 user = new User();
@@ -183,14 +174,14 @@ implements AuthenticationService {
                 user.setEmail(email);
                 user.setAuthProvider(User.AuthProvider.OIDC);
                 try {
-                    role = UserRole.valueOf((String)this.defaultRole.toUpperCase());
+                    role = UserRole.valueOf(this.defaultRole.toUpperCase());
                 }
                 catch (IllegalArgumentException e) {
                     role = UserRole.VIEWER;
                 }
                 user.setRoles(Set.of(role));
                 try {
-                    clearance = ClearanceLevel.valueOf((String)this.defaultClearance.toUpperCase());
+                    clearance = ClearanceLevel.valueOf(this.defaultClearance.toUpperCase());
                 }
                 catch (IllegalArgumentException e) {
                     clearance = ClearanceLevel.UNCLASSIFIED;
@@ -201,35 +192,35 @@ implements AuthenticationService {
                 if (this.requireApproval) {
                     user.setActive(false);
                     user.setPendingApproval(true);
-                    user = (User)this.userRepository.save((Object)user);
+                    user = (User)this.userRepository.save(user);
                     log.info("New OIDC user '{}' created PENDING APPROVAL (role: {}, clearance: {})", new Object[]{user.getUsername(), role, clearance});
                     return null;
                 }
                 user.setActive(true);
-                user = (User)this.userRepository.save((Object)user);
+                user = (User)this.userRepository.save(user);
                 log.info("Auto-provisioned new OIDC user: {} (role: {}, clearance: {})", new Object[]{user.getUsername(), role, clearance});
             }
             if (user.isPendingApproval()) {
-                log.warn("OIDC user '{}' is pending admin approval", (Object)user.getUsername());
+                log.warn("OIDC user '{}' is pending admin approval", user.getUsername());
                 return null;
             }
             if (!user.isActive()) {
-                log.warn("OIDC user '{}' is deactivated", (Object)user.getUsername());
+                log.warn("OIDC user '{}' is deactivated", user.getUsername());
                 return null;
             }
             user.setLastLoginAt(Instant.now());
-            this.userRepository.save((Object)user);
-            log.debug("OIDC user '{}' authenticated successfully", (Object)user.getUsername());
+            this.userRepository.save(user);
+            log.debug("OIDC user '{}' authenticated successfully", user.getUsername());
             return user;
         }
         catch (Exception e) {
-            log.error("OIDC authentication failed: {}", (Object)e.getMessage(), (Object)e);
+            log.error("OIDC authentication failed: {}", e.getMessage(), e);
             return null;
         }
     }
 
+    @Override
     public String getAuthMode() {
         return "OIDC";
     }
 }
-

@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hifirag.GapDetector
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.stereotype.Component
@@ -63,7 +62,7 @@ public class GapDetector {
             if (word.length() < 4 || this.isStopWord(word) || this.isCommonVerb(word)) continue;
             concepts.add(word);
         }
-        log.debug("Extracted {} concepts from text", (Object)concepts.size());
+        log.debug("Extracted {} concepts from text", concepts.size());
         return new ArrayList<String>(concepts);
     }
 
@@ -71,18 +70,18 @@ public class GapDetector {
         if (queryConcepts == null || queryConcepts.isEmpty()) {
             return List.of();
         }
-        Set normalizedCovered = coveredConcepts.stream().map(String::toLowerCase).collect(Collectors.toSet());
+        Set<String> normalizedCovered = coveredConcepts.stream().map(String::toLowerCase).collect(Collectors.toSet());
         ArrayList<String> gaps = new ArrayList<String>();
         for (String concept : queryConcepts) {
             String normalized = concept.toLowerCase();
             boolean covered = normalizedCovered.contains(normalized);
             if (!covered) {
-                covered = normalizedCovered.stream().anyMatch(c -> c.contains(normalized) || normalized.contains((CharSequence)c));
+                covered = normalizedCovered.stream().anyMatch(c -> c.contains(normalized) || normalized.contains(c));
             }
             if (covered) continue;
             gaps.add(concept);
         }
-        log.debug("Found {} gaps from {} query concepts", (Object)gaps.size(), (Object)queryConcepts.size());
+        log.debug("Found {} gaps from {} query concepts", gaps.size(), queryConcepts.size());
         return gaps;
     }
 
@@ -95,7 +94,7 @@ public class GapDetector {
         gapQuery.append(" ");
         gapQuery.append(String.join((CharSequence)" ", gaps));
         String result = gapQuery.toString().trim();
-        log.debug("Generated gap query: {}", (Object)result);
+        log.debug("Generated gap query: {}", result);
         return result;
     }
 
@@ -112,9 +111,8 @@ public class GapDetector {
         if (queryConcepts == null || queryConcepts.isEmpty()) {
             return 0.0;
         }
-        Set docSet = documentConcepts.stream().map(String::toLowerCase).collect(Collectors.toSet());
-        long covered = queryConcepts.stream().map(String::toLowerCase).filter(c -> docSet.contains(c) || docSet.stream().anyMatch(d -> d.contains((CharSequence)c) || c.contains((CharSequence)d))).count();
+        Set<String> docSet = documentConcepts.stream().map(String::toLowerCase).collect(Collectors.toSet());
+        long covered = queryConcepts.stream().map(String::toLowerCase).filter(c -> docSet.contains(c) || docSet.stream().anyMatch(d -> d.contains(c) || c.contains(d))).count();
         return (double)covered / (double)queryConcepts.size();
     }
 }
-

@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.model.Feedback
- *  com.jreinhal.mercenary.model.Feedback$FeedbackCategory
- *  com.jreinhal.mercenary.model.Feedback$FeedbackType
- *  com.jreinhal.mercenary.model.Feedback$ResolutionStatus
  *  org.springframework.data.annotation.Id
  *  org.springframework.data.mongodb.core.index.CompoundIndex
  *  org.springframework.data.mongodb.core.index.CompoundIndexes
@@ -14,7 +10,6 @@
  */
 package com.jreinhal.mercenary.model;
 
-import com.jreinhal.mercenary.model.Feedback;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +19,6 @@ import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-/*
- * Exception performing whole class analysis ignored.
- */
 @Document(collection="feedback")
 @CompoundIndexes(value={@CompoundIndex(name="sector_type_idx", def="{'sector': 1, 'feedbackType': 1}"), @CompoundIndex(name="user_time_idx", def="{'userId': 1, 'timestamp': -1}")})
 public class Feedback {
@@ -67,8 +59,8 @@ public class Feedback {
         Feedback fb = new Feedback();
         fb.userId = userId;
         fb.messageId = messageId;
-        fb.query = Feedback.truncate((String)query, (int)1000);
-        fb.response = Feedback.truncate((String)response, (int)5000);
+        fb.query = Feedback.truncate(query, 1000);
+        fb.response = Feedback.truncate(response, 5000);
         fb.responseLength = response != null ? response.length() : 0;
         fb.feedbackType = FeedbackType.POSITIVE;
         fb.resolutionStatus = ResolutionStatus.NOT_APPLICABLE;
@@ -79,8 +71,8 @@ public class Feedback {
         Feedback fb = new Feedback();
         fb.userId = userId;
         fb.messageId = messageId;
-        fb.query = Feedback.truncate((String)query, (int)1000);
-        fb.response = Feedback.truncate((String)response, (int)5000);
+        fb.query = Feedback.truncate(query, 1000);
+        fb.response = Feedback.truncate(response, 5000);
         fb.responseLength = response != null ? response.length() : 0;
         fb.feedbackType = FeedbackType.NEGATIVE;
         fb.category = category;
@@ -112,7 +104,7 @@ public class Feedback {
     }
 
     public Feedback withComments(String comments) {
-        this.additionalComments = Feedback.truncate((String)comments, (int)2000);
+        this.additionalComments = Feedback.truncate(comments, 2000);
         return this;
     }
 
@@ -310,5 +302,46 @@ public class Feedback {
     public void setHallucinationScore(Double hallucinationScore) {
         this.hallucinationScore = hallucinationScore;
     }
-}
 
+    public static enum ResolutionStatus {
+        OPEN,
+        IN_PROGRESS,
+        RESOLVED,
+        WONT_FIX,
+        NOT_APPLICABLE;
+
+    }
+
+    public static enum FeedbackType {
+        POSITIVE,
+        NEGATIVE;
+
+    }
+
+    public static enum FeedbackCategory {
+        INACCURATE_CITATION("Inaccurate Citation", "Citation doesn't match source content"),
+        HALLUCINATION("Hallucination", "Made-up information not in source documents"),
+        OUTDATED_INFO("Outdated Information", "Information is stale or superseded"),
+        INCOMPLETE("Incomplete Response", "Missing relevant information from corpus"),
+        WRONG_SOURCES("Wrong Sources", "Retrieved irrelevant documents"),
+        FORMATTING("Formatting Issue", "Response poorly structured or hard to read"),
+        TOO_SLOW("Too Slow", "Response time unacceptable"),
+        OTHER("Other", "Other issue not categorized above");
+
+        private final String displayName;
+        private final String description;
+
+        private FeedbackCategory(String displayName, String description) {
+            this.displayName = displayName;
+            this.description = description;
+        }
+
+        public String getDisplayName() {
+            return this.displayName;
+        }
+
+        public String getDescription() {
+            return this.description;
+        }
+    }
+}

@@ -2,11 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.model.Feedback
- *  com.jreinhal.mercenary.model.Feedback$FeedbackCategory
- *  com.jreinhal.mercenary.model.Feedback$FeedbackType
- *  com.jreinhal.mercenary.model.Feedback$ResolutionStatus
- *  com.jreinhal.mercenary.repository.FeedbackRepository
  *  org.springframework.data.domain.Page
  *  org.springframework.data.domain.Pageable
  *  org.springframework.data.mongodb.repository.MongoRepository
@@ -58,4 +53,3 @@ extends MongoRepository<Feedback, String> {
 
     public Feedback findByUserIdAndMessageId(String var1, String var2);
 }
-

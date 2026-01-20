@@ -2,9 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.vector.LocalMongoVectorStore
- *  com.jreinhal.mercenary.vector.LocalMongoVectorStore$MongoDocument
- *  com.jreinhal.mercenary.vector.LocalMongoVectorStore$ScoredDocument
  *  com.mongodb.client.result.DeleteResult
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -12,6 +9,7 @@
  *  org.springframework.ai.embedding.EmbeddingModel
  *  org.springframework.ai.vectorstore.SearchRequest
  *  org.springframework.ai.vectorstore.VectorStore
+ *  org.springframework.data.annotation.Id
  *  org.springframework.data.mongodb.core.MongoTemplate
  *  org.springframework.data.mongodb.core.query.Criteria
  *  org.springframework.data.mongodb.core.query.CriteriaDefinition
@@ -19,10 +17,10 @@
  */
 package com.jreinhal.mercenary.vector;
 
-import com.jreinhal.mercenary.vector.LocalMongoVectorStore;
 import com.mongodb.client.result.DeleteResult;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -31,6 +29,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.CriteriaDefinition;
@@ -55,19 +54,30 @@ implements VectorStore {
         }
         try {
             for (Document doc : documents) {
-                List embedding = doc.getEmbedding();
+                List<Double> embedding = null;
+                float[] rawEmbedding = doc.getEmbedding();
+                if (rawEmbedding != null && rawEmbedding.length > 0) {
+                    embedding = new java.util.ArrayList<>();
+                    for (float f : rawEmbedding) {
+                        embedding.add((double) f);
+                    }
+                }
                 if (embedding == null || embedding.isEmpty()) {
-                    log.debug("Generating embedding for doc: {}", (Object)doc.getId());
-                    embedding = this.embeddingModel.embed(doc.getContent());
+                    log.debug("Generating embedding for doc: {}", doc.getId());
+                    float[] embeddingArray = this.embeddingModel.embed(doc.getContent());
+                    embedding = new java.util.ArrayList<>();
+                    for (float f : embeddingArray) {
+                        embedding.add((double) f);
+                    }
                 }
                 MongoDocument mongoDoc = new MongoDocument();
                 mongoDoc.setId(doc.getId());
                 mongoDoc.setContent(doc.getContent());
                 mongoDoc.setMetadata(doc.getMetadata());
                 mongoDoc.setEmbedding(embedding);
-                this.mongoTemplate.save((Object)mongoDoc, COLLECTION_NAME);
+                this.mongoTemplate.save(mongoDoc, COLLECTION_NAME);
             }
-            log.info("Persisted {} documents to local MongoDB", (Object)documents.size());
+            log.info("Persisted {} documents to local MongoDB", documents.size());
         }
         catch (Exception e) {
             log.error("CRITICAL ERROR in LocalMongoVectorStore.add()", (Throwable)e);
@@ -81,7 +91,7 @@ implements VectorStore {
         }
         Query query = new Query((CriteriaDefinition)Criteria.where((String)"_id").in(idList));
         DeleteResult result = this.mongoTemplate.remove(query, COLLECTION_NAME);
-        log.info("Deleted {} documents from local store", (Object)result.getDeletedCount());
+        log.info("Deleted {} documents from local store", result.getDeletedCount());
         return Optional.of(result.getDeletedCount() > 0L);
     }
 
@@ -89,9 +99,13 @@ implements VectorStore {
         String queryText = request.getQuery();
         int topK = request.getTopK();
         double threshold = request.getSimilarityThreshold();
-        List queryEmbedding = this.embeddingModel.embed(queryText);
-        List allDocs = this.mongoTemplate.findAll(MongoDocument.class, COLLECTION_NAME);
-        log.debug("Total documents found in vector store: {}", (Object)allDocs.size());
+        float[] embeddingArray = this.embeddingModel.embed(queryText);
+        List<Double> queryEmbedding = new java.util.ArrayList<>();
+        for (float f : embeddingArray) {
+            queryEmbedding.add((double) f);
+        }
+        List<MongoDocument> allDocs = this.mongoTemplate.findAll(MongoDocument.class, COLLECTION_NAME);
+        log.debug("Total documents found in vector store: {}", allDocs.size());
         return allDocs.stream().filter(md -> {
             try {
                 String[] parts;
@@ -107,7 +121,7 @@ implements VectorStore {
             }
             return true;
         }).map(md -> {
-            HashMap metadata = md.getMetadata() != null ? new HashMap(md.getMetadata()) : new HashMap();
+            HashMap<String, Object> metadata = md.getMetadata() != null ? new HashMap<String, Object>(md.getMetadata()) : new HashMap();
             Document doc = new Document(md.getId(), md.getContent(), metadata);
             return new ScoredDocument(doc, this.calculateCosineSimilarity(queryEmbedding, md.getEmbedding()));
         }).filter(scored -> scored.score >= threshold).sorted((a, b) -> Double.compare(b.score, a.score)).limit(topK).map(scored -> {
@@ -130,5 +144,50 @@ implements VectorStore {
         }
         return normA == 0.0 || normB == 0.0 ? 0.0 : dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
-}
 
+    public static class MongoDocument {
+        @Id
+        private String id;
+        private String content;
+        private Map<String, Object> metadata;
+        private List<Double> embedding;
+
+        public String getId() {
+            return this.id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getContent() {
+            return this.content;
+        }
+
+        public void setContent(String content) {
+            this.content = content;
+        }
+
+        public Map<String, Object> getMetadata() {
+            return this.metadata;
+        }
+
+        public void setMetadata(Map<String, Object> metadata) {
+            this.metadata = metadata;
+        }
+
+        public List<Double> getEmbedding() {
+            return this.embedding;
+        }
+
+        public void setEmbedding(List<Double> embedding) {
+            this.embedding = embedding;
+        }
+    }
+
+    private record ScoredDocument(Document document, double score) {
+        public Document getDocument() {
+            return this.document;
+        }
+    }
+}

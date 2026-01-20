@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.service.QueryDecompositionService
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.stereotype.Service
@@ -32,7 +31,7 @@ public class QueryDecompositionService {
         String lowerQuery = query.toLowerCase();
         for (String indicator : COMPOUND_INDICATORS) {
             if (!lowerQuery.contains(indicator)) continue;
-            log.debug("Compound query detected via indicator: '{}'", (Object)indicator.trim());
+            log.debug("Compound query detected via indicator: '{}'", indicator.trim());
             return true;
         }
         if (QUESTION_SPLIT_PATTERN.matcher(query).find()) {
@@ -78,7 +77,7 @@ public class QueryDecompositionService {
         if (subQueries.isEmpty()) {
             return Collections.singletonList(query);
         }
-        log.info("Decomposed query into {} sub-queries:", (Object)subQueries.size());
+        log.info("Decomposed query into {} sub-queries:", subQueries.size());
         subQueries.forEach(sq -> log.info("  -> {}", sq));
         return subQueries;
     }
@@ -133,4 +132,3 @@ public class QueryDecompositionService {
         return String.join((CharSequence)"\n\n---\n\n", uniqueResults);
     }
 }
-

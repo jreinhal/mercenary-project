@@ -2,11 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.controller.AuthController
- *  com.jreinhal.mercenary.controller.AuthController$LoginRequest
- *  com.jreinhal.mercenary.controller.AuthController$LoginResponse
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.service.StandardAuthenticationService
  *  jakarta.servlet.http.HttpServletRequest
  *  jakarta.servlet.http.HttpSession
  *  org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -22,7 +17,6 @@
  */
 package com.jreinhal.mercenary.controller;
 
-import com.jreinhal.mercenary.controller.AuthController;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.service.StandardAuthenticationService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,9 +59,9 @@ public class AuthController {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
         }
         HttpSession session = httpRequest.getSession(true);
-        session.setAttribute("mercenary.auth.userId", (Object)user.getId());
+        session.setAttribute("mercenary.auth.userId", user.getId());
         String displayName = user.getDisplayName() != null ? user.getDisplayName() : user.getUsername();
-        return ResponseEntity.ok((Object)new LoginResponse(displayName));
+        return ResponseEntity.ok(new LoginResponse(displayName));
     }
 
     @PostMapping(value={"/logout"})
@@ -78,5 +72,10 @@ public class AuthController {
         }
         return ResponseEntity.noContent().build();
     }
-}
 
+    public record LoginRequest(String username, String password) {
+    }
+
+    public record LoginResponse(String displayName) {
+    }
+}

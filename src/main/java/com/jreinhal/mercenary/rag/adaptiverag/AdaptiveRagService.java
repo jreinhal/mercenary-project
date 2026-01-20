@@ -2,11 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService
- *  com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService$RoutingDecision
- *  com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService$RoutingResult
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -17,7 +12,6 @@
  */
 package com.jreinhal.mercenary.rag.adaptiverag;
 
-import com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -124,7 +118,7 @@ public class AdaptiveRagService {
                 return this.logAndReturn(decision2, reason2, 0.9, signals, totalDuration);
             }
             catch (Exception e) {
-                log.error("Semantic Router failed, falling back to heuristics: {}", (Object)e.getMessage());
+                log.error("Semantic Router failed, falling back to heuristics: {}", e.getMessage());
                 signals.put("routerError", e.getMessage());
             }
         }
@@ -181,5 +175,14 @@ public class AdaptiveRagService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record RoutingResult(RoutingDecision decision, String reason, double confidence, Map<String, Object> signals) {
+    }
+
+    public static enum RoutingDecision {
+        NO_RETRIEVAL,
+        CHUNK,
+        DOCUMENT;
+
+    }
+}

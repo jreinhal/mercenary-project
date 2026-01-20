@@ -1,13 +1,8 @@
 /*
  * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.model.UserRole$Permission
  */
 package com.jreinhal.mercenary.model;
 
-import com.jreinhal.mercenary.model.UserRole;
 import java.util.Set;
 
 public enum UserRole {
@@ -30,5 +25,14 @@ public enum UserRole {
     public boolean hasPermission(Permission permission) {
         return this.permissions.contains(permission);
     }
-}
 
+    public static enum Permission {
+        QUERY,
+        INGEST,
+        DELETE,
+        MANAGE_USERS,
+        VIEW_AUDIT,
+        CONFIGURE;
+
+    }
+}

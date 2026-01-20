@@ -2,12 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hybridrag.HybridRagService
- *  com.jreinhal.mercenary.rag.hybridrag.HybridRagService$HybridRetrievalResult
- *  com.jreinhal.mercenary.rag.hybridrag.HybridRagService$RankedDoc
- *  com.jreinhal.mercenary.rag.hybridrag.QueryExpander
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -19,7 +13,6 @@
  */
 package com.jreinhal.mercenary.rag.hybridrag;
 
-import com.jreinhal.mercenary.rag.hybridrag.HybridRagService;
 import com.jreinhal.mercenary.rag.hybridrag.QueryExpander;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
@@ -77,8 +70,8 @@ public class HybridRagService {
             return new HybridRetrievalResult(docs, Map.of("mode", "fallback"));
         }
         long startTime = System.currentTimeMillis();
-        List queryVariants = this.generateQueryVariants(query);
-        LinkedHashMap semanticResults = new LinkedHashMap();
+        List<String> queryVariants = this.generateQueryVariants(query);
+        LinkedHashMap<String, List<RankedDoc>> semanticResults = new LinkedHashMap<String, List<RankedDoc>>();
         for (String variant : queryVariants) {
             List results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression("dept == '" + department + "'"));
             ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
@@ -87,11 +80,11 @@ public class HybridRagService {
             }
             semanticResults.put(variant, ranked);
         }
-        List keywordResults = this.performKeywordRetrieval(query, department);
+        List<RankedDoc> keywordResults = this.performKeywordRetrieval(query, department);
         if (this.ocrTolerance) {
             keywordResults = this.applyOcrTolerance(keywordResults, query);
         }
-        List fusedResults = this.applyRrfFusion(semanticResults, keywordResults);
+        List<Document> fusedResults = this.applyRrfFusion(semanticResults, keywordResults);
         long elapsed = System.currentTimeMillis() - startTime;
         int totalCandidates = semanticResults.values().stream().mapToInt(List::size).sum() + keywordResults.size();
         this.reasoningTracer.addStep(ReasoningStep.StepType.HYBRID_RETRIEVAL, "Hybrid RAG with RRF Fusion", String.format("%d query variants, %d candidates, %d fused results", queryVariants.size(), totalCandidates, fusedResults.size()), elapsed, Map.of("queryVariants", queryVariants.size(), "semanticCandidates", semanticResults.values().stream().mapToInt(List::size).sum(), "keywordCandidates", keywordResults.size(), "fusedResults", fusedResults.size()));
@@ -102,17 +95,17 @@ public class HybridRagService {
     private List<String> generateQueryVariants(String query) {
         ArrayList<String> variants = new ArrayList<String>();
         variants.add(query);
-        List expansions = this.queryExpander.expand(query, this.multiQueryCount - 1);
+        List<String> expansions = this.queryExpander.expand(query, this.multiQueryCount - 1);
         variants.addAll(expansions);
         return variants;
     }
 
     private List<RankedDoc> performKeywordRetrieval(String query, String department) {
-        Set keywords = this.extractKeywords(query);
+        Set<String> keywords = this.extractKeywords(query);
         if (keywords.isEmpty()) {
             return List.of();
         }
-        List candidates = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.1).withFilterExpression("dept == '" + department + "'"));
+        List<Document> candidates = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.1).withFilterExpression("dept == '" + department + "'"));
         ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
         for (Document doc : candidates) {
             int keywordScore = this.countKeywordMatches(doc.getContent(), keywords);
@@ -129,17 +122,17 @@ public class HybridRagService {
     }
 
     private List<RankedDoc> applyOcrTolerance(List<RankedDoc> results, String query) {
-        Set queryTerms = this.extractKeywords(query);
-        HashMap<String, Set> ocrVariants = new HashMap<String, Set>();
+        Set<String> queryTerms = this.extractKeywords(query);
+        HashMap<String, Set<String>> ocrVariants = new HashMap<String, Set<String>>();
         for (String term : queryTerms) {
-            Set variants = this.generateOcrVariants(term);
+            Set<String> variants = this.generateOcrVariants(term);
             ocrVariants.put(term, variants);
         }
         ArrayList<RankedDoc> boosted = new ArrayList<RankedDoc>();
         for (RankedDoc rd : results) {
             String content = rd.document.getContent().toLowerCase();
             int variantMatches = 0;
-            block2: for (Set variants : ocrVariants.values()) {
+            block2: for (Set<String> variants : ocrVariants.values()) {
                 for (String variant : variants) {
                     if (!content.contains(variant)) continue;
                     ++variantMatches;
@@ -186,9 +179,9 @@ public class HybridRagService {
             rrfScores.merge(docId, rrfContribution, Double::sum);
             docMap.putIfAbsent(docId, rd.document);
         }
-        ArrayList sorted = new ArrayList(rrfScores.entrySet());
-        sorted.sort((a, b) -> Double.compare((Double)b.getValue(), (Double)a.getValue()));
-        return sorted.stream().limit(15L).map(e -> (Document)docMap.get(e.getKey())).filter(Objects::nonNull).collect(Collectors.toList());
+        ArrayList<Map.Entry<String, Double>> sorted = new ArrayList<>(rrfScores.entrySet());
+        sorted.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+        return sorted.stream().limit(15L).map(e -> docMap.get(e.getKey())).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     private String getDocId(Document doc) {
@@ -222,5 +215,13 @@ public class HybridRagService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record HybridRetrievalResult(List<Document> documents, Map<String, Object> metadata) {
+    }
+
+    private record RankedDoc(Document document, int rank, String source, int keywordScore) {
+        RankedDoc(Document document, int rank, String source) {
+            this(document, rank, source, 0);
+        }
+    }
+}

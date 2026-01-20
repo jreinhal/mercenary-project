@@ -2,8 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.MercenaryApplication
- *  com.jreinhal.mercenary.vector.LocalMongoVectorStore
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -63,8 +61,8 @@ public class MercenaryApplication {
             log.error("=================================================================");
             log.error("  CRITICAL SECURITY ERROR: DEV MODE WITH PRODUCTION DATABASE");
             log.error("=================================================================");
-            log.error("  Auth Mode: {}", (Object)authMode);
-            log.error("  Profile: {}", (Object)activeProfile);
+            log.error("  Auth Mode: {}", authMode);
+            log.error("  Profile: {}", activeProfile);
             log.error("  MongoDB URI appears to be production (Atlas/cloud)");
             log.error("");
             log.error("  DEV mode auto-provisions ADMIN users with TOP_SECRET clearance!");
@@ -87,8 +85,8 @@ public class MercenaryApplication {
             log.error("=================================================================");
             log.error("  CRITICAL SECURITY ERROR: DEV AUTH MODE OUTSIDE DEV PROFILE");
             log.error("=================================================================");
-            log.error("  Auth Mode: {}", (Object)authMode);
-            log.error("  Profile: {}", (Object)activeProfile);
+            log.error("  Auth Mode: {}", authMode);
+            log.error("  Profile: {}", activeProfile);
             log.error("");
             log.error("  DEV mode auto-provisions ADMIN users with TOP_SECRET clearance!");
             log.error("  This is a critical misconfiguration for non-dev environments.");
@@ -120,8 +118,8 @@ public class MercenaryApplication {
         }
         if (!isDevMode) {
             log.info("Security configuration validated:");
-            log.info("  Auth Mode: {}", (Object)authMode);
-            log.info("  Profile: {}", (Object)activeProfile);
+            log.info("  Auth Mode: {}", authMode);
+            log.info("  Profile: {}", activeProfile);
         }
     }
 
@@ -134,4 +132,3 @@ public class MercenaryApplication {
         return new MongoDBAtlasVectorStore(mongoTemplate, embeddingModel, config, false);
     }
 }
-

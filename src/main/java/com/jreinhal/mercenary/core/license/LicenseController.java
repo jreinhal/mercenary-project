@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.core.license.LicenseController
- *  com.jreinhal.mercenary.core.license.LicenseController$FeatureResponse
- *  com.jreinhal.mercenary.core.license.LicenseService
- *  com.jreinhal.mercenary.core.license.LicenseService$LicenseStatus
  *  org.springframework.http.ResponseEntity
  *  org.springframework.web.bind.annotation.GetMapping
  *  org.springframework.web.bind.annotation.RequestMapping
@@ -13,7 +9,6 @@
  */
 package com.jreinhal.mercenary.core.license;
 
-import com.jreinhal.mercenary.core.license.LicenseController;
 import com.jreinhal.mercenary.core.license.LicenseService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,13 +26,15 @@ public class LicenseController {
 
     @GetMapping(value={"/status"})
     public ResponseEntity<LicenseService.LicenseStatus> getStatus() {
-        return ResponseEntity.ok((Object)this.licenseService.getStatus());
+        return ResponseEntity.ok(this.licenseService.getStatus());
     }
 
     @GetMapping(value={"/feature"})
     public ResponseEntity<FeatureResponse> checkFeature(String feature) {
         boolean available = this.licenseService.hasFeature(feature);
-        return ResponseEntity.ok((Object)new FeatureResponse(feature, available, this.licenseService.getEdition().name()));
+        return ResponseEntity.ok(new FeatureResponse(feature, available, this.licenseService.getEdition().name()));
+    }
+
+    public record FeatureResponse(String feature, boolean available, String edition) {
     }
 }
-

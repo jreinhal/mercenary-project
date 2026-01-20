@@ -2,13 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.crag.CragGraderService
- *  com.jreinhal.mercenary.rag.crag.CragGraderService$CragDecision
- *  com.jreinhal.mercenary.rag.crag.CragGraderService$CragResult
- *  com.jreinhal.mercenary.rag.crag.CragGraderService$DocumentGrade
- *  com.jreinhal.mercenary.rag.crag.CragGraderService$GradedDocument
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -20,7 +13,6 @@
  */
 package com.jreinhal.mercenary.rag.crag;
 
-import com.jreinhal.mercenary.rag.crag.CragGraderService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -69,7 +61,7 @@ public class CragGraderService {
         long startTime = System.currentTimeMillis();
         if (!this.enabled) {
             log.debug("CRAG disabled, passing all documents through");
-            List passthrough = documents.stream().map(d -> new GradedDocument(d, DocumentGrade.CORRECT, 1.0, "CRAG disabled")).collect(Collectors.toList());
+            List<GradedDocument> passthrough = documents.stream().map(d -> new GradedDocument((Document)d, DocumentGrade.CORRECT, 1.0, "CRAG disabled")).collect(Collectors.toList());
             return new CragResult(CragDecision.USE_RETRIEVED, passthrough, "CRAG disabled", 1.0, Map.of());
         }
         if (documents == null || documents.isEmpty()) {
@@ -104,10 +96,10 @@ public class CragGraderService {
             confidence = usableRatio * 0.5;
         }
         long elapsed = System.currentTimeMillis() - startTime;
-        Map<String, Long> metrics = Map.of("totalDocuments", documents.size(), "correctCount", correctCount, "ambiguousCount", ambiguousCount, "incorrectCount", incorrectCount, "correctRatio", correctRatio, "elapsed", elapsed);
-        this.reasoningTracer.addStep(ReasoningStep.StepType.VALIDATION, "CRAG Document Grading", String.format("%s: %s (%.0f%% confidence)", decision, reason, confidence * 100.0), elapsed, metrics);
+        Map<String, Object> metrics = Map.of("totalDocuments", documents.size(), "correctCount", correctCount, "ambiguousCount", ambiguousCount, "incorrectCount", incorrectCount, "correctRatio", correctRatio, "elapsed", elapsed);
+        this.reasoningTracer.addStep(ReasoningStep.StepType.VALIDATION, "CRAG Document Grading", String.format("%s: %s (%.0f%% confidence)", new Object[]{decision, reason, confidence * 100.0}), elapsed, metrics);
         log.info("CRAG: {} - {} correct, {} ambiguous, {} incorrect ({}ms)", new Object[]{decision, correctCount, ambiguousCount, incorrectCount, elapsed});
-        List usableDocs = gradedDocs.stream().filter(g -> g.grade() != DocumentGrade.INCORRECT).sorted((a, b) -> Double.compare(b.relevanceScore(), a.relevanceScore())).collect(Collectors.toList());
+        List<GradedDocument> usableDocs = gradedDocs.stream().filter(g -> g.grade() != DocumentGrade.INCORRECT).sorted((a, b) -> Double.compare(b.relevanceScore(), a.relevanceScore())).collect(Collectors.toList());
         return new CragResult(decision, usableDocs, reason, confidence, metrics);
     }
 
@@ -138,7 +130,7 @@ public class CragGraderService {
             return new GradedDocument(document, grade, score, "LLM grading: " + response);
         }
         catch (Exception e) {
-            log.warn("CRAG LLM grading failed, falling back to heuristics: {}", (Object)e.getMessage());
+            log.warn("CRAG LLM grading failed, falling back to heuristics: {}", e.getMessage());
             return this.gradeDocumentWithHeuristics(query, document);
         }
     }
@@ -149,8 +141,8 @@ public class CragGraderService {
         double overlapRatio;
         String queryLower = query.toLowerCase();
         String contentLower = document.getContent().toLowerCase();
-        Set queryKeywords = this.extractKeywords(queryLower);
-        Set contentKeywords = this.extractKeywords(contentLower);
+        Set<String> queryKeywords = this.extractKeywords(queryLower);
+        Set<String> contentKeywords = this.extractKeywords(contentLower);
         long matchCount = queryKeywords.stream().filter(contentKeywords::contains).count();
         double d = overlapRatio = queryKeywords.isEmpty() ? 0.0 : (double)matchCount / (double)queryKeywords.size();
         if (overlapRatio >= 0.6) {
@@ -203,5 +195,25 @@ public class CragGraderService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record CragResult(CragDecision decision, List<GradedDocument> gradedDocuments, String reason, double overallConfidence, Map<String, Object> metrics) {
+    }
+
+    public static enum CragDecision {
+        USE_RETRIEVED,
+        SUPPLEMENT_NEEDED,
+        INSUFFICIENT_EVIDENCE,
+        REWRITE_NEEDED;
+
+    }
+
+    public record GradedDocument(Document document, DocumentGrade grade, double relevanceScore, String gradeReason) {
+    }
+
+    public static enum DocumentGrade {
+        CORRECT,
+        AMBIGUOUS,
+        INCORRECT;
+
+    }
+}

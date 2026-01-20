@@ -2,14 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.professional.admin.AdminController
- *  com.jreinhal.mercenary.professional.admin.AdminController$DashboardSummary
- *  com.jreinhal.mercenary.professional.admin.AdminController$RoleUpdateRequest
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService$DocumentStats
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService$HealthStatus
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService$UsageStats
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService$UserSummary
  *  org.springframework.http.ResponseEntity
  *  org.springframework.security.access.prepost.PreAuthorize
  *  org.springframework.web.bind.annotation.GetMapping
@@ -22,10 +14,11 @@
  */
 package com.jreinhal.mercenary.professional.admin;
 
-import com.jreinhal.mercenary.professional.admin.AdminController;
+import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.professional.admin.AdminDashboardService;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,12 +41,12 @@ public class AdminController {
 
     @GetMapping(value={"/users"})
     public ResponseEntity<List<AdminDashboardService.UserSummary>> getAllUsers() {
-        return ResponseEntity.ok((Object)this.dashboardService.getAllUsers());
+        return ResponseEntity.ok(this.dashboardService.getAllUsers());
     }
 
     @GetMapping(value={"/users/pending"})
     public ResponseEntity<List<AdminDashboardService.UserSummary>> getPendingUsers() {
-        return ResponseEntity.ok((Object)this.dashboardService.getPendingApprovals());
+        return ResponseEntity.ok(this.dashboardService.getPendingApprovals());
     }
 
     @PostMapping(value={"/users/{userId}/approve"})
@@ -82,22 +75,27 @@ public class AdminController {
 
     @GetMapping(value={"/stats/usage"})
     public ResponseEntity<AdminDashboardService.UsageStats> getUsageStats() {
-        return ResponseEntity.ok((Object)this.dashboardService.getUsageStats());
+        return ResponseEntity.ok(this.dashboardService.getUsageStats());
     }
 
     @GetMapping(value={"/stats/documents"})
     public ResponseEntity<AdminDashboardService.DocumentStats> getDocumentStats() {
-        return ResponseEntity.ok((Object)this.dashboardService.getDocumentStats());
+        return ResponseEntity.ok(this.dashboardService.getDocumentStats());
     }
 
     @GetMapping(value={"/health"})
     public ResponseEntity<AdminDashboardService.HealthStatus> getHealthStatus() {
-        return ResponseEntity.ok((Object)this.dashboardService.getHealthStatus());
+        return ResponseEntity.ok(this.dashboardService.getHealthStatus());
     }
 
     @GetMapping(value={"/dashboard"})
     public ResponseEntity<DashboardSummary> getDashboardSummary() {
-        return ResponseEntity.ok((Object)new DashboardSummary(this.dashboardService.getUsageStats(), this.dashboardService.getHealthStatus(), this.dashboardService.getDocumentStats(), this.dashboardService.getPendingApprovals().size()));
+        return ResponseEntity.ok(new DashboardSummary(this.dashboardService.getUsageStats(), this.dashboardService.getHealthStatus(), this.dashboardService.getDocumentStats(), this.dashboardService.getPendingApprovals().size()));
+    }
+
+    public record RoleUpdateRequest(Set<UserRole> roles) {
+    }
+
+    public record DashboardSummary(AdminDashboardService.UsageStats usage, AdminDashboardService.HealthStatus health, AdminDashboardService.DocumentStats documents, int pendingApprovals) {
     }
 }
-

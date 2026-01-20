@@ -2,8 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.repository.UserRepository
  *  org.springframework.data.mongodb.repository.MongoRepository
  *  org.springframework.stereotype.Repository
  */
@@ -26,4 +24,3 @@ extends MongoRepository<User, String> {
 
     public List<User> findByActiveTrue();
 }
-

@@ -2,9 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.core.license.LicenseService
- *  com.jreinhal.mercenary.core.license.LicenseService$Edition
- *  com.jreinhal.mercenary.core.license.LicenseService$LicenseStatus
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -13,7 +10,6 @@
  */
 package com.jreinhal.mercenary.core.license;
 
-import com.jreinhal.mercenary.core.license.LicenseService;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,9 +20,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-/*
- * Exception performing whole class analysis ignored.
- */
 @Service
 public class LicenseService {
     private static final Logger log = LoggerFactory.getLogger(LicenseService.class);
@@ -55,10 +48,10 @@ public class LicenseService {
 
     private Edition parseEdition(String value) {
         try {
-            return Edition.valueOf((String)value.toUpperCase());
+            return Edition.valueOf(value.toUpperCase());
         }
         catch (IllegalArgumentException e) {
-            log.warn("Unknown edition '{}', defaulting to TRIAL", (Object)value);
+            log.warn("Unknown edition '{}', defaulting to TRIAL", value);
             return Edition.TRIAL;
         }
     }
@@ -69,16 +62,16 @@ public class LicenseService {
             startDate = LocalDate.parse(this.trialStartDate);
         } else {
             startDate = LocalDate.now();
-            log.info("Trial started: {}", (Object)startDate);
+            log.info("Trial started: {}", startDate);
         }
         LocalDate expirationDate = startDate.plusDays(this.trialDays);
         this.trialExpiration = expirationDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
         this.licenseValid = Instant.now().isBefore(this.trialExpiration);
         if (!this.licenseValid) {
-            log.warn("Trial expired on {}. Contact sales for licensing.", (Object)expirationDate);
+            log.warn("Trial expired on {}. Contact sales for licensing.", expirationDate);
         } else {
             long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(), expirationDate);
-            log.info("Trial active: {} days remaining", (Object)daysRemaining);
+            log.info("Trial active: {} days remaining", daysRemaining);
         }
     }
 
@@ -127,7 +120,7 @@ public class LicenseService {
                 yield false;
             }
             default -> {
-                log.debug("Unknown feature requested: {}", (Object)feature);
+                log.debug("Unknown feature requested: {}", feature);
                 yield false;
             }
         };
@@ -144,5 +137,15 @@ public class LicenseService {
     public LicenseStatus getStatus() {
         return new LicenseStatus(this.edition, this.isValid(), this.getTrialDaysRemaining(), this.trialExpiration);
     }
-}
 
+    public static enum Edition {
+        TRIAL,
+        PROFESSIONAL,
+        MEDICAL,
+        GOVERNMENT;
+
+    }
+
+    public record LicenseStatus(Edition edition, boolean valid, long trialDaysRemaining, Instant expirationDate) {
+    }
+}

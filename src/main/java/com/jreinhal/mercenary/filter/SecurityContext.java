@@ -1,9 +1,5 @@
 /*
  * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.jreinhal.mercenary.filter.SecurityContext
- *  com.jreinhal.mercenary.model.User
  */
 package com.jreinhal.mercenary.filter;
 
@@ -17,7 +13,7 @@ public class SecurityContext {
     }
 
     public static User getCurrentUser() {
-        return (User)currentUser.get();
+        return currentUser.get();
     }
 
     public static boolean isAuthenticated() {
@@ -25,12 +21,12 @@ public class SecurityContext {
     }
 
     public static String getCurrentUserId() {
-        User user = (User)currentUser.get();
+        User user = currentUser.get();
         return user != null ? user.getId() : "ANONYMOUS";
     }
 
     public static String getCurrentUserDisplayName() {
-        User user = (User)currentUser.get();
+        User user = currentUser.get();
         return user != null ? user.getDisplayName() : "Anonymous";
     }
 
@@ -38,4 +34,3 @@ public class SecurityContext {
         currentUser.remove();
     }
 }
-

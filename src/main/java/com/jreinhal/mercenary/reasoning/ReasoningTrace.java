@@ -1,9 +1,5 @@
 /*
  * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.jreinhal.mercenary.reasoning.ReasoningStep
- *  com.jreinhal.mercenary.reasoning.ReasoningTrace
  */
 package com.jreinhal.mercenary.reasoning;
 
@@ -35,8 +31,8 @@ public class ReasoningTrace {
         this.query = query;
         this.department = department;
         this.userId = userId;
-        this.steps = new ArrayList();
-        this.metrics = new LinkedHashMap();
+        this.steps = new ArrayList<ReasoningStep>();
+        this.metrics = new LinkedHashMap<String, Object>();
         this.totalDurationMs = 0L;
         this.completed = false;
     }
@@ -137,4 +133,3 @@ public class ReasoningTrace {
         return stepMaps;
     }
 }
-

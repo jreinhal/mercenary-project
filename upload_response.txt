@@ -1,0 +1,6 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100   894    0   106  100   788   9752  72499 --:--:-- --:--:-- --:--:-- 89400
+{"timestamp":"2026-01-20T01:00:18.458+00:00","status":400,"error":"Bad Request","path":"/api/ingest/file"}

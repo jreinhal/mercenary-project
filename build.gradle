@@ -1,7 +1,7 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.2.0'
-    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springframework.boot' version '3.4.2'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.jreinhal'
@@ -32,6 +32,7 @@ dependencies {
     // Spring AI for Ollama
     implementation 'org.springframework.ai:spring-ai-ollama-spring-boot-starter:1.0.0-M4'
     implementation 'org.springframework.ai:spring-ai-mongodb-atlas-store-spring-boot-starter:1.0.0-M4'
+    implementation 'org.springframework.ai:spring-ai-pdf-document-reader:1.0.0-M4'
 
     // Apache Tika for file type detection
     implementation 'org.apache.tika:tika-core:2.9.1'

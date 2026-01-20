@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.security.JwksKeyProvider
  *  com.nimbusds.jose.JOSEException
  *  com.nimbusds.jose.jwk.JWK
  *  com.nimbusds.jose.jwk.JWKSet
@@ -72,7 +71,7 @@ public class JwksKeyProvider {
             if (newKeySet != null) {
                 this.cachedKeySet = newKeySet;
                 this.cacheExpiry = Instant.now().plusSeconds(this.cacheTtlSeconds);
-                log.info("JWKS refreshed: {} keys loaded, cache expires at {}", (Object)newKeySet.getKeys().size(), (Object)this.cacheExpiry);
+                log.info("JWKS refreshed: {} keys loaded, cache expires at {}", newKeySet.getKeys().size(), this.cacheExpiry);
             }
             ImmutableJWKSet immutableJWKSet = this.cachedKeySet != null ? new ImmutableJWKSet(this.cachedKeySet) : null;
             return immutableJWKSet;
@@ -86,7 +85,7 @@ public class JwksKeyProvider {
         JWKSet remoteKeys;
         JWKSet localKeys;
         if (this.localJwksPath != null && !this.localJwksPath.isEmpty() && (localKeys = this.loadFromFile(this.localJwksPath)) != null) {
-            log.info("Loaded JWKS from local file: {}", (Object)this.localJwksPath);
+            log.info("Loaded JWKS from local file: {}", this.localJwksPath);
             return localKeys;
         }
         if (this.jwksUri != null && !this.jwksUri.isEmpty() && (remoteKeys = this.loadFromUri(this.jwksUri)) != null) {
@@ -108,30 +107,30 @@ public class JwksKeyProvider {
         try {
             Path filePath = Path.of(path, new String[0]);
             if (!Files.exists(filePath, new LinkOption[0])) {
-                log.warn("Local JWKS file not found: {}", (Object)path);
+                log.warn("Local JWKS file not found: {}", path);
                 return null;
             }
             String content = Files.readString(filePath);
             JWKSet keySet = JWKSet.parse((String)content);
-            log.debug("Loaded {} keys from local file", (Object)keySet.getKeys().size());
+            log.debug("Loaded {} keys from local file", keySet.getKeys().size());
             return keySet;
         }
         catch (IOException | ParseException e) {
-            log.error("Failed to load JWKS from file {}: {}", (Object)path, (Object)e.getMessage());
+            log.error("Failed to load JWKS from file {}: {}", path, e.getMessage());
             return null;
         }
     }
 
     private JWKSet loadFromUri(String uri) {
         try {
-            log.debug("Fetching JWKS from: {}", (Object)uri);
+            log.debug("Fetching JWKS from: {}", uri);
             URL url = new URL(uri);
             JWKSet keySet = JWKSet.load((URL)url);
-            log.info("Loaded {} keys from remote JWKS endpoint", (Object)keySet.getKeys().size());
+            log.info("Loaded {} keys from remote JWKS endpoint", keySet.getKeys().size());
             return keySet;
         }
         catch (IOException | ParseException e) {
-            log.warn("Failed to load JWKS from {}: {}", (Object)uri, (Object)e.getMessage());
+            log.warn("Failed to load JWKS from {}: {}", uri, e.getMessage());
             return null;
         }
     }
@@ -179,4 +178,3 @@ public class JwksKeyProvider {
         }
     }
 }
-

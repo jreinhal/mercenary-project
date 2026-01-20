@@ -2,8 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.ragpart.SuspicionScorer
- *  com.jreinhal.mercenary.rag.ragpart.SuspicionScorer$AggregateAssessment
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.beans.factory.annotation.Value
@@ -11,7 +9,6 @@
  */
 package com.jreinhal.mercenary.rag.ragpart;
 
-import com.jreinhal.mercenary.rag.ragpart.SuspicionScorer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -88,5 +85,16 @@ public class SuspicionScorer {
         double suspiciousRatio = total > 0 ? (double)suspicious / (double)total : 0.0;
         return new AggregateAssessment(total, suspicious, avgScore, maxScore, suspiciousRatio);
     }
-}
 
+    public record AggregateAssessment(int totalDocuments, int suspiciousDocuments, double averageScore, double maxScore, double suspiciousRatio) {
+        public String getSummary() {
+            if (this.suspiciousRatio > 0.2) {
+                return "ALERT: High proportion of suspicious documents (" + String.format("%.1f%%", this.suspiciousRatio * 100.0) + ")";
+            }
+            if (this.suspiciousRatio > 0.05) {
+                return "WARNING: Some suspicious documents detected (" + String.format("%.1f%%", this.suspiciousRatio * 100.0) + ")";
+            }
+            return "HEALTHY: Corpus appears clean (" + this.totalDocuments + " documents verified)";
+        }
+    }
+}

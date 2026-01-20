@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.qucorag.InfiniGramClient
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -69,11 +68,11 @@ public class InfiniGramClient {
             return future.get(this.timeoutMs, TimeUnit.MILLISECONDS);
         }
         catch (TimeoutException e) {
-            log.warn("Infini-gram timeout for query: {}", (Object)query);
+            log.warn("Infini-gram timeout for query: {}", query);
             return -1L;
         }
         catch (Exception e) {
-            log.error("Infini-gram error for query: {}", (Object)query, (Object)e);
+            log.error("Infini-gram error for query: {}", query, e);
             return -1L;
         }
     }
@@ -88,7 +87,7 @@ public class InfiniGramClient {
             return future.get(this.timeoutMs, TimeUnit.MILLISECONDS);
         }
         catch (TimeoutException e) {
-            log.warn("Infini-gram timeout for co-occurrence: {} AND {}", (Object)entity1, (Object)entity2);
+            log.warn("Infini-gram timeout for co-occurrence: {} AND {}", entity1, entity2);
             return -1L;
         }
         catch (Exception e) {
@@ -103,7 +102,7 @@ public class InfiniGramClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
             Map<String, String> payload = Map.of("index", this.indexName, "query_type", queryType, "query", query);
             HttpEntity request = new HttpEntity(payload, (MultiValueMap)headers);
-            ResponseEntity response = this.restTemplate.postForEntity(API_URL, (Object)request, Map.class, new Object[0]);
+            ResponseEntity response = this.restTemplate.postForEntity(API_URL, request, Map.class, new Object[0]);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Map body = (Map)response.getBody();
                 if (body.containsKey("error")) {
@@ -115,7 +114,7 @@ public class InfiniGramClient {
                     return ((Number)count).longValue();
                 }
             }
-            log.warn("Unexpected Infini-gram response: {}", (Object)response);
+            log.warn("Unexpected Infini-gram response: {}", response);
             return -1L;
         }
         catch (Exception e) {
@@ -137,4 +136,3 @@ public class InfiniGramClient {
         }
     }
 }
-

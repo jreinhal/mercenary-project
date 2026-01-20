@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.service.PiiRedactionService
- *  com.jreinhal.mercenary.service.PiiRedactionService$RedactionResult
- *  com.jreinhal.mercenary.service.SecureIngestionService
  *  org.apache.tika.Tika
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -35,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.TextReader;
+import org.springframework.ai.document.DocumentReader;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -59,11 +56,11 @@ public class SecureIngestionService {
 
     public void ingest(MultipartFile file, Department dept) {
         try {
-            List rawDocuments;
+            List<Document> rawDocuments;
             String filename = file.getOriginalFilename();
-            log.info("Initiating RAGPart Defense Protocol for: {} [Sector: {}]", (Object)filename, (Object)dept);
+            log.info("Initiating RAGPart Defense Protocol for: {} [Sector: {}]", filename, dept);
             String detectedMimeType = this.detectMimeType(file);
-            log.info(">> Magic byte detection: {} -> {}", (Object)filename, (Object)detectedMimeType);
+            log.info(">> Magic byte detection: {} -> {}", filename, detectedMimeType);
             this.validateFileType(filename, detectedMimeType);
             InputStreamResource resource = new InputStreamResource(file.getInputStream());
             if (detectedMimeType.equals("application/pdf")) {
@@ -77,14 +74,14 @@ public class SecureIngestionService {
             }
             ArrayList<Document> cleanDocs = new ArrayList<Document>();
             for (Document doc : rawDocuments) {
-                HashMap<String, String> cleanMeta = new HashMap<String, String>();
+                java.util.Map<String, Object> cleanMeta = new java.util.HashMap<>();
                 cleanMeta.put("source", filename);
                 cleanMeta.put("dept", dept.name());
                 cleanMeta.put("mimeType", detectedMimeType);
                 cleanDocs.add(new Document(doc.getContent(), cleanMeta));
             }
             TokenTextSplitter splitter = new TokenTextSplitter();
-            List splitDocuments = splitter.apply(cleanDocs);
+            List<Document> splitDocuments = splitter.apply(cleanDocs);
             ArrayList<Document> finalDocuments = new ArrayList<Document>();
             int totalRedactions = 0;
             for (Document doc : splitDocuments) {
@@ -94,7 +91,7 @@ public class SecureIngestionService {
                 finalDocuments.add(redactedDoc);
             }
             this.vectorStore.add(finalDocuments);
-            log.info("Securely ingested {} memory points. Total PII redactions: {}", (Object)finalDocuments.size(), (Object)totalRedactions);
+            log.info("Securely ingested {} memory points. Total PII redactions: {}", finalDocuments.size(), totalRedactions);
         }
         catch (IOException e) {
             throw new RuntimeException("Secure Ingestion Failed: " + e.getMessage());
@@ -110,15 +107,15 @@ public class SecureIngestionService {
 
     private void validateFileType(String filename, String detectedMimeType) {
         if (BLOCKED_MIME_TYPES.contains(detectedMimeType)) {
-            log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", (Object)filename, (Object)detectedMimeType);
+            log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", filename, detectedMimeType);
             throw new SecurityException("File type not allowed: " + detectedMimeType + ". Executable and script files are blocked.");
         }
         String extension = this.getExtension(filename).toLowerCase();
         if (extension.equals("pdf") && !detectedMimeType.equals("application/pdf")) {
-            log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", (Object)detectedMimeType, (Object)filename);
+            log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", detectedMimeType, filename);
         }
         if (Set.of("exe", "dll", "bat", "sh", "cmd", "ps1", "jar").contains(extension)) {
-            log.error("SECURITY: Executable extension blocked: {}", (Object)filename);
+            log.error("SECURITY: Executable extension blocked: {}", filename);
             throw new SecurityException("Executable files are not allowed: " + filename);
         }
     }
@@ -131,4 +128,3 @@ public class SecureIngestionService {
         return lastDot > 0 ? filename.substring(lastDot + 1) : "";
     }
 }
-

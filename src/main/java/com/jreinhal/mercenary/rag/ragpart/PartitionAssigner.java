@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.ragpart.PartitionAssigner
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.document.Document
@@ -40,11 +39,11 @@ public class PartitionAssigner {
             byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
             int hashInt = (hash[0] & 0xFF) << 24 | (hash[1] & 0xFF) << 16 | (hash[2] & 0xFF) << 8 | hash[3] & 0xFF;
             int partition = Math.abs(hashInt) % this.numPartitions;
-            log.debug("Assigned partition {} to document", (Object)partition);
+            log.debug("Assigned partition {} to document", partition);
             return partition;
         }
         catch (NoSuchAlgorithmException e) {
-            log.warn("Hash algorithm {} not available, using fallback", (Object)this.hashAlgorithm);
+            log.warn("Hash algorithm {} not available, using fallback", this.hashAlgorithm);
             return Math.abs(content.hashCode()) % this.numPartitions;
         }
     }
@@ -53,7 +52,7 @@ public class PartitionAssigner {
         int partitionId = this.assignPartition(document);
         Map metadata = document.getMetadata();
         metadata.put("partition_id", partitionId);
-        log.debug("Tagged document with partition_id={}", (Object)partitionId);
+        log.debug("Tagged document with partition_id={}", partitionId);
         return document;
     }
 
@@ -87,4 +86,3 @@ public class PartitionAssigner {
         return -1;
     }
 }
-

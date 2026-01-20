@@ -2,11 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.config.SecurityConfig
- *  com.jreinhal.mercenary.filter.PreAuthRateLimitFilter
- *  com.jreinhal.mercenary.filter.RateLimitFilter
- *  com.jreinhal.mercenary.filter.SecurityFilter
- *  com.jreinhal.mercenary.security.CacUserDetailsService
  *  jakarta.servlet.Filter
  *  org.springframework.beans.factory.annotation.Value
  *  org.springframework.boot.web.servlet.FilterRegistrationBean
@@ -116,4 +111,3 @@ public class SecurityConfig {
         return (SecurityFilterChain)http.build();
     }
 }
-

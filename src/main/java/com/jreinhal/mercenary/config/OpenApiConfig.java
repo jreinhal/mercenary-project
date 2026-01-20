@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.config.OpenApiConfig
  *  io.swagger.v3.oas.models.Components
  *  io.swagger.v3.oas.models.OpenAPI
  *  io.swagger.v3.oas.models.info.Contact
@@ -54,4 +53,3 @@ public class OpenApiConfig {
         return new Components().addSecuritySchemes("bearerAuth", new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT").description("JWT token from OIDC provider (Azure AD, Okta, etc.)")).addSecuritySchemes("basicAuth", new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("basic").description("Username and password (STANDARD mode)")).addSecuritySchemes("devAuth", new SecurityScheme().type(SecurityScheme.Type.APIKEY).in(SecurityScheme.In.HEADER).name("X-Dev-User").description("Development mode: Set to 'admin' or any username"));
     }
 }
-

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>SENTINEL // INTELLIGENCE PLATFORM</title>
+    <!-- Immediate theme application to prevent flash -->
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="css/fonts.css?v=20260116f">
+    <link rel="stylesheet" href="css/sentinel.css?v=20260118r" id="sentinel-css">
+    <script src="js/css-bust.js"></script>
+    <!-- Knowledge graph rendering (CSP-safe, no external libs) -->
+</head>
+
+<body>
+
+    <!-- Feedback Modal -->
+    <a href="#query-input" class="skip-link">Skip to main content</a>
+
+    <!-- Feedback Modal -->
+    <div class="feedback-modal" id="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
+        <div class="feedback-modal-content">
+            <div class="feedback-modal-header">
+                <span class="feedback-modal-title" id="feedback-modal-title">Report Issue</span>
+                <button class="icon-btn" data-action="closeFeedbackModal" aria-label="Close feedback modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="feedback-modal-body">
+                <div class="feedback-options" id="feedback-options">
+                    <label class="feedback-option" data-value="inaccurate_citation">
+                        <input type="radio" name="feedback" value="inaccurate_citation">
+                        <span class="feedback-option-radio"></span>
+                        <span class="feedback-option-label">Inaccurate Citation</span>
+                    </label>
+                    <label class="feedback-option" data-value="hallucination">
+                        <input type="radio" name="feedback" value="hallucination">
+                        <span class="feedback-option-radio"></span>
+                        <span class="feedback-option-label">Hallucination / Made-up Information</span>
+                    </label>
+                    <label class="feedback-option" data-value="outdated_info">
+                        <input type="radio" name="feedback" value="outdated_info">
+                        <span class="feedback-option-radio"></span>
+                        <span class="feedback-option-label">Outdated Information</span>
+                    </label>
+                    <label class="feedback-option" data-value="incomplete">
+                        <input type="radio" name="feedback" value="incomplete">
+                        <span class="feedback-option-radio"></span>
+                        <span class="feedback-option-label">Incomplete Response</span>
+                    </label>
+                    <label class="feedback-option" data-value="other">
+                        <input type="radio" name="feedback" value="other">
+                        <span class="feedback-option-radio"></span>
+                        <span class="feedback-option-label">Other Issue</span>
+                    </label>
+                </div>
+            </div>
+            <div class="feedback-modal-footer">
+                <button class="btn btn-secondary" data-action="closeFeedbackModal">Cancel</button>
+                <button class="btn btn-primary" data-action="submitFeedback">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Classification Banner (DoD requirement - shown for high-security sectors) -->
+    <div id="classification-banner" class="classification-banner unclassified hidden" role="banner" aria-live="polite">
+        UNCLASSIFIED
+    </div>
+
+    <div class="auth-modal hidden" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <div class="auth-modal-content">
+            <div class="auth-modal-header">
+                <span class="auth-modal-title" id="auth-title">Sign In</span>
+            </div>
+            <div class="auth-modal-body">
+                <p class="auth-modal-subtitle">Enter your credentials to continue.</p>
+                <label class="auth-label" for="auth-username">Username</label>
+                <input class="auth-input" id="auth-username" type="text" autocomplete="username">
+                <label class="auth-label" for="auth-password">Password</label>
+                <input class="auth-input" id="auth-password" type="password" autocomplete="current-password">
+                <div class="auth-error hidden" id="auth-error" role="alert"></div>
+            </div>
+            <div class="auth-modal-footer">
+                <button class="btn btn-primary" data-action="authSubmit" id="auth-submit">Sign In</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skip Link for 508 Accessibility -->
+    <a href="#query-input" class="skip-link">Skip to main content</a>
+
+    <!-- Settings Sidebar -->
+    <aside class="sidebar" id="sidebar" role="complementary" aria-label="Settings">
+        <div class="sidebar-header">
+            <span class="sidebar-title">Settings</span>
+            <button class="icon-btn" data-action="toggleSidebar" aria-label="Close settings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+        </div>
+        <div class="sidebar-content">
+            <!-- Active Sector -->
+            <div class="sidebar-section" id="sector-section">
+                <div class="sidebar-section-title">Active Sector</div>
+                <p class="settings-description">Select the document collection to search within.</p>
+                <select class="sector-select" id="sector-select" aria-label="Select Target Sector">
+                    <!-- Populated dynamically based on edition -->
+                </select>
+            </div>
+
+            <!-- Appearance -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Appearance</div>
+                <p class="settings-description">Choose your preferred color theme.</p>
+                <div class="theme-toggle-group">
+                    <button class="theme-btn" id="theme-light" data-action="setTheme" data-theme="light" aria-label="Light mode">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                        </svg>
+                        Light
+                    </button>
+                    <button class="theme-btn active" id="theme-dark" data-action="setTheme" data-theme="dark" aria-label="Dark mode">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                        Dark
+                    </button>
+                </div>
+            </div>
+
+            <!-- RAG Settings -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Retrieval Settings</div>
+                <p class="settings-description">Configure how documents are retrieved and ranked.</p>
+
+                <div class="settings-row">
+                    <div class="settings-label-row">
+                        <label for="top-k-slider">Top K Results</label>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                Number of document chunks to retrieve for each query. Higher values provide more context but may include less relevant results.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-slider-group">
+                        <input type="range" id="top-k-slider" min="1" max="20" value="5" class="settings-slider">
+                        <span id="top-k-value" class="settings-value">5</span>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-label-row">
+                        <label for="similarity-slider">Similarity Threshold</label>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                Minimum similarity score (0-1) for retrieved documents. Higher values return fewer but more relevant results.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-slider-group">
+                        <input type="range" id="similarity-slider" min="0" max="100" value="70" class="settings-slider">
+                        <span id="similarity-value" class="settings-value">0.70</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RAG Engines -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">RAG Engines</div>
+                <p class="settings-description">Enable or disable retrieval augmentation techniques.</p>
+
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-label">
+                        <span>HyDE</span>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                <strong>Hypothetical Document Embeddings.</strong> Generates a hypothetical answer first, then uses it to find similar real documents. Improves retrieval for complex queries.
+                            </div>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="hyde-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-label">
+                        <span>GraphRAG</span>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                <strong>Knowledge Graph Retrieval.</strong> Extracts entities and relationships to build a graph structure. Enables multi-hop reasoning across connected concepts.
+                            </div>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="graphrag-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-label">
+                        <span>Reranking</span>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                <strong>Cross-Encoder Reranking.</strong> Re-scores retrieved documents using a more accurate (but slower) model. Significantly improves result relevance.
+                            </div>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="rerank-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Advanced -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Advanced</div>
+
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-label">
+                        <span>Debug Mode</span>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                <strong>Developer Diagnostics.</strong> Shows detailed retrieval scores, latency breakdowns, chunk IDs, and embedding distances for troubleshooting.
+                            </div>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="debug-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-label">
+                        <span>Show Reasoning</span>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                Display the step-by-step reasoning chain showing how the system arrived at its answer. Useful for transparency and auditing.
+                            </div>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="show-reasoning" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-label">
+                        <span>Auto-scroll</span>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                Automatically scroll to new messages as they appear in the chat. Disable if you prefer to control scrolling manually.
+                            </div>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="auto-scroll" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="settings-toggle-row">
+                    <div class="settings-toggle-label">
+                        <span>Save History</span>
+                        <div class="info-tooltip">
+                                                        <div class="info-tooltip-content">
+                                Persist conversation history in browser storage. Disable for sensitive sessions where you don't want queries saved locally.
+                            </div>
+                        </div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="save-history" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Save Settings Button -->
+                <div class="settings-actions">
+                    <button id="save-settings-btn" class="save-settings-btn" data-action="saveSettingsWithConfirmation">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <div class="version-info">SENTINEL v1.0.0</div>
+        </div>
+    </aside>
+
+    <!-- Hidden file input -->
+    <input type="file" id="file-input" accept=".pdf,.txt,.md" class="hidden" multiple>
+
+    <!-- Simple Menu Bar (Kotaemon-style) -->
+    <nav class="menu-bar" role="navigation">
+        <a href="#" class="menu-item" data-tab="files" data-action="switchMainTab" data-tab="files">Files</a>
+        <div class="menu-dropdown">
+            <a href="#" class="menu-item" data-tab="resources" data-action="toggleResourcesMenu">Resources</a>
+            <div class="menu-dropdown-content" id="resources-dropdown">
+                <a href="#" data-action="openManual">User Manual</a>
+                <a href="#" data-action="openReadme">README</a>
+            </div>
+        </div>
+        <a href="#" class="menu-item" data-action="toggleSidebar">Settings</a>
+    </nav>
+
+    <!-- Main Workspace (3-Column Kotaemon Layout) -->
+    <main class="workspace" role="main">
+        <!-- LEFT SIDEBAR: Conversations & Collections -->
+        <aside class="left-sidebar" role="complementary" aria-label="Navigation sidebar">
+            <div class="left-sidebar-header">
+                <span class="left-sidebar-title">Chats</span>
+                <button class="sidebar-action-btn" data-action="startNewChat" aria-label="New conversation">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-xs">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    New
+                </button>
+            </div>
+            <div class="left-sidebar-content">
+                <!-- Pinned Conversations -->
+                <div class="pinned-section" id="pinned-section" class="hidden">
+                    <div class="pinned-section-title">Pinned</div>
+                    <div class="conversation-list" id="pinned-list" role="list">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+
+                <!-- Conversation History - Collapsible (collapsed by default) -->
+                <div class="conversation-section collapsed" id="conversation-section">
+                    <div class="conversation-header" data-action="toggleConversationList">
+                        <div class="conversation-header-left">
+                            <span class="conversation-header-title">Recent Conversations</span>
+                            <span class="conversation-header-count" id="conversation-count">0</span>
+                        </div>
+                        <div class="conversation-header-actions">
+                            <button class="clear-history-btn" data-action="clearUnpinnedConversations" title="Clear unpinned conversations">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                            <svg class="conversation-header-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="conversation-list" id="conversation-list" role="list">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+
+                <!-- Saved Queries - Collapsible -->
+                <div class="conversation-section collapsed" id="saved-queries-section">
+                    <div class="conversation-header" data-action="toggleSavedQueriesList">
+                        <div class="conversation-header-left">
+                            <span class="conversation-header-title">Saved Queries</span>
+                            <span class="conversation-header-count" id="saved-queries-count">0</span>
+                        </div>
+                        <svg class="conversation-header-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="saved-queries-list" id="saved-queries-list" role="list">
+                        <!-- Dynamically populated -->
+                    </div>
+                    <div class="saved-queries-actions">
+                        <button class="save-query-btn" data-action="saveCurrentQuery" title="Save current query">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-xs">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            Save Query
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Upload -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-title">Quick Upload</span>
+                    </div>
+                    <div class="quick-upload" id="upload-zone" data-action="triggerFileInput" role="button" tabindex="0" aria-label="Upload files">
+                        <svg class="quick-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <div class="quick-upload-text">Drop files here</div>
+                        <div class="quick-upload-hint">Click to Upload</div>
+                    </div>
+                    <div class="upload-progress hidden" id="upload-progress-container" role="status" aria-live="polite">
+                        <div class="upload-progress-header">
+                            <span class="upload-progress-filename" id="upload-filename">Awaiting file...</span>
+                            <span class="upload-progress-percent" id="upload-percent">0%</span>
+                        </div>
+                        <progress class="upload-progress-bar" id="upload-progress-bar" value="0" max="100"></progress>
+                        <div class="upload-progress-stage" id="upload-stage">Uploading...</div>
+                    </div>
+                    <div id="upload-status"></div>
+                </div>
+
+                <!-- System Status Card -->
+                <div class="sidebar-section stats-card">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-title">System Status</span>
+                    </div>
+                    <div class="stats-card-content">
+                        <div class="stats-item">
+                            <span class="stats-indicator online" id="stats-status-dot"></span>
+                            <span class="stats-label">Status</span>
+                            <span class="stats-value" id="stats-status">Online</span>
+                        </div>
+                        <div class="stats-item">
+                            <span class="stats-label">User</span>
+                            <span class="stats-value" id="stats-user">-</span>
+                        </div>
+                        <div class="stats-item">
+                            <span class="stats-label">Context</span>
+                            <span class="stats-value" id="stats-context">-</span>
+                        </div>
+                        <div class="stats-item">
+                            <span class="stats-label">Documents</span>
+                            <span class="stats-value" id="stats-docs">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER PANEL: Chat Interface -->
+        <div class="chat-panel">
+            <!-- Minimal Chat Header -->
+            <div class="chat-header">
+                <div class="chat-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <span id="chat-title-text">New Conversation</span>
+                </div>
+                <div class="chat-controls">
+                    <button class="icon-btn" data-action="toggleSidebar" title="Settings" aria-label="Open settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </button>
+                    <button class="icon-btn" data-action="clearChat" title="Clear Chat" aria-label="Clear chat history">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Context Control Panel - Hidden, sources now shown in Information Panel -->
+            <div class="context-panel hidden" id="context-panel">
+                <div class="context-header">
+                    <span class="context-title">Uploaded this session</span>
+                    <span class="font-xs text-tertiary font-mono">
+                        <span id="context-count">0</span> documents loaded
+                    </span>
+                </div>
+                <div class="context-docs" id="context-docs">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+                <div class="welcome-state" id="welcome-state">
+                    <svg class="welcome-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                    <h2 class="welcome-title">SENTINEL Intelligence Platform</h2>
+                    <p class="welcome-subtitle" id="splash-subtitle">Loading...</p>
+
+                    <div class="welcome-features" id="splash-features">
+                        <!-- Dynamically populated per edition config -->
+                    </div>
+
+                    <p class="welcome-hint">Press <kbd>/</kbd> to focus input or <kbd>Ctrl</kbd>+<kbd>U</kbd> to upload
+                    </p>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <input type="text" class="chat-input" id="query-input" placeholder="Chat input"
+                        autocomplete="off" aria-label="Chat input">
+                    <button class="send-btn" id="send-btn" data-action="executeQuery" aria-label="Send message">
+                        Send
+                    </button>
+                    <button class="regen-btn" data-action="regenerateResponse" aria-label="Regenerate response" title="Regenerate">
+                        Regen
+                    </button>
+                </div>
+            </div>
+            </div><!-- End Chat Content -->
+        </div><!-- End Center Chat Panel -->
+
+        <!-- RIGHT PANEL: Information Panel (Kotaemon-style) -->
+        <aside class="right-panel" role="complementary" aria-label="Information panel">
+            <div class="right-panel-header">
+                <span class="right-panel-title">Information panel</span>
+                <div class="right-panel-tabs">
+                    <button class="right-panel-tab active" data-action="switchRightTab" data-tab="plot" data-tab="plot">Plot</button>
+                    <button class="right-panel-tab" data-action="switchRightTab" data-tab="source" data-tab="source">Source</button>
+                </div>
+            </div>
+
+            <!-- Plot Tab (Graph Visualization) -->
+            <div class="right-panel-content" id="right-tab-plot">
+                <!-- Knowledge Graph Container -->
+                <div class="graph-container" id="graph-container">
+                    <div id="plotly-graph" class="w-full h-full"></div>
+                    <div class="graph-placeholder" id="graph-placeholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="3"/>
+                            <circle cx="19" cy="5" r="2"/>
+                            <circle cx="5" cy="5" r="2"/>
+                            <circle cx="5" cy="19" r="2"/>
+                            <circle cx="19" cy="19" r="2"/>
+                            <line x1="14" y1="10" x2="17" y2="7"/>
+                            <line x1="10" y1="10" x2="7" y2="7"/>
+                            <line x1="7" y1="17" x2="10" y2="14"/>
+                            <line x1="17" y1="17" x2="14" y2="14"/>
+                        </svg>
+                        <div class="graph-placeholder-text">Knowledge graph will appear here</div>
+                    </div>
+                </div>
+
+                <!-- Collapsible Sources Section -->
+                <div class="info-section">
+                    <button class="info-section-header" data-action="toggleInfoSection" aria-expanded="true">
+                        <span class="info-section-toggle">▼</span>
+                        <span><strong>Sources</strong></span>
+                        <span class="info-section-score hidden" id="source-score-badge"></span>
+                    </button>
+                    <div class="info-section-content" id="sources-section-content">
+                        <div class="info-sources-list" id="info-sources-list">
+                            <div class="info-empty-state">
+                                No sources yet
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Collapsible Entity Section -->
+                <div class="info-section">
+                    <button class="info-section-header" data-action="toggleInfoSection" aria-expanded="true">
+                        <span class="info-section-toggle">▼</span>
+                        <span><strong>Entities</strong></span>
+                        <span class="info-section-score hidden" id="entity-score-badge"></span>
+                    </button>
+                    <div class="info-section-content" id="entity-section-content">
+                        <div class="info-sources-list" id="info-entities-list">
+                            <div class="info-empty-state">
+                                No entities extracted
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Source Tab (Document Viewer) -->
+            <div class="right-panel-content hidden" id="right-tab-source">
+                <!-- Source Tabs -->
+                <div class="source-tabs hidden mb-3" id="source-tabs">
+                    <!-- Dynamically populated -->
+                </div>
+
+                <div class="source-empty" id="source-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="icon-xl mb-3 opacity-50">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    <div class="font-md text-secondary mb-1">No Source Selected</div>
+                    <div class="font-sm text-tertiary">Click a citation to view source</div>
+                </div>
+
+                <div id="source-viewer-container" class="hidden">
+                    <div class="source-meta mb-3">
+                        <div class="source-info flex-col gap-1">
+                            <div class="source-info-item">
+                                <span>Source:</span>
+                                <span class="value" id="source-filename">-</span>
+                            </div>
+                            <div class="source-info-item">
+                                <span>Sector:</span>
+                                <span class="value" id="source-sector">-</span>
+                            </div>
+                            <div class="source-info-item">
+                                <span>Type:</span>
+                                <span class="value" id="source-type">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Highlight Navigation Bar -->
+                    <div class="highlight-nav hidden" id="highlight-nav" role="navigation" aria-label="Navigate highlights">
+                        <span class="highlight-nav-label">Passages:</span>
+                        <span class="highlight-nav-count" id="highlight-count">0</span>
+                        <button class="highlight-nav-btn" data-action="navigateHighlight" data-direction="prev" aria-label="Previous highlight">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <polyline points="15 18 9 12 15 6"/>
+                            </svg>
+                        </button>
+                        <button class="highlight-nav-btn" data-action="navigateHighlight" data-direction="next" aria-label="Next highlight">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                        </button>
+                        <span id="highlight-position" class="ml-auto">-</span>
+                    </div>
+                    <div class="source-viewer" id="source-viewer" class="source-viewer-constrained">
+                        Loading document content...
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div>SENTINEL Intelligence Platform v1.0.0 | &copy; 2026 Project Mercenary</div>
+        <div>Powered by AdaptiveRAG &amp; HGMem</div>
+    </footer>
+
+    <script src="js/sentinel-app.js?v=20260118r" defer></script>
+</body>
+</html>

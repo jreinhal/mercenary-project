@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.repository.UserRepository
- *  com.jreinhal.mercenary.service.AuthenticationService
- *  com.jreinhal.mercenary.service.StandardAuthenticationService
  *  jakarta.servlet.http.HttpServletRequest
  *  jakarta.servlet.http.HttpSession
  *  org.slf4j.Logger
@@ -53,6 +49,7 @@ implements AuthenticationService {
         log.info("==========================================================");
     }
 
+    @Override
     public User authenticate(HttpServletRequest request) {
         User sessionUser = this.authenticateSession(request);
         if (sessionUser != null) {
@@ -69,27 +66,27 @@ implements AuthenticationService {
             log.warn("Authentication failed: Missing credentials");
             return null;
         }
-        Optional userOpt = this.userRepository.findByUsername(username);
+        Optional<User> userOpt = this.userRepository.findByUsername(username);
         if (userOpt.isEmpty()) {
-            log.warn("Authentication failed: User '{}' not found", (Object)username);
+            log.warn("Authentication failed: User '{}' not found", username);
             return null;
         }
-        User user = (User)userOpt.get();
+        User user = userOpt.get();
         if (!user.isActive()) {
-            log.warn("Authentication failed: User '{}' is deactivated", (Object)username);
+            log.warn("Authentication failed: User '{}' is deactivated", username);
             return null;
         }
         if (user.isPendingApproval()) {
-            log.warn("Authentication failed: User '{}' pending approval", (Object)username);
+            log.warn("Authentication failed: User '{}' pending approval", username);
             return null;
         }
         if (user.getPasswordHash() != null && this.passwordEncoder.matches((CharSequence)password, user.getPasswordHash())) {
             user.setLastLoginAt(Instant.now());
-            this.userRepository.save((Object)user);
-            log.info("User '{}' authenticated successfully", (Object)username);
+            this.userRepository.save(user);
+            log.info("User '{}' authenticated successfully", username);
             return user;
         }
-        log.warn("Authentication failed: Invalid password for user '{}'", (Object)username);
+        log.warn("Authentication failed: Invalid password for user '{}'", username);
         return null;
     }
 
@@ -103,7 +100,7 @@ implements AuthenticationService {
         if (!(userIdObj instanceof String) || (userId = (String)userIdObj).isBlank()) {
             return null;
         }
-        Optional userOpt = this.userRepository.findById((Object)userId);
+        Optional userOpt = this.userRepository.findById(userId);
         if (userOpt.isEmpty()) {
             session.removeAttribute(SESSION_USER_ID);
             return null;
@@ -134,7 +131,7 @@ implements AuthenticationService {
             String password = values[1];
             User user = this.authenticateCredentials(username, password);
             if (user != null) {
-                log.info("User '{}' authenticated successfully via Basic Auth", (Object)username);
+                log.info("User '{}' authenticated successfully via Basic Auth", username);
             }
             return user;
         }
@@ -148,8 +145,8 @@ implements AuthenticationService {
         }
     }
 
+    @Override
     public String getAuthMode() {
         return "STANDARD";
     }
 }
-

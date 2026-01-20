@@ -2,21 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.controller.FeedbackController
- *  com.jreinhal.mercenary.controller.FeedbackController$CategoryInfo
- *  com.jreinhal.mercenary.controller.FeedbackController$NegativeFeedbackRequest
- *  com.jreinhal.mercenary.controller.FeedbackController$PositiveFeedbackRequest
- *  com.jreinhal.mercenary.controller.FeedbackController$ResolveRequest
- *  com.jreinhal.mercenary.filter.SecurityContext
- *  com.jreinhal.mercenary.model.Feedback
- *  com.jreinhal.mercenary.model.Feedback$FeedbackCategory
- *  com.jreinhal.mercenary.model.Feedback$FeedbackType
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.service.FeedbackService
- *  com.jreinhal.mercenary.service.FeedbackService$FeedbackAnalytics
- *  com.jreinhal.mercenary.service.FeedbackService$FeedbackResult
- *  com.jreinhal.mercenary.service.FeedbackService$TrainingExample
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.data.domain.Page
@@ -32,7 +17,6 @@
  */
 package com.jreinhal.mercenary.controller;
 
-import com.jreinhal.mercenary.controller.FeedbackController;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.Feedback;
 import com.jreinhal.mercenary.model.User;
@@ -40,6 +24,7 @@ import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.service.FeedbackService;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -73,8 +58,8 @@ public class FeedbackController {
         String username = user.getDisplayName();
         String sector = user.getAllowedSectors().stream().findFirst().map(Enum::name).orElse(null);
         FeedbackService.FeedbackResult result = this.feedbackService.submitPositiveFeedback(userId, username, sector, request.messageId(), request.query(), request.response(), request.ragMetadata());
-        log.debug("Positive feedback submitted: messageId={}, user={}", (Object)request.messageId(), (Object)userId);
-        return ResponseEntity.ok((Object)result);
+        log.debug("Positive feedback submitted: messageId={}, user={}", request.messageId(), userId);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping(value={"/negative"})
@@ -88,14 +73,14 @@ public class FeedbackController {
         String username = user.getDisplayName();
         String sector = user.getAllowedSectors().stream().findFirst().map(Enum::name).orElse(null);
         try {
-            category = Feedback.FeedbackCategory.valueOf((String)request.category().toUpperCase());
+            category = Feedback.FeedbackCategory.valueOf(request.category().toUpperCase());
         }
         catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
         FeedbackService.FeedbackResult result = this.feedbackService.submitNegativeFeedback(userId, username, sector, request.messageId(), request.query(), request.response(), category, request.comments(), request.ragMetadata());
         log.info("Negative feedback submitted: messageId={}, category={}, user={}", new Object[]{request.messageId(), category, userId});
-        return ResponseEntity.ok((Object)result);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping(value={"/analytics"})
@@ -108,25 +93,25 @@ public class FeedbackController {
         String userId = user.getId();
         String userSector = user.getAllowedSectors().stream().findFirst().map(Enum::name).orElse(null);
         if (!user.hasRole(UserRole.ADMIN) && sector != null && !sector.equals(userSector)) {
-            log.warn("User {} attempted to access analytics for sector {} without permission", (Object)userId, (Object)sector);
+            log.warn("User {} attempted to access analytics for sector {} without permission", userId, sector);
             sector = userSector;
         }
         FeedbackService.FeedbackAnalytics analytics = this.feedbackService.getAnalytics(sector, days);
-        return ResponseEntity.ok((Object)analytics);
+        return ResponseEntity.ok(analytics);
     }
 
     @GetMapping(value={"/issues"})
     @PreAuthorize(value="hasRole('ADMIN') or hasRole('ANALYST')")
     public ResponseEntity<Page<Feedback>> getOpenIssues(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) {
-        Page issues = this.feedbackService.getOpenIssues(page, size);
-        return ResponseEntity.ok((Object)issues);
+        Page<Feedback> issues = this.feedbackService.getOpenIssues(page, size);
+        return ResponseEntity.ok(issues);
     }
 
     @GetMapping(value={"/hallucinations"})
     @PreAuthorize(value="hasRole('ADMIN') or hasRole('ANALYST')")
     public ResponseEntity<List<Feedback>> getHallucinationReports() {
-        List reports = this.feedbackService.getHallucinationReports();
-        return ResponseEntity.ok((Object)reports);
+        List<Feedback> reports = this.feedbackService.getHallucinationReports();
+        return ResponseEntity.ok(reports);
     }
 
     @PostMapping(value={"/issues/{feedbackId}/resolve"})
@@ -135,8 +120,8 @@ public class FeedbackController {
         User user = SecurityContext.getCurrentUser();
         String resolvedBy = user != null ? user.getDisplayName() : "SYSTEM";
         Feedback resolved = this.feedbackService.resolveIssue(feedbackId, resolvedBy, request.notes());
-        log.info("Issue resolved: feedbackId={}, resolvedBy={}", (Object)feedbackId, (Object)resolvedBy);
-        return ResponseEntity.ok((Object)resolved);
+        log.info("Issue resolved: feedbackId={}, resolvedBy={}", feedbackId, resolvedBy);
+        return ResponseEntity.ok(resolved);
     }
 
     @GetMapping(value={"/export/training"})
@@ -144,14 +129,14 @@ public class FeedbackController {
     public ResponseEntity<List<FeedbackService.TrainingExample>> exportTrainingData(@RequestParam(required=false) String sector, @RequestParam(defaultValue="POSITIVE") String type) {
         Feedback.FeedbackType feedbackType;
         try {
-            feedbackType = Feedback.FeedbackType.valueOf((String)type.toUpperCase());
+            feedbackType = Feedback.FeedbackType.valueOf(type.toUpperCase());
         }
         catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
-        List examples = this.feedbackService.exportTrainingData(sector, feedbackType);
+        List<FeedbackService.TrainingExample> examples = this.feedbackService.exportTrainingData(sector, feedbackType);
         log.info("Training data exported: {} examples, type={}, sector={}", new Object[]{examples.size(), feedbackType, sector != null ? sector : "all"});
-        return ResponseEntity.ok((Object)examples);
+        return ResponseEntity.ok(examples);
     }
 
     @GetMapping(value={"/categories"})
@@ -159,5 +144,16 @@ public class FeedbackController {
         List<CategoryInfo> categories = Arrays.stream(Feedback.FeedbackCategory.values()).map(c -> new CategoryInfo(c.name(), c.getDisplayName(), c.getDescription())).toList();
         return ResponseEntity.ok(categories);
     }
-}
 
+    public record PositiveFeedbackRequest(String messageId, String query, String response, Map<String, Object> ragMetadata) {
+    }
+
+    public record NegativeFeedbackRequest(String messageId, String query, String response, String category, String comments, Map<String, Object> ragMetadata) {
+    }
+
+    public record ResolveRequest(String notes) {
+    }
+
+    public record CategoryInfo(String value, String displayName, String description) {
+    }
+}

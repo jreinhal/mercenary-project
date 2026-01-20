@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.model.ClearanceLevel
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.service.AuthenticationService
  *  jakarta.servlet.http.HttpServletRequest
  */
 package com.jreinhal.mercenary.service;
@@ -30,4 +26,3 @@ public interface AuthenticationService {
 
     public String getAuthMode();
 }
-

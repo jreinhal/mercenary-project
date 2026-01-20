@@ -1,8 +1,5 @@
 /*
  * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.jreinhal.mercenary.model.ClearanceLevel
  */
 package com.jreinhal.mercenary.model;
 
@@ -39,4 +36,3 @@ public enum ClearanceLevel {
         return this.level >= required.level;
     }
 }
-

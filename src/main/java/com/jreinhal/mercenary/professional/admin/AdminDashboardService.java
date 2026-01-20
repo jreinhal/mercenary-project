@@ -2,14 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService$DocumentStats
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService$HealthStatus
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService$UsageStats
- *  com.jreinhal.mercenary.professional.admin.AdminDashboardService$UserSummary
- *  com.jreinhal.mercenary.repository.UserRepository
  *  org.bson.Document
  *  org.bson.conversions.Bson
  *  org.slf4j.Logger
@@ -24,7 +16,6 @@ package com.jreinhal.mercenary.professional.admin;
 
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
-import com.jreinhal.mercenary.professional.admin.AdminDashboardService;
 import com.jreinhal.mercenary.repository.UserRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -63,38 +54,38 @@ public class AdminDashboardService {
     }
 
     public boolean approveUser(String userId) {
-        return this.userRepository.findById((Object)userId).map(user -> {
+        return this.userRepository.findById(userId).map(user -> {
             user.setPendingApproval(false);
             user.setActive(true);
             this.userRepository.save(user);
-            log.info("Approved user: {}", (Object)user.getUsername());
+            log.info("Approved user: {}", user.getUsername());
             return true;
         }).orElse(false);
     }
 
     public boolean deactivateUser(String userId) {
-        return this.userRepository.findById((Object)userId).map(user -> {
+        return this.userRepository.findById(userId).map(user -> {
             user.setActive(false);
             this.userRepository.save(user);
-            log.info("Deactivated user: {}", (Object)user.getUsername());
+            log.info("Deactivated user: {}", user.getUsername());
             return true;
         }).orElse(false);
     }
 
     public boolean activateUser(String userId) {
-        return this.userRepository.findById((Object)userId).map(user -> {
+        return this.userRepository.findById(userId).map(user -> {
             user.setActive(true);
             this.userRepository.save(user);
-            log.info("Activated user: {}", (Object)user.getUsername());
+            log.info("Activated user: {}", user.getUsername());
             return true;
         }).orElse(false);
     }
 
     public boolean updateUserRoles(String userId, Set<UserRole> newRoles) {
-        return this.userRepository.findById((Object)userId).map(user -> {
+        return this.userRepository.findById(userId).map(user -> {
             user.setRoles(newRoles);
             this.userRepository.save(user);
-            log.info("Updated roles for user {}: {}", (Object)user.getUsername(), (Object)newRoles);
+            log.info("Updated roles for user {}: {}", user.getUsername(), newRoles);
             return true;
         }).orElse(false);
     }
@@ -106,7 +97,7 @@ public class AdminDashboardService {
         long queriesLast24h = this.countRecentEntries("chat_logs", "timestamp", 24);
         long totalDocuments = this.countCollection("vector_store");
         double avgQueryTime = this.calculateAverageQueryTime();
-        Map queriesByDay = this.getQueriesByDay(7);
+        Map<String, Long> queriesByDay = this.getQueriesByDay(7);
         return new UsageStats(totalUsers, activeUsers, totalQueries, queriesLast24h, totalDocuments, avgQueryTime, queriesByDay);
     }
 
@@ -122,7 +113,7 @@ public class AdminDashboardService {
     private long countRecentEntries(String collection, String timestampField, int hours) {
         try {
             Instant cutoff = Instant.now().minus(hours, ChronoUnit.HOURS);
-            Query query = new Query((CriteriaDefinition)Criteria.where((String)timestampField).gte((Object)cutoff));
+            Query query = new Query((CriteriaDefinition)Criteria.where((String)timestampField).gte(cutoff));
             return this.mongoTemplate.count(query, collection);
         }
         catch (Exception e) {
@@ -141,7 +132,7 @@ public class AdminDashboardService {
             Instant dayEnd = dayStart.plus(1L, ChronoUnit.DAYS);
             try {
                 Query query = new Query();
-                query.addCriteria((CriteriaDefinition)Criteria.where((String)"timestamp").gte((Object)dayStart).lt((Object)dayEnd));
+                query.addCriteria((CriteriaDefinition)Criteria.where((String)"timestamp").gte(dayStart).lt(dayEnd));
                 long count = this.mongoTemplate.count(query, "chat_logs");
                 String dateKey = dayStart.toString().substring(0, 10);
                 result.put(dateKey, count);
@@ -174,11 +165,11 @@ public class AdminDashboardService {
 
     private boolean checkMongoConnection() {
         try {
-            this.mongoTemplate.getDb().runCommand((Bson)new Document("ping", (Object)1));
+            this.mongoTemplate.getDb().runCommand((Bson)new Document("ping", 1));
             return true;
         }
         catch (Exception e) {
-            log.error("MongoDB connection check failed: {}", (Object)e.getMessage());
+            log.error("MongoDB connection check failed: {}", e.getMessage());
             return false;
         }
     }
@@ -190,5 +181,16 @@ public class AdminDashboardService {
     public DocumentStats getDocumentStats() {
         return new DocumentStats(this.countCollection("vector_store"), this.countRecentEntries("vector_store", "metadata.ingested_at", 24), Map.of("pdf", 100L, "docx", 50L, "txt", 30L), Map.of("GOVERNMENT", 80L, "FINANCE", 60L, "MEDICAL", 40L));
     }
-}
 
+    public record UsageStats(long totalUsers, long activeUsers, long totalQueries, long queriesLast24h, long totalDocuments, double avgQueryTime, Map<String, Long> queriesByDay) {
+    }
+
+    public record HealthStatus(boolean mongoConnected, boolean ollamaConnected, long memoryUsedMb, long memoryMaxMb, double cpuUsage, String uptime, List<String> warnings) {
+    }
+
+    public record DocumentStats(long totalDocuments, long documentsLast24h, Map<String, Long> documentsByType, Map<String, Long> documentsBySector) {
+    }
+
+    public record UserSummary(String id, String username, String displayName, Set<UserRole> roles, boolean active, Instant lastLogin, Instant createdAt) {
+    }
+}

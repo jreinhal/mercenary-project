@@ -2,13 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.filter.SecurityContext
- *  com.jreinhal.mercenary.filter.SecurityFilter
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.model.UserRole$Permission
- *  com.jreinhal.mercenary.service.AuditService
- *  com.jreinhal.mercenary.service.AuthenticationService
  *  jakarta.servlet.FilterChain
  *  jakarta.servlet.ServletException
  *  jakarta.servlet.ServletRequest
@@ -66,7 +59,7 @@ extends OncePerRequestFilter {
     public SecurityFilter(AuthenticationService authService, AuditService auditService) {
         this.authService = authService;
         this.auditService = auditService;
-        log.info("Security filter initialized with auth mode: {}", (Object)authService.getAuthMode());
+        log.info("Security filter initialized with auth mode: {}", authService.getAuthMode());
     }
 
     /*
@@ -80,18 +73,18 @@ extends OncePerRequestFilter {
         }
         User user = this.authService.authenticate(httpRequest);
         if (user == null && "DEV".equals(this.authService.getAuthMode())) {
-            user = User.devUser((String)"DEMO_USER");
+            user = User.devUser("DEMO_USER");
         }
         if (user == null) {
-            log.warn("Authentication failed for path: {} from IP: {}", (Object)path, (Object)httpRequest.getRemoteAddr());
+            log.warn("Authentication failed for path: {} from IP: {}", path, httpRequest.getRemoteAddr());
             this.auditService.logAuthFailure("UNKNOWN", "No valid credentials", httpRequest);
             httpResponse.setStatus(401);
             httpResponse.setContentType("application/json");
             httpResponse.getWriter().write("{\"error\":\"Authentication required\"}");
             return;
         }
-        SecurityContext.setCurrentUser((User)user);
-        httpRequest.setAttribute("authenticatedUser", (Object)user);
+        SecurityContext.setCurrentUser(user);
+        httpRequest.setAttribute("authenticatedUser", user);
         this.setSpringSecurityContext(user);
         try {
             chain.doFilter((ServletRequest)httpRequest, (ServletResponse)httpResponse);
@@ -115,8 +108,8 @@ extends OncePerRequestFilter {
         if (context.getAuthentication() != null && context.getAuthentication().isAuthenticated()) {
             return;
         }
-        Collection authorities = this.buildAuthorities(user);
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken((Object)user, null, authorities);
+        Collection<GrantedAuthority> authorities = this.buildAuthorities(user);
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
         context.setAuthentication((Authentication)auth);
     }
 
@@ -132,4 +125,3 @@ extends OncePerRequestFilter {
         return authorities;
     }
 }
-

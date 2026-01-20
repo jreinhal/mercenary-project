@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.megarag.ImageAnalyzer
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$ImageAnalysis
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$ImageType
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$VisualEntity
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -47,14 +43,14 @@ public class ImageAnalyzer {
     }
 
     public MegaRagService.ImageAnalysis analyze(byte[] imageBytes, String filename) {
-        log.info("MegaRAG ImageAnalyzer: Analyzing image '{}' ({} bytes)", (Object)filename, (Object)imageBytes.length);
+        log.info("MegaRAG ImageAnalyzer: Analyzing image '{}' ({} bytes)", filename, imageBytes.length);
         try {
             MegaRagService.ImageType imageType = this.classifyImage(imageBytes);
-            log.debug("Classified as: {}", (Object)imageType);
+            log.debug("Classified as: {}", imageType);
             String description = this.generateDescription(imageBytes);
             String extractedText = this.extractText(imageBytes);
-            List entities = this.extractEntities(imageBytes);
-            Map chartData = new HashMap();
+            List<MegaRagService.VisualEntity> entities = this.extractEntities(imageBytes);
+            Map<String, Object> chartData = new HashMap<>();
             if (this.isChartType(imageType)) {
                 chartData = this.extractChartData(imageBytes);
             }
@@ -72,7 +68,7 @@ public class ImageAnalyzer {
             String response = this.callVisionModel(imageBytes, CLASSIFICATION_PROMPT);
             String classification = response.trim().toUpperCase().replace(" ", "_");
             try {
-                return MegaRagService.ImageType.valueOf((String)classification);
+                return MegaRagService.ImageType.valueOf(classification);
             }
             catch (IllegalArgumentException e) {
                 for (MegaRagService.ImageType type : MegaRagService.ImageType.values()) {
@@ -83,7 +79,7 @@ public class ImageAnalyzer {
             }
         }
         catch (Exception e) {
-            log.warn("Image classification failed: {}", (Object)e.getMessage());
+            log.warn("Image classification failed: {}", e.getMessage());
             return MegaRagService.ImageType.UNKNOWN;
         }
     }
@@ -93,7 +89,7 @@ public class ImageAnalyzer {
             return this.callVisionModel(imageBytes, DESCRIPTION_PROMPT);
         }
         catch (Exception e) {
-            log.warn("Description generation failed: {}", (Object)e.getMessage());
+            log.warn("Description generation failed: {}", e.getMessage());
             return "Visual content - analysis unavailable";
         }
     }
@@ -104,7 +100,7 @@ public class ImageAnalyzer {
             return this.callVisionModel(imageBytes, prompt);
         }
         catch (Exception e) {
-            log.warn("Text extraction failed: {}", (Object)e.getMessage());
+            log.warn("Text extraction failed: {}", e.getMessage());
             return "";
         }
     }
@@ -133,7 +129,7 @@ public class ImageAnalyzer {
             return entities;
         }
         catch (Exception e) {
-            log.warn("Entity extraction failed: {}", (Object)e.getMessage());
+            log.warn("Entity extraction failed: {}", e.getMessage());
             return List.of();
         }
     }
@@ -151,7 +147,7 @@ public class ImageAnalyzer {
             return data;
         }
         catch (Exception e) {
-            log.warn("Chart data extraction failed: {}", (Object)e.getMessage());
+            log.warn("Chart data extraction failed: {}", e.getMessage());
             return Map.of();
         }
     }
@@ -164,7 +160,7 @@ public class ImageAnalyzer {
             return response != null ? response : "";
         }
         catch (Exception e) {
-            log.warn("Vision model call failed: {}", (Object)e.getMessage());
+            log.warn("Vision model call failed: {}", e.getMessage());
             throw e;
         }
     }
@@ -173,4 +169,3 @@ public class ImageAnalyzer {
         return type == MegaRagService.ImageType.CHART_BAR || type == MegaRagService.ImageType.CHART_LINE || type == MegaRagService.ImageType.CHART_PIE;
     }
 }
-

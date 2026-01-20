@@ -2,16 +2,12 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.medical.hipaa.PhiDetectionService
- *  com.jreinhal.mercenary.medical.hipaa.PhiDetectionService$PhiMatch
- *  com.jreinhal.mercenary.medical.hipaa.PhiDetectionService$PhiType
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.stereotype.Service
  */
 package com.jreinhal.mercenary.medical.hipaa;
 
-import com.jreinhal.mercenary.medical.hipaa.PhiDetectionService;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -47,7 +43,7 @@ public class PhiDetectionService {
         matches.addAll(this.findMatches(text, IP_PATTERN, PhiType.IP_ADDRESS, 0.9));
         matches.addAll(this.findMatches(text, MRN_PATTERN, PhiType.MRN, 0.85));
         matches.addAll(this.findMatches(text, URL_PATTERN, PhiType.URL, 0.8));
-        log.debug("PHI detection found {} potential identifiers", (Object)matches.size());
+        log.debug("PHI detection found {} potential identifiers", matches.size());
         return matches;
     }
 
@@ -56,7 +52,7 @@ public class PhiDetectionService {
     }
 
     public Map<PhiType, Integer> countPhiByType(String text) {
-        List matches = this.detectPhi(text);
+        List<PhiMatch> matches = this.detectPhi(text);
         EnumMap<PhiType, Integer> counts = new EnumMap<PhiType, Integer>(PhiType.class);
         for (PhiMatch match : matches) {
             counts.merge(match.type(), 1, Integer::sum);
@@ -68,7 +64,7 @@ public class PhiDetectionService {
         if (text == null) {
             return null;
         }
-        List matches = this.detectPhi(text);
+        List<PhiMatch> matches = this.detectPhi(text);
         matches.sort((a, b) -> Integer.compare(b.startIndex(), a.startIndex()));
         StringBuilder result = new StringBuilder(text);
         for (PhiMatch match : matches) {
@@ -88,14 +84,46 @@ public class PhiDetectionService {
     }
 
     public String getPhiSummary(String text) {
-        List matches = this.detectPhi(text);
+        List<PhiMatch> matches = this.detectPhi(text);
         if (matches.isEmpty()) {
             return "No PHI detected";
         }
-        Map counts = this.countPhiByType(text);
+        Map<PhiType, Integer> counts = this.countPhiByType(text);
         StringBuilder summary = new StringBuilder("PHI detected: ");
         counts.forEach((type, count) -> summary.append(type.getDisplayName()).append("(").append(count).append(") "));
         return summary.toString().trim();
     }
-}
 
+    public static enum PhiType {
+        SSN("Social Security Number"),
+        MRN("Medical Record Number"),
+        PHONE("Phone Number"),
+        FAX("Fax Number"),
+        EMAIL("Email Address"),
+        ADDRESS("Street Address"),
+        ZIP_CODE("ZIP Code"),
+        DATE_OF_BIRTH("Date of Birth"),
+        IP_ADDRESS("IP Address"),
+        HEALTH_PLAN_ID("Health Plan Beneficiary Number"),
+        ACCOUNT_NUMBER("Account Number"),
+        LICENSE_NUMBER("License/Certificate Number"),
+        VEHICLE_ID("Vehicle Identifier"),
+        DEVICE_ID("Device Identifier"),
+        URL("Web URL"),
+        NAME("Personal Name"),
+        UNKNOWN("Unknown Identifier");
+
+        private final String displayName;
+
+        private PhiType(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return this.displayName;
+        }
+    }
+
+    public record PhiMatch(PhiType type, String value, int startIndex, int endIndex, double confidence) {
+    }
+}

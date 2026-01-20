@@ -2,13 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.config.DataInitializer
- *  com.jreinhal.mercenary.model.ClearanceLevel
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.User$AuthProvider
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.repository.UserRepository
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.beans.factory.annotation.Value
@@ -80,7 +73,7 @@ public class DataInitializer {
                 admin.setAuthProvider(User.AuthProvider.LOCAL);
                 admin.setCreatedAt(Instant.now());
                 admin.setActive(true);
-                userRepository.save((Object)admin);
+                userRepository.save(admin);
                 log.info("==========================================================");
                 log.info("  DEFAULT ADMIN USER CREATED");
                 log.info("  Username: admin");
@@ -92,9 +85,8 @@ public class DataInitializer {
                 log.warn("  automated deployments. Default password is insecure.");
                 log.info("==========================================================");
             } else {
-                log.info("Database already initialized ({} users found)", (Object)userRepository.count());
+                log.info("Database already initialized ({} users found)", userRepository.count());
             }
         };
     }
 }
-

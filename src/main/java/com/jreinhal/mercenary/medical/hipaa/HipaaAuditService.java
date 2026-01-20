@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.medical.hipaa.HipaaAuditService
- *  com.jreinhal.mercenary.medical.hipaa.HipaaAuditService$AuditEventType
- *  com.jreinhal.mercenary.medical.hipaa.HipaaAuditService$HipaaAuditEvent
- *  com.jreinhal.mercenary.model.User
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.data.mongodb.core.MongoTemplate
@@ -13,7 +9,6 @@
  */
 package com.jreinhal.mercenary.medical.hipaa;
 
-import com.jreinhal.mercenary.medical.hipaa.HipaaAuditService;
 import com.jreinhal.mercenary.model.User;
 import java.time.Instant;
 import java.util.List;
@@ -78,7 +73,7 @@ public class HipaaAuditService {
 
     private void saveEvent(HipaaAuditEvent event) {
         try {
-            this.mongoTemplate.save((Object)event, COLLECTION_NAME);
+            this.mongoTemplate.save(event, COLLECTION_NAME);
             log.debug("HIPAA audit: {} by {} - {}", new Object[]{event.eventType(), event.username(), event.details()});
         }
         catch (Exception e) {
@@ -95,5 +90,25 @@ public class HipaaAuditService {
         sanitized = sanitized.replaceAll("\\b[A-Z]{2,3}\\d{6,10}\\b", "[MRN-REDACTED]");
         return sanitized;
     }
-}
 
+    public static enum AuditEventType {
+        PHI_ACCESS,
+        PHI_CREATE,
+        PHI_MODIFY,
+        PHI_DELETE,
+        PHI_DISCLOSURE,
+        PHI_EXPORT,
+        PHI_PRINT,
+        PHI_QUERY,
+        AUTH_SUCCESS,
+        AUTH_FAILURE,
+        PERMISSION_DENIED;
+
+    }
+
+    public record HipaaAuditEvent(AuditEventType eventType, String username, String userId, String ipAddress, Map<String, Object> details, Instant timestamp, String id) {
+        public HipaaAuditEvent(AuditEventType eventType, String username, String userId, String ipAddress, Map<String, Object> details) {
+            this(eventType, username, userId, ipAddress, details, Instant.now(), null);
+        }
+    }
+}

@@ -2,15 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.qucorag.EntityExtractor
- *  com.jreinhal.mercenary.rag.qucorag.InfiniGramClient
- *  com.jreinhal.mercenary.rag.qucorag.LlmEntityExtractor
- *  com.jreinhal.mercenary.rag.qucorag.QuCoRagService
- *  com.jreinhal.mercenary.rag.qucorag.QuCoRagService$EntityAnalysis
- *  com.jreinhal.mercenary.rag.qucorag.QuCoRagService$HallucinationResult
- *  com.jreinhal.mercenary.rag.qucorag.QuCoRagService$UncertaintyResult
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -25,7 +16,6 @@ package com.jreinhal.mercenary.rag.qucorag;
 import com.jreinhal.mercenary.rag.qucorag.EntityExtractor;
 import com.jreinhal.mercenary.rag.qucorag.InfiniGramClient;
 import com.jreinhal.mercenary.rag.qucorag.LlmEntityExtractor;
-import com.jreinhal.mercenary.rag.qucorag.QuCoRagService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -89,7 +79,7 @@ public class QuCoRagService {
             return new UncertaintyResult(0.0, List.of(), "QuCo-RAG disabled");
         }
         long startTime = System.currentTimeMillis();
-        Set entities = this.extractEntities(query);
+        Set<String> entities = this.extractEntities(query);
         if (entities.isEmpty()) {
             return new UncertaintyResult(0.0, List.of(), "No entities detected");
         }
@@ -105,7 +95,7 @@ public class QuCoRagService {
         this.reasoningTracer.addStep(ReasoningStep.StepType.UNCERTAINTY_ANALYSIS, "QuCo-RAG Query Uncertainty", String.format("Analyzed %d entities, uncertainty=%.3f (threshold=%.2f)", entities.size(), uncertaintyScore, this.uncertaintyThreshold), elapsed, Map.of("entities", entities, "uncertaintyScore", uncertaintyScore, "shouldRetrieve", uncertaintyScore >= this.uncertaintyThreshold));
         String reason = uncertaintyScore >= this.uncertaintyThreshold ? "High uncertainty - additional retrieval recommended" : "Low uncertainty - generation can proceed";
         log.info("QuCo-RAG: Query uncertainty={:.3f} for {} entities ({})", new Object[]{uncertaintyScore, entities.size(), reason});
-        return new UncertaintyResult(uncertaintyScore, new ArrayList(entities), reason);
+        return new UncertaintyResult(uncertaintyScore, new ArrayList<String>(entities), reason);
     }
 
     public HallucinationResult detectHallucinationRisk(String generatedText, String query) {
@@ -113,9 +103,9 @@ public class QuCoRagService {
             return new HallucinationResult(0.0, List.of(), false);
         }
         long startTime = System.currentTimeMillis();
-        Set generatedEntities = this.extractEntities(generatedText);
-        Set queryEntities = this.extractEntities(query);
-        HashSet novelEntities = new HashSet(generatedEntities);
+        Set<String> generatedEntities = this.extractEntities(generatedText);
+        Set<String> queryEntities = this.extractEntities(query);
+        HashSet<String> novelEntities = new HashSet<String>(generatedEntities);
         novelEntities.removeAll(queryEntities);
         if (novelEntities.isEmpty()) {
             return new HallucinationResult(0.0, List.of(), false);
@@ -125,21 +115,21 @@ public class QuCoRagService {
         }
         ArrayList<String> flaggedEntities = new ArrayList<String>();
         int verifiedCount = 0;
-        ArrayList queryEntityList = new ArrayList(queryEntities);
+        ArrayList<String> queryEntityList = new ArrayList<String>(queryEntities);
         queryEntityList.sort((a, b) -> Integer.compare(b.length(), a.length()));
         if (queryEntityList.size() > 8) {
-            queryEntityList = new ArrayList(queryEntityList.subList(0, 8));
+            queryEntityList = new ArrayList<String>(queryEntityList.subList(0, 8));
         }
-        ArrayList novelEntityList = new ArrayList(novelEntities);
+        ArrayList<String> novelEntityList = new ArrayList<String>(novelEntities);
         novelEntityList.sort((a, b) -> Integer.compare(b.length(), a.length()));
         if (novelEntityList.size() > 12) {
-            novelEntityList = new ArrayList(novelEntityList.subList(0, 12));
+            novelEntityList = new ArrayList<String>(novelEntityList.subList(0, 12));
         }
         for (String novelEntity : novelEntityList) {
             boolean hasCoOccurrence = false;
             String novelLower = novelEntity.toLowerCase();
             try {
-                List entityDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)novelEntity).withTopK(20).withSimilarityThreshold(0.4));
+                List<Document> entityDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)novelEntity).withTopK(20).withSimilarityThreshold(0.4));
                 for (Document doc : entityDocs) {
                     String contentLower;
                     String content;
@@ -159,7 +149,7 @@ public class QuCoRagService {
                 }
             }
             catch (Exception e) {
-                log.warn("Co-occurrence check failed for novel entity '{}': {}", (Object)novelEntity, (Object)e.getMessage());
+                log.warn("Co-occurrence check failed for novel entity '{}': {}", novelEntity, e.getMessage());
             }
             if (hasCoOccurrence) continue;
             flaggedEntities.add(novelEntity);
@@ -187,13 +177,13 @@ public class QuCoRagService {
 
     private EntityAnalysis analyzeEntityLocally(String entity) {
         try {
-            List matches = this.vectorStore.similaritySearch(SearchRequest.query((String)entity).withTopK(10).withSimilarityThreshold(0.5));
+            List<Document> matches = this.vectorStore.similaritySearch(SearchRequest.query((String)entity).withTopK(10).withSimilarityThreshold(0.5));
             int matchCount = matches.size();
             double uncertainty = matchCount == 0 ? 1.0 : Math.max(0.0, 1.0 - (double)matchCount / 10.0);
-            return new EntityAnalysis(entity, (long)matchCount, uncertainty, "local-corpus");
+            return new EntityAnalysis(entity, matchCount, uncertainty, "local-corpus");
         }
         catch (Exception e) {
-            log.warn("Local entity analysis failed for '{}': {}", (Object)entity, (Object)e.getMessage());
+            log.warn("Local entity analysis failed for '{}': {}", entity, e.getMessage());
             return new EntityAnalysis(entity, 0L, 0.5, "fallback");
         }
     }
@@ -206,7 +196,7 @@ public class QuCoRagService {
         try {
             String entity1Lower = entity1.toLowerCase();
             String entity2Lower = entity2.toLowerCase();
-            List entity1Docs = this.vectorStore.similaritySearch(SearchRequest.query((String)entity1).withTopK(20).withSimilarityThreshold(0.4));
+            List<Document> entity1Docs = this.vectorStore.similaritySearch(SearchRequest.query((String)entity1).withTopK(20).withSimilarityThreshold(0.4));
             long coOccurrenceCount = entity1Docs.stream().filter(doc -> {
                 String content = doc.getContent().toLowerCase();
                 return content.contains(entity1Lower) && content.contains(entity2Lower);
@@ -223,5 +213,16 @@ public class QuCoRagService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record UncertaintyResult(double uncertaintyScore, List<String> detectedEntities, String reason) {
+        public boolean isHighUncertainty(double threshold) {
+            return this.uncertaintyScore >= threshold;
+        }
+    }
+
+    private record EntityAnalysis(String entity, long frequency, double uncertaintyContribution, String source) {
+    }
+
+    public record HallucinationResult(double riskScore, List<String> flaggedEntities, boolean isHighRisk) {
+    }
+}

@@ -4,9 +4,6 @@
  * Could not load the following classes:
  *  com.github.benmanes.caffeine.cache.Cache
  *  com.github.benmanes.caffeine.cache.Caffeine
- *  com.jreinhal.mercenary.filter.PreAuthRateLimitFilter
- *  com.jreinhal.mercenary.filter.SecurityContext
- *  com.jreinhal.mercenary.service.AuditService
  *  io.github.bucket4j.Bandwidth
  *  io.github.bucket4j.Bucket
  *  io.github.bucket4j.Refill
@@ -76,14 +73,14 @@ extends OncePerRequestFilter {
             return;
         }
         String rateLimitKey = "ip:" + this.getClientIp(request);
-        Bucket bucket = (Bucket)this.bucketCache.get((Object)rateLimitKey, k -> this.createBucket(this.anonymousRpm));
+        Bucket bucket = this.bucketCache.get(rateLimitKey, k -> this.createBucket(this.anonymousRpm));
         if (bucket.tryConsume(1L)) {
             response.setHeader("X-RateLimit-Limit", String.valueOf(this.anonymousRpm));
             response.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getAvailableTokens()));
             chain.doFilter((ServletRequest)request, (ServletResponse)response);
             return;
         }
-        log.warn("Pre-auth rate limit exceeded for key: {} on path: {}", (Object)rateLimitKey, (Object)path);
+        log.warn("Pre-auth rate limit exceeded for key: {} on path: {}", rateLimitKey, path);
         this.auditService.logAccessDenied(null, path, "Pre-auth rate limit exceeded", request);
         response.setStatus(429);
         response.setContentType("application/json");
@@ -110,4 +107,3 @@ extends OncePerRequestFilter {
         return path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/images/") || path.startsWith("/fonts/") || path.equals("/favicon.ico") || path.equals("/api/health") || path.equals("/api/status") || path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs");
     }
 }
-

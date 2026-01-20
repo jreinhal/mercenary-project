@@ -2,15 +2,13 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.security.JwksKeyProvider
- *  com.jreinhal.mercenary.security.JwtValidator
- *  com.jreinhal.mercenary.security.JwtValidator$ValidationResult
  *  com.nimbusds.jose.JOSEException
  *  com.nimbusds.jose.JWSAlgorithm
  *  com.nimbusds.jose.jwk.source.JWKSource
  *  com.nimbusds.jose.proc.BadJOSEException
  *  com.nimbusds.jose.proc.JWSKeySelector
  *  com.nimbusds.jose.proc.JWSVerificationKeySelector
+ *  com.nimbusds.jose.proc.SecurityContext
  *  com.nimbusds.jwt.JWTClaimsSet
  *  com.nimbusds.jwt.SignedJWT
  *  com.nimbusds.jwt.proc.DefaultJWTProcessor
@@ -22,13 +20,13 @@
 package com.jreinhal.mercenary.security;
 
 import com.jreinhal.mercenary.security.JwksKeyProvider;
-import com.jreinhal.mercenary.security.JwtValidator;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.BadJOSEException;
 import com.nimbusds.jose.proc.JWSKeySelector;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
@@ -43,9 +41,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/*
- * Exception performing whole class analysis ignored.
- */
 @Component
 public class JwtValidator {
     private static final Logger log = LoggerFactory.getLogger(JwtValidator.class);
@@ -69,17 +64,17 @@ public class JwtValidator {
 
     public ValidationResult validate(String token) {
         if (token == null || token.isEmpty()) {
-            return ValidationResult.failure((String)"Token is null or empty");
+            return ValidationResult.failure("Token is null or empty");
         }
         try {
             SignedJWT signedJWT = SignedJWT.parse((String)token);
             JWSAlgorithm algorithm = signedJWT.getHeader().getAlgorithm();
             if (!this.isAllowedAlgorithm(algorithm)) {
-                return ValidationResult.failure((String)("Algorithm not allowed: " + String.valueOf(algorithm)));
+                return ValidationResult.failure("Algorithm not allowed: " + String.valueOf(algorithm));
             }
-            JWKSource keySource = this.keyProvider.getKeySource();
+            JWKSource<SecurityContext> keySource = this.keyProvider.getKeySource();
             if (keySource == null) {
-                return ValidationResult.failure((String)"JWKS not available - cannot validate signature");
+                return ValidationResult.failure("JWKS not available - cannot validate signature");
             }
             DefaultJWTProcessor processor = new DefaultJWTProcessor();
             JWSVerificationKeySelector keySelector = new JWSVerificationKeySelector(algorithm, keySource);
@@ -89,20 +84,20 @@ public class JwtValidator {
             if (!claimsValidation.isValid()) {
                 return claimsValidation;
             }
-            log.debug("JWT validated successfully for subject: {}", (Object)claims.getSubject());
-            return ValidationResult.success((JWTClaimsSet)claims);
+            log.debug("JWT validated successfully for subject: {}", claims.getSubject());
+            return ValidationResult.success(claims);
         }
         catch (ParseException e) {
-            log.warn("Failed to parse JWT: {}", (Object)e.getMessage());
-            return ValidationResult.failure((String)("Invalid JWT format: " + e.getMessage()));
+            log.warn("Failed to parse JWT: {}", e.getMessage());
+            return ValidationResult.failure("Invalid JWT format: " + e.getMessage());
         }
         catch (BadJOSEException e) {
-            log.warn("JWT signature verification failed: {}", (Object)e.getMessage());
-            return ValidationResult.failure((String)("Signature verification failed: " + e.getMessage()));
+            log.warn("JWT signature verification failed: {}", e.getMessage());
+            return ValidationResult.failure("Signature verification failed: " + e.getMessage());
         }
         catch (JOSEException e) {
-            log.error("JWT processing error: {}", (Object)e.getMessage());
-            return ValidationResult.failure((String)("JWT processing error: " + e.getMessage()));
+            log.error("JWT processing error: {}", e.getMessage());
+            return ValidationResult.failure("JWT processing error: " + e.getMessage());
         }
     }
 
@@ -115,31 +110,31 @@ public class JwtValidator {
         Instant now = Instant.now();
         Date expirationTime = claims.getExpirationTime();
         if (expirationTime != null && now.isAfter(expiry = expirationTime.toInstant().plusSeconds(this.clockSkewSeconds))) {
-            return ValidationResult.failure((String)"Token has expired");
+            return ValidationResult.failure("Token has expired");
         }
         Date notBeforeTime = claims.getNotBeforeTime();
         if (notBeforeTime != null && now.isBefore(notBefore = notBeforeTime.toInstant().minusSeconds(this.clockSkewSeconds))) {
-            return ValidationResult.failure((String)"Token not yet valid");
+            return ValidationResult.failure("Token not yet valid");
         }
         Date issueTime = claims.getIssueTime();
         if (issueTime != null && now.isBefore(issuedAt = issueTime.toInstant().minusSeconds(this.clockSkewSeconds))) {
-            return ValidationResult.failure((String)"Token issued in the future");
+            return ValidationResult.failure("Token issued in the future");
         }
         if (!(!this.validateIssuer || this.expectedIssuer == null || this.expectedIssuer.isEmpty() || (issuer = claims.getIssuer()) != null && issuer.equals(this.expectedIssuer))) {
-            return ValidationResult.failure((String)("Invalid issuer: " + issuer));
+            return ValidationResult.failure("Invalid issuer: " + issuer);
         }
         if (!(!this.validateAudience || this.expectedAudience == null || this.expectedAudience.isEmpty() || (audience = claims.getAudience()) != null && audience.contains(this.expectedAudience))) {
-            return ValidationResult.failure((String)"Invalid audience");
+            return ValidationResult.failure("Invalid audience");
         }
         if (claims.getSubject() == null || claims.getSubject().isEmpty()) {
-            return ValidationResult.failure((String)"Token missing subject claim");
+            return ValidationResult.failure("Token missing subject claim");
         }
-        return ValidationResult.success((JWTClaimsSet)claims);
+        return ValidationResult.success(claims);
     }
 
     private boolean isAllowedAlgorithm(JWSAlgorithm algorithm) {
         if (this.allowedAlgorithms == null || this.allowedAlgorithms.isEmpty()) {
-            return algorithm.equals((Object)JWSAlgorithm.RS256) || algorithm.equals((Object)JWSAlgorithm.RS384) || algorithm.equals((Object)JWSAlgorithm.RS512) || algorithm.equals((Object)JWSAlgorithm.ES256);
+            return algorithm.equals(JWSAlgorithm.RS256) || algorithm.equals(JWSAlgorithm.RS384) || algorithm.equals(JWSAlgorithm.RS512) || algorithm.equals(JWSAlgorithm.ES256);
         }
         HashSet<String> allowed = new HashSet<String>(Arrays.asList(this.allowedAlgorithms.split(",")));
         return allowed.contains(algorithm.getName());
@@ -152,5 +147,52 @@ public class JwtValidator {
         String[] parts = token.split("\\.");
         return parts.length == 3;
     }
-}
 
+    public static class ValidationResult {
+        private final boolean valid;
+        private final JWTClaimsSet claims;
+        private final String error;
+
+        private ValidationResult(boolean valid, JWTClaimsSet claims, String error) {
+            this.valid = valid;
+            this.claims = claims;
+            this.error = error;
+        }
+
+        public static ValidationResult success(JWTClaimsSet claims) {
+            return new ValidationResult(true, claims, null);
+        }
+
+        public static ValidationResult failure(String error) {
+            return new ValidationResult(false, null, error);
+        }
+
+        public boolean isValid() {
+            return this.valid;
+        }
+
+        public JWTClaimsSet getClaims() {
+            return this.claims;
+        }
+
+        public String getError() {
+            return this.error;
+        }
+
+        public String getSubject() {
+            return this.claims != null ? this.claims.getSubject() : null;
+        }
+
+        public String getStringClaim(String name) {
+            if (this.claims == null) {
+                return null;
+            }
+            try {
+                return this.claims.getStringClaim(name);
+            }
+            catch (ParseException e) {
+                return null;
+            }
+        }
+    }
+}

@@ -1,9 +1,5 @@
 /*
  * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.model.ClearanceLevel
  */
 package com.jreinhal.mercenary;
 
@@ -48,4 +44,3 @@ public enum Department {
         return this.requiredClearance.getLevel() > ClearanceLevel.UNCLASSIFIED.getLevel();
     }
 }
-

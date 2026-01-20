@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.miarag.MindscapeBuilder
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -46,8 +45,8 @@ public class MindscapeBuilder {
             return List.of(summary);
         }
         ArrayList<String> summaries = new ArrayList<String>();
-        List groups = this.partition(inputs, this.chunksPerSummary);
-        for (List group : groups) {
+        List<List<String>> groups = this.partition(inputs, this.chunksPerSummary);
+        for (List<String> group : groups) {
             String combinedInput = String.join((CharSequence)"\n\n---\n\n", group);
             String summary = this.summarizeGroup(combinedInput, level);
             summaries.add(summary);
@@ -97,7 +96,7 @@ public class MindscapeBuilder {
             return response != null ? response.trim() : "";
         }
         catch (Exception e) {
-            log.error("MindscapeBuilder: LLM call failed: {}", (Object)e.getMessage());
+            log.error("MindscapeBuilder: LLM call failed: {}", e.getMessage());
             return "";
         }
     }
@@ -110,4 +109,3 @@ public class MindscapeBuilder {
         return partitions;
     }
 }
-

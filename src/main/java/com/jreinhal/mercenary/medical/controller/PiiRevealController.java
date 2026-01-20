@@ -2,11 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.medical.controller.PiiRevealController
- *  com.jreinhal.mercenary.medical.controller.PiiRevealController$EmergencyRevealRequest
- *  com.jreinhal.mercenary.medical.controller.PiiRevealController$RevealRequest
- *  com.jreinhal.mercenary.medical.hipaa.HipaaAuditService
- *  com.jreinhal.mercenary.service.TokenizationVault
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.http.HttpStatus
@@ -24,7 +19,6 @@
  */
 package com.jreinhal.mercenary.medical.controller;
 
-import com.jreinhal.mercenary.medical.controller.PiiRevealController;
 import com.jreinhal.mercenary.medical.hipaa.HipaaAuditService;
 import com.jreinhal.mercenary.service.TokenizationVault;
 import java.time.Instant;
@@ -73,9 +67,9 @@ public class PiiRevealController {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid token format", "timestamp", Instant.now().toString()));
         }
         this.hipaaAuditService.logPhiAccess(userId, "PII_REVEAL_REQUEST", request.token(), request.reason(), request.breakTheGlass() != null && request.breakTheGlass() != false);
-        Optional revealedValue = this.tokenizationVault.detokenize(request.token(), userId);
+        Optional<String> revealedValue = this.tokenizationVault.detokenize(request.token(), userId);
         if (revealedValue.isEmpty()) {
-            log.warn("PII reveal failed for token {} by user {} - not found", (Object)this.maskToken(request.token()), (Object)userId);
+            log.warn("PII reveal failed for token {} by user {} - not found", this.maskToken(request.token()), userId);
             return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_FOUND).body(Map.of("error", "Token not found or expired", "timestamp", Instant.now().toString()));
         }
         this.hipaaAuditService.logPhiAccess(userId, "PII_REVEAL_SUCCESS", request.token(), request.reason(), request.breakTheGlass() != null && request.breakTheGlass() != false);
@@ -99,13 +93,13 @@ public class PiiRevealController {
             return ResponseEntity.badRequest().body(Map.of("error", "Patient ID is required for emergency access"));
         }
         log.warn("=== BREAK-THE-GLASS EMERGENCY ACCESS ===");
-        log.warn("User: {}", (Object)userId);
-        log.warn("Token: {}", (Object)this.maskToken(request.token()));
-        log.warn("Patient: {}", (Object)request.patientId());
-        log.warn("Reason: {}", (Object)request.emergencyReason());
+        log.warn("User: {}", userId);
+        log.warn("Token: {}", this.maskToken(request.token()));
+        log.warn("Patient: {}", request.patientId());
+        log.warn("Reason: {}", request.emergencyReason());
         log.warn("=========================================");
         this.hipaaAuditService.logBreakTheGlass(userId, request.token(), request.patientId(), request.emergencyReason());
-        Optional revealedValue = this.tokenizationVault.detokenize(request.token(), userId);
+        Optional<String> revealedValue = this.tokenizationVault.detokenize(request.token(), userId);
         if (revealedValue.isEmpty()) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_FOUND).body(Map.of("error", "Token not found", "timestamp", Instant.now().toString()));
         }
@@ -128,5 +122,10 @@ public class PiiRevealController {
         }
         return "[MASKED]";
     }
-}
 
+    public record RevealRequest(String token, String reason, Boolean breakTheGlass) {
+    }
+
+    public record EmergencyRevealRequest(String token, String emergencyReason, String patientId) {
+    }
+}

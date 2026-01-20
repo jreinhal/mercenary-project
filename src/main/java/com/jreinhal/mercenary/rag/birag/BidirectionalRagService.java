@@ -2,15 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.birag.BidirectionalRagService
- *  com.jreinhal.mercenary.rag.birag.BidirectionalRagService$AttributionResult
- *  com.jreinhal.mercenary.rag.birag.BidirectionalRagService$Experience
- *  com.jreinhal.mercenary.rag.birag.BidirectionalRagService$GroundingResult
- *  com.jreinhal.mercenary.rag.birag.BidirectionalRagService$NoveltyResult
- *  com.jreinhal.mercenary.rag.birag.BidirectionalRagService$ValidationResult
- *  com.jreinhal.mercenary.rag.birag.GroundingVerifier
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -30,7 +21,6 @@
  */
 package com.jreinhal.mercenary.rag.birag;
 
-import com.jreinhal.mercenary.rag.birag.BidirectionalRagService;
 import com.jreinhal.mercenary.rag.birag.GroundingVerifier;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
@@ -101,7 +91,7 @@ public class BidirectionalRagService {
         AttributionResult attribution = this.checkAttribution(response, retrievedDocs);
         NoveltyResult novelty = this.detectNovelty(response, query, retrievedDocs);
         double confidence = this.calculateConfidence(grounding, attribution, novelty);
-        ArrayList<Object> issues = new ArrayList<Object>();
+        ArrayList<String> issues = new ArrayList<String>();
         if (grounding.groundingScore() < this.groundingThreshold) {
             issues.add("Low grounding score: " + String.format("%.2f", grounding.groundingScore()));
         }
@@ -116,10 +106,10 @@ public class BidirectionalRagService {
             experience = this.createExperience(query, response, retrievedDocs, department, userId, confidence);
             if (this.autoApprove) {
                 this.storeExperience(experience);
-                log.info("BiRAG: Auto-approved experience for query: {}", (Object)this.truncate(query, 50));
+                log.info("BiRAG: Auto-approved experience for query: {}", this.truncate(query, 50));
             } else {
                 this.storePendingExperience(experience);
-                log.info("BiRAG: Experience pending approval for query: {}", (Object)this.truncate(query, 50));
+                log.info("BiRAG: Experience pending approval for query: {}", this.truncate(query, 50));
             }
         }
         long elapsed = System.currentTimeMillis() - startTime;
@@ -132,33 +122,33 @@ public class BidirectionalRagService {
         if (!this.enabled) {
             return List.of();
         }
-        Query mongoQuery = new Query((CriteriaDefinition)Criteria.where((String)"department").is((Object)department).and("status").is((Object)"APPROVED"));
+        Query mongoQuery = new Query((CriteriaDefinition)Criteria.where((String)"department").is(department).and("status").is("APPROVED"));
         mongoQuery.limit(limit * 3);
-        List candidates = this.mongoTemplate.find(mongoQuery, Experience.class, EXPERIENCE_STORE);
+        List<Experience> candidates = this.mongoTemplate.find(mongoQuery, Experience.class, EXPERIENCE_STORE);
         if (candidates.isEmpty()) {
             return List.of();
         }
-        List experienceDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(limit).withSimilarityThreshold(0.5).withFilterExpression("dept == '" + department + "' && type == 'experience'"));
-        Set relevantIds = experienceDocs.stream().map(d -> (String)d.getMetadata().get("experienceId")).filter(Objects::nonNull).collect(Collectors.toSet());
+        List<Document> experienceDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(limit).withSimilarityThreshold(0.5).withFilterExpression("dept == '" + department + "' && type == 'experience'"));
+        Set<String> relevantIds = experienceDocs.stream().map(d -> (String)d.getMetadata().get("experienceId")).filter(Objects::nonNull).collect(Collectors.toSet());
         return candidates.stream().filter(e -> relevantIds.contains(e.id())).limit(limit).toList();
     }
 
     public boolean approveExperience(String experienceId, String approvedBy) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"id").is((Object)experienceId));
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"id").is(experienceId));
         Experience pending = (Experience)this.mongoTemplate.findOne(query, Experience.class, PENDING_EXPERIENCES);
         if (pending == null) {
             return false;
         }
-        Experience approved = new Experience(pending.id(), pending.query(), pending.response(), pending.sourceDocuments(), pending.department(), pending.userId(), pending.confidence(), "APPROVED", pending.createdAt(), Long.valueOf(System.currentTimeMillis()), approvedBy);
+        Experience approved = new Experience(pending.id(), pending.query(), pending.response(), pending.sourceDocuments(), pending.department(), pending.userId(), pending.confidence(), "APPROVED", pending.createdAt(), System.currentTimeMillis(), approvedBy);
         this.storeExperience(approved);
         this.mongoTemplate.remove(query, PENDING_EXPERIENCES);
-        log.info("BiRAG: Experience {} approved by {}", (Object)experienceId, (Object)approvedBy);
+        log.info("BiRAG: Experience {} approved by {}", experienceId, approvedBy);
         return true;
     }
 
     public boolean rejectExperience(String experienceId, String rejectedBy, String reason) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"id").is((Object)experienceId));
-        Update update = new Update().set("status", (Object)"REJECTED").set("reviewedAt", (Object)System.currentTimeMillis()).set("reviewedBy", (Object)rejectedBy).set("rejectionReason", (Object)reason);
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"id").is(experienceId));
+        Update update = new Update().set("status", "REJECTED").set("reviewedAt", System.currentTimeMillis()).set("reviewedBy", rejectedBy).set("rejectionReason", reason);
         this.mongoTemplate.updateFirst(query, (UpdateDefinition)update, PENDING_EXPERIENCES);
         log.info("BiRAG: Experience {} rejected by {}: {}", new Object[]{experienceId, rejectedBy, reason});
         return true;
@@ -166,15 +156,15 @@ public class BidirectionalRagService {
 
     public List<Experience> getPendingExperiences(int limit) {
         Query query = new Query().limit(limit);
-        query.addCriteria((CriteriaDefinition)Criteria.where((String)"status").is((Object)"PENDING"));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"status").is("PENDING"));
         return this.mongoTemplate.find(query, Experience.class, PENDING_EXPERIENCES);
     }
 
     private AttributionResult checkAttribution(String response, List<Document> docs) {
-        List claims = this.extractClaims(response);
+        List<String> claims = this.extractClaims(response);
         int attributed = 0;
         ArrayList<String> unattributed = new ArrayList<String>();
-        Set docContent = docs.stream().map(Document::getContent).map(String::toLowerCase).collect(Collectors.toSet());
+        Set<String> docContent = docs.stream().map(Document::getContent).map(String::toLowerCase).collect(Collectors.toSet());
         for (String claim : claims) {
             boolean found = false;
             String claimLower = claim.toLowerCase();
@@ -240,12 +230,12 @@ public class BidirectionalRagService {
     }
 
     private Experience createExperience(String query, String response, List<Document> docs, String department, String userId, double confidence) {
-        List<String> sources = docs.stream().map(d -> d.getMetadata().getOrDefault("source", "unknown")).distinct().toList();
-        return new Experience(UUID.randomUUID().toString(), query, response, sources, department, userId, confidence, "PENDING", Long.valueOf(System.currentTimeMillis()), null, null);
+        List<String> sources = docs.stream().map(d -> String.valueOf(d.getMetadata().getOrDefault("source", "unknown"))).distinct().toList();
+        return new Experience(UUID.randomUUID().toString(), query, response, sources, department, userId, confidence, "PENDING", System.currentTimeMillis(), null, null);
     }
 
     private void storeExperience(Experience experience) {
-        this.mongoTemplate.save((Object)experience, EXPERIENCE_STORE);
+        this.mongoTemplate.save(experience, EXPERIENCE_STORE);
         Document expDoc = new Document(experience.query() + "\n\n" + experience.response());
         expDoc.getMetadata().put("experienceId", experience.id());
         expDoc.getMetadata().put("dept", experience.department());
@@ -255,7 +245,7 @@ public class BidirectionalRagService {
     }
 
     private void storePendingExperience(Experience experience) {
-        this.mongoTemplate.save((Object)experience, PENDING_EXPERIENCES);
+        this.mongoTemplate.save(experience, PENDING_EXPERIENCES);
     }
 
     private String truncate(String s, int max) {
@@ -265,5 +255,19 @@ public class BidirectionalRagService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record ValidationResult(boolean passed, double confidence, List<String> issues, String experienceId) {
+    }
+
+    public record GroundingResult(double groundingScore, List<String> groundedStatements, List<String> ungroundedStatements) {
+    }
+
+    public record AttributionResult(int attributedClaims, List<String> unattributedClaims) {
+    }
+
+    public record NoveltyResult(List<String> novelTerms, boolean hasHighRiskNovelty) {
+    }
+
+    public record Experience(String id, String query, String response, List<String> sourceDocuments, String department, String userId, double confidence, String status, Long createdAt, Long reviewedAt, String reviewedBy) {
+    }
+}

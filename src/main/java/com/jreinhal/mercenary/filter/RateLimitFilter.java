@@ -4,11 +4,6 @@
  * Could not load the following classes:
  *  com.github.benmanes.caffeine.cache.Cache
  *  com.github.benmanes.caffeine.cache.Caffeine
- *  com.jreinhal.mercenary.filter.RateLimitFilter
- *  com.jreinhal.mercenary.filter.SecurityContext
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.service.AuditService
  *  io.github.bucket4j.Bandwidth
  *  io.github.bucket4j.Bucket
  *  io.github.bucket4j.Refill
@@ -75,7 +70,6 @@ implements Filter {
     }
 
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        int allowedRpm;
         if (!this.enabled) {
             chain.doFilter(request, response);
             return;
@@ -88,13 +82,14 @@ implements Filter {
             return;
         }
         String rateLimitKey = this.getRateLimitKey(httpRequest);
-        Bucket bucket = (Bucket)this.bucketCache.get((Object)rateLimitKey, arg_0 -> this.lambda$doFilter$0(allowedRpm = this.getAllowedRpm(), arg_0));
+        int allowedRpm = this.getAllowedRpm();
+        Bucket bucket = this.bucketCache.get(rateLimitKey, k -> this.createBucket(allowedRpm));
         if (bucket.tryConsume(1L)) {
             httpResponse.setHeader("X-RateLimit-Limit", String.valueOf(allowedRpm));
             httpResponse.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getAvailableTokens()));
             chain.doFilter(request, response);
         } else {
-            log.warn("Rate limit exceeded for key: {} on path: {}", (Object)rateLimitKey, (Object)path);
+            log.warn("Rate limit exceeded for key: {} on path: {}", rateLimitKey, path);
             User user = SecurityContext.getCurrentUser();
             if (user != null) {
                 this.auditService.logAccessDenied(user, path, "Rate limit exceeded", httpRequest);
@@ -147,9 +142,4 @@ implements Filter {
     private boolean isExemptPath(String path) {
         return path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/images/") || path.startsWith("/fonts/") || path.equals("/favicon.ico") || path.equals("/api/health") || path.equals("/api/status") || path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs");
     }
-
-    private /* synthetic */ Bucket lambda$doFilter$0(int allowedRpm, String k) {
-        return this.createBucket(allowedRpm);
-    }
 }
-

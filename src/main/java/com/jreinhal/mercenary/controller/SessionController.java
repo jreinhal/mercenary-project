@@ -2,17 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.controller.SessionController
- *  com.jreinhal.mercenary.controller.SessionController$SessionResponse
- *  com.jreinhal.mercenary.filter.SecurityContext
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService
- *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService$ConversationContext
- *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService
- *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService$ActiveSession
- *  com.jreinhal.mercenary.professional.memory.SessionPersistenceService$PersistedTrace
- *  com.jreinhal.mercenary.service.AuditService
  *  jakarta.servlet.http.HttpServletRequest
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -30,7 +19,6 @@
 package com.jreinhal.mercenary.controller;
 
 import com.jreinhal.mercenary.Department;
-import com.jreinhal.mercenary.controller.SessionController;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
@@ -78,9 +66,9 @@ public class SessionController {
         String dept = department != null ? department : Department.ENTERPRISE.name();
         String sessionId = this.sessionPersistenceService.generateSessionId();
         SessionPersistenceService.ActiveSession session = this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
-        Department sector = Department.valueOf((String)dept);
+        Department sector = Department.valueOf(dept);
         this.auditService.logQuery(user, "session_create: " + sessionId, sector, "Session created", request);
-        return ResponseEntity.ok((Object)new SessionResponse(session.sessionId(), session.department(), session.createdAt().toString(), "Session created successfully"));
+        return ResponseEntity.ok(new SessionResponse(session.sessionId(), session.department(), session.createdAt().toString(), "Session created successfully"));
     }
 
     @GetMapping(value={"/{sessionId}"})
@@ -89,15 +77,15 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        Optional session = this.sessionPersistenceService.getSession(sessionId);
+        Optional<SessionPersistenceService.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
         if (session.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        if (!((SessionPersistenceService.ActiveSession)session.get()).userId().equals(user.getId())) {
+        if (!session.get().userId().equals(user.getId())) {
             this.auditService.logQuery(user, "session_access_denied: " + sessionId, Department.ENTERPRISE, "Access denied", request);
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok((Object)((SessionPersistenceService.ActiveSession)session.get()));
+        return ResponseEntity.ok(session.get());
     }
 
     @GetMapping
@@ -106,8 +94,8 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        List sessions = this.sessionPersistenceService.getUserSessions(user.getId());
-        return ResponseEntity.ok((Object)sessions);
+        List<SessionPersistenceService.ActiveSession> sessions = this.sessionPersistenceService.getUserSessions(user.getId());
+        return ResponseEntity.ok(sessions);
     }
 
     @PostMapping(value={"/{sessionId}/touch"})
@@ -118,7 +106,7 @@ public class SessionController {
         }
         String dept = department != null ? department : Department.ENTERPRISE.name();
         SessionPersistenceService.ActiveSession session = this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
-        return ResponseEntity.ok((Object)session);
+        return ResponseEntity.ok(session);
     }
 
     @DeleteMapping(value={"/{sessionId}/history"})
@@ -127,8 +115,8 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        Optional session = this.sessionPersistenceService.getSession(sessionId);
-        if (session.isEmpty() || !((SessionPersistenceService.ActiveSession)session.get()).userId().equals(user.getId())) {
+        Optional<SessionPersistenceService.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
+        if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
         this.conversationMemoryService.clearSession(user.getId(), sessionId);
@@ -142,12 +130,12 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        Optional session = this.sessionPersistenceService.getSession(sessionId);
-        if (session.isEmpty() || !((SessionPersistenceService.ActiveSession)session.get()).userId().equals(user.getId())) {
+        Optional<SessionPersistenceService.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
+        if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
         ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
-        return ResponseEntity.ok((Object)context);
+        return ResponseEntity.ok(context);
     }
 
     @GetMapping(value={"/{sessionId}/traces"})
@@ -156,12 +144,12 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        Optional session = this.sessionPersistenceService.getSession(sessionId);
-        if (session.isEmpty() || !((SessionPersistenceService.ActiveSession)session.get()).userId().equals(user.getId())) {
+        Optional<SessionPersistenceService.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
+        if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
-        List traces = this.sessionPersistenceService.getSessionTraces(sessionId);
-        return ResponseEntity.ok((Object)traces);
+        List<SessionPersistenceService.PersistedTrace> traces = this.sessionPersistenceService.getSessionTraces(sessionId);
+        return ResponseEntity.ok(traces);
     }
 
     @GetMapping(value={"/traces/{traceId}"})
@@ -170,15 +158,15 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        Optional trace = this.sessionPersistenceService.getPersistedTrace(traceId);
+        Optional<SessionPersistenceService.PersistedTrace> trace = this.sessionPersistenceService.getPersistedTrace(traceId);
         if (trace.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        if (!((SessionPersistenceService.PersistedTrace)trace.get()).userId().equals(user.getId())) {
+        if (!trace.get().userId().equals(user.getId())) {
             this.auditService.logQuery(user, "trace_access_denied: " + traceId, Department.ENTERPRISE, "Access denied", request);
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok((Object)((SessionPersistenceService.PersistedTrace)trace.get()));
+        return ResponseEntity.ok(trace.get());
     }
 
     @GetMapping(value={"/{sessionId}/export"}, produces={"application/json"})
@@ -190,17 +178,17 @@ public class SessionController {
         try {
             String json = this.sessionPersistenceService.exportSessionToJson(sessionId, user.getId());
             this.auditService.logQuery(user, "session_export: " + sessionId, Department.ENTERPRISE, "Session exported", request);
-            return ResponseEntity.ok((Object)json);
+            return ResponseEntity.ok(json);
         }
         catch (SecurityException e) {
-            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body((Object)"{\"error\": \"Access denied\"}");
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body("{\"error\": \"Access denied\"}");
         }
         catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
         catch (IOException e) {
-            log.error("Failed to export session {}: {}", (Object)sessionId, (Object)e.getMessage());
-            return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body((Object)"{\"error\": \"Export failed\"}");
+            log.error("Failed to export session {}: {}", sessionId, e.getMessage());
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body("{\"error\": \"Export failed\"}");
         }
     }
 
@@ -222,7 +210,7 @@ public class SessionController {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_FOUND).body(Map.of("error", "Session not found"));
         }
         catch (IOException e) {
-            log.error("Failed to export session to file {}: {}", (Object)sessionId, (Object)e.getMessage());
+            log.error("Failed to export session to file {}: {}", sessionId, e.getMessage());
             return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Export failed: " + e.getMessage()));
         }
     }
@@ -233,12 +221,14 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        Map stats = this.sessionPersistenceService.getStatistics();
-        List userSessions = this.sessionPersistenceService.getUserSessions(user.getId());
+        Map<String, Object> stats = this.sessionPersistenceService.getStatistics();
+        List<SessionPersistenceService.ActiveSession> userSessions = this.sessionPersistenceService.getUserSessions(user.getId());
         stats.put("userActiveSessions", userSessions.size());
         stats.put("userTotalMessages", userSessions.stream().mapToInt(SessionPersistenceService.ActiveSession::messageCount).sum());
         stats.put("userTotalTraces", userSessions.stream().mapToInt(SessionPersistenceService.ActiveSession::traceCount).sum());
-        return ResponseEntity.ok((Object)stats);
+        return ResponseEntity.ok(stats);
+    }
+
+    public record SessionResponse(String sessionId, String department, String createdAt, String message) {
     }
 }
-

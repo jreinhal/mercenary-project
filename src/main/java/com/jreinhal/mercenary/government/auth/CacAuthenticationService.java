@@ -2,14 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.government.auth.CacAuthenticationService
- *  com.jreinhal.mercenary.model.ClearanceLevel
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.User$AuthProvider
- *  com.jreinhal.mercenary.model.UserRole
- *  com.jreinhal.mercenary.repository.UserRepository
- *  com.jreinhal.mercenary.service.AuthenticationService
  *  jakarta.servlet.http.HttpServletRequest
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -47,13 +39,14 @@ implements AuthenticationService {
         log.info(">>> Ensure mutual TLS is configured on the server <<<");
     }
 
+    @Override
     public User authenticate(HttpServletRequest request) {
         X509Certificate[] certs = (X509Certificate[])request.getAttribute("jakarta.servlet.request.X509Certificate");
         String certHeader = request.getHeader("X-Client-Cert");
         String subjectDn = null;
         if (certs != null && certs.length > 0) {
             subjectDn = certs[0].getSubjectX500Principal().getName();
-            log.debug("Client certificate DN: {}", (Object)subjectDn);
+            log.debug("Client certificate DN: {}", subjectDn);
         } else if (certHeader != null && !certHeader.isEmpty()) {
             subjectDn = this.extractDnFromHeader(certHeader);
         }
@@ -63,7 +56,7 @@ implements AuthenticationService {
         }
         String commonName = this.extractCn(subjectDn);
         if (commonName == null) {
-            log.warn("No CN in certificate DN: {}", (Object)subjectDn);
+            log.warn("No CN in certificate DN: {}", subjectDn);
             return null;
         }
         User user = this.userRepository.findByExternalId(subjectDn).orElse(null);
@@ -78,15 +71,15 @@ implements AuthenticationService {
             user.setAllowedSectors(Set.of(Department.GOVERNMENT));
             user.setCreatedAt(Instant.now());
             user.setActive(true);
-            user = (User)this.userRepository.save((Object)user);
-            log.info("Auto-provisioned new CAC user: {} (requires clearance verification)", (Object)commonName);
+            user = (User)this.userRepository.save(user);
+            log.info("Auto-provisioned new CAC user: {} (requires clearance verification)", commonName);
         }
         if (!user.isActive()) {
-            log.warn("CAC user {} is deactivated", (Object)commonName);
+            log.warn("CAC user {} is deactivated", commonName);
             return null;
         }
         user.setLastLoginAt(Instant.now());
-        this.userRepository.save((Object)user);
+        this.userRepository.save(user);
         return user;
     }
 
@@ -108,8 +101,8 @@ implements AuthenticationService {
         return null;
     }
 
+    @Override
     public String getAuthMode() {
         return "CAC";
     }
 }
-

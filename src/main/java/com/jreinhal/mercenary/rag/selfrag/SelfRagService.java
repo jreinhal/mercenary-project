@@ -2,12 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.selfrag.SelfRagService
- *  com.jreinhal.mercenary.rag.selfrag.SelfRagService$ReflectedClaim
- *  com.jreinhal.mercenary.rag.selfrag.SelfRagService$ReflectionToken
- *  com.jreinhal.mercenary.rag.selfrag.SelfRagService$SelfRagResult
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -19,7 +13,6 @@
  */
 package com.jreinhal.mercenary.rag.selfrag;
 
-import com.jreinhal.mercenary.rag.selfrag.SelfRagService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -75,16 +68,16 @@ public class SelfRagService {
             rawResponse = this.chatClient.prompt().system(SELF_RAG_SYSTEM_PROMPT).user(this.buildUserPrompt(query, contextStr)).call().content();
         }
         catch (Exception e) {
-            log.error("Self-RAG generation failed: {}", (Object)e.getMessage());
+            log.error("Self-RAG generation failed: {}", e.getMessage());
             return this.standardGeneration(query, context, startTime);
         }
-        List claims = this.parseReflectionTokens(rawResponse);
+        List<ReflectedClaim> claims = this.parseReflectionTokens(rawResponse);
         List<String> uncertainClaims = claims.stream().filter(c -> c.token() == ReflectionToken.UNCERTAIN || c.token() == ReflectionToken.UNSUPPORTED).map(ReflectedClaim::claim).toList();
         double confidence = this.calculateConfidence(claims);
         boolean needsReRetrieval = this.reRetrieveOnUncertain && uncertainClaims.size() > this.maxUncertainClaims;
         String cleanResponse = this.cleanReflectionTokens(rawResponse);
         long elapsed = System.currentTimeMillis() - startTime;
-        Map<String, Long> metrics = Map.of("totalClaims", claims.size(), "supportedClaims", claims.stream().filter(c -> c.token() == ReflectionToken.SUPPORTED).count(), "inferredClaims", claims.stream().filter(c -> c.token() == ReflectionToken.INFERRED).count(), "uncertainClaims", uncertainClaims.size(), "confidence", confidence, "needsReRetrieval", needsReRetrieval, "elapsed", elapsed);
+        Map<String, Object> metrics = Map.of("totalClaims", claims.size(), "supportedClaims", claims.stream().filter(c -> c.token() == ReflectionToken.SUPPORTED).count(), "inferredClaims", claims.stream().filter(c -> c.token() == ReflectionToken.INFERRED).count(), "uncertainClaims", uncertainClaims.size(), "confidence", confidence, "needsReRetrieval", needsReRetrieval, "elapsed", elapsed);
         this.reasoningTracer.addStep(ReasoningStep.StepType.GENERATION, "Self-RAG Reflective Generation", String.format("%d claims analyzed: %.0f%% confidence, %d uncertain", claims.size(), confidence * 100.0, uncertainClaims.size()), elapsed, metrics);
         log.info("Self-RAG: {} claims, {:.0f}% confidence, {} uncertain ({}ms)", new Object[]{claims.size(), confidence * 100.0, uncertainClaims.size(), elapsed});
         return new SelfRagResult(rawResponse, cleanResponse, claims, needsReRetrieval, uncertainClaims, confidence, metrics);
@@ -96,14 +89,14 @@ public class SelfRagService {
         String verificationPrompt = "Analyze this response and verify each claim against the provided context.\nMark each claim with: [SUPPORTED], [INFERRED], [UNCERTAIN], or [UNSUPPORTED].\n\nRESPONSE TO VERIFY:\n%s\n\nCONTEXT:\n%s\n\nProvide the response with reflection tokens added:\n".formatted(response, contextStr);
         try {
             String verifiedResponse = this.chatClient.prompt().system("You verify claims against provided context.").user(verificationPrompt).call().content();
-            List claims = this.parseReflectionTokens(verifiedResponse);
+            List<ReflectedClaim> claims = this.parseReflectionTokens(verifiedResponse);
             List<String> uncertainClaims = claims.stream().filter(c -> c.token() == ReflectionToken.UNCERTAIN || c.token() == ReflectionToken.UNSUPPORTED).map(ReflectedClaim::claim).toList();
             double confidence = this.calculateConfidence(claims);
             long elapsed = System.currentTimeMillis() - startTime;
             return new SelfRagResult(verifiedResponse, response, claims, false, uncertainClaims, confidence, Map.of("mode", "verification", "elapsed", elapsed));
         }
         catch (Exception e) {
-            log.error("Self-RAG verification failed: {}", (Object)e.getMessage());
+            log.error("Self-RAG verification failed: {}", e.getMessage());
             return new SelfRagResult(response, response, List.of(), false, List.of(), 0.5, Map.of("error", e.getMessage()));
         }
     }
@@ -173,5 +166,18 @@ public class SelfRagService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record SelfRagResult(String response, String cleanResponse, List<ReflectedClaim> claims, boolean needsReRetrieval, List<String> uncertainClaims, double overallConfidence, Map<String, Object> metrics) {
+    }
+
+    public record ReflectedClaim(String claim, ReflectionToken token, String supportingContext, double confidence) {
+    }
+
+    public static enum ReflectionToken {
+        SUPPORTED,
+        INFERRED,
+        UNCERTAIN,
+        UNSUPPORTED;
+
+    }
+}

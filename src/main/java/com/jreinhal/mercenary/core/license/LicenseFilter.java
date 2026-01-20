@@ -2,8 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.core.license.LicenseFilter
- *  com.jreinhal.mercenary.core.license.LicenseService
  *  jakarta.servlet.FilterChain
  *  jakarta.servlet.ServletException
  *  jakarta.servlet.ServletRequest
@@ -47,7 +45,7 @@ extends OncePerRequestFilter {
         if (!this.licenseService.isValid()) {
             response.setStatus(402);
             response.setContentType("application/json");
-            response.getWriter().write("{\n    \"error\": \"LICENSE_EXPIRED\",\n    \"message\": \"Your trial has expired. Please contact sales for licensing.\",\n    \"edition\": \"%s\",\n    \"contactUrl\": \"https://sentinel-platform.com/sales\"\n}\n".formatted(this.licenseService.getEdition()));
+            response.getWriter().write("{\n    \"error\": \"LICENSE_EXPIRED\",\n    \"message\": \"Your trial has expired. Please contact sales for licensing.\",\n    \"edition\": \"%s\",\n    \"contactUrl\": \"https://sentinel-platform.com/sales\"\n}\n".formatted(new Object[]{this.licenseService.getEdition()}));
             return;
         }
         filterChain.doFilter((ServletRequest)request, (ServletResponse)response);
@@ -57,4 +55,3 @@ extends OncePerRequestFilter {
         return path.startsWith("/static/") || path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/images/") || path.equals("/") || path.equals("/index.html") || path.equals("/favicon.ico") || path.equals("/health") || path.equals("/actuator/health") || path.startsWith("/api/license");
     }
 }
-

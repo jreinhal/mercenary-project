@@ -2,9 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.professional.rag.SelfReflectiveRagService
- *  com.jreinhal.mercenary.professional.rag.SelfReflectiveRagService$ClaimVerification
- *  com.jreinhal.mercenary.professional.rag.SelfReflectiveRagService$ReflectiveResult
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -14,9 +11,7 @@
  */
 package com.jreinhal.mercenary.professional.rag;
 
-import com.jreinhal.mercenary.professional.rag.SelfReflectiveRagService;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -38,25 +33,25 @@ public class SelfReflectiveRagService {
 
     public ReflectiveResult generateWithReflection(String query, List<Document> retrievedDocs) {
         boolean hasHallucinations;
-        log.debug("Starting self-reflective RAG for query: {}", (Object)this.truncate(query, 100));
+        log.debug("Starting self-reflective RAG for query: {}", this.truncate(query, 100));
         String context = this.buildContext(retrievedDocs);
-        ArrayList<Object> warnings = new ArrayList<Object>();
+        ArrayList<String> warnings = new ArrayList<String>();
         String currentAnswer = null;
-        Collection verifications = null;
+        List<ClaimVerification> verifications = null;
         double confidence = 0.0;
         int iterations = 0;
         while (iterations < 3) {
-            currentAnswer = this.generateAnswer(query, context, currentAnswer, (List)verifications);
+            currentAnswer = this.generateAnswer(query, context, currentAnswer, verifications);
             verifications = this.verifyClaims(currentAnswer, retrievedDocs);
-            confidence = this.calculateConfidence((List)verifications);
-            log.debug("Reflection iteration {}: confidence = {}", (Object)(++iterations), (Object)confidence);
+            confidence = this.calculateConfidence(verifications);
+            log.debug("Reflection iteration {}: confidence = {}", (++iterations), confidence);
             if (confidence >= 0.75) break;
             warnings.add("Iteration " + iterations + ": confidence " + String.format("%.1f%%", confidence * 100.0) + " below threshold");
         }
         if (hasHallucinations = verifications.stream().anyMatch(v -> !v.supported() && v.confidence() < 0.3)) {
             warnings.add("WARNING: Answer may contain unsupported claims. Please verify with source documents.");
         }
-        return new ReflectiveResult(currentAnswer, (List)verifications, confidence, iterations, hasHallucinations, warnings);
+        return new ReflectiveResult(currentAnswer, verifications, confidence, iterations, hasHallucinations, warnings);
     }
 
     private String generateAnswer(String query, String context, String previousAnswer, List<ClaimVerification> previousVerifications) {
@@ -75,13 +70,13 @@ public class SelfReflectiveRagService {
             return this.chatClient.prompt().system(systemPrompt.toString()).user(userPrompt).call().content();
         }
         catch (Exception e) {
-            log.error("Error generating answer: {}", (Object)e.getMessage());
+            log.error("Error generating answer: {}", e.getMessage());
             return "Unable to generate answer: " + e.getMessage();
         }
     }
 
     private List<ClaimVerification> verifyClaims(String answer, List<Document> documents) {
-        List claims = this.extractClaims(answer);
+        List<String> claims = this.extractClaims(answer);
         ArrayList<ClaimVerification> verifications = new ArrayList<ClaimVerification>();
         for (String claim : claims) {
             ClaimVerification verification = this.verifySingleClaim(claim, documents);
@@ -97,7 +92,7 @@ public class SelfReflectiveRagService {
             return response.lines().map(String::trim).filter(line -> !line.isEmpty()).filter(line -> !line.startsWith("-")).map(line -> line.replaceFirst("^\\d+\\.\\s*", "")).toList();
         }
         catch (Exception e) {
-            log.warn("Error extracting claims: {}", (Object)e.getMessage());
+            log.warn("Error extracting claims: {}", e.getMessage());
             return List.of(answer.split("(?<=[.!?])\\s+"));
         }
     }
@@ -113,7 +108,7 @@ public class SelfReflectiveRagService {
             return this.parseVerificationResponse(claim, response);
         }
         catch (Exception e) {
-            log.warn("Error verifying claim: {}", (Object)e.getMessage());
+            log.warn("Error verifying claim: {}", e.getMessage());
             return new ClaimVerification(claim, false, "error", 0.0, "Verification failed: " + e.getMessage());
         }
     }
@@ -196,5 +191,10 @@ public class SelfReflectiveRagService {
         }
         return str.length() <= maxLength ? str : str.substring(0, maxLength) + "...";
     }
-}
 
+    public record ReflectiveResult(String answer, List<ClaimVerification> verifications, double overallConfidence, int reflectionIterations, boolean containsHallucinations, List<String> warnings) {
+    }
+
+    public record ClaimVerification(String claim, boolean supported, String sourceDocument, double confidence, String explanation) {
+    }
+}

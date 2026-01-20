@@ -2,9 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.birag.BidirectionalRagService$GroundingResult
- *  com.jreinhal.mercenary.rag.birag.GroundingVerifier
- *  com.jreinhal.mercenary.rag.birag.GroundingVerifier$VerificationScore
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -16,7 +13,6 @@
 package com.jreinhal.mercenary.rag.birag;
 
 import com.jreinhal.mercenary.rag.birag.BidirectionalRagService;
-import com.jreinhal.mercenary.rag.birag.GroundingVerifier;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -51,7 +47,7 @@ public class GroundingVerifier {
         if (response == null || response.isBlank() || documents.isEmpty()) {
             return new BidirectionalRagService.GroundingResult(0.0, List.of(), List.of(response));
         }
-        List statements = this.extractStatements(response);
+        List<String> statements = this.extractStatements(response);
         if (statements.isEmpty()) {
             return new BidirectionalRagService.GroundingResult(1.0, List.of(), List.of());
         }
@@ -93,8 +89,8 @@ public class GroundingVerifier {
     }
 
     private double calculateLexicalOverlap(String statement, String evidence) {
-        Set statementTokens = this.tokenize(statement);
-        Set evidenceTokens = this.tokenize(evidence);
+        Set<String> statementTokens = this.tokenize(statement);
+        Set<String> evidenceTokens = this.tokenize(evidence);
         if (statementTokens.isEmpty()) {
             return 0.0;
         }
@@ -130,7 +126,7 @@ public class GroundingVerifier {
             return 0.5;
         }
         catch (Exception e) {
-            log.warn("Semantic grounding check failed: {}", (Object)e.getMessage());
+            log.warn("Semantic grounding check failed: {}", e.getMessage());
             return 0.5;
         }
     }
@@ -148,5 +144,10 @@ public class GroundingVerifier {
         }
         return tokens;
     }
-}
 
+    private record VerificationScore(double combinedScore, double lexicalScore, double semanticScore) {
+        boolean isGrounded() {
+            return this.combinedScore >= 0.5;
+        }
+    }
+}

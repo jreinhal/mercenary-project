@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hybridrag.QueryExpander
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -42,14 +41,14 @@ public class QueryExpander {
         if (query == null || query.isBlank() || count <= 0) {
             return List.of();
         }
-        ArrayList variants = new ArrayList();
-        List synonymVariants = this.generateSynonymVariants(query);
+        ArrayList<String> variants = new ArrayList<String>();
+        List<String> synonymVariants = this.generateSynonymVariants(query);
         variants.addAll(synonymVariants);
-        List reformulations = this.generateReformulations(query);
+        List<String> reformulations = this.generateReformulations(query);
         variants.addAll(reformulations);
         if (this.llmExpansionEnabled && variants.size() < count) {
             int remaining = count - variants.size();
-            List llmVariants = this.generateLlmVariants(query, remaining);
+            List<String> llmVariants = this.generateLlmVariants(query, remaining);
             variants.addAll(llmVariants);
         }
         LinkedHashSet<String> seen = new LinkedHashSet<String>();
@@ -62,17 +61,17 @@ public class QueryExpander {
             if (result.size() < count) continue;
             break;
         }
-        log.debug("QueryExpander: Generated {} variants for query: '{}'", (Object)result.size(), query.length() > 50 ? query.substring(0, 50) + "..." : query);
+        log.debug("QueryExpander: Generated {} variants for query: '{}'", result.size(), query.length() > 50 ? query.substring(0, 50) + "..." : query);
         return result;
     }
 
     private List<String> generateSynonymVariants(String query) {
         ArrayList<String> variants = new ArrayList<String>();
         String lower = query.toLowerCase();
-        for (Map.Entry entry : SYNONYMS.entrySet()) {
-            String word = (String)entry.getKey();
+        for (Map.Entry<String, List<String>> entry : SYNONYMS.entrySet()) {
+            String word = entry.getKey();
             if (!lower.contains(word)) continue;
-            for (String synonym : (List)entry.getValue()) {
+            for (String synonym : entry.getValue()) {
                 String variant = query.replaceAll("(?i)\\b" + word + "\\b", synonym);
                 if (variant.equalsIgnoreCase(query)) continue;
                 variants.add(variant);
@@ -113,7 +112,7 @@ public class QueryExpander {
             return this.parseLlmVariants(response);
         }
         catch (Exception e) {
-            log.warn("LLM query expansion failed: {}", (Object)e.getMessage());
+            log.warn("LLM query expansion failed: {}", e.getMessage());
             return List.of();
         }
     }
@@ -136,4 +135,3 @@ public class QueryExpander {
         return variants;
     }
 }
-

@@ -2,11 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.service.PiiRedactionService
- *  com.jreinhal.mercenary.service.PiiRedactionService$PiiType
- *  com.jreinhal.mercenary.service.PiiRedactionService$RedactionMode
- *  com.jreinhal.mercenary.service.PiiRedactionService$RedactionResult
- *  com.jreinhal.mercenary.service.TokenizationVault
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.beans.factory.annotation.Value
@@ -14,7 +9,6 @@
  */
 package com.jreinhal.mercenary.service;
 
-import com.jreinhal.mercenary.service.PiiRedactionService;
 import com.jreinhal.mercenary.service.TokenizationVault;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -26,9 +20,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-/*
- * Exception performing whole class analysis ignored.
- */
 @Service
 public class PiiRedactionService {
     private static final Logger log = LoggerFactory.getLogger(PiiRedactionService.class);
@@ -84,7 +75,7 @@ public class PiiRedactionService {
             return new RedactionResult(content, Collections.emptyMap());
         }
         RedactionMode redactionMode = this.parseMode(this.mode);
-        EnumMap counts = new EnumMap(PiiType.class);
+        EnumMap<PiiType, Integer> counts = new EnumMap<PiiType, Integer>(PiiType.class);
         String result = content;
         if (this.redactCreditCard) {
             result = this.redactPattern(result, CREDIT_CARD_PATTERN, PiiType.CREDIT_CARD, redactionMode, counts);
@@ -123,7 +114,7 @@ public class PiiRedactionService {
         }
         RedactionResult redactionResult = new RedactionResult(result, counts);
         if (this.auditRedactions && redactionResult.hasRedactions()) {
-            log.info("PII Redaction Complete: {} items redacted {}", (Object)redactionResult.getTotalRedactions(), (Object)this.summarizeCounts(counts));
+            log.info("PII Redaction Complete: {} items redacted {}", redactionResult.getTotalRedactions(), this.summarizeCounts(counts));
         }
         return redactionResult;
     }
@@ -195,10 +186,10 @@ public class PiiRedactionService {
 
     private RedactionMode parseMode(String modeStr) {
         try {
-            return RedactionMode.valueOf((String)modeStr.toUpperCase());
+            return RedactionMode.valueOf(modeStr.toUpperCase());
         }
         catch (IllegalArgumentException e) {
-            log.warn("Invalid PII redaction mode '{}', defaulting to MASK", (Object)modeStr);
+            log.warn("Invalid PII redaction mode '{}', defaulting to MASK", modeStr);
             return RedactionMode.MASK;
         }
     }
@@ -231,5 +222,63 @@ public class PiiRedactionService {
         }
         return sum % 10 == 0;
     }
-}
 
+    public static class RedactionResult {
+        private final String redactedContent;
+        private final Map<PiiType, Integer> redactionCounts;
+        private final int totalRedactions;
+
+        public RedactionResult(String redactedContent, Map<PiiType, Integer> redactionCounts) {
+            this.redactedContent = redactedContent;
+            this.redactionCounts = Collections.unmodifiableMap(redactionCounts);
+            this.totalRedactions = redactionCounts.values().stream().mapToInt(Integer::intValue).sum();
+        }
+
+        public String getRedactedContent() {
+            return this.redactedContent;
+        }
+
+        public Map<PiiType, Integer> getRedactionCounts() {
+            return this.redactionCounts;
+        }
+
+        public int getTotalRedactions() {
+            return this.totalRedactions;
+        }
+
+        public boolean hasRedactions() {
+            return this.totalRedactions > 0;
+        }
+    }
+
+    public static enum RedactionMode {
+        MASK,
+        TOKENIZE,
+        REMOVE;
+
+    }
+
+    public static enum PiiType {
+        SSN("Social Security Number"),
+        EMAIL("Email Address"),
+        PHONE("Phone Number"),
+        CREDIT_CARD("Credit Card Number"),
+        DATE_OF_BIRTH("Date of Birth"),
+        IP_ADDRESS("IP Address"),
+        PASSPORT("Passport Number"),
+        DRIVERS_LICENSE("Driver's License"),
+        NAME("Personal Name"),
+        ADDRESS("Physical Address"),
+        MEDICAL_ID("Medical Record Number");
+
+        private final String displayName;
+
+        private PiiType(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return this.displayName;
+        }
+    }
+}

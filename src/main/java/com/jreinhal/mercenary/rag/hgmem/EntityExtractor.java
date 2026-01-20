@@ -2,16 +2,12 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hgmem.EntityExtractor
- *  com.jreinhal.mercenary.rag.hgmem.EntityExtractor$Entity
- *  com.jreinhal.mercenary.rag.hgmem.EntityExtractor$EntityType
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.stereotype.Component
  */
 package com.jreinhal.mercenary.rag.hgmem;
 
-import com.jreinhal.mercenary.rag.hgmem.EntityExtractor;
 import java.lang.invoke.CallSite;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,19 +36,19 @@ public class EntityExtractor {
         if (text == null || text.isEmpty()) {
             return List.of();
         }
-        ArrayList entities = new ArrayList();
+        ArrayList<Entity> entities = new ArrayList<Entity>();
         entities.addAll(this.extractDates(text));
         entities.addAll(this.extractTechnical(text));
         entities.addAll(this.extractReferences(text));
         entities.addAll(this.extractNamesAndOrgs(text));
-        LinkedHashMap<CallSite, Entity> deduplicated = new LinkedHashMap<CallSite, Entity>();
+        LinkedHashMap<String, Entity> deduplicated = new LinkedHashMap<String, Entity>();
         for (Entity e : entities) {
             String key = e.normalizedValue() + "_" + String.valueOf(e.type());
-            if (deduplicated.containsKey(key) && ((Entity)deduplicated.get(key)).value().length() >= e.value().length()) continue;
-            deduplicated.put((CallSite)((Object)key), e);
+            if (deduplicated.containsKey(key) && deduplicated.get(key).value().length() >= e.value().length()) continue;
+            deduplicated.put(key, e);
         }
         ArrayList<Entity> result = new ArrayList<Entity>(deduplicated.values());
-        log.debug("Extracted {} unique entities from text ({} chars)", (Object)result.size(), (Object)text.length());
+        log.debug("Extracted {} unique entities from text ({} chars)", result.size(), text.length());
         return result;
     }
 
@@ -151,5 +147,20 @@ public class EntityExtractor {
     public List<Entity> extractByType(String text, EntityType type) {
         return this.extract(text).stream().filter(e -> e.type() == type).toList();
     }
-}
 
+    public record Entity(String value, EntityType type, int startPos, int endPos) {
+        public String normalizedValue() {
+            return this.value.toLowerCase().trim();
+        }
+    }
+
+    public static enum EntityType {
+        PERSON,
+        ORGANIZATION,
+        LOCATION,
+        DATE,
+        TECHNICAL,
+        REFERENCE;
+
+    }
+}

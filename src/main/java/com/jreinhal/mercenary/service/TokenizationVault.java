@@ -2,12 +2,12 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.service.TokenizationVault
- *  com.jreinhal.mercenary.service.TokenizationVault$TokenEntry
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.beans.factory.annotation.Value
+ *  org.springframework.data.annotation.Id
  *  org.springframework.data.mongodb.core.MongoTemplate
+ *  org.springframework.data.mongodb.core.mapping.Document
  *  org.springframework.data.mongodb.core.query.Criteria
  *  org.springframework.data.mongodb.core.query.CriteriaDefinition
  *  org.springframework.data.mongodb.core.query.Query
@@ -15,11 +15,11 @@
  */
 package com.jreinhal.mercenary.service;
 
-import com.jreinhal.mercenary.service.TokenizationVault;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 import javax.crypto.Cipher;
@@ -29,7 +29,9 @@ import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.CriteriaDefinition;
 import org.springframework.data.mongodb.core.query.Query;
@@ -72,16 +74,16 @@ public class TokenizationVault {
         try {
             Query query;
             String token = this.generateToken(value, piiType);
-            if (this.storeOriginals && this.mongoTemplate.findOne(query = new Query((CriteriaDefinition)Criteria.where((String)"token").is((Object)token)), TokenEntry.class) == null) {
+            if (this.storeOriginals && this.mongoTemplate.findOne(query = new Query((CriteriaDefinition)Criteria.where((String)"token").is(token)), TokenEntry.class) == null) {
                 String encryptedValue = this.encryptValue(value);
                 TokenEntry entry = new TokenEntry(token, encryptedValue, piiType, userId);
-                this.mongoTemplate.save((Object)entry);
-                log.debug("Tokenized {} value, stored in vault", (Object)piiType);
+                this.mongoTemplate.save(entry);
+                log.debug("Tokenized {} value, stored in vault", piiType);
             }
             return token;
         }
         catch (Exception e) {
-            log.error("Tokenization failed for {}: {}", (Object)piiType, (Object)e.getMessage());
+            log.error("Tokenization failed for {}: {}", piiType, e.getMessage());
             return "[TOKENIZATION-FAILED-" + piiType + "]";
         }
     }
@@ -91,10 +93,10 @@ public class TokenizationVault {
             return Optional.empty();
         }
         try {
-            Query query = new Query((CriteriaDefinition)Criteria.where((String)"token").is((Object)token));
+            Query query = new Query((CriteriaDefinition)Criteria.where((String)"token").is(token));
             TokenEntry entry = (TokenEntry)this.mongoTemplate.findOne(query, TokenEntry.class);
             if (entry == null) {
-                log.warn("Detokenization requested for unknown token by user {}", (Object)userId);
+                log.warn("Detokenization requested for unknown token by user {}", userId);
                 return Optional.empty();
             }
             String originalValue = this.decryptValue(entry.getEncryptedValue());
@@ -102,7 +104,7 @@ public class TokenizationVault {
             return Optional.of(originalValue);
         }
         catch (Exception e) {
-            log.error("Detokenization failed: {}", (Object)e.getMessage());
+            log.error("Detokenization failed: {}", e.getMessage());
             return Optional.empty();
         }
     }
@@ -138,7 +140,7 @@ public class TokenizationVault {
             return Base64.getEncoder().encodeToString(buffer.array());
         }
         catch (Exception e) {
-            log.error("AES-256-GCM encryption failed: {}", (Object)e.getMessage());
+            log.error("AES-256-GCM encryption failed: {}", e.getMessage());
             throw new RuntimeException("Encryption failed", e);
         }
     }
@@ -159,7 +161,7 @@ public class TokenizationVault {
             return new String(plaintext, StandardCharsets.UTF_8);
         }
         catch (Exception e) {
-            log.error("AES-256-GCM decryption failed (possible tampering): {}", (Object)e.getMessage());
+            log.error("AES-256-GCM decryption failed (possible tampering): {}", e.getMessage());
             throw new RuntimeException("Decryption failed - data may have been tampered with", e);
         }
     }
@@ -169,5 +171,50 @@ public class TokenizationVault {
         new SecureRandom().nextBytes(key);
         return Base64.getEncoder().encodeToString(key);
     }
-}
 
+    @Document(collection="tokenization_vault")
+    public static class TokenEntry {
+        @Id
+        private String id;
+        private String token;
+        private String encryptedValue;
+        private String piiType;
+        private Instant createdAt;
+        private String createdBy;
+
+        public TokenEntry() {
+        }
+
+        public TokenEntry(String token, String encryptedValue, String piiType, String createdBy) {
+            this.token = token;
+            this.encryptedValue = encryptedValue;
+            this.piiType = piiType;
+            this.createdAt = Instant.now();
+            this.createdBy = createdBy;
+        }
+
+        public String getId() {
+            return this.id;
+        }
+
+        public String getToken() {
+            return this.token;
+        }
+
+        public String getEncryptedValue() {
+            return this.encryptedValue;
+        }
+
+        public String getPiiType() {
+            return this.piiType;
+        }
+
+        public Instant getCreatedAt() {
+            return this.createdAt;
+        }
+
+        public String getCreatedBy() {
+            return this.createdBy;
+        }
+    }
+}

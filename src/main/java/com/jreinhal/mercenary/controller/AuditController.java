@@ -2,12 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.controller.AuditController
- *  com.jreinhal.mercenary.filter.SecurityContext
- *  com.jreinhal.mercenary.model.AuditEvent$EventType
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.model.UserRole$Permission
- *  com.jreinhal.mercenary.service.AuditService
  *  jakarta.servlet.http.HttpServletRequest
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -51,14 +45,14 @@ public class AuditController {
     public Object getRecentEvents(@RequestParam(value="limit", defaultValue="100") int limit, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null || !user.hasPermission(UserRole.Permission.VIEW_AUDIT)) {
-            log.warn("Unauthorized audit log access attempt from: {}", (Object)(user != null ? user.getUsername() : "ANONYMOUS"));
+            log.warn("Unauthorized audit log access attempt from: {}", (user != null ? user.getUsername() : "ANONYMOUS"));
             this.auditService.logAccessDenied(user, "/api/audit/events", "Missing VIEW_AUDIT permission", request);
             return Map.of("error", "ACCESS DENIED: Audit log access requires AUDITOR role.");
         }
         if (limit > 1000) {
             limit = 1000;
         }
-        List events = this.auditService.getRecentEvents(limit);
+        List<AuditEvent> events = this.auditService.getRecentEvents(limit);
         HashMap<String, Object> response = new HashMap<String, Object>();
         response.put("count", events.size());
         response.put("events", events);
@@ -73,7 +67,7 @@ public class AuditController {
             this.auditService.logAccessDenied(user, "/api/audit/stats", "Missing VIEW_AUDIT permission", request);
             return Map.of("error", "ACCESS DENIED: Audit statistics require AUDITOR role.");
         }
-        List recentEvents = this.auditService.getRecentEvents(500);
+        List<AuditEvent> recentEvents = this.auditService.getRecentEvents(500);
         long authSuccessCount = recentEvents.stream().filter(e -> e.getEventType() == AuditEvent.EventType.AUTH_SUCCESS).count();
         long authFailCount = recentEvents.stream().filter(e -> e.getEventType() == AuditEvent.EventType.AUTH_FAILURE).count();
         long queryCount = recentEvents.stream().filter(e -> e.getEventType() == AuditEvent.EventType.QUERY_EXECUTED).count();
@@ -82,4 +76,3 @@ public class AuditController {
         return Map.of("totalEvents", recentEvents.size(), "authSuccess", authSuccessCount, "authFailure", authFailCount, "queries", queryCount, "accessDenied", accessDeniedCount, "securityAlerts", securityAlerts);
     }
 }
-

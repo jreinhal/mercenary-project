@@ -2,18 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.megarag.ImageAnalyzer
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$CrossModalEdge
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$CrossModalRetrievalResult
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$ImageAnalysis
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$ScoredDocument
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$VisualEntity
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$VisualIngestionResult
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$VisualNode
- *  com.jreinhal.mercenary.rag.megarag.VisualEntityLinker
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -32,7 +20,6 @@
 package com.jreinhal.mercenary.rag.megarag;
 
 import com.jreinhal.mercenary.rag.megarag.ImageAnalyzer;
-import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import com.jreinhal.mercenary.rag.megarag.VisualEntityLinker;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
@@ -98,13 +85,13 @@ public class MegaRagService {
         long startTime = System.currentTimeMillis();
         try {
             ImageAnalysis analysis = this.imageAnalyzer.analyze(imageBytes, filename);
-            List visualEntities = analysis.entities();
+            List<VisualEntity> visualEntities = analysis.entities();
             VisualNode node = new VisualNode(UUID.randomUUID().toString(), filename, analysis.imageType(), analysis.description(), analysis.extractedText(), visualEntities.stream().map(VisualEntity::name).toList(), department, System.currentTimeMillis());
-            this.mongoTemplate.save((Object)node, VISUAL_NODES_COLLECTION);
+            this.mongoTemplate.save(node, VISUAL_NODES_COLLECTION);
             if (contextText != null && !contextText.isBlank()) {
-                List edges = this.visualEntityLinker.linkEntities(visualEntities, contextText, node.id());
+                List<CrossModalEdge> edges = this.visualEntityLinker.linkEntities(visualEntities, contextText, node.id());
                 for (CrossModalEdge edge : edges) {
-                    this.mongoTemplate.save((Object)edge, CROSS_MODAL_EDGES_COLLECTION);
+                    this.mongoTemplate.save(edge, CROSS_MODAL_EDGES_COLLECTION);
                 }
             }
             Document visualDoc = new Document(analysis.description());
@@ -132,10 +119,10 @@ public class MegaRagService {
             return new CrossModalRetrievalResult(List.of(), List.of(), List.of());
         }
         long startTime = System.currentTimeMillis();
-        List textDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "' && type != 'visual'"));
-        List visualDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "' && type == 'visual'"));
-        Set visualNodeIds = visualDocs.stream().map(d -> (String)d.getMetadata().get("visualNodeId")).filter(Objects::nonNull).collect(Collectors.toSet());
-        List relevantEdges = new ArrayList();
+        List<Document> textDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "' && type != 'visual'"));
+        List<Document> visualDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "' && type == 'visual'"));
+        Set<String> visualNodeIds = visualDocs.stream().map(d -> (String)d.getMetadata().get("visualNodeId")).filter(Objects::nonNull).collect(Collectors.toSet());
+        List<CrossModalEdge> relevantEdges = new ArrayList<>();
         if (!visualNodeIds.isEmpty()) {
             Query edgeQuery = new Query((CriteriaDefinition)Criteria.where((String)"visualNodeId").in(visualNodeIds));
             relevantEdges = this.mongoTemplate.find(edgeQuery, CrossModalEdge.class, CROSS_MODAL_EDGES_COLLECTION);
@@ -172,7 +159,7 @@ public class MegaRagService {
         if (!textDocs.isEmpty()) {
             context.append("=== TEXT SOURCES ===\n");
             for (Document doc : textDocs) {
-                source = doc.getMetadata().getOrDefault("source", "Unknown");
+                source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown"));
                 context.append("SOURCE: ").append(source).append("\n");
                 context.append(doc.getContent()).append("\n\n");
             }
@@ -180,9 +167,9 @@ public class MegaRagService {
         if (!visualDocs.isEmpty()) {
             context.append("=== VISUAL SOURCES ===\n");
             for (Document doc : visualDocs) {
-                source = doc.getMetadata().getOrDefault("source", "Unknown");
-                String imageType = doc.getMetadata().getOrDefault("imageType", "UNKNOWN");
-                String extractedText = doc.getMetadata().getOrDefault("extractedText", "");
+                source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown"));
+                String imageType = String.valueOf(doc.getMetadata().getOrDefault("imageType", "UNKNOWN"));
+                String extractedText = String.valueOf(doc.getMetadata().getOrDefault("extractedText", ""));
                 context.append("VISUAL SOURCE: ").append(source).append(" [").append(imageType).append("]\n");
                 context.append("DESCRIPTION: ").append(doc.getContent()).append("\n");
                 if (!extractedText.isBlank()) {
@@ -197,7 +184,7 @@ public class MegaRagService {
             return response;
         }
         catch (Exception e) {
-            log.error("MegaRAG: Generation failed: {}", (Object)e.getMessage());
+            log.error("MegaRAG: Generation failed: {}", e.getMessage());
             return null;
         }
     }
@@ -205,5 +192,40 @@ public class MegaRagService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record VisualIngestionResult(boolean success, String message, List<VisualEntity> entities, String nodeId) {
+    }
+
+    public record ImageAnalysis(ImageType imageType, String description, String extractedText, List<VisualEntity> entities, Map<String, Object> chartData) {
+    }
+
+    public record VisualNode(String id, String filename, ImageType imageType, String description, String extractedText, List<String> entities, String department, long timestamp) {
+    }
+
+    public static enum ImageType {
+        CHART_BAR,
+        CHART_LINE,
+        CHART_PIE,
+        DIAGRAM_FLOWCHART,
+        DIAGRAM_ARCHITECTURE,
+        DIAGRAM_ORG_CHART,
+        MAP,
+        PHOTO,
+        SCREENSHOT,
+        TABLE,
+        UNKNOWN;
+
+    }
+
+    public record CrossModalEdge(String id, String visualNodeId, String textEntityName, String visualEntityName, double similarity, String relationshipType) {
+    }
+
+    public record CrossModalRetrievalResult(List<Document> mergedResults, List<Document> visualDocs, List<CrossModalEdge> crossModalEdges) {
+    }
+
+    public record ScoredDocument(Document document, double score, String modality) {
+    }
+
+    public record VisualEntity(String name, String type, double confidence, Map<String, Object> attributes) {
+    }
+}

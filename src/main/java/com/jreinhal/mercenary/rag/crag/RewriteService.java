@@ -2,7 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.crag.RewriteService
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -37,9 +36,8 @@ public class RewriteService {
             return rewritten;
         }
         catch (Exception e) {
-            log.warn("CRAG: Query rewrite failed: {}", (Object)e.getMessage());
+            log.warn("CRAG: Query rewrite failed: {}", e.getMessage());
             return originalQuery;
         }
     }
 }
-

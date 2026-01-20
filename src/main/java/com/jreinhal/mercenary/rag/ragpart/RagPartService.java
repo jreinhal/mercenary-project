@@ -2,13 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.ragpart.PartitionAssigner
- *  com.jreinhal.mercenary.rag.ragpart.RagPartService
- *  com.jreinhal.mercenary.rag.ragpart.RagPartService$DocumentAppearance
- *  com.jreinhal.mercenary.rag.ragpart.RagPartService$RagPartResult
- *  com.jreinhal.mercenary.rag.ragpart.SuspicionScorer
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -21,7 +14,6 @@
 package com.jreinhal.mercenary.rag.ragpart;
 
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
-import com.jreinhal.mercenary.rag.ragpart.RagPartService;
 import com.jreinhal.mercenary.rag.ragpart.SuspicionScorer;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
@@ -75,18 +67,18 @@ public class RagPartService {
     public RagPartResult retrieve(String query, String department) {
         if (!this.enabled) {
             log.debug("RAGPart disabled, performing undefended retrieval");
-            List docs = this.standardRetrieval(query, department);
+            List<Document> docs = this.standardRetrieval(query, department);
             return new RagPartResult(docs, List.of(), Map.of());
         }
         long startTime = System.currentTimeMillis();
-        log.info("RAGPart: Starting defended retrieval for query: {}", (Object)query);
-        List combinations = this.generateCombinations(this.numPartitions, this.combinationSize);
-        log.debug("RAGPart: Generated {} partition combinations", (Object)combinations.size());
+        log.info("RAGPart: Starting defended retrieval for query: {}", query);
+        List<Set<Integer>> combinations = this.generateCombinations(this.numPartitions, this.combinationSize);
+        log.debug("RAGPart: Generated {} partition combinations", combinations.size());
         HashMap<String, DocumentAppearance> documentAppearances = new HashMap<String, DocumentAppearance>();
         for (int i = 0; i < combinations.size(); ++i) {
-            Set partitionSet = (Set)combinations.get(i);
+            Set<Integer> partitionSet = combinations.get(i);
             String partitionFilter = this.buildPartitionFilter(partitionSet, department);
-            List combinationResults = this.retrieveWithFilter(query, partitionFilter);
+            List<Document> combinationResults = this.retrieveWithFilter(query, partitionFilter);
             log.debug("RAGPart: Combination {} ({}) returned {} documents", new Object[]{i + 1, partitionSet, combinationResults.size()});
             Iterator iterator = combinationResults.iterator();
             while (iterator.hasNext()) {
@@ -106,7 +98,7 @@ public class RagPartService {
                 continue;
             }
             suspiciousDocs.add(appearance.getDocument());
-            log.warn("RAGPart: Suspicious document detected (score={:.2f}): {}", (Object)score, appearance.getDocument().getMetadata().get("source"));
+            log.warn("RAGPart: Suspicious document detected (score={:.2f}): {}", score, appearance.getDocument().getMetadata().get("source"));
         }
         long duration = System.currentTimeMillis() - startTime;
         this.reasoningTracer.addStep(ReasoningStep.StepType.FILTERING, "RAGPart Defense", String.format("Analyzed %d documents across %d combinations: %d verified, %d suspicious (threshold=%.2f)", documentAppearances.size(), combinations.size(), verifiedDocs.size(), suspiciousDocs.size(), this.suspicionThreshold), duration, Map.of("totalDocuments", documentAppearances.size(), "combinations", combinations.size(), "verified", verifiedDocs.size(), "suspicious", suspiciousDocs.size(), "suspicionThreshold", this.suspicionThreshold));
@@ -116,7 +108,7 @@ public class RagPartService {
 
     private List<Set<Integer>> generateCombinations(int n, int k) {
         ArrayList<Set<Integer>> result = new ArrayList<Set<Integer>>();
-        this.generateCombinationsRecursive(result, new HashSet(), 0, n, k);
+        this.generateCombinationsRecursive(result, new HashSet<Integer>(), 0, n, k);
         return result;
     }
 
@@ -142,7 +134,7 @@ public class RagPartService {
             return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.retrievalK).withSimilarityThreshold(0.1).withFilterExpression(filter));
         }
         catch (Exception e) {
-            log.debug("RAGPart: Partition filter failed, using standard retrieval: {}", (Object)e.getMessage());
+            log.debug("RAGPart: Partition filter failed, using standard retrieval: {}", e.getMessage());
             return List.of();
         }
     }
@@ -168,5 +160,55 @@ public class RagPartService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record RagPartResult(List<Document> verifiedDocuments, List<Document> suspiciousDocuments, Map<String, Double> suspicionScores) {
+        public boolean hasSuspiciousDocuments() {
+            return !this.suspiciousDocuments.isEmpty();
+        }
+
+        public int totalDocuments() {
+            return this.verifiedDocuments.size() + this.suspiciousDocuments.size();
+        }
+    }
+
+    private static class DocumentAppearance {
+        private final Document document;
+        private final List<Integer> combinationIndices = new ArrayList<Integer>();
+        private final List<Set<Integer>> partitionSets = new ArrayList<Set<Integer>>();
+
+        DocumentAppearance(Document document) {
+            this.document = document;
+        }
+
+        void addAppearance(int combinationIndex, Set<Integer> partitionSet) {
+            this.combinationIndices.add(combinationIndex);
+            this.partitionSets.add(partitionSet);
+        }
+
+        Document getDocument() {
+            return this.document;
+        }
+
+        int getAppearanceCount() {
+            return this.combinationIndices.size();
+        }
+
+        double getPartitionVariance() {
+            if (this.partitionSets.isEmpty()) {
+                return 1.0;
+            }
+            HashMap<Integer, Integer> partitionFreq = new HashMap<Integer, Integer>();
+            for (Set<Integer> set : this.partitionSets) {
+                for (Integer p : set) {
+                    partitionFreq.merge(p, 1, Integer::sum);
+                }
+            }
+            double mean = partitionFreq.values().stream().mapToInt(Integer::intValue).average().orElse(0.0);
+            if (mean == 0.0) {
+                return 1.0;
+            }
+            double variance = partitionFreq.values().stream().mapToDouble(v -> Math.pow((double)v.intValue() - mean, 2.0)).average().orElse(0.0);
+            return Math.min(1.0, variance / (mean * mean + 1.0));
+        }
+    }
+}

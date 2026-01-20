@@ -2,14 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hgmem.EntityExtractor
- *  com.jreinhal.mercenary.rag.hgmem.EntityExtractor$Entity
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory$HGEdge
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory$HGNode
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory$HGNode$NodeType
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory$HGQueryResult
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory$HGStats
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -24,7 +16,6 @@
 package com.jreinhal.mercenary.rag.hgmem;
 
 import com.jreinhal.mercenary.rag.hgmem.EntityExtractor;
-import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,9 +37,6 @@ import org.springframework.data.mongodb.core.query.CriteriaDefinition;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
-/*
- * Exception performing whole class analysis ignored.
- */
 @Component
 public class HyperGraphMemory {
     private static final Logger log = LoggerFactory.getLogger(HyperGraphMemory.class);
@@ -79,9 +67,9 @@ public class HyperGraphMemory {
         if (!this.enabled) {
             return;
         }
-        log.debug("HGMem: Indexing document for department {}", (Object)department);
-        List entities = this.entityExtractor.extract(document.getContent());
-        log.debug("HGMem: Extracted {} entities", (Object)entities.size());
+        log.debug("HGMem: Indexing document for department {}", department);
+        List<EntityExtractor.Entity> entities = this.entityExtractor.extract(document.getContent());
+        log.debug("HGMem: Extracted {} entities", entities.size());
         ArrayList<String> nodeIds = new ArrayList<String>();
         for (EntityExtractor.Entity entity : entities) {
             HGNode node = this.findOrCreateNode(entity, department);
@@ -92,7 +80,7 @@ public class HyperGraphMemory {
         if (nodeIds.size() > 1) {
             this.createHyperedge(nodeIds, "co_occurrence", document.getMetadata().get("source"));
         }
-        log.info("HGMem: Indexed document with {} nodes and 1 hyperedge", (Object)nodeIds.size());
+        log.info("HGMem: Indexed document with {} nodes and 1 hyperedge", nodeIds.size());
     }
 
     public HGQueryResult query(String query, String department, int hops) {
@@ -100,24 +88,24 @@ public class HyperGraphMemory {
             return HGQueryResult.empty();
         }
         long startTime = System.currentTimeMillis();
-        log.debug("HGMem: Querying hypergraph for: {}", (Object)query);
-        List queryEntities = this.entityExtractor.extract(query);
-        log.debug("HGMem: Query contains {} entities", (Object)queryEntities.size());
+        log.debug("HGMem: Querying hypergraph for: {}", query);
+        List<EntityExtractor.Entity> queryEntities = this.entityExtractor.extract(query);
+        log.debug("HGMem: Query contains {} entities", queryEntities.size());
         if (queryEntities.isEmpty()) {
             return HGQueryResult.empty();
         }
-        HashSet visitedNodes = new HashSet();
-        LinkedHashSet relevantChunkIds = new LinkedHashSet();
-        HashMap entityScores = new HashMap();
+        HashSet<String> visitedNodes = new HashSet<String>();
+        LinkedHashSet<String> relevantChunkIds = new LinkedHashSet<String>();
+        HashMap<String, Double> entityScores = new HashMap<String, Double>();
         for (EntityExtractor.Entity entity : queryEntities) {
-            List matchingNodes = this.findNodesByEntity(entity, department);
+            List<HGNode> matchingNodes = this.findNodesByEntity(entity, department);
             for (HGNode node : matchingNodes) {
                 this.traverseGraph(node.getId(), hops, visitedNodes, relevantChunkIds, entityScores, 1.0);
             }
         }
-        List<HGNode> relatedChunks = relevantChunkIds.stream().map(arg_0 -> this.getNode(arg_0)).filter(Objects::nonNull).filter(n -> n.getType() == HGNode.NodeType.CHUNK).limit(this.maxMemoryPoints).toList();
+        List<HGNode> relatedChunks = relevantChunkIds.stream().map(this::getNode).filter(Objects::nonNull).filter(n -> n.getType() == HGNode.NodeType.CHUNK).limit(this.maxMemoryPoints).toList();
         long duration = System.currentTimeMillis() - startTime;
-        log.info("HGMem: Query completed in {}ms, found {} related chunks", (Object)duration, (Object)relatedChunks.size());
+        log.info("HGMem: Query completed in {}ms, found {} related chunks", duration, relatedChunks.size());
         return new HGQueryResult(relatedChunks, queryEntities.stream().map(EntityExtractor.Entity::value).toList(), entityScores, visitedNodes.size(), duration);
     }
 
@@ -136,7 +124,7 @@ public class HyperGraphMemory {
         if (node.getType() == HGNode.NodeType.ENTITY) {
             scores.merge(node.getValue(), currentScore, Math::max);
         }
-        List edges = this.findEdgesContaining(nodeId);
+        List<HGEdge> edges = this.findEdgesContaining(nodeId);
         for (HGEdge edge : edges) {
             double edgeWeight = edge.getWeight();
             for (String connectedId : edge.getNodeIds()) {
@@ -147,15 +135,15 @@ public class HyperGraphMemory {
     }
 
     private HGNode findOrCreateNode(EntityExtractor.Entity entity, String department) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"type").is((Object)HGNode.NodeType.ENTITY.name()).and("value").is((Object)entity.value()).and("entityType").is((Object)entity.type().name()).and("department").is((Object)department));
-        HGNode existing = (HGNode)this.mongoTemplate.findOne(query, HGNode.class, "hypergraph_nodes");
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"type").is(HGNode.NodeType.ENTITY.name()).and("value").is(entity.value()).and("entityType").is(entity.type().name()).and("department").is(department));
+        HGNode existing = (HGNode)this.mongoTemplate.findOne(query, HGNode.class, NODES_COLLECTION);
         if (existing != null) {
             existing.incrementReferences();
-            this.mongoTemplate.save((Object)existing, "hypergraph_nodes");
+            this.mongoTemplate.save(existing, NODES_COLLECTION);
             return existing;
         }
         HGNode node = new HGNode(UUID.randomUUID().toString(), HGNode.NodeType.ENTITY, entity.value(), entity.type(), department, null, Instant.now());
-        this.mongoTemplate.save((Object)node, "hypergraph_nodes");
+        this.mongoTemplate.save(node, NODES_COLLECTION);
         return node;
     }
 
@@ -164,32 +152,32 @@ public class HyperGraphMemory {
         String content = document.getContent();
         Object source = document.getMetadata().get("source");
         HGNode node = new HGNode(chunkId, HGNode.NodeType.CHUNK, content.length() > 200 ? content.substring(0, 200) : content, null, department, source != null ? source.toString() : null, Instant.now());
-        this.mongoTemplate.save((Object)node, "hypergraph_nodes");
+        this.mongoTemplate.save(node, NODES_COLLECTION);
         return node;
     }
 
     private void createHyperedge(List<String> nodeIds, String relation, Object source) {
         HGEdge edge = new HGEdge(UUID.randomUUID().toString(), new ArrayList<String>(nodeIds), relation, 1.0, source != null ? source.toString() : null, Instant.now());
-        this.mongoTemplate.save((Object)edge, "hypergraph_edges");
+        this.mongoTemplate.save(edge, EDGES_COLLECTION);
     }
 
     private List<HGNode> findNodesByEntity(EntityExtractor.Entity entity, String department) {
-        Query exactQuery = new Query((CriteriaDefinition)Criteria.where((String)"type").is((Object)HGNode.NodeType.ENTITY.name()).and("value").regex("^" + this.escapeRegex(entity.value()) + "$", "i").and("department").is((Object)department));
-        List results = this.mongoTemplate.find(exactQuery, HGNode.class, "hypergraph_nodes");
+        Query exactQuery = new Query((CriteriaDefinition)Criteria.where((String)"type").is(HGNode.NodeType.ENTITY.name()).and("value").regex("^" + this.escapeRegex(entity.value()) + "$", "i").and("department").is(department));
+        List results = this.mongoTemplate.find(exactQuery, HGNode.class, NODES_COLLECTION);
         if (results.isEmpty()) {
-            Query partialQuery = new Query((CriteriaDefinition)Criteria.where((String)"type").is((Object)HGNode.NodeType.ENTITY.name()).and("value").regex(this.escapeRegex(entity.value()), "i").and("department").is((Object)department));
-            results = this.mongoTemplate.find(partialQuery, HGNode.class, "hypergraph_nodes");
+            Query partialQuery = new Query((CriteriaDefinition)Criteria.where((String)"type").is(HGNode.NodeType.ENTITY.name()).and("value").regex(this.escapeRegex(entity.value()), "i").and("department").is(department));
+            results = this.mongoTemplate.find(partialQuery, HGNode.class, NODES_COLLECTION);
         }
         return results;
     }
 
     private List<HGEdge> findEdgesContaining(String nodeId) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"nodeIds").is((Object)nodeId));
-        return this.mongoTemplate.find(query, HGEdge.class, "hypergraph_edges");
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"nodeIds").is(nodeId));
+        return this.mongoTemplate.find(query, HGEdge.class, EDGES_COLLECTION);
     }
 
     private HGNode getNode(String nodeId) {
-        return (HGNode)this.mongoTemplate.findById((Object)nodeId, HGNode.class, "hypergraph_nodes");
+        return (HGNode)this.mongoTemplate.findById(nodeId, HGNode.class, NODES_COLLECTION);
     }
 
     private String escapeRegex(String text) {
@@ -201,11 +189,134 @@ public class HyperGraphMemory {
     }
 
     public HGStats getStats() {
-        long nodeCount = this.mongoTemplate.count(new Query(), "hypergraph_nodes");
-        long edgeCount = this.mongoTemplate.count(new Query(), "hypergraph_edges");
-        long entityCount = this.mongoTemplate.count(new Query((CriteriaDefinition)Criteria.where((String)"type").is((Object)HGNode.NodeType.ENTITY.name())), "hypergraph_nodes");
-        long chunkCount = this.mongoTemplate.count(new Query((CriteriaDefinition)Criteria.where((String)"type").is((Object)HGNode.NodeType.CHUNK.name())), "hypergraph_nodes");
+        long nodeCount = this.mongoTemplate.count(new Query(), NODES_COLLECTION);
+        long edgeCount = this.mongoTemplate.count(new Query(), EDGES_COLLECTION);
+        long entityCount = this.mongoTemplate.count(new Query((CriteriaDefinition)Criteria.where((String)"type").is(HGNode.NodeType.ENTITY.name())), NODES_COLLECTION);
+        long chunkCount = this.mongoTemplate.count(new Query((CriteriaDefinition)Criteria.where((String)"type").is(HGNode.NodeType.CHUNK.name())), NODES_COLLECTION);
         return new HGStats(nodeCount, edgeCount, entityCount, chunkCount);
     }
-}
 
+    public static class HGNode {
+        private String id;
+        private NodeType type;
+        private String value;
+        private EntityExtractor.EntityType entityType;
+        private String department;
+        private String sourceDoc;
+        private Instant createdAt;
+        private int referenceCount = 1;
+
+        public HGNode() {
+        }
+
+        public HGNode(String id, NodeType type, String value, EntityExtractor.EntityType entityType, String department, String sourceDoc, Instant createdAt) {
+            this.id = id;
+            this.type = type;
+            this.value = value;
+            this.entityType = entityType;
+            this.department = department;
+            this.sourceDoc = sourceDoc;
+            this.createdAt = createdAt;
+        }
+
+        public String getId() {
+            return this.id;
+        }
+
+        public NodeType getType() {
+            return this.type;
+        }
+
+        public String getValue() {
+            return this.value;
+        }
+
+        public EntityExtractor.EntityType getEntityType() {
+            return this.entityType;
+        }
+
+        public String getDepartment() {
+            return this.department;
+        }
+
+        public String getSourceDoc() {
+            return this.sourceDoc;
+        }
+
+        public Instant getCreatedAt() {
+            return this.createdAt;
+        }
+
+        public int getReferenceCount() {
+            return this.referenceCount;
+        }
+
+        public void incrementReferences() {
+            ++this.referenceCount;
+        }
+
+        public static enum NodeType {
+            ENTITY,
+            CHUNK;
+
+        }
+    }
+
+    public record HGQueryResult(List<HGNode> relatedChunks, List<String> matchedEntities, Map<String, Double> entityScores, int nodesTraversed, long queryTimeMs) {
+        public static HGQueryResult empty() {
+            return new HGQueryResult(List.of(), List.of(), Map.of(), 0, 0L);
+        }
+
+        public boolean isEmpty() {
+            return this.relatedChunks.isEmpty();
+        }
+    }
+
+    public static class HGEdge {
+        private String id;
+        private List<String> nodeIds;
+        private String relation;
+        private double weight;
+        private String sourceDoc;
+        private Instant createdAt;
+
+        public HGEdge() {
+        }
+
+        public HGEdge(String id, List<String> nodeIds, String relation, double weight, String sourceDoc, Instant createdAt) {
+            this.id = id;
+            this.nodeIds = nodeIds;
+            this.relation = relation;
+            this.weight = weight;
+            this.sourceDoc = sourceDoc;
+            this.createdAt = createdAt;
+        }
+
+        public String getId() {
+            return this.id;
+        }
+
+        public List<String> getNodeIds() {
+            return this.nodeIds;
+        }
+
+        public String getRelation() {
+            return this.relation;
+        }
+
+        public double getWeight() {
+            return this.weight;
+        }
+
+        public String getSourceDoc() {
+            return this.sourceDoc;
+        }
+
+        public Instant getCreatedAt() {
+            return this.createdAt;
+        }
+    }
+
+    public record HGStats(long totalNodes, long totalEdges, long entityNodes, long chunkNodes) {
+    }
+}

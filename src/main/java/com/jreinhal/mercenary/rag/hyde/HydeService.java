@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hyde.HydeService
- *  com.jreinhal.mercenary.rag.hyde.HydeService$HydeResult
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -19,7 +15,6 @@
  */
 package com.jreinhal.mercenary.rag.hyde;
 
-import com.jreinhal.mercenary.rag.hyde.HydeService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -67,24 +62,24 @@ public class HydeService {
         long startTime = System.currentTimeMillis();
         if (!this.enabled) {
             log.debug("HyDE disabled, performing standard retrieval");
-            List docs = this.standardRetrieval(query, department);
+            List<Document> docs = this.standardRetrieval(query, department);
             return new HydeResult(docs, null, false, Map.of("mode", "disabled"));
         }
         String hypothetical = this.generateHypothetical(query);
         long hypoTime = System.currentTimeMillis() - startTime;
         if (hypothetical == null || hypothetical.isBlank()) {
             log.warn("HyDE: Failed to generate hypothetical, falling back to standard retrieval");
-            List docs = this.standardRetrieval(query, department);
+            List<Document> docs = this.standardRetrieval(query, department);
             return new HydeResult(docs, null, false, Map.of("fallback", "hypothesis_failed"));
         }
-        log.debug("HyDE: Generated hypothetical ({}ms): {}", (Object)hypoTime, (Object)this.truncate(hypothetical, 100));
+        log.debug("HyDE: Generated hypothetical ({}ms): {}", hypoTime, this.truncate(hypothetical, 100));
         long searchStart = System.currentTimeMillis();
         List hydeResults = this.vectorStore.similaritySearch(SearchRequest.query((String)hypothetical).withTopK(this.topK).withSimilarityThreshold(this.similarityThreshold).withFilterExpression("dept == '" + department + "'"));
         long searchTime = System.currentTimeMillis() - searchStart;
-        List standardResults = this.standardRetrieval(query, department);
-        List fusedResults = this.fuseResults(hydeResults, standardResults);
+        List<Document> standardResults = this.standardRetrieval(query, department);
+        List<Document> fusedResults = this.fuseResults(hydeResults, standardResults);
         long totalTime = System.currentTimeMillis() - startTime;
-        Map<String, Long> metrics = Map.of("hypotheticalLength", hypothetical.length(), "hydeResultCount", hydeResults.size(), "standardResultCount", standardResults.size(), "fusedResultCount", fusedResults.size(), "hypoGenerationMs", hypoTime, "searchMs", searchTime, "totalMs", totalTime);
+        Map<String, Object> metrics = Map.of("hypotheticalLength", hypothetical.length(), "hydeResultCount", hydeResults.size(), "standardResultCount", standardResults.size(), "fusedResultCount", fusedResults.size(), "hypoGenerationMs", hypoTime, "searchMs", searchTime, "totalMs", totalTime);
         this.reasoningTracer.addStep(ReasoningStep.StepType.RETRIEVAL, "HyDE Enhanced Retrieval", String.format("Generated hypothetical, found %d HyDE + %d standard = %d fused results", hydeResults.size(), standardResults.size(), fusedResults.size()), totalTime, metrics);
         log.info("HyDE: {} HyDE + {} standard = {} fused results ({}ms)", new Object[]{hydeResults.size(), standardResults.size(), fusedResults.size(), totalTime});
         return new HydeResult(fusedResults, hypothetical, true, metrics);
@@ -99,7 +94,7 @@ public class HydeService {
             return response;
         }
         catch (Exception e) {
-            log.error("HyDE: Failed to generate hypothetical: {}", (Object)e.getMessage());
+            log.error("HyDE: Failed to generate hypothetical: {}", e.getMessage());
             return null;
         }
     }
@@ -109,7 +104,7 @@ public class HydeService {
             return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.topK).withSimilarityThreshold(this.similarityThreshold).withFilterExpression("dept == '" + department + "'"));
         }
         catch (Exception e) {
-            log.error("HyDE: Standard retrieval failed: {}", (Object)e.getMessage());
+            log.error("HyDE: Standard retrieval failed: {}", e.getMessage());
             return List.of();
         }
     }
@@ -165,5 +160,7 @@ public class HydeService {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record HydeResult(List<Document> documents, String hypotheticalDocument, boolean hydeApplied, Map<String, Object> metrics) {
+    }
+}

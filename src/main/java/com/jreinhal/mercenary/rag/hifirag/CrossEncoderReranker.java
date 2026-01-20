@@ -2,8 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hifirag.CrossEncoderReranker
- *  com.jreinhal.mercenary.rag.hifirag.HiFiRagService$ScoredDocument
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -55,17 +53,17 @@ public class CrossEncoderReranker {
 
     @PostConstruct
     public void init() {
-        log.info("Cross-Encoder Reranker initialized (useLlm={})", (Object)this.useLlm);
+        log.info("Cross-Encoder Reranker initialized (useLlm={})", this.useLlm);
     }
 
     public List<HiFiRagService.ScoredDocument> rerank(String query, List<Document> documents) {
         if (documents.isEmpty()) {
             return List.of();
         }
-        log.debug("Cross-encoder reranking {} documents", (Object)documents.size());
+        log.debug("Cross-encoder reranking {} documents", documents.size());
         long startTime = System.currentTimeMillis();
-        List scored = this.useLlm ? this.rerankWithLlm(query, documents) : this.rerankWithKeywords(query, documents);
-        log.debug("Reranking completed in {}ms", (Object)(System.currentTimeMillis() - startTime));
+        List<HiFiRagService.ScoredDocument> scored = this.useLlm ? this.rerankWithLlm(query, documents) : this.rerankWithKeywords(query, documents);
+        log.debug("Reranking completed in {}ms", (System.currentTimeMillis() - startTime));
         return scored.stream().sorted((a, b) -> Double.compare(b.score(), a.score())).collect(Collectors.toList());
     }
 
@@ -76,9 +74,9 @@ public class CrossEncoderReranker {
             List<Document> batch = documents.subList(i, end);
             ArrayList<Future<HiFiRagService.ScoredDocument>> futures = new ArrayList<Future<HiFiRagService.ScoredDocument>>();
             for (Document document : batch) {
-                futures.add(this.executor.submit(() -> this.scoreDocument(query, doc)));
+                futures.add(this.executor.submit(() -> this.scoreDocument(query, document)));
             }
-            for (Future future : futures) {
+            for (Future<HiFiRagService.ScoredDocument> future : futures) {
                 try {
                     HiFiRagService.ScoredDocument sd = (HiFiRagService.ScoredDocument)future.get(this.timeoutSeconds, TimeUnit.SECONDS);
                     if (sd == null) continue;
@@ -88,7 +86,7 @@ public class CrossEncoderReranker {
                     log.warn("Cross-encoder scoring timed out");
                 }
                 catch (Exception e) {
-                    log.warn("Cross-encoder scoring failed: {}", (Object)e.getMessage());
+                    log.warn("Cross-encoder scoring failed: {}", e.getMessage());
                 }
             }
         }
@@ -107,7 +105,7 @@ public class CrossEncoderReranker {
             return new HiFiRagService.ScoredDocument(doc, score);
         }
         catch (Exception e) {
-            log.debug("LLM scoring failed for document, using fallback: {}", (Object)e.getMessage());
+            log.debug("LLM scoring failed for document, using fallback: {}", e.getMessage());
             return this.scoreWithKeywords(query, doc);
         }
     }
@@ -131,7 +129,7 @@ public class CrossEncoderReranker {
     }
 
     private List<HiFiRagService.ScoredDocument> rerankWithKeywords(String query, List<Document> documents) {
-        return documents.stream().map(doc -> this.scoreWithKeywords(query, doc)).collect(Collectors.toList());
+        return documents.stream().map(doc -> this.scoreWithKeywords(query, (Document)doc)).collect(Collectors.toList());
     }
 
     private HiFiRagService.ScoredDocument scoreWithKeywords(String query, Document doc) {
@@ -159,4 +157,3 @@ public class CrossEncoderReranker {
         return new HiFiRagService.ScoredDocument(doc, score);
     }
 }
-

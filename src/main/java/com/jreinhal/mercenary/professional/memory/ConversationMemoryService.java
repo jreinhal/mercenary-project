@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService
- *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService$ConversationContext
- *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService$ConversationMessage
- *  com.jreinhal.mercenary.professional.memory.ConversationMemoryService$MessageRole
  *  com.mongodb.client.result.DeleteResult
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -19,7 +15,6 @@
  */
 package com.jreinhal.mercenary.professional.memory;
 
-import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
 import com.mongodb.client.result.DeleteResult;
 import java.time.Instant;
 import java.util.Collections;
@@ -54,7 +49,7 @@ public class ConversationMemoryService {
     }
 
     public void saveAssistantMessage(String userId, String sessionId, String content, List<String> sourceDocs) {
-        HashMap<String, List<String>> metadata = new HashMap<String, List<String>>();
+        HashMap<String, Object> metadata = new HashMap<String, Object>();
         if (sourceDocs != null && !sourceDocs.isEmpty()) {
             metadata.put("sourceDocs", sourceDocs);
         }
@@ -64,18 +59,18 @@ public class ConversationMemoryService {
     private void saveMessage(String userId, String sessionId, MessageRole role, String content, Map<String, Object> metadata) {
         ConversationMessage message = new ConversationMessage(UUID.randomUUID().toString(), userId, sessionId, role, content, Instant.now(), metadata);
         try {
-            this.mongoTemplate.save((Object)message, COLLECTION_NAME);
+            this.mongoTemplate.save(message, COLLECTION_NAME);
             log.debug("Saved {} message for user {} in session {}", new Object[]{role, userId, sessionId});
         }
         catch (Exception e) {
-            log.error("Failed to save conversation message: {}", (Object)e.getMessage());
+            log.error("Failed to save conversation message: {}", e.getMessage());
         }
     }
 
     public ConversationContext getContext(String userId, String sessionId) {
-        List messages = this.getRecentMessages(userId, sessionId);
-        List topics = this.extractTopics(messages);
-        Map sessionMeta = this.getSessionMetadata(userId, sessionId);
+        List<ConversationMessage> messages = this.getRecentMessages(userId, sessionId);
+        List<String> topics = this.extractTopics(messages);
+        Map<String, Object> sessionMeta = this.getSessionMetadata(userId, sessionId);
         String formatted = this.formatContext(messages);
         return new ConversationContext(messages, topics, sessionMeta, formatted);
     }
@@ -83,9 +78,9 @@ public class ConversationMemoryService {
     private List<ConversationMessage> getRecentMessages(String userId, String sessionId) {
         Instant cutoff = Instant.now().minusSeconds(86400L);
         Query query = new Query();
-        query.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is((Object)userId));
-        query.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is((Object)sessionId));
-        query.addCriteria((CriteriaDefinition)Criteria.where((String)"timestamp").gte((Object)cutoff));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is(userId));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"timestamp").gte(cutoff));
         query.limit(10);
         query.with(Sort.by((Sort.Direction)Sort.Direction.DESC, (String[])new String[]{"timestamp"}));
         try {
@@ -94,7 +89,7 @@ public class ConversationMemoryService {
             return messages;
         }
         catch (Exception e) {
-            log.error("Failed to retrieve conversation history: {}", (Object)e.getMessage());
+            log.error("Failed to retrieve conversation history: {}", e.getMessage());
             return List.of();
         }
     }
@@ -120,8 +115,8 @@ public class ConversationMemoryService {
     private Map<String, Object> getSessionMetadata(String userId, String sessionId) {
         HashMap<String, Object> metadata = new HashMap<String, Object>();
         Query countQuery = new Query();
-        countQuery.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is((Object)userId));
-        countQuery.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is((Object)sessionId));
+        countQuery.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is(userId));
+        countQuery.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
         try {
             long count = this.mongoTemplate.count(countQuery, COLLECTION_NAME);
             metadata.put("messageCount", count);
@@ -176,29 +171,29 @@ public class ConversationMemoryService {
 
     public void clearSession(String userId, String sessionId) {
         Query query = new Query();
-        query.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is((Object)userId));
-        query.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is((Object)sessionId));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is(userId));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
         try {
             this.mongoTemplate.remove(query, COLLECTION_NAME);
-            log.info("Cleared conversation history for user {} session {}", (Object)userId, (Object)sessionId);
+            log.info("Cleared conversation history for user {} session {}", userId, sessionId);
         }
         catch (Exception e) {
-            log.error("Failed to clear conversation history: {}", (Object)e.getMessage());
+            log.error("Failed to clear conversation history: {}", e.getMessage());
         }
     }
 
     public long purgeOldConversations(int retentionDays) {
         Instant cutoff = Instant.now().minusSeconds((long)retentionDays * 24L * 3600L);
         Query query = new Query();
-        query.addCriteria((CriteriaDefinition)Criteria.where((String)"timestamp").lt((Object)cutoff));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"timestamp").lt(cutoff));
         try {
             DeleteResult result = this.mongoTemplate.remove(query, COLLECTION_NAME);
             long deleted = result.getDeletedCount();
-            log.info("Purged {} old conversation messages (older than {} days)", (Object)deleted, (Object)retentionDays);
+            log.info("Purged {} old conversation messages (older than {} days)", deleted, retentionDays);
             return deleted;
         }
         catch (Exception e) {
-            log.error("Failed to purge old conversations: {}", (Object)e.getMessage());
+            log.error("Failed to purge old conversations: {}", e.getMessage());
             return 0L;
         }
     }
@@ -209,5 +204,17 @@ public class ConversationMemoryService {
         }
         return str.length() <= maxLen ? str : str.substring(0, maxLen) + "...";
     }
-}
 
+    public static enum MessageRole {
+        USER,
+        ASSISTANT,
+        SYSTEM;
+
+    }
+
+    public record ConversationMessage(String id, String userId, String sessionId, MessageRole role, String content, Instant timestamp, Map<String, Object> metadata) {
+    }
+
+    public record ConversationContext(List<ConversationMessage> recentMessages, List<String> activeTopics, Map<String, Object> sessionMetadata, String formattedContext) {
+    }
+}

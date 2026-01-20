@@ -2,8 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.professional.rag.HybridSearchService
- *  com.jreinhal.mercenary.professional.rag.HybridSearchService$HybridResult
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.document.Document
@@ -13,7 +11,6 @@
  */
 package com.jreinhal.mercenary.professional.rag;
 
-import com.jreinhal.mercenary.professional.rag.HybridSearchService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -47,9 +44,9 @@ public class HybridSearchService {
 
     public List<HybridResult> search(String query, int topK, double vectorWeight, double bm25Weight) {
         log.debug("Hybrid search: query='{}', topK={}, weights=[vector={}, bm25={}]", new Object[]{this.truncate(query, 50), topK, vectorWeight, bm25Weight});
-        List vectorResults = this.performVectorSearch(query, topK * 2);
-        List bm25Results = this.performBm25Search(query, topK * 2);
-        List fusedResults = this.fuseResults(vectorResults, bm25Results, vectorWeight, bm25Weight);
+        List<Document> vectorResults = this.performVectorSearch(query, topK * 2);
+        List<Document> bm25Results = this.performBm25Search(query, topK * 2);
+        List<HybridResult> fusedResults = this.fuseResults(vectorResults, bm25Results, vectorWeight, bm25Weight);
         return fusedResults.stream().limit(topK).toList();
     }
 
@@ -59,14 +56,14 @@ public class HybridSearchService {
             return this.vectorStore.similaritySearch(request);
         }
         catch (Exception e) {
-            log.error("Vector search failed: {}", (Object)e.getMessage());
+            log.error("Vector search failed: {}", e.getMessage());
             return List.of();
         }
     }
 
     private List<Document> performBm25Search(String query, int limit) {
         try {
-            List candidates = this.performVectorSearch(query, limit * 3);
+            List<Document> candidates = this.performVectorSearch(query, limit * 3);
             ArrayList<Map.Entry<Document, Double>> scored = new ArrayList<Map.Entry<Document, Double>>();
             for (Document doc : candidates) {
                 double score = this.calculateBm25Score(query, doc.getContent());
@@ -76,7 +73,7 @@ public class HybridSearchService {
             return scored.stream().limit(limit).map(Map.Entry::getKey).toList();
         }
         catch (Exception e) {
-            log.error("BM25 search failed: {}", (Object)e.getMessage());
+            log.error("BM25 search failed: {}", e.getMessage());
             return List.of();
         }
     }
@@ -85,8 +82,8 @@ public class HybridSearchService {
         double k1 = 1.2;
         double b = 0.75;
         double avgDocLength = 500.0;
-        Set queryTerms = this.tokenize(query);
-        ArrayList docTerms = new ArrayList(this.tokenize(document));
+        Set<String> queryTerms = this.tokenize(query);
+        ArrayList<String> docTerms = new ArrayList<String>(this.tokenize(document));
         int docLength = docTerms.size();
         double score = 0.0;
         for (String term : queryTerms) {
@@ -115,10 +112,10 @@ public class HybridSearchService {
             vectorRanks.put(docId, i + 1);
             vectorScores.put(docId, 1.0 / (double)(i + 1));
         }
-        HashMap<Iterator<Document>, Integer> bm25Ranks = new HashMap<Iterator<Document>, Integer>();
-        HashMap<Iterator<Document>, Double> bm25Scores = new HashMap<Iterator<Document>, Double>();
+        HashMap<String, Integer> bm25Ranks = new HashMap<String, Integer>();
+        HashMap<String, Double> bm25Scores = new HashMap<String, Double>();
         for (int i = 0; i < bm25Results.size(); ++i) {
-            Iterator<Document> docId = this.getDocumentId(bm25Results.get(i));
+            String docId = this.getDocumentId(bm25Results.get(i));
             bm25Ranks.put(docId, i + 1);
             bm25Scores.put(docId, 1.0 / (double)(i + 1));
         }
@@ -130,9 +127,9 @@ public class HybridSearchService {
             allDocs.put(this.getDocumentId(doc), doc);
         }
         ArrayList<HybridResult> results = new ArrayList<HybridResult>();
-        for (Map.Entry entry : allDocs.entrySet()) {
-            String docId = (String)entry.getKey();
-            Document doc = (Document)entry.getValue();
+        for (Map.Entry<String, Document> entry : allDocs.entrySet()) {
+            String docId = entry.getKey();
+            Document doc = entry.getValue();
             int vRank = vectorRanks.getOrDefault(docId, Integer.MAX_VALUE);
             int bRank = bm25Ranks.getOrDefault(docId, Integer.MAX_VALUE);
             double vScore = vectorScores.getOrDefault(docId, 0.0);
@@ -189,5 +186,7 @@ public class HybridSearchService {
         }
         return str.length() <= maxLen ? str : str.substring(0, maxLen) + "...";
     }
-}
 
+    public record HybridResult(Document document, double combinedScore, double vectorScore, double bm25Score, int vectorRank, int bm25Rank) {
+    }
+}

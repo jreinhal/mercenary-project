@@ -1,8 +1,5 @@
 /*
  * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  com.jreinhal.mercenary.constant.MetadataConstants
  */
 package com.jreinhal.mercenary.constant;
 
@@ -17,4 +14,3 @@ public final class MetadataConstants {
     private MetadataConstants() {
     }
 }
-

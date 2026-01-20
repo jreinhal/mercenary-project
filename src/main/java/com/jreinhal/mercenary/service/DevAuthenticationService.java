@@ -2,9 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.model.User
- *  com.jreinhal.mercenary.service.AuthenticationService
- *  com.jreinhal.mercenary.service.DevAuthenticationService
  *  jakarta.servlet.http.HttpServletRequest
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -32,6 +29,7 @@ implements AuthenticationService {
         log.warn(">>> Set app.auth-mode=OIDC or app.auth-mode=CAC for production <<<");
     }
 
+    @Override
     public User authenticate(HttpServletRequest request) {
         String operatorId = request.getHeader("X-Operator-Id");
         if (operatorId == null || operatorId.isEmpty()) {
@@ -40,11 +38,11 @@ implements AuthenticationService {
         if (operatorId == null || operatorId.isEmpty()) {
             operatorId = "DEMO_USER";
         }
-        return User.devUser((String)operatorId);
+        return User.devUser(operatorId);
     }
 
+    @Override
     public String getAuthMode() {
         return "DEV";
     }
 }
-

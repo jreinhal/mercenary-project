@@ -2,13 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.miarag.MiARagService
- *  com.jreinhal.mercenary.rag.miarag.MiARagService$Mindscape
- *  com.jreinhal.mercenary.rag.miarag.MiARagService$MindscapeRetrievalResult
- *  com.jreinhal.mercenary.rag.miarag.MiARagService$ScoredChunk
- *  com.jreinhal.mercenary.rag.miarag.MindscapeBuilder
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -26,7 +19,6 @@
  */
 package com.jreinhal.mercenary.rag.miarag;
 
-import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.miarag.MindscapeBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
@@ -86,22 +78,22 @@ public class MiARagService {
             return null;
         }
         long startTime = System.currentTimeMillis();
-        log.info("MiA-RAG: Building mindscape for '{}' with {} chunks", (Object)filename, (Object)chunks.size());
+        log.info("MiA-RAG: Building mindscape for '{}' with {} chunks", filename, chunks.size());
         try {
-            ArrayList<List> hierarchy = new ArrayList<List>();
+            ArrayList<List<String>> hierarchy = new ArrayList<List<String>>();
             hierarchy.add(chunks);
-            List currentLevel = chunks;
+            List<String> currentLevel = chunks;
             for (int level = 1; level <= this.hierarchyLevels; ++level) {
-                List summaries = this.mindscapeBuilder.summarizeLevel(currentLevel, level);
+                List<String> summaries = this.mindscapeBuilder.summarizeLevel(currentLevel, level);
                 hierarchy.add(summaries);
                 currentLevel = summaries;
-                log.debug("Level {}: {} summaries", (Object)level, (Object)summaries.size());
+                log.debug("Level {}: {} summaries", level, summaries.size());
                 if (summaries.size() <= 1) break;
             }
             String documentMindscape = currentLevel.isEmpty() ? "" : currentLevel.get(0);
-            List keyConcepts = this.mindscapeBuilder.extractKeyConcepts(documentMindscape);
+            List<String> keyConcepts = this.mindscapeBuilder.extractKeyConcepts(documentMindscape);
             Mindscape mindscape = new Mindscape(UUID.randomUUID().toString(), filename, department, documentMindscape, hierarchy, keyConcepts, chunks.size(), System.currentTimeMillis());
-            this.mongoTemplate.save((Object)mindscape, MINDSCAPE_COLLECTION);
+            this.mongoTemplate.save(mindscape, MINDSCAPE_COLLECTION);
             Document mindscapeDoc = new Document(documentMindscape);
             mindscapeDoc.getMetadata().put("source", filename);
             mindscapeDoc.getMetadata().put("dept", department);
@@ -121,25 +113,25 @@ public class MiARagService {
 
     public MindscapeRetrievalResult retrieve(String query, String department) {
         if (!this.enabled) {
-            List docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "'"));
+            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "'"));
             return new MindscapeRetrievalResult(docs, null, List.of());
         }
         long startTime = System.currentTimeMillis();
-        List mindscapeDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(3).withSimilarityThreshold(0.4).withFilterExpression("dept == '" + department + "' && type == 'mindscape'"));
+        List<Document> mindscapeDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(3).withSimilarityThreshold(0.4).withFilterExpression("dept == '" + department + "' && type == 'mindscape'"));
         ArrayList<Mindscape> relevantMindscapes = new ArrayList<Mindscape>();
         for (Document doc : mindscapeDocs) {
             Query q;
             Mindscape ms;
             String mindscapeId = (String)doc.getMetadata().get("mindscapeId");
-            if (mindscapeId == null || (ms = (Mindscape)this.mongoTemplate.findOne(q = new Query((CriteriaDefinition)Criteria.where((String)"id").is((Object)mindscapeId)), Mindscape.class, MINDSCAPE_COLLECTION)) == null) continue;
+            if (mindscapeId == null || (ms = (Mindscape)this.mongoTemplate.findOne(q = new Query((CriteriaDefinition)Criteria.where((String)"id").is(mindscapeId)), Mindscape.class, MINDSCAPE_COLLECTION)) == null) continue;
             relevantMindscapes.add(ms);
         }
         String globalContext = this.buildGlobalContext(relevantMindscapes);
-        Set relevantSources = relevantMindscapes.stream().map(Mindscape::filename).collect(Collectors.toSet());
-        List localDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.25).withFilterExpression("dept == '" + department + "' && type != 'mindscape'"));
+        Set<String> relevantSources = relevantMindscapes.stream().map(Mindscape::filename).collect(Collectors.toSet());
+        List<Document> localDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.25).withFilterExpression("dept == '" + department + "' && type != 'mindscape'"));
         ArrayList<ScoredChunk> scoredChunks = new ArrayList<ScoredChunk>();
         for (int i = 0; i < localDocs.size(); ++i) {
-            Document doc = (Document)localDocs.get(i);
+            Document doc = localDocs.get(i);
             String source = (String)doc.getMetadata().get("source");
             double baseScore = 1.0 - (double)i * 0.05;
             if (relevantSources.contains(source)) {
@@ -167,7 +159,7 @@ public class MiARagService {
         }
         context.append("=== DETAILED SOURCES ===\n");
         for (Document doc : localDocs) {
-            String source = doc.getMetadata().getOrDefault("source", "Unknown");
+            String source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown"));
             context.append("SOURCE: ").append(source).append("\n");
             context.append(doc.getContent()).append("\n\n");
         }
@@ -177,7 +169,7 @@ public class MiARagService {
             return response;
         }
         catch (Exception e) {
-            log.error("MiA-RAG: Generation failed: {}", (Object)e.getMessage());
+            log.error("MiA-RAG: Generation failed: {}", e.getMessage());
             return null;
         }
     }
@@ -199,12 +191,20 @@ public class MiARagService {
     }
 
     public Mindscape getMindscape(String filename, String department) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"filename").is((Object)filename).and("department").is((Object)department));
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"filename").is(filename).and("department").is(department));
         return (Mindscape)this.mongoTemplate.findOne(query, Mindscape.class, MINDSCAPE_COLLECTION);
     }
 
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record Mindscape(String id, String filename, String department, String documentSummary, List<List<String>> hierarchy, List<String> keyConcepts, int chunkCount, long timestamp) {
+    }
+
+    public record MindscapeRetrievalResult(List<Document> localDocs, String globalContext, List<Mindscape> mindscapes) {
+    }
+
+    public record ScoredChunk(Document document, double score) {
+    }
+}

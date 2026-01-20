@@ -2,12 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.grapho1.GraphO1Service
- *  com.jreinhal.mercenary.rag.grapho1.GraphO1Service$GraphEdge
- *  com.jreinhal.mercenary.rag.grapho1.GraphO1Service$MCTSNode
- *  com.jreinhal.mercenary.rag.grapho1.GraphO1Service$MCTSResult
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -19,7 +13,6 @@
  */
 package com.jreinhal.mercenary.rag.grapho1;
 
-import com.jreinhal.mercenary.rag.grapho1.GraphO1Service;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -86,10 +79,10 @@ public class GraphO1Service {
             ++totalSimulations;
             this.backpropagate(selected, reward);
             if (!(this.getBestPathConfidence(root) >= this.minConfidence)) continue;
-            log.debug("MCTS: Early termination at iteration {} (confidence={})", (Object)i, (Object)this.getBestPathConfidence(root));
+            log.debug("MCTS: Early termination at iteration {} (confidence={})", i, this.getBestPathConfidence(root));
             break;
         }
-        List bestPath = this.extractBestPath(root);
+        List<MCTSNode> bestPath = this.extractBestPath(root);
         List<Document> orderedDocs = bestPath.stream().filter(n -> n.document != null).map(n -> n.document).toList();
         double confidence = this.getBestPathConfidence(root);
         long elapsed = System.currentTimeMillis() - startTime;
@@ -103,7 +96,7 @@ public class GraphO1Service {
             if (node.children.stream().anyMatch(c -> c.visits == 0)) {
                 return node.children.stream().filter(c -> c.visits == 0).findFirst().orElse(node);
             }
-            node = node.children.stream().max(Comparator.comparingDouble(arg_0 -> this.ucb1(arg_0))).orElse(node);
+            node = node.children.stream().max(Comparator.comparingDouble(this::ucb1)).orElse(node);
         }
         return node;
     }
@@ -118,7 +111,7 @@ public class GraphO1Service {
     }
 
     private MCTSNode expand(MCTSNode node, Map<String, List<GraphEdge>> adjacencyMap) {
-        List edges = adjacencyMap.getOrDefault(node.nodeId, List.of());
+        List<GraphEdge> edges = adjacencyMap.getOrDefault(node.nodeId, List.of());
         HashSet<String> exploredIds = new HashSet<String>();
         for (MCTSNode child : node.children) {
             exploredIds.add(child.nodeId);
@@ -134,7 +127,7 @@ public class GraphO1Service {
     }
 
     private boolean isFullyExpanded(MCTSNode node, Map<String, List<GraphEdge>> adjacencyMap) {
-        List edges = adjacencyMap.getOrDefault(node.nodeId, List.of());
+        List<GraphEdge> edges = adjacencyMap.getOrDefault(node.nodeId, List.of());
         return node.children.size() >= edges.size();
     }
 
@@ -159,7 +152,7 @@ public class GraphO1Service {
             return this.parseScore(response);
         }
         catch (Exception e) {
-            log.warn("MCTS simulation failed: {}", (Object)e.getMessage());
+            log.warn("MCTS simulation failed: {}", e.getMessage());
             return this.heuristicScore(query, pathDocs);
         }
     }
@@ -184,7 +177,7 @@ public class GraphO1Service {
     }
 
     private double getBestPathConfidence(MCTSNode root) {
-        List path = this.extractBestPath(root);
+        List<MCTSNode> path = this.extractBestPath(root);
         if (path.isEmpty()) {
             return 0.0;
         }
@@ -236,5 +229,28 @@ public class GraphO1Service {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record MCTSResult(List<Document> documents, List<String> reasoningPath, double confidence, Map<String, Object> metadata) {
+    }
+
+    private static class MCTSNode {
+        MCTSNode parent;
+        String nodeId;
+        Document document;
+        int depth;
+        String edgeType;
+        List<MCTSNode> children = new ArrayList<MCTSNode>();
+        int visits = 0;
+        double totalReward = 0.0;
+
+        MCTSNode(MCTSNode parent, String nodeId, Document document, int depth) {
+            this.parent = parent;
+            this.nodeId = nodeId;
+            this.document = document;
+            this.depth = depth;
+        }
+    }
+
+    public record GraphEdge(String targetId, Document targetDoc, String type, double weight) {
+    }
+}

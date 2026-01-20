@@ -2,18 +2,12 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.model.AuditEvent
- *  com.jreinhal.mercenary.model.AuditEvent$EventType
- *  com.jreinhal.mercenary.model.AuditEvent$Outcome
- *  com.jreinhal.mercenary.model.ClearanceLevel
- *  com.jreinhal.mercenary.model.User
  *  org.springframework.data.annotation.Id
  *  org.springframework.data.mongodb.core.index.Indexed
  *  org.springframework.data.mongodb.core.mapping.Document
  */
 package com.jreinhal.mercenary.model;
 
-import com.jreinhal.mercenary.model.AuditEvent;
 import com.jreinhal.mercenary.model.ClearanceLevel;
 import com.jreinhal.mercenary.model.User;
 import java.time.Instant;
@@ -45,7 +39,7 @@ public class AuditEvent {
     private Outcome outcome;
     private String outcomeReason;
     private String responseSummary;
-    private Map<String, Object> metadata = new HashMap();
+    private Map<String, Object> metadata = new HashMap<String, Object>();
 
     public AuditEvent() {
         this.timestamp = Instant.now();
@@ -161,5 +155,30 @@ public class AuditEvent {
     public Map<String, Object> getMetadata() {
         return this.metadata;
     }
-}
 
+    public static enum EventType {
+        AUTH_SUCCESS,
+        AUTH_FAILURE,
+        AUTH_LOGOUT,
+        ACCESS_GRANTED,
+        ACCESS_DENIED,
+        QUERY_EXECUTED,
+        DOCUMENT_INGESTED,
+        DOCUMENT_DELETED,
+        USER_CREATED,
+        USER_MODIFIED,
+        USER_DEACTIVATED,
+        CONFIG_CHANGED,
+        SECURITY_ALERT,
+        PROMPT_INJECTION_DETECTED;
+
+    }
+
+    public static enum Outcome {
+        SUCCESS,
+        FAILURE,
+        DENIED,
+        ERROR;
+
+    }
+}

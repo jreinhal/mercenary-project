@@ -2,21 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService
- *  com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService$RoutingDecision
- *  com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService$RoutingResult
- *  com.jreinhal.mercenary.rag.agentic.AgenticRagOrchestrator
- *  com.jreinhal.mercenary.rag.agentic.AgenticRagOrchestrator$AgenticResult
- *  com.jreinhal.mercenary.rag.crag.CragGraderService
- *  com.jreinhal.mercenary.rag.crag.CragGraderService$CragDecision
- *  com.jreinhal.mercenary.rag.crag.CragGraderService$CragResult
- *  com.jreinhal.mercenary.rag.crag.RewriteService
- *  com.jreinhal.mercenary.rag.hyde.HydeService
- *  com.jreinhal.mercenary.rag.hyde.HydeService$HydeResult
- *  com.jreinhal.mercenary.rag.selfrag.SelfRagService
- *  com.jreinhal.mercenary.rag.selfrag.SelfRagService$SelfRagResult
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -29,7 +14,6 @@
 package com.jreinhal.mercenary.rag.agentic;
 
 import com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService;
-import com.jreinhal.mercenary.rag.agentic.AgenticRagOrchestrator;
 import com.jreinhal.mercenary.rag.crag.CragGraderService;
 import com.jreinhal.mercenary.rag.crag.RewriteService;
 import com.jreinhal.mercenary.rag.hyde.HydeService;
@@ -102,7 +86,7 @@ public class AgenticRagOrchestrator {
             executedSteps.add("DIRECT_RESPONSE");
             return this.directResponse(query, executedSteps, startTime, metrics);
         }
-        List documents = null;
+        List<Document> documents = null;
         String currentQuery = query;
         for (int iteration = 0; iteration < this.maxIterations; ++iteration) {
             boolean shouldUseHyde;
@@ -119,7 +103,7 @@ public class AgenticRagOrchestrator {
                 documents = this.standardRetrieval(currentQuery, department, routing);
                 metrics.put("hydeApplied", false);
             }
-            log.debug("Agentic: Iteration {} retrieved {} documents", (Object)(iteration + 1), (Object)documents.size());
+            log.debug("Agentic: Iteration {} retrieved {} documents", (iteration + 1), documents.size());
             executedSteps.add("CRAG_VALIDATION");
             CragGraderService.CragResult cragResult = this.cragGrader.evaluate(currentQuery, documents);
             metrics.put("cragDecision", cragResult.decision().name());
@@ -137,7 +121,7 @@ public class AgenticRagOrchestrator {
             executedSteps.add("QUERY_REWRITE");
             currentQuery = this.rewriteService.rewriteQuery(currentQuery);
             metrics.put("rewrittenQuery", currentQuery);
-            log.info("Agentic: Rewriting query to: {}", (Object)currentQuery);
+            log.info("Agentic: Rewriting query to: {}", currentQuery);
         }
         if (this.useSelfRag) {
             executedSteps.add("SELFRAG_GENERATION");
@@ -153,9 +137,9 @@ public class AgenticRagOrchestrator {
         }
         long elapsed = System.currentTimeMillis() - startTime;
         metrics.put("totalMs", elapsed);
-        this.reasoningTracer.addStep(ReasoningStep.StepType.ORCHESTRATION, "Agentic RAG Orchestration", String.format("Completed in %d steps, %d iterations, %.0f%% confidence", executedSteps.size(), (int)metrics.getOrDefault("iteration", 1), confidence * 100.0), elapsed, metrics);
+        this.reasoningTracer.addStep(ReasoningStep.StepType.ORCHESTRATION, "Agentic RAG Orchestration", String.format("Completed in %d steps, %d iterations, %.0f%% confidence", executedSteps.size(), (int)((Integer)metrics.getOrDefault("iteration", 1)), confidence * 100.0), elapsed, metrics);
         log.info("Agentic: Completed {} steps in {}ms with {:.0f}% confidence", new Object[]{executedSteps.size(), elapsed, confidence * 100.0});
-        return new AgenticResult(response, documents, confidence, executedSteps, metrics.getOrDefault("iteration", 1).intValue(), metrics);
+        return new AgenticResult(response, documents, confidence, executedSteps, (Integer)metrics.getOrDefault("iteration", 1), metrics);
     }
 
     private AgenticResult simpleRetrieval(String query, String department, long startTime) {
@@ -176,7 +160,7 @@ public class AgenticRagOrchestrator {
         String response = "I couldn't find sufficient information in the knowledge base to answer your question. Please try rephrasing your query or contact an administrator if you believe the information should be available.";
         long elapsed = System.currentTimeMillis() - startTime;
         metrics.put("totalMs", elapsed);
-        return new AgenticResult(response, List.of(), 0.2, steps, ((Integer)metrics.getOrDefault("iteration", 1)).intValue(), metrics);
+        return new AgenticResult(response, List.of(), 0.2, steps, (Integer)metrics.getOrDefault("iteration", 1), metrics);
     }
 
     private List<Document> standardRetrieval(String query, String department, AdaptiveRagService.RoutingResult routing) {
@@ -199,5 +183,7 @@ public class AgenticRagOrchestrator {
     public boolean isEnabled() {
         return this.enabled;
     }
-}
 
+    public record AgenticResult(String response, List<Document> sources, double confidence, List<String> executedSteps, int iterations, Map<String, Object> metrics) {
+    }
+}

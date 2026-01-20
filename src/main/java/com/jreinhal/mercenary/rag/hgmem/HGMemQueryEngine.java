@@ -2,15 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.hgmem.HGMemQueryEngine
- *  com.jreinhal.mercenary.rag.hgmem.HGMemQueryEngine$HGMemResult
- *  com.jreinhal.mercenary.rag.hgmem.HGMemQueryEngine$ScoredDocument
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory$HGNode
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory$HGQueryResult
- *  com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory$HGStats
- *  com.jreinhal.mercenary.reasoning.ReasoningStep$StepType
- *  com.jreinhal.mercenary.reasoning.ReasoningTracer
  *  jakarta.annotation.PostConstruct
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
@@ -22,7 +13,6 @@
  */
 package com.jreinhal.mercenary.rag.hgmem;
 
-import com.jreinhal.mercenary.rag.hgmem.HGMemQueryEngine;
 import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
@@ -72,22 +62,22 @@ public class HGMemQueryEngine {
         String docId;
         if (!this.enabled) {
             log.debug("HGMem disabled, using vector search only");
-            List vectorResults = this.vectorSearch(query, department);
+            List<Document> vectorResults = this.vectorSearch(query, department);
             return new HGMemResult(vectorResults, List.of(), List.of(), 0);
         }
         long startTime = System.currentTimeMillis();
-        log.info("HGMem: Starting hybrid query for: {}", (Object)query);
+        log.info("HGMem: Starting hybrid query for: {}", query);
         long vectorStart = System.currentTimeMillis();
-        List vectorResults = this.vectorSearch(query, department);
+        List<Document> vectorResults = this.vectorSearch(query, department);
         long vectorTime = System.currentTimeMillis() - vectorStart;
-        log.debug("HGMem: Vector search returned {} results in {}ms", (Object)vectorResults.size(), (Object)vectorTime);
+        log.debug("HGMem: Vector search returned {} results in {}ms", vectorResults.size(), vectorTime);
         long graphStart = System.currentTimeMillis();
         HyperGraphMemory.HGQueryResult graphResult = this.hypergraph.query(query, department, this.maxHops);
         long graphTime = System.currentTimeMillis() - graphStart;
-        log.debug("HGMem: Graph traversal returned {} results in {}ms", (Object)graphResult.relatedChunks().size(), (Object)graphTime);
+        log.debug("HGMem: Graph traversal returned {} results in {}ms", graphResult.relatedChunks().size(), graphTime);
         LinkedHashMap<String, ScoredDocument> combinedDocs = new LinkedHashMap<String, ScoredDocument>();
         for (int i = 0; i < vectorResults.size(); ++i) {
-            Document doc = (Document)vectorResults.get(i);
+            Document doc = vectorResults.get(i);
             docId = this.getDocumentId(doc);
             double score = this.vectorWeight * (1.0 - (double)i / (double)vectorResults.size());
             combinedDocs.put(docId, new ScoredDocument(doc, score, "vector"));
@@ -104,11 +94,11 @@ public class HGMemQueryEngine {
             double score = this.graphWeight * 0.8;
             combinedDocs.put(docId, new ScoredDocument(graphDoc, score, "graph"));
         }
-        List finalResults = combinedDocs.values().stream().sorted((a, b) -> Double.compare(b.score(), a.score())).limit(this.topK).map(ScoredDocument::document).collect(Collectors.toList());
+        List<Document> finalResults = combinedDocs.values().stream().sorted((a, b) -> Double.compare(b.score(), a.score())).limit(this.topK).map(ScoredDocument::document).collect(Collectors.toList());
         long totalTime = System.currentTimeMillis() - startTime;
         this.reasoningTracer.addStep(ReasoningStep.StepType.RETRIEVAL, "HGMem Hybrid Query", String.format("Vector: %d docs (%dms), Graph: %d nodes (%dms), Final: %d docs", vectorResults.size(), vectorTime, graphResult.nodesTraversed(), graphTime, finalResults.size()), totalTime, Map.of("vectorResults", vectorResults.size(), "graphNodes", graphResult.nodesTraversed(), "matchedEntities", graphResult.matchedEntities(), "finalResults", finalResults.size(), "vectorTimeMs", vectorTime, "graphTimeMs", graphTime));
-        log.info("HGMem: Hybrid query completed in {}ms, returning {} documents", (Object)totalTime, (Object)finalResults.size());
-        return new HGMemResult(finalResults, graphResult.matchedEntities(), new ArrayList(graphResult.entityScores().keySet()), graphResult.nodesTraversed());
+        log.info("HGMem: Hybrid query completed in {}ms, returning {} documents", totalTime, finalResults.size());
+        return new HGMemResult(finalResults, graphResult.matchedEntities(), new ArrayList<String>(graphResult.entityScores().keySet()), graphResult.nodesTraversed());
     }
 
     private List<Document> vectorSearch(String query, String department) {
@@ -148,5 +138,13 @@ public class HGMemQueryEngine {
     public HyperGraphMemory.HGStats getGraphStats() {
         return this.hypergraph.getStats();
     }
-}
 
+    public record HGMemResult(List<Document> documents, List<String> matchedEntities, List<String> relatedEntities, int nodesTraversed) {
+        public boolean hasGraphEnhancement() {
+            return this.nodesTraversed > 0;
+        }
+    }
+
+    private record ScoredDocument(Document document, double score, String source) {
+    }
+}

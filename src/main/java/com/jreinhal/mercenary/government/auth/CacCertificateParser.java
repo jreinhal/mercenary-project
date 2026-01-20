@@ -2,15 +2,12 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.government.auth.CacCertificateParser
- *  com.jreinhal.mercenary.government.auth.CacCertificateParser$CacIdentity
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.stereotype.Component
  */
 package com.jreinhal.mercenary.government.auth;
 
-import com.jreinhal.mercenary.government.auth.CacCertificateParser;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.regex.Matcher;
@@ -37,7 +34,7 @@ public class CacCertificateParser {
             return this.parseDn(dn);
         }
         catch (Exception e) {
-            log.error("Failed to parse certificate: {}", (Object)e.getMessage());
+            log.error("Failed to parse certificate: {}", e.getMessage());
             return null;
         }
     }
@@ -47,7 +44,7 @@ public class CacCertificateParser {
         if (dn == null || dn.isEmpty()) {
             return new CacIdentity(null, null, null, null, null, null, null);
         }
-        log.debug("Parsing DN: {}", (Object)dn);
+        log.debug("Parsing DN: {}", dn);
         String cn = this.extractCn(dn);
         if (cn == null) {
             cn = dn;
@@ -117,7 +114,7 @@ public class CacCertificateParser {
             return true;
         }
         catch (Exception e) {
-            log.debug("Certificate validity check failed: {}", (Object)e.getMessage());
+            log.debug("Certificate validity check failed: {}", e.getMessage());
             return false;
         }
     }
@@ -134,5 +131,23 @@ public class CacCertificateParser {
         String cn = this.extractCn(dn);
         return cn != null && this.extractEdipi(cn) != null;
     }
-}
 
+    public record CacIdentity(String edipi, String firstName, String lastName, String middleName, String commonName, String email, String organization) {
+        public String toUsername() {
+            if (this.edipi != null && !this.edipi.isEmpty()) {
+                return this.edipi;
+            }
+            if (this.commonName != null) {
+                return this.commonName.toLowerCase().replaceAll("[^a-z0-9]", "_");
+            }
+            return "unknown";
+        }
+
+        public String toDisplayName() {
+            if (this.firstName != null && this.lastName != null) {
+                return this.firstName + " " + this.lastName;
+            }
+            return this.commonName != null ? this.commonName : "Unknown User";
+        }
+    }
+}

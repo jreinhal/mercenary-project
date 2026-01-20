@@ -2,8 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.model.ChatLog
- *  com.jreinhal.mercenary.repository.ChatLogRepository
  *  org.springframework.data.mongodb.repository.MongoRepository
  */
 package com.jreinhal.mercenary.repository;
@@ -16,4 +14,3 @@ public interface ChatLogRepository
 extends MongoRepository<ChatLog, String> {
     public List<ChatLog> findByDepartmentOrderByTimestampAsc(String var1);
 }
-

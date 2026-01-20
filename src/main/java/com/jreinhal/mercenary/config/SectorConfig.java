@@ -2,8 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.Department
- *  com.jreinhal.mercenary.config.SectorConfig
  *  org.springframework.stereotype.Component
  */
 package com.jreinhal.mercenary.config;
@@ -43,4 +41,3 @@ public class SectorConfig {
         return this.getHighSecuritySectors().contains(dept);
     }
 }
-

@@ -2,9 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$CrossModalEdge
- *  com.jreinhal.mercenary.rag.megarag.MegaRagService$VisualEntity
- *  com.jreinhal.mercenary.rag.megarag.VisualEntityLinker
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.stereotype.Component
@@ -35,7 +32,7 @@ public class VisualEntityLinker {
         if (visualEntities.isEmpty() || textContext == null || textContext.isBlank()) {
             return List.of();
         }
-        Set textEntities = this.extractTextEntities(textContext);
+        Set<String> textEntities = this.extractTextEntities(textContext);
         ArrayList<MegaRagService.CrossModalEdge> edges = new ArrayList<MegaRagService.CrossModalEdge>();
         for (MegaRagService.VisualEntity visualEntity : visualEntities) {
             String visualName = visualEntity.name();
@@ -152,4 +149,3 @@ public class VisualEntityLinker {
         return stopWords.contains(word.toLowerCase());
     }
 }
-

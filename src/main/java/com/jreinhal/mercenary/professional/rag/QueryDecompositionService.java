@@ -2,10 +2,6 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.professional.rag.QueryDecompositionService
- *  com.jreinhal.mercenary.professional.rag.QueryDecompositionService$DecompositionResult
- *  com.jreinhal.mercenary.professional.rag.QueryDecompositionService$DecompositionStrategy
- *  com.jreinhal.mercenary.professional.rag.QueryDecompositionService$SubQuery
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.ai.chat.client.ChatClient
@@ -14,7 +10,6 @@
  */
 package com.jreinhal.mercenary.professional.rag;
 
-import com.jreinhal.mercenary.professional.rag.QueryDecompositionService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,12 +29,12 @@ public class QueryDecompositionService {
     }
 
     public DecompositionResult decompose(String query) {
-        log.debug("Analyzing query for decomposition: {}", (Object)this.truncate(query, 100));
+        log.debug("Analyzing query for decomposition: {}", this.truncate(query, 100));
         if (!this.requiresDecomposition(query)) {
             return new DecompositionResult(query, DecompositionStrategy.PARALLEL, List.of(new SubQuery(query, 1, false, "Direct answer", List.of())), "Return the answer directly", false);
         }
         DecompositionStrategy strategy = this.determineStrategy(query);
-        List subQueries = this.performDecomposition(query, strategy);
+        List<SubQuery> subQueries = this.performDecomposition(query, strategy);
         String synthesisPrompt = this.generateSynthesisPrompt(query, strategy, subQueries);
         return new DecompositionResult(query, strategy, subQueries, synthesisPrompt, true);
     }
@@ -77,7 +72,7 @@ public class QueryDecompositionService {
             return this.parseSubQueries(response, strategy);
         }
         catch (Exception e) {
-            log.error("Error decomposing query: {}", (Object)e.getMessage());
+            log.error("Error decomposing query: {}", e.getMessage());
             return List.of(new SubQuery(query, 1, false, "Fallback - direct query", List.of()));
         }
     }
@@ -99,14 +94,14 @@ public class QueryDecompositionService {
         String[] blocks = response.split("---");
         int order = 0;
         for (String block : blocks) {
-            List entities;
+            List<String> entities;
             if ((block = block.trim()).isEmpty()) continue;
             ++order;
             String queryText = this.extractField(block, "SUBQUERY:");
             String purpose = this.extractField(block, "PURPOSE:");
             boolean depends = this.extractField(block, "DEPENDS:").toLowerCase().contains("yes");
             String entitiesStr = this.extractField(block, "ENTITIES:");
-            List<Object> list = entities = entitiesStr.isEmpty() ? List.of() : Arrays.asList(entitiesStr.split(",\\s*"));
+            List<String> list = entities = entitiesStr.isEmpty() ? List.of() : Arrays.asList(entitiesStr.split(",\\s*"));
             if (queryText.isEmpty()) continue;
             subQueries.add(new SubQuery(queryText, order, depends, purpose, entities));
         }
@@ -163,7 +158,7 @@ public class QueryDecompositionService {
             return this.chatClient.prompt().user(prompt).call().content();
         }
         catch (Exception e) {
-            log.error("Error synthesizing answers: {}", (Object)e.getMessage());
+            log.error("Error synthesizing answers: {}", e.getMessage());
             StringBuilder fallback = new StringBuilder();
             for (SubQuery sq : decomposition.subQueries()) {
                 fallback.append(sq.query()).append("\n");
@@ -179,5 +174,19 @@ public class QueryDecompositionService {
         }
         return str.length() <= maxLen ? str : str.substring(0, maxLen) + "...";
     }
-}
 
+    public record DecompositionResult(String originalQuery, DecompositionStrategy strategy, List<SubQuery> subQueries, String synthesisPrompt, boolean isComplex) {
+    }
+
+    public static enum DecompositionStrategy {
+        SEQUENTIAL,
+        PARALLEL,
+        COMPARATIVE,
+        TEMPORAL,
+        HIERARCHICAL;
+
+    }
+
+    public record SubQuery(String query, int order, boolean dependsOnPrevious, String purpose, List<String> requiredEntities) {
+    }
+}

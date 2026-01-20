@@ -2,16 +2,12 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  com.jreinhal.mercenary.rag.qucorag.EntityExtractor
- *  com.jreinhal.mercenary.rag.qucorag.EntityExtractor$Entity
- *  com.jreinhal.mercenary.rag.qucorag.EntityExtractor$EntityType
  *  org.slf4j.Logger
  *  org.slf4j.LoggerFactory
  *  org.springframework.stereotype.Component
  */
 package com.jreinhal.mercenary.rag.qucorag;
 
-import com.jreinhal.mercenary.rag.qucorag.EntityExtractor;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -37,7 +33,7 @@ public class EntityExtractor {
         if (text == null || text.isBlank()) {
             return List.of();
         }
-        LinkedHashSet entities = new LinkedHashSet();
+        LinkedHashSet<Entity> entities = new LinkedHashSet<Entity>();
         this.extractByPattern(text, ORG_PATTERN, EntityType.ORG, entities);
         this.extractByPattern(text, DATE_PATTERN, EntityType.DATE, entities);
         this.extractByPattern(text, TECHNICAL_PATTERN, EntityType.TECHNICAL, entities);
@@ -45,7 +41,7 @@ public class EntityExtractor {
         this.extractByPattern(text, TITLED_NAME_PATTERN, EntityType.PERSON, entities);
         this.extractCapitalizedPhrases(text, entities);
         ArrayList<Entity> result = new ArrayList<Entity>(entities);
-        log.debug("Extracted {} entities from text ({} chars)", (Object)result.size(), (Object)text.length());
+        log.debug("Extracted {} entities from text ({} chars)", result.size(), text.length());
         return result;
     }
 
@@ -85,5 +81,21 @@ public class EntityExtractor {
         String lower = phrase.toLowerCase();
         return lower.startsWith("the ") || lower.startsWith("a ") || lower.startsWith("an ") || lower.equals("united states") || lower.equals("new york") || lower.length() < 4;
     }
-}
 
+    public static enum EntityType {
+        PERSON,
+        ORG,
+        LOCATION,
+        DATE,
+        TECHNICAL,
+        UNKNOWN;
+
+    }
+
+    public record Entity(String text, EntityType type, int startIndex, int endIndex) {
+        @Override
+        public String toString() {
+            return String.format("%s [%s]", new Object[]{this.text, this.type});
+        }
+    }
+}
