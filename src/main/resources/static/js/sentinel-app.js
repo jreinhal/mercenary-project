@@ -3616,8 +3616,8 @@
         }
 
         /**
-         * Execute query with SSE streaming for real-time progress updates.
-         * Shows each reasoning step as it completes.
+         * Execute query with SSE streaming for real-time token output.
+         * Minimal status indicator during pre-generation, then live token stream.
          */
         async function executeQueryWithStreaming(query, sector, activeFiles, params) {
             const loadingId = 'streaming-' + Date.now();
@@ -3625,15 +3625,12 @@
             div.className = 'message assistant';
             div.id = loadingId;
             div.innerHTML = `
-                <div class="streaming-progress">
-                    <div class="streaming-header">
-                        <div class="loading-spinner"></div>
-                        <span class="streaming-status">Connecting to SENTINEL...</span>
+                <div class="streaming-container">
+                    <div class="streaming-status-minimal">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Connecting...</span>
                     </div>
                     <div class="streaming-response" style="display: none;"></div>
-                    <div class="streaming-progress-bar">
-                        <div class="streaming-progress-fill" style="width: 0%"></div>
-                    </div>
                 </div>
             `;
             chatMessages.appendChild(div);
@@ -3641,12 +3638,10 @@
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
 
-            const statusEl = div.querySelector('.streaming-status');
-            const progressFill = div.querySelector('.streaming-progress-fill');
+            const statusEl = div.querySelector('.streaming-status-minimal');
+            const statusText = div.querySelector('.status-text');
             const responseEl = div.querySelector('.streaming-response');
             const reasoningSteps = [];
-            let stepCount = 0;
-            const totalExpectedSteps = 6;
             let tokenBuffer = '';
             let isGenerating = false;
 
@@ -3654,25 +3649,14 @@
                 const eventSource = new EventSource(`${API_BASE}/ask/stream?${params.toString()}`);
 
                 eventSource.addEventListener('connected', (e) => {
-                    statusEl.textContent = 'Connected - Processing query...';
-                    progressFill.style.width = '5%';
+                    statusText.textContent = 'Processing...';
                 });
 
                 eventSource.addEventListener('step', (e) => {
                     try {
                         const step = JSON.parse(e.data);
-                        stepCount++;
 
-                        // Show progress during pre-generation steps
-                        if (!isGenerating) {
-                            const progress = Math.min(50, (stepCount / totalExpectedSteps) * 45 + 5);
-                            progressFill.style.width = progress + '%';
-                        }
-
-                        // Update status
-                        statusEl.textContent = step.label + ': ' + step.detail;
-
-                        // Store for reasoning accordion
+                        // Store for reasoning accordion (still collected but not shown step-by-step)
                         reasoningSteps.push({
                             type: mapStepType(step.type),
                             label: step.label,
@@ -3680,12 +3664,23 @@
                             durationMs: 0
                         });
 
-                        // When LLM generation starts, prepare the response area
-                        if (step.type === 'llm_generation' && step.detail.includes('Generating')) {
-                            isGenerating = true;
-                            responseEl.style.display = 'block';
-                            responseEl.innerHTML = '<span class="streaming-cursor">▊</span>';
-                            progressFill.style.width = '50%';
+                        // Update minimal status based on phase
+                        if (!isGenerating) {
+                            if (step.type === 'vector_search') {
+                                statusText.textContent = 'Searching documents...';
+                            } else if (step.type === 'context_assembly') {
+                                statusText.textContent = 'Building context...';
+                            } else if (step.type === 'llm_generation') {
+                                if (step.detail.includes('Generating')) {
+                                    isGenerating = true;
+                                    // Hide status, show response area
+                                    statusEl.style.display = 'none';
+                                    responseEl.style.display = 'block';
+                                    responseEl.innerHTML = '<span class="streaming-cursor">▊</span>';
+                                } else {
+                                    statusText.textContent = 'Generating response...';
+                                }
+                            }
                         }
 
                         if (appSettings.autoScroll) {
@@ -3702,17 +3697,19 @@
                         const data = JSON.parse(e.data);
                         tokenBuffer += data.token;
 
-                        // Convert markdown to HTML for display (simple version)
+                        // Ensure status is hidden and response is visible
+                        if (statusEl.style.display !== 'none') {
+                            statusEl.style.display = 'none';
+                            responseEl.style.display = 'block';
+                        }
+
+                        // Convert markdown to HTML for display
                         let displayText = escapeHtml(tokenBuffer);
                         displayText = displayText.replace(/\n/g, '<br>');
                         displayText = displayText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
                         displayText = displayText.replace(/\[([^\]]+)\]/g, '<span class="citation">[$1]</span>');
 
                         responseEl.innerHTML = displayText + '<span class="streaming-cursor">▊</span>';
-
-                        // Update progress based on token count (estimate)
-                        const estimatedProgress = Math.min(95, 50 + (tokenBuffer.length / 20));
-                        progressFill.style.width = estimatedProgress + '%';
 
                         if (appSettings.autoScroll) {
                             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -3724,7 +3721,6 @@
 
                 eventSource.addEventListener('complete', (e) => {
                     eventSource.close();
-                    progressFill.style.width = '100%';
 
                     try {
                         const result = JSON.parse(e.data);
@@ -3732,7 +3728,7 @@
                         // Remove streaming UI
                         removeElement(loadingId);
 
-                        // Show final response
+                        // Show final response with sources
                         const sources = (result.sources || []).map(s => ({ filename: s }));
                         appendAssistantResponse(
                             result.answer,
@@ -3753,9 +3749,9 @@
                     if (e.data) {
                         try {
                             const err = JSON.parse(e.data);
-                            statusEl.textContent = 'Error: ' + err.error;
+                            statusText.textContent = 'Error: ' + err.error;
                         } catch {
-                            statusEl.textContent = 'Connection error';
+                            statusText.textContent = 'Connection error';
                         }
                     }
                     eventSource.close();

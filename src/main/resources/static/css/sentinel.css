@@ -4363,7 +4363,37 @@
             transition: width 0.5s ease-out;
         }
 
-        /* SSE Streaming Progress */
+        /* SSE Streaming - Minimal Status */
+        .streaming-container {
+            padding: 12px 16px;
+        }
+
+        .streaming-status-minimal {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .streaming-status-minimal .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .streaming-status-minimal .status-text {
+            color: var(--text-secondary);
+        }
+
+        /* Legacy streaming progress (kept for fallback) */
         .streaming-progress {
             padding: 16px;
             background: var(--accent-muted);
