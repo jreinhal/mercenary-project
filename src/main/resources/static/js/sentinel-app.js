@@ -3137,18 +3137,62 @@
             recordMessage('user', text, [], [], null);
         }
 
-        function appendLoadingIndicator() {
+        function appendLoadingIndicator(queryText = '') {
             const id = 'loading-' + Date.now();
             const div = document.createElement('div');
             div.className = 'message assistant';
             div.id = id;
+
+            // Estimate complexity based on query characteristics
+            const wordCount = queryText.split(/\s+/).length;
+            const isComplex = wordCount > 10 ||
+                /summary|detailed|comprehensive|all|compare|analyze/i.test(queryText);
+            const estimatedTime = isComplex ? '30-120 seconds' : '5-15 seconds';
+
+            // Progress stages for complex queries
+            const stages = [
+                'Scanning security protocols...',
+                'Analyzing query intent...',
+                'Searching document vectors...',
+                'Retrieving relevant documents...',
+                'Reranking by relevance...',
+                'Synthesizing response...'
+            ];
+
             div.innerHTML = `
             <div class="loading-indicator">
                 <div class="loading-spinner"></div>
-                <span class="loading-text">Analyzing hypergraph nodes...</span>
+                <span class="loading-text" data-stages='${JSON.stringify(stages)}' data-stage-index="0">
+                    ${stages[0]}
+                </span>
+                ${isComplex ? `<span class="loading-estimate">(Complex query: ~${estimatedTime})</span>` : ''}
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill" style="width: 5%"></div>
+                </div>
             </div>
         `;
             chatMessages.appendChild(div);
+
+            // Animate through stages for complex queries
+            if (isComplex) {
+                let stageIndex = 0;
+                const progressInterval = setInterval(() => {
+                    stageIndex = (stageIndex + 1) % stages.length;
+                    const textEl = div.querySelector('.loading-text');
+                    const progressEl = div.querySelector('.loading-progress-fill');
+                    if (textEl && document.getElementById(id)) {
+                        textEl.textContent = stages[stageIndex];
+                        if (progressEl) {
+                            const progress = Math.min(95, 5 + (stageIndex + 1) * 15);
+                            progressEl.style.width = progress + '%';
+                        }
+                    } else {
+                        clearInterval(progressInterval);
+                    }
+                }, 5000);
+                div.dataset.progressInterval = progressInterval;
+            }
+
             if (appSettings.autoScroll) {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
@@ -3157,7 +3201,13 @@
 
         function removeElement(id) {
             const el = document.getElementById(id);
-            if (el) el.remove();
+            if (el) {
+                // Clear any progress animation interval
+                if (el.dataset.progressInterval) {
+                    clearInterval(parseInt(el.dataset.progressInterval));
+                }
+                el.remove();
+            }
         }
 
         function appendAssistantResponse(text, reasoningSteps = [], sources = [], traceId = null, metrics = null) {
@@ -3501,7 +3551,18 @@
             appendUserMessage(query);
             queryInput.value = '';
 
-            const loadingId = appendLoadingIndicator();
+            // Detect if query is complex (use SSE for complex queries)
+            const wordCount = query.split(/\s+/).length;
+            const isComplex = wordCount > 8 ||
+                /summary|detailed|comprehensive|all|compare|analyze|explain/i.test(query);
+
+            if (isComplex && typeof EventSource !== 'undefined') {
+                // Use SSE streaming for complex queries
+                await executeQueryWithStreaming(query, sector, activeFiles, params);
+                return;
+            }
+
+            const loadingId = appendLoadingIndicator(query);
 
             try {
                 const startTime = Date.now();
@@ -3551,6 +3612,192 @@
                 } catch (fallbackError) {
                     appendAssistantResponse(`Error: ${error.message}`, [], [], null, null);
                 }
+            }
+        }
+
+        /**
+         * Execute query with SSE streaming for real-time progress updates.
+         * Shows each reasoning step as it completes.
+         */
+        async function executeQueryWithStreaming(query, sector, activeFiles, params) {
+            const loadingId = 'streaming-' + Date.now();
+            const div = document.createElement('div');
+            div.className = 'message assistant';
+            div.id = loadingId;
+            div.innerHTML = `
+                <div class="streaming-progress">
+                    <div class="streaming-header">
+                        <div class="loading-spinner"></div>
+                        <span class="streaming-status">Connecting to SENTINEL...</span>
+                    </div>
+                    <div class="streaming-response" style="display: none;"></div>
+                    <div class="streaming-progress-bar">
+                        <div class="streaming-progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(div);
+            if (appSettings.autoScroll) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            const statusEl = div.querySelector('.streaming-status');
+            const progressFill = div.querySelector('.streaming-progress-fill');
+            const responseEl = div.querySelector('.streaming-response');
+            const reasoningSteps = [];
+            let stepCount = 0;
+            const totalExpectedSteps = 6;
+            let tokenBuffer = '';
+            let isGenerating = false;
+
+            try {
+                const eventSource = new EventSource(`${API_BASE}/ask/stream?${params.toString()}`);
+
+                eventSource.addEventListener('connected', (e) => {
+                    statusEl.textContent = 'Connected - Processing query...';
+                    progressFill.style.width = '5%';
+                });
+
+                eventSource.addEventListener('step', (e) => {
+                    try {
+                        const step = JSON.parse(e.data);
+                        stepCount++;
+
+                        // Show progress during pre-generation steps
+                        if (!isGenerating) {
+                            const progress = Math.min(50, (stepCount / totalExpectedSteps) * 45 + 5);
+                            progressFill.style.width = progress + '%';
+                        }
+
+                        // Update status
+                        statusEl.textContent = step.label + ': ' + step.detail;
+
+                        // Store for reasoning accordion
+                        reasoningSteps.push({
+                            type: mapStepType(step.type),
+                            label: step.label,
+                            detail: step.detail,
+                            durationMs: 0
+                        });
+
+                        // When LLM generation starts, prepare the response area
+                        if (step.type === 'llm_generation' && step.detail.includes('Generating')) {
+                            isGenerating = true;
+                            responseEl.style.display = 'block';
+                            responseEl.innerHTML = '<span class="streaming-cursor">▊</span>';
+                            progressFill.style.width = '50%';
+                        }
+
+                        if (appSettings.autoScroll) {
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    } catch (err) {
+                        console.error('Error parsing step:', err);
+                    }
+                });
+
+                // Handle real-time token streaming
+                eventSource.addEventListener('token', (e) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        tokenBuffer += data.token;
+
+                        // Convert markdown to HTML for display (simple version)
+                        let displayText = escapeHtml(tokenBuffer);
+                        displayText = displayText.replace(/\n/g, '<br>');
+                        displayText = displayText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                        displayText = displayText.replace(/\[([^\]]+)\]/g, '<span class="citation">[$1]</span>');
+
+                        responseEl.innerHTML = displayText + '<span class="streaming-cursor">▊</span>';
+
+                        // Update progress based on token count (estimate)
+                        const estimatedProgress = Math.min(95, 50 + (tokenBuffer.length / 20));
+                        progressFill.style.width = estimatedProgress + '%';
+
+                        if (appSettings.autoScroll) {
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    } catch (err) {
+                        console.error('Error parsing token:', err);
+                    }
+                });
+
+                eventSource.addEventListener('complete', (e) => {
+                    eventSource.close();
+                    progressFill.style.width = '100%';
+
+                    try {
+                        const result = JSON.parse(e.data);
+
+                        // Remove streaming UI
+                        removeElement(loadingId);
+
+                        // Show final response
+                        const sources = (result.sources || []).map(s => ({ filename: s }));
+                        appendAssistantResponse(
+                            result.answer,
+                            reasoningSteps,
+                            sources,
+                            null,
+                            { activeFileCount: activeFiles.length, streamed: true }
+                        );
+                        fetchSystemStatus();
+                    } catch (err) {
+                        console.error('Error parsing complete:', err);
+                        removeElement(loadingId);
+                        appendAssistantResponse('Error processing response.', reasoningSteps, [], null, null);
+                    }
+                });
+
+                eventSource.addEventListener('error', (e) => {
+                    if (e.data) {
+                        try {
+                            const err = JSON.parse(e.data);
+                            statusEl.textContent = 'Error: ' + err.error;
+                        } catch {
+                            statusEl.textContent = 'Connection error';
+                        }
+                    }
+                    eventSource.close();
+
+                    // Fall back to non-streaming after a delay
+                    setTimeout(() => {
+                        removeElement(loadingId);
+                        appendAssistantResponse('Streaming failed. Please try again.', [], [], null, null);
+                    }, 2000);
+                });
+
+                eventSource.onerror = () => {
+                    eventSource.close();
+                    removeElement(loadingId);
+                    // Fall back to regular endpoint
+                    executeQueryFallback(query, sector, activeFiles, params);
+                };
+
+            } catch (error) {
+                console.error('SSE error:', error);
+                removeElement(loadingId);
+                executeQueryFallback(query, sector, activeFiles, params);
+            }
+        }
+
+        async function executeQueryFallback(query, sector, activeFiles, params) {
+            const loadingId = appendLoadingIndicator(query);
+            try {
+                const response = await guardedFetch(`${API_BASE}/ask/enhanced?${params.toString()}`);
+                const data = await response.json();
+                removeElement(loadingId);
+                const reasoningSteps = (data.reasoning || []).map(step => ({
+                    type: mapStepType(step.type),
+                    label: step.label,
+                    detail: step.detail,
+                    durationMs: step.durationMs
+                }));
+                const sources = (data.sources || []).map(s => typeof s === 'string' ? { filename: s } : s);
+                appendAssistantResponse(data.answer, reasoningSteps, sources, data.traceId, data.metrics);
+            } catch (err) {
+                removeElement(loadingId);
+                appendAssistantResponse('Error: ' + err.message, [], [], null, null);
             }
         }
 

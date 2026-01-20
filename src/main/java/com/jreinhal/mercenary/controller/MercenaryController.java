@@ -38,8 +38,10 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -52,6 +54,8 @@ import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,6 +64,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping(value={"/api"})
@@ -94,7 +99,8 @@ public class MercenaryController {
     private static final Pattern NUMERIC_PATTERN = Pattern.compile("\\d");
     private static final Pattern RELATIONSHIP_PATTERN = Pattern.compile("\\b(relationship|relate|comparison|compare|versus|between|difference|differ|impact|effect|align|alignment|correlat|dependency|tradeoff|link)\\b", 2);
     private static final List<Pattern> NO_INFO_PATTERNS = List.of(Pattern.compile("no relevant records found", 2), Pattern.compile("no relevant (?:information|data|documents)", 2), Pattern.compile("no specific (?:information|data|metrics)", 2), Pattern.compile("no internal records", 2), Pattern.compile("no information (?:available|found)", 2), Pattern.compile("unable to find", 2), Pattern.compile("couldn'?t find", 2), Pattern.compile("do not contain any (?:information|data|metrics)", 2), Pattern.compile("not mentioned in (?:the )?documents", 2));
-    private static final int LLM_TIMEOUT_SECONDS = 30;
+    @Value("${sentinel.llm.timeout-seconds:60}")
+    private int llmTimeoutSeconds;
     private static final List<Pattern> INJECTION_PATTERNS = List.of(Pattern.compile("ignore\\s+(all\\s+)?(previous|prior|above)\\s+(instructions?|prompts?|rules?)", 2), Pattern.compile("disregard\\s+(all\\s+)?(previous|prior|above)", 2), Pattern.compile("forget\\s+(all\\s+)?(previous|prior|your)\\s+(instructions?|context|rules?)", 2), Pattern.compile("(show|reveal|display|print|output)\\s+(me\\s+)?(the\\s+)?(system|initial)\\s+prompt", 2), Pattern.compile("what\\s+(is|are)\\s+your\\s+(system\\s+)?(instructions?|rules?|prompt)", 2), Pattern.compile("you\\s+are\\s+now\\s+(a|an|in)\\s+", 2), Pattern.compile("act\\s+as\\s+(if|though)\\s+you", 2), Pattern.compile("pretend\\s+(to\\s+be|you\\s+are)", 2), Pattern.compile("roleplay\\s+as", 2), Pattern.compile("\\bDAN\\b.*mode", 2), Pattern.compile("developer\\s+mode\\s+(enabled|on|activated)", 2), Pattern.compile("bypass\\s+(your\\s+)?(safety|security|restrictions?|filters?)", 2), Pattern.compile("```\\s*(system|assistant)\\s*:", 2), Pattern.compile("\\[INST\\]|\\[/INST\\]|<<SYS>>|<</SYS>>", 2), Pattern.compile("(start|begin)\\s+(your\\s+)?response\\s+with", 2), Pattern.compile("(what|tell|show|reveal|repeat|print|display).{0,15}(your|system|internal|hidden).{0,10}(prompt|instructions?|directives?|rules|guidelines)", 2), Pattern.compile("(what|how).{0,10}(are|were).{0,10}you.{0,10}(programmed|instructed|told|prompted)", 2), Pattern.compile("(ignore|forget|disregard).{0,20}(previous|above|prior|all).{0,20}(instructions?|prompt|rules|context)", 2), Pattern.compile("(repeat|echo|output).{0,15}(everything|all).{0,10}(above|before|prior)", 2));
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService) {
@@ -408,11 +414,12 @@ public class MercenaryController {
             try {
                 String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
                 String userQuery = query.replace("{", "[").replace("}", "]");
-                response = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(30L, TimeUnit.SECONDS);
+                String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                response = cleanLlmResponse(rawResponse);
             }
             catch (TimeoutException te) {
                 llmSuccess = false;
-                log.warn("LLM response timed out after {}s for query: {}", 30, query.substring(0, Math.min(50, query.length())));
+                log.warn("LLM response timed out after {}s for query: {}", llmTimeoutSeconds, query.substring(0, Math.min(50, query.length())));
                 response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try:\n- Simplifying your question\n- Asking about a more specific topic\n- Trying again in a moment";
             }
             catch (Exception llmError) {
@@ -571,10 +578,11 @@ public class MercenaryController {
                 log.info("AdaptiveRAG: ZeroHop path - skipping retrieval for conversational query");
                 try {
                     String userQuery = query.replace("{", "[").replace("}", "]");
-                    directResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.").user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(30L, TimeUnit.SECONDS);
+                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.").user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                    directResponse = cleanLlmResponse(rawResponse);
                 }
                 catch (TimeoutException te) {
-                    log.warn("LLM response timed out after {}s for ZeroHop query", 30);
+                    log.warn("LLM response timed out after {}s for ZeroHop query", llmTimeoutSeconds);
                     directResponse = "**Response Timeout**\n\nThe system is taking longer than expected. Please try again.";
                 }
                 catch (Exception llmError) {
@@ -639,11 +647,12 @@ public class MercenaryController {
             try {
                 String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
                 String userQuery = query.replace("{", "[").replace("}", "]");
-                response = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(30L, TimeUnit.SECONDS);
+                String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                response = cleanLlmResponse(rawResponse);
             }
             catch (TimeoutException te) {
                 llmSuccess = false;
-                log.warn("LLM response timed out after {}s", 30);
+                log.warn("LLM response timed out after {}s", llmTimeoutSeconds);
                 response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try:\n- Simplifying your question\n- Asking about a more specific topic\n- Trying again in a moment";
             }
             catch (Exception llmError) {
@@ -803,6 +812,281 @@ public class MercenaryController {
             return Map.of("error", "Access denied - not trace owner", "traceId", traceId);
         }
         return trace.toMap();
+    }
+
+    /**
+     * SSE Streaming endpoint for real-time query processing feedback.
+     * Streams reasoning steps as they complete, then the final response.
+     */
+    @GetMapping(value = "/ask/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter askStream(
+            @RequestParam("q") String query,
+            @RequestParam("dept") String dept,
+            @RequestParam(value = "file", required = false) List<String> fileParams,
+            @RequestParam(value = "files", required = false) String filesParam,
+            @RequestParam(value = "sessionId", required = false) String sessionId,
+            HttpServletRequest request) {
+
+        SseEmitter emitter = new SseEmitter(180000L); // 3 minute timeout
+
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            sendSseError(emitter, "Authentication required");
+            return emitter;
+        }
+
+        Department department;
+        try {
+            department = Department.valueOf(dept.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            sendSseError(emitter, "Invalid sector: " + dept);
+            return emitter;
+        }
+
+        if (!user.hasPermission(UserRole.Permission.QUERY)) {
+            sendSseError(emitter, "Insufficient permissions");
+            return emitter;
+        }
+
+        List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
+
+        // Process in background thread
+        CompletableFuture.runAsync(() -> {
+            try {
+                // Send initial connection event
+                emitter.send(SseEmitter.event()
+                    .name("connected")
+                    .data("{\"status\":\"connected\",\"query\":\"" + escapeJson(query) + "\"}"));
+
+                // Step 1: Security Check
+                sendSseStep(emitter, "security_check", "Security Scan", "Analyzing query for threats...");
+                boolean isInjection = this.isPromptInjection(query);
+                if (isInjection) {
+                    sendSseStep(emitter, "security_check", "Security Scan", "BLOCKED: Injection detected");
+                    emitter.send(SseEmitter.event()
+                        .name("complete")
+                        .data("{\"answer\":\"SECURITY ALERT: Indirect Prompt Injection Detected.\",\"blocked\":true}"));
+                    emitter.complete();
+                    return;
+                }
+                sendSseStep(emitter, "security_check", "Security Scan", "Query passed security check");
+
+                // Step 2: Query Routing
+                sendSseStep(emitter, "query_routing", "Query Routing", "Analyzing query complexity...");
+                Thread.sleep(100); // Small delay for visual feedback
+
+                // Step 3: Vector Search
+                sendSseStep(emitter, "vector_search", "Vector Search", "Searching document vectors...");
+                double adaptiveThreshold = 0.45;
+                List<Document> docs = this.performHybridRerankingTracked(query, dept, adaptiveThreshold, activeFiles);
+                sendSseStep(emitter, "vector_search", "Vector Search", "Found " + docs.size() + " relevant documents");
+
+                // Step 4: Context Assembly
+                sendSseStep(emitter, "context_assembly", "Context Assembly", "Building context from documents...");
+                List<Document> topDocs = docs.stream().limit(10).toList();
+                String information = topDocs.stream().map(doc -> {
+                    String filename = (String) doc.getMetadata().get("source");
+                    String content = doc.getContent().replace("{", "[").replace("}", "]");
+                    return "SOURCE: " + filename + "\nCONTENT: " + content;
+                }).collect(Collectors.joining("\n\n---\n\n"));
+                sendSseStep(emitter, "context_assembly", "Context Assembly", "Assembled " + information.length() + " chars from " + topDocs.size() + " docs");
+
+                // Step 5: LLM Generation with Token Streaming
+                sendSseStep(emitter, "llm_generation", "Response Synthesis", "Generating response...");
+
+                String systemMessage = information.isEmpty()
+                    ? "You are SENTINEL. No documents found. Respond: 'No relevant records found.'"
+                    : "You are SENTINEL, an intelligence analyst. Base your response ONLY on these documents. Cite sources using [filename] format.\n\nDOCUMENTS:\n" + information;
+
+                String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
+                String userQuery = query.replace("{", "[").replace("}", "]");
+
+                // Stream tokens in real-time
+                StringBuilder responseBuilder = new StringBuilder();
+                AtomicBoolean streamComplete = new AtomicBoolean(false);
+                AtomicBoolean hasError = new AtomicBoolean(false);
+                AtomicReference<String> errorMsg = new AtomicReference<>("");
+
+                try {
+                    this.chatClient.prompt()
+                        .system(sysMsg)
+                        .user(userQuery)
+                        .options((ChatOptions) LLM_OPTIONS)
+                        .stream()
+                        .content()
+                        .doOnNext(token -> {
+                            try {
+                                responseBuilder.append(token);
+                                // Send token to client
+                                emitter.send(SseEmitter.event()
+                                    .name("token")
+                                    .data("{\"token\":\"" + escapeJson(token) + "\"}"));
+                            } catch (Exception e) {
+                                log.warn("Error sending token: {}", e.getMessage());
+                            }
+                        })
+                        .doOnComplete(() -> streamComplete.set(true))
+                        .doOnError(e -> {
+                            hasError.set(true);
+                            errorMsg.set(e.getMessage());
+                            log.error("Stream error: {}", e.getMessage());
+                        })
+                        .blockLast(Duration.ofSeconds(llmTimeoutSeconds));
+
+                } catch (Exception e) {
+                    hasError.set(true);
+                    errorMsg.set(e.getMessage());
+                    log.error("Streaming failed: {}", e.getMessage());
+                }
+
+                String response;
+                if (hasError.get()) {
+                    if (errorMsg.get().contains("timeout") || errorMsg.get().toLowerCase().contains("deadline")) {
+                        response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try simplifying your question.";
+                        sendSseStep(emitter, "llm_generation", "Response Synthesis", "Timeout - using fallback response");
+                    } else {
+                        response = "An error occurred generating the response.";
+                        sendSseStep(emitter, "llm_generation", "Response Synthesis", "Error: " + errorMsg.get());
+                    }
+                } else {
+                    response = cleanLlmResponse(responseBuilder.toString());
+                    sendSseStep(emitter, "llm_generation", "Response Synthesis", "Response generated successfully");
+                }
+
+                // Step 6: Citation Verification
+                sendSseStep(emitter, "citation_verification", "Citation Check", "Verifying citations...");
+                int citationCount = countCitations(response);
+                sendSseStep(emitter, "citation_verification", "Citation Check", "Found " + citationCount + " citations");
+
+                // Send final response with sources
+                List<String> sources = topDocs.stream()
+                    .map(d -> (String) d.getMetadata().get("source"))
+                    .filter(s -> s != null)
+                    .distinct()
+                    .toList();
+
+                emitter.send(SseEmitter.event()
+                    .name("complete")
+                    .data("{\"answer\":\"" + escapeJson(response) + "\",\"sources\":" + toJsonArray(sources) + ",\"citationCount\":" + citationCount + "}"));
+
+                emitter.complete();
+
+            } catch (Exception e) {
+                log.error("SSE stream error", e);
+                try {
+                    emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data("{\"error\":\"" + escapeJson(e.getMessage()) + "\"}"));
+                    emitter.complete();
+                } catch (Exception ex) {
+                    emitter.completeWithError(ex);
+                }
+            }
+        });
+
+        return emitter;
+    }
+
+    private void sendSseStep(SseEmitter emitter, String type, String label, String detail) {
+        try {
+            String json = String.format(
+                "{\"type\":\"%s\",\"label\":\"%s\",\"detail\":\"%s\",\"timestamp\":%d}",
+                type, label, escapeJson(detail), System.currentTimeMillis()
+            );
+            emitter.send(SseEmitter.event().name("step").data(json));
+        } catch (Exception e) {
+            log.warn("Failed to send SSE step: {}", e.getMessage());
+        }
+    }
+
+    private void sendSseError(SseEmitter emitter, String message) {
+        try {
+            emitter.send(SseEmitter.event()
+                .name("error")
+                .data("{\"error\":\"" + escapeJson(message) + "\"}"));
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+
+    private String toJsonArray(List<String> list) {
+        if (list == null || list.isEmpty()) return "[]";
+        return "[" + list.stream()
+            .map(s -> "\"" + escapeJson(s) + "\"")
+            .collect(Collectors.joining(",")) + "]";
+    }
+
+    /**
+     * Cleans up LLM responses that may contain raw function call JSON.
+     * This happens when the model outputs tool calls instead of plain text.
+     */
+    private static String cleanLlmResponse(String response) {
+        if (response == null || response.isBlank()) {
+            return response;
+        }
+
+        String trimmed = response.trim();
+
+        // Detect function call JSON pattern: {"name": "...", "parameters": {...}}
+        if (trimmed.startsWith("{\"name\"") && trimmed.contains("\"parameters\"")) {
+            try {
+                // Try to extract the expression/content from the function call
+                int exprStart = trimmed.indexOf("\"expression\"");
+                if (exprStart == -1) {
+                    exprStart = trimmed.indexOf("\"content\"");
+                }
+                if (exprStart == -1) {
+                    exprStart = trimmed.indexOf("\"value\"");
+                }
+
+                if (exprStart != -1) {
+                    // Find the value after the key
+                    int colonPos = trimmed.indexOf(":", exprStart);
+                    if (colonPos != -1) {
+                        int valueStart = trimmed.indexOf("\"", colonPos + 1);
+                        if (valueStart != -1) {
+                            int valueEnd = trimmed.lastIndexOf("\"");
+                            if (valueEnd > valueStart) {
+                                String extracted = trimmed.substring(valueStart + 1, valueEnd);
+                                // Unescape JSON string
+                                extracted = extracted.replace("\\\"", "\"")
+                                                   .replace("\\n", "\n")
+                                                   .replace("\\t", "\t");
+                                log.warn("Cleaned malformed function call response, extracted: {}...",
+                                    extracted.substring(0, Math.min(100, extracted.length())));
+                                return extracted;
+                            }
+                        }
+                    }
+                }
+
+                // If we can't extract, return a warning message
+                log.error("Unable to parse function call response: {}", trimmed.substring(0, Math.min(200, trimmed.length())));
+                return "The system encountered a formatting issue. Please try rephrasing your question.";
+
+            } catch (Exception e) {
+                log.error("Error cleaning LLM response: {}", e.getMessage());
+                return "An error occurred processing the response. Please try again.";
+            }
+        }
+
+        // Also handle array of function calls: [{"name": ...}]
+        if (trimmed.startsWith("[{\"name\"")) {
+            log.warn("Detected array function call response, returning fallback");
+            return "The system encountered a formatting issue. Please try rephrasing your question.";
+        }
+
+        return response;
     }
 
     private static int countCitations(String response) {

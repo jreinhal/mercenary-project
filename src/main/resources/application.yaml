@@ -89,9 +89,9 @@ app:
 # Single-product with 5 sectors: GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
 # ============================================
 sentinel:
-  # LLM timeout for complex queries (default 60s, increase for compound/multi-hop queries)
+  # LLM timeout for complex queries (default 120s, increase for slower hardware)
   llm:
-    timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
+    timeout-seconds: ${LLM_TIMEOUT_SECONDS:120}
 
 # ============================================
 # SENTINEL Advanced RAG Configuration
