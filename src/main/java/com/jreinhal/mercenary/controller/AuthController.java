@@ -41,6 +41,10 @@ public class AuthController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
         }
+        HttpSession existingSession = httpRequest.getSession(false);
+        if (existingSession != null) {
+            existingSession.invalidate();
+        }
         HttpSession session = httpRequest.getSession(true);
         session.setAttribute("mercenary.auth.userId", user.getId());
         String displayName = user.getDisplayName() != null ? user.getDisplayName() : user.getUsername();

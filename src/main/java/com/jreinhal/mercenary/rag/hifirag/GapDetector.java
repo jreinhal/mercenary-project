@@ -1,5 +1,7 @@
 package com.jreinhal.mercenary.rag.hifirag;
 
+import com.jreinhal.mercenary.constant.StopWords;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -7,7 +9,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import com.jreinhal.mercenary.constant.StopWords;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -87,7 +88,7 @@ public class GapDetector {
         gapQuery.append(" ");
         gapQuery.append(String.join((CharSequence)" ", gaps));
         String result = gapQuery.toString().trim();
-        log.debug("Generated gap query: {}", result);
+        log.debug("Generated gap query {}", LogSanitizer.querySummary(result));
         return result;
     }
 

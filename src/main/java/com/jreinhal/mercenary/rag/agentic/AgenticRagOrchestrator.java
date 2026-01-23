@@ -8,6 +8,7 @@ import com.jreinhal.mercenary.rag.selfrag.SelfRagService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -109,7 +110,7 @@ public class AgenticRagOrchestrator {
             executedSteps.add("QUERY_REWRITE");
             currentQuery = this.rewriteService.rewriteQuery(currentQuery);
             metrics.put("rewrittenQuery", currentQuery);
-            log.info("Agentic: Rewriting query to: {}", currentQuery);
+            log.info("Agentic: Rewriting query to {}", LogSanitizer.querySummary(currentQuery));
         }
         if (this.useSelfRag) {
             executedSteps.add("SELFRAG_GENERATION");

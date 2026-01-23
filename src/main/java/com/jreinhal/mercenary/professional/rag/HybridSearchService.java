@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.professional.rag;
 
+import com.jreinhal.mercenary.util.LogSanitizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,7 +33,7 @@ public class HybridSearchService {
     }
 
     public List<HybridResult> search(String query, int topK, double vectorWeight, double bm25Weight) {
-        log.debug("Hybrid search: query='{}', topK={}, weights=[vector={}, bm25={}]", new Object[]{this.truncate(query, 50), topK, vectorWeight, bm25Weight});
+        log.debug("Hybrid search: query={}, topK={}, weights=[vector={}, bm25={}]", LogSanitizer.querySummary(query), topK, vectorWeight, bm25Weight);
         List<Document> vectorResults = this.performVectorSearch(query, topK * 2);
         List<Document> bm25Results = this.performBm25Search(query, topK * 2);
         List<HybridResult> fusedResults = this.fuseResults(vectorResults, bm25Results, vectorWeight, bm25Weight);
@@ -167,13 +168,6 @@ public class HybridSearchService {
         }
         double total = vectorWeight + bm25Weight;
         return new double[]{vectorWeight / total, bm25Weight / total};
-    }
-
-    private String truncate(String str, int maxLen) {
-        if (str == null) {
-            return "";
-        }
-        return str.length() <= maxLen ? str : str.substring(0, maxLen) + "...";
     }
 
     public record HybridResult(Document document, double combinedScore, double vectorScore, double bm25Score, int vectorRank, int bm25Rank) {

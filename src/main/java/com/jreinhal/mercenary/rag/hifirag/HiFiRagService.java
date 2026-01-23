@@ -5,6 +5,7 @@ import com.jreinhal.mercenary.rag.hifirag.GapDetector;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -63,7 +64,7 @@ public class HiFiRagService {
             return this.standardRetrieval(query, normalizedDept);
         }
         long startTime = System.currentTimeMillis();
-        log.info("HiFi-RAG: Starting iterative retrieval for query: {}", query);
+        log.info("HiFi-RAG: Starting iterative retrieval for query {}", LogSanitizer.querySummary(query));
         LinkedHashMap<String, ScoredDocument> allDocuments = new LinkedHashMap<String, ScoredDocument>();
         HashSet<String> coveredConcepts = new HashSet<String>();
         List<String> queryConcepts = this.gapDetector.extractConcepts(query);
@@ -96,7 +97,7 @@ public class HiFiRagService {
                 break;
             }
             currentQuery = this.gapDetector.generateGapQuery(query, gaps);
-            log.debug("HiFi-RAG: Generated gap query: {}", currentQuery);
+            log.debug("HiFi-RAG: Generated gap query {}", LogSanitizer.querySummary(currentQuery));
         }
         List<Document> finalDocs = allDocuments.values().stream().sorted((a, b) -> Double.compare(b.score(), a.score())).limit(this.filteredK).map(ScoredDocument::document).collect(Collectors.toList());
         long totalTime = System.currentTimeMillis() - startTime;

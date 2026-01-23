@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.rag.hybridrag;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -85,7 +86,7 @@ public class QueryExpander {
         if (this.expansionCache != null) {
             this.expansionCache.put(cacheKey, List.copyOf(result));
         }
-        log.debug("QueryExpander: Generated {} variants for query: '{}'", result.size(), query.length() > 50 ? query.substring(0, 50) + "..." : query);
+        log.debug("QueryExpander: Generated {} variants for query {}", result.size(), LogSanitizer.querySummary(query));
         return result;
     }
 

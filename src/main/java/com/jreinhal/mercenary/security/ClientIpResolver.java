@@ -55,7 +55,11 @@ public class ClientIpResolver {
         return remoteAddr != null ? remoteAddr : "UNKNOWN";
     }
 
-    private boolean isTrustedProxy(String remoteAddr) {
+    public boolean isTrustedProxy(String remoteAddr) {
+        if (remoteAddr == null || remoteAddr.isBlank()) {
+            return false;
+        }
         return this.trustedProxies.contains(remoteAddr);
     }
+
 }

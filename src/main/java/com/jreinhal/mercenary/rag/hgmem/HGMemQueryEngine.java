@@ -1,9 +1,10 @@
 package com.jreinhal.mercenary.rag.hgmem;
 
 import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
-import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -54,7 +55,7 @@ public class HGMemQueryEngine {
             return new HGMemResult(vectorResults, List.of(), List.of(), 0);
         }
         long startTime = System.currentTimeMillis();
-        log.info("HGMem: Starting hybrid query for: {}", query);
+        log.info("HGMem: Starting hybrid query for {}", LogSanitizer.querySummary(query));
         long vectorStart = System.currentTimeMillis();
         List<Document> vectorResults = this.vectorSearch(query, department);
         long vectorTime = System.currentTimeMillis() - vectorStart;

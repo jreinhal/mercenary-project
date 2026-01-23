@@ -31,6 +31,7 @@ import com.jreinhal.mercenary.service.QueryDecompositionService;
 import com.jreinhal.mercenary.service.RagOrchestrationService;
 import com.jreinhal.mercenary.service.SecureIngestionService;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
 import com.jreinhal.mercenary.util.DocumentMetadataUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -722,10 +723,10 @@ public class MercenaryController {
         List<Document> keywordResults = new ArrayList<>();
         try {
             semanticResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
-            log.info("Semantic search found {} results for '{}'", semanticResults.size(), query);
+            log.info("Semantic search found {} results for query {}", semanticResults.size(), LogSanitizer.querySummary(query));
             String lowerQuery = query.toLowerCase();
             keywordResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.01).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
-            log.info("Keyword fallback found {} documents for '{}'", keywordResults.size(), query);
+            log.info("Keyword fallback found {} documents for query {}", keywordResults.size(), LogSanitizer.querySummary(query));
             Set<String> stopWords = Set.of("the", "and", "for", "was", "are", "is", "of", "to", "in", "what", "where", "when", "who", "how", "why", "tell", "me", "about", "describe", "find", "show", "give", "also");
             String[] queryTerms = lowerQuery.split("\\s+");
             keywordResults = keywordResults.stream().filter(doc -> {

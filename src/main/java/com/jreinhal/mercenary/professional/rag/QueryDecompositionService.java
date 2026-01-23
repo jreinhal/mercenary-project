@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.professional.rag;
 
+import com.jreinhal.mercenary.util.LogSanitizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -19,7 +20,7 @@ public class QueryDecompositionService {
     }
 
     public DecompositionResult decompose(String query) {
-        log.debug("Analyzing query for decomposition: {}", this.truncate(query, 100));
+        log.debug("Analyzing query for decomposition {}", LogSanitizer.querySummary(query));
         if (!this.requiresDecomposition(query)) {
             return new DecompositionResult(query, DecompositionStrategy.PARALLEL, List.of(new SubQuery(query, 1, false, "Direct answer", List.of())), "Return the answer directly", false);
         }
@@ -156,13 +157,6 @@ public class QueryDecompositionService {
             }
             return fallback.toString();
         }
-    }
-
-    private String truncate(String str, int maxLen) {
-        if (str == null) {
-            return "";
-        }
-        return str.length() <= maxLen ? str : str.substring(0, maxLen) + "...";
     }
 
     public record DecompositionResult(String originalQuery, DecompositionStrategy strategy, List<SubQuery> subQueries, String synthesisPrompt, boolean isComplex) {

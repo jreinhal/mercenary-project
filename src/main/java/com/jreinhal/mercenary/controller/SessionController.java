@@ -183,7 +183,7 @@ public class SessionController {
         try {
             Path exportPath = this.sessionPersistenceService.exportSession(sessionId, user.getId());
             this.auditService.logQuery(user, "session_export_file: " + sessionId, Department.ENTERPRISE, "Session exported to file", request);
-            return ResponseEntity.ok(Map.of("status", "exported", "path", exportPath.toString(), "sessionId", sessionId));
+            return ResponseEntity.ok(Map.of("status", "exported", "file", exportPath.getFileName().toString(), "sessionId", sessionId));
         }
         catch (SecurityException e) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied"));

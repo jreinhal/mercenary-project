@@ -5,6 +5,7 @@ import com.jreinhal.mercenary.model.ClearanceLevel;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.repository.UserRepository;
+import com.jreinhal.mercenary.security.ClientIpResolver;
 import com.jreinhal.mercenary.service.AuthenticationService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -22,9 +24,15 @@ public class CacAuthenticationService
 implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(CacAuthenticationService.class);
     private final UserRepository userRepository;
+    private final ClientIpResolver clientIpResolver;
+    @Value("${app.cac.auto-provision:false}")
+    private boolean autoProvision;
+    @Value("${app.cac.require-approval:true}")
+    private boolean requireApproval;
 
-    public CacAuthenticationService(UserRepository userRepository) {
+    public CacAuthenticationService(UserRepository userRepository, ClientIpResolver clientIpResolver) {
         this.userRepository = userRepository;
+        this.clientIpResolver = clientIpResolver;
         log.info(">>> CAC/PIV AUTHENTICATION MODE ACTIVE <<<");
         log.info(">>> Ensure mutual TLS is configured on the server <<<");
     }
@@ -38,7 +46,12 @@ implements AuthenticationService {
             subjectDn = certs[0].getSubjectX500Principal().getName();
             log.debug("Client certificate DN: {}", subjectDn);
         } else if (certHeader != null && !certHeader.isEmpty()) {
-            subjectDn = this.extractDnFromHeader(certHeader);
+            boolean trustedProxy = this.clientIpResolver.isTrustedProxy(request.getRemoteAddr());
+            if (trustedProxy) {
+                subjectDn = this.extractDnFromHeader(certHeader);
+            } else {
+                log.warn("Ignoring X-Client-Cert from untrusted proxy: {}", request.getRemoteAddr());
+            }
         }
         if (subjectDn == null) {
             log.warn("No client certificate provided");
@@ -51,6 +64,10 @@ implements AuthenticationService {
         }
         User user = this.userRepository.findByExternalId(subjectDn).orElse(null);
         if (user == null) {
+            if (!this.autoProvision) {
+                log.warn("CAC user {} not found and auto-provisioning disabled", commonName);
+                return null;
+            }
             user = new User();
             user.setExternalId(subjectDn);
             user.setUsername(commonName);
@@ -60,9 +77,21 @@ implements AuthenticationService {
             user.setClearance(ClearanceLevel.UNCLASSIFIED);
             user.setAllowedSectors(Set.of(Department.GOVERNMENT));
             user.setCreatedAt(Instant.now());
+            if (this.requireApproval) {
+                user.setActive(false);
+                user.setPendingApproval(true);
+                user = (User)this.userRepository.save(user);
+                log.info("Auto-provisioned new CAC user pending approval: {}", commonName);
+                return null;
+            }
             user.setActive(true);
+            user.setPendingApproval(false);
             user = (User)this.userRepository.save(user);
-            log.info("Auto-provisioned new CAC user: {} (requires clearance verification)", commonName);
+            log.info("Auto-provisioned new CAC user: {}", commonName);
+        }
+        if (user.isPendingApproval()) {
+            log.warn("CAC user {} is pending approval", commonName);
+            return null;
         }
         if (!user.isActive()) {
             log.warn("CAC user {} is deactivated", commonName);

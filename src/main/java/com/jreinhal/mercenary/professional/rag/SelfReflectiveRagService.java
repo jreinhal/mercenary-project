@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.professional.rag;
 
+import com.jreinhal.mercenary.util.LogSanitizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,7 @@ public class SelfReflectiveRagService {
 
     public ReflectiveResult generateWithReflection(String query, List<Document> retrievedDocs) {
         boolean hasHallucinations;
-        log.debug("Starting self-reflective RAG for query: {}", this.truncate(query, 100));
+        log.debug("Starting self-reflective RAG for query {}", LogSanitizer.querySummary(query));
         String context = this.buildContext(retrievedDocs);
         ArrayList<String> warnings = new ArrayList<String>();
         String currentAnswer = null;
@@ -172,13 +173,6 @@ public class SelfReflectiveRagService {
             context.append("\n\n");
         }
         return context.toString();
-    }
-
-    private String truncate(String str, int maxLength) {
-        if (str == null) {
-            return "";
-        }
-        return str.length() <= maxLength ? str : str.substring(0, maxLength) + "...";
     }
 
     public record ReflectiveResult(String answer, List<ClaimVerification> verifications, double overallConfidence, int reflectionIterations, boolean containsHallucinations, List<String> warnings) {

@@ -4,6 +4,7 @@ import com.jreinhal.mercenary.rag.birag.GroundingVerifier;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -86,10 +87,10 @@ public class BidirectionalRagService {
             experience = this.createExperience(query, response, retrievedDocs, department, userId, confidence);
             if (this.autoApprove) {
                 this.storeExperience(experience);
-                log.info("BiRAG: Auto-approved experience for query: {}", this.truncate(query, 50));
+                log.info("BiRAG: Auto-approved experience for query {}", LogSanitizer.querySummary(query));
             } else {
                 this.storePendingExperience(experience);
-                log.info("BiRAG: Experience pending approval for query: {}", this.truncate(query, 50));
+                log.info("BiRAG: Experience pending approval for query {}", LogSanitizer.querySummary(query));
             }
         }
         long elapsed = System.currentTimeMillis() - startTime;
@@ -226,10 +227,6 @@ public class BidirectionalRagService {
 
     private void storePendingExperience(Experience experience) {
         this.mongoTemplate.save(experience, PENDING_EXPERIENCES);
-    }
-
-    private String truncate(String s, int max) {
-        return s.length() > max ? s.substring(0, max) + "..." : s;
     }
 
     public boolean isEnabled() {

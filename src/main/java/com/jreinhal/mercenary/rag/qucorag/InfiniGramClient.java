@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.rag.qucorag;
 
+import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.Arrays;
@@ -62,7 +63,7 @@ public class InfiniGramClient {
             return this.queryInfiniGram(query, "count");
         }
         catch (Exception e) {
-            log.error("Infini-gram error for query: {}", query, e);
+            log.error("Infini-gram error for query {}", LogSanitizer.querySummary(query), e);
             return -1L;
         }
     }
@@ -76,7 +77,7 @@ public class InfiniGramClient {
             return this.queryInfiniGram(query, "count");
         }
         catch (Exception e) {
-            log.error("Infini-gram error for co-occurrence: {} AND {}", new Object[]{entity1, entity2, e});
+            log.error("Infini-gram error for co-occurrence {} AND {}", LogSanitizer.querySummary(entity1), LogSanitizer.querySummary(entity2), e);
             return -1L;
         }
     }

@@ -7,6 +7,7 @@ import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -30,6 +31,10 @@ public class CacUserDetailsService implements UserDetailsService {
     private static final Logger log = LoggerFactory.getLogger(CacUserDetailsService.class);
 
     private final UserRepository userRepository;
+    @Value("${app.cac.auto-provision:false}")
+    private boolean autoProvision;
+    @Value("${app.cac.require-approval:true}")
+    private boolean requireApproval;
 
     public CacUserDetailsService(UserRepository userRepository) {
         this.userRepository = userRepository;
@@ -48,8 +53,11 @@ public class CacUserDetailsService implements UserDetailsService {
             user = userRepository.findByExternalId(username).orElse(null);
         }
 
-        // Auto-provision new CAC users with minimal permissions
+        // Auto-provision new CAC users with minimal permissions (optional)
         if (user == null) {
+            if (!this.autoProvision) {
+                throw new UsernameNotFoundException("User not found and auto-provisioning disabled: " + username);
+            }
             log.info("Auto-provisioning new CAC user: {} (requires admin approval for elevated access)", username);
             user = new User();
             user.setUsername(username);
@@ -60,11 +68,23 @@ public class CacUserDetailsService implements UserDetailsService {
             user.setClearance(ClearanceLevel.UNCLASSIFIED);
             user.setAllowedSectors(Set.of(Department.GOVERNMENT));
             user.setCreatedAt(Instant.now());
-            user.setActive(true);
-            user.setPendingApproval(true); // Mark for admin review
+            if (this.requireApproval) {
+                user.setActive(false);
+                user.setPendingApproval(true); // Mark for admin review
+            } else {
+                user.setActive(true);
+                user.setPendingApproval(false);
+            }
             user = userRepository.save(user);
+            if (this.requireApproval) {
+                throw new UsernameNotFoundException("User pending approval: " + username);
+            }
         }
 
+        if (user.isPendingApproval()) {
+            log.warn("CAC user {} is pending approval", username);
+            throw new UsernameNotFoundException("User pending approval: " + username);
+        }
         if (!user.isActive()) {
             log.warn("CAC user {} is deactivated", username);
             throw new UsernameNotFoundException("User account is deactivated: " + username);

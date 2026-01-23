@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.government.auth;
 
 import com.jreinhal.mercenary.government.auth.CacCertificateParser.CacIdentity;
 import com.jreinhal.mercenary.service.AuditService;
+import com.jreinhal.mercenary.security.ClientIpResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,10 +37,12 @@ public class CacAuthFilter extends OncePerRequestFilter {
 
     private final CacCertificateParser certificateParser;
     private final AuditService auditService;
+    private final ClientIpResolver clientIpResolver;
 
-    public CacAuthFilter(CacCertificateParser certificateParser, AuditService auditService) {
+    public CacAuthFilter(CacCertificateParser certificateParser, AuditService auditService, ClientIpResolver clientIpResolver) {
         this.certificateParser = certificateParser;
         this.auditService = auditService;
+        this.clientIpResolver = clientIpResolver;
         log.info(">>> CAC Authentication Filter initialized <<<");
         log.info(">>> Government edition - X.509 client certificate validation enabled <<<");
     }
@@ -81,13 +84,16 @@ public class CacAuthFilter extends OncePerRequestFilter {
             String certHeader = request.getHeader("X-Client-Cert");
             String certDnHeader = request.getHeader("X-Client-Cert-DN");
 
-            if (certDnHeader != null && !certDnHeader.isEmpty()) {
+            boolean trustedProxy = clientIpResolver.isTrustedProxy(request.getRemoteAddr());
+            if (trustedProxy && certDnHeader != null && !certDnHeader.isEmpty()) {
                 CacIdentity identity = certificateParser.parseDn(certDnHeader);
                 if (identity != null) {
                     request.setAttribute(CAC_IDENTITY_ATTRIBUTE, identity);
                     log.debug("CAC identity from header: EDIPI={}, Name={}",
                              identity.edipi(), identity.toDisplayName());
                 }
+            } else if ((certHeader != null && !certHeader.isEmpty()) || (certDnHeader != null && !certDnHeader.isEmpty())) {
+                log.warn("Ignoring CAC headers from untrusted proxy: {}", request.getRemoteAddr());
             }
         }
 

@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.service;
 import com.jreinhal.mercenary.model.Feedback;
 import com.jreinhal.mercenary.repository.FeedbackRepository;
 import com.jreinhal.mercenary.service.AuditService;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
@@ -69,7 +70,7 @@ public class FeedbackService {
         Feedback saved = (Feedback)this.feedbackRepository.save(feedback);
         log.warn("Negative feedback recorded: user={}, sector={}, category={}, messageId={}", new Object[]{userId, sector, category, messageId});
         if (category == Feedback.FeedbackCategory.HALLUCINATION) {
-            log.error("HALLUCINATION REPORTED: messageId={}, query={}", messageId, this.truncate(query, 100));
+            log.error("HALLUCINATION REPORTED: messageId={}, query={}", messageId, LogSanitizer.querySummary(query));
         }
         return FeedbackResult.success(saved.getId(), Feedback.FeedbackType.NEGATIVE);
     }
@@ -154,13 +155,6 @@ public class FeedbackService {
             return ((Number)val).longValue();
         }
         return def;
-    }
-
-    private String truncate(String s, int len) {
-        if (s == null) {
-            return null;
-        }
-        return s.length() > len ? s.substring(0, len) + "..." : s;
     }
 
     public static class FeedbackResult {

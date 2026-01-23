@@ -5,6 +5,7 @@ import com.jreinhal.mercenary.rag.ragpart.SuspicionScorer;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,7 +60,7 @@ public class RagPartService {
             return new RagPartResult(docs, List.of(), Map.of());
         }
         long startTime = System.currentTimeMillis();
-        log.info("RAGPart: Starting defended retrieval for query: {}", query);
+        log.info("RAGPart: Starting defended retrieval for query {}", LogSanitizer.querySummary(query));
         List<Set<Integer>> combinations = this.generateCombinations(this.numPartitions, this.combinationSize);
         log.debug("RAGPart: Generated {} partition combinations", combinations.size());
         HashMap<String, DocumentAppearance> documentAppearances = new HashMap<String, DocumentAppearance>();

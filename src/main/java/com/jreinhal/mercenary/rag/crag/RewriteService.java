@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.rag.crag;
 
+import com.jreinhal.mercenary.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -22,7 +23,7 @@ public class RewriteService {
             if (rewritten.startsWith("\"") && rewritten.endsWith("\"")) {
                 rewritten = rewritten.substring(1, rewritten.length() - 1);
             }
-            log.info("CRAG: Rewrote query '{}' -> '{}' ({}ms)", new Object[]{originalQuery, rewritten, System.currentTimeMillis() - startTime});
+            log.info("CRAG: Rewrote query {} -> {} ({}ms)", LogSanitizer.querySummary(originalQuery), LogSanitizer.querySummary(rewritten), System.currentTimeMillis() - startTime);
             return rewritten;
         }
         catch (Exception e) {

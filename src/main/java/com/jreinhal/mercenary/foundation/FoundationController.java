@@ -6,7 +6,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/foundation")
-@CrossOrigin(origins = "*") // Allow easy UI access for now
 public class FoundationController {
 
     private final ModelOrchestrator orchestrator;

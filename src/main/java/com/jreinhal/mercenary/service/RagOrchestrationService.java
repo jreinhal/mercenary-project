@@ -25,6 +25,7 @@ import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTrace;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
 import com.jreinhal.mercenary.util.DocumentMetadataUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -232,7 +233,7 @@ public class RagOrchestrationService {
             }
             ArrayList<Document> rawDocs = new ArrayList<Document>(allDocs);
             List<Document> orderedDocs = this.sortDocumentsDeterministically(rawDocs);
-            log.info("Retrieved {} documents for query: {}", rawDocs.size(), query);
+            log.info("Retrieved {} documents for query {}", rawDocs.size(), LogSanitizer.querySummary(query));
             rawDocs.forEach(doc -> log.info("  - Source: {}, Content preview: {}", doc.getMetadata().get("source"), doc.getContent().substring(0, Math.min(50, doc.getContent().length()))));
             List<Document> topDocs = orderedDocs.stream().limit(15L).toList();
             String globalContext = this.mergeGlobalContexts(globalContexts);
@@ -266,7 +267,7 @@ public class RagOrchestrationService {
             }
             catch (TimeoutException te) {
                 llmSuccess = false;
-                log.warn("LLM response timed out after {}s for query: {}", llmTimeoutSeconds, query.substring(0, Math.min(50, query.length())));
+                log.warn("LLM response timed out after {}s for query {}", llmTimeoutSeconds, LogSanitizer.querySummary(query));
                 response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try:\n- Simplifying your question\n- Asking about a more specific topic\n- Trying again in a moment";
             }
             catch (Exception llmError) {
@@ -323,11 +324,11 @@ public class RagOrchestrationService {
                 citationCount = 0;
             }
             if (usedAnswerabilityGate) {
-                log.info("Answerability gate applied (citations={}, answerable=false) for query: {}", citationCount, query.substring(0, Math.min(80, query.length())));
+                log.info("Answerability gate applied (citations={}, answerable=false) for query {}", citationCount, LogSanitizer.querySummary(query));
             } else if (rescueApplied) {
-                log.info("Citation rescue applied (extractive fallback) for query: {}", query.substring(0, Math.min(80, query.length())));
+                log.info("Citation rescue applied (extractive fallback) for query {}", LogSanitizer.querySummary(query));
             } else if (excerptFallbackApplied) {
-                log.info("Excerpt fallback applied (no direct answer) for query: {}", query.substring(0, Math.min(80, query.length())));
+                log.info("Excerpt fallback applied (no direct answer) for query {}", LogSanitizer.querySummary(query));
             }
             QuCoRagService.HallucinationResult hallucinationResult = this.quCoRagService.detectHallucinationRisk(response, query);
             if (hallucinationResult.isHighRisk()) {
@@ -459,7 +460,7 @@ public class RagOrchestrationService {
                     directResponse = cleanLlmResponse(rawResponse);
                 }
                 catch (TimeoutException te) {
-                    log.warn("LLM response timed out after {}s for ZeroHop query", llmTimeoutSeconds);
+                    log.warn("LLM response timed out after {}s for ZeroHop query {}", llmTimeoutSeconds, LogSanitizer.querySummary(query));
                     directResponse = "**Response Timeout**\n\nThe system is taking longer than expected. Please try again.";
                 }
                 catch (Exception llmError) {
@@ -1225,10 +1226,10 @@ public class RagOrchestrationService {
         List<Document> keywordResults = new ArrayList<>();
         try {
             semanticResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
-            log.info("Semantic search found {} results for '{}'", semanticResults.size(), query);
+            log.info("Semantic search found {} results for query {}", semanticResults.size(), LogSanitizer.querySummary(query));
             String lowerQuery = query.toLowerCase();
             keywordResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.01).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
-            log.info("Keyword fallback found {} documents for '{}'", keywordResults.size(), query);
+            log.info("Keyword fallback found {} documents for query {}", keywordResults.size(), LogSanitizer.querySummary(query));
             Set<String> stopWords = Set.of("the", "and", "for", "was", "are", "is", "of", "to", "in", "what", "where", "when", "who", "how", "why", "tell", "me", "about", "describe", "find", "show", "give", "also");
             String[] queryTerms = lowerQuery.split("\\s+");
             keywordResults = keywordResults.stream().filter(doc -> {

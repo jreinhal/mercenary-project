@@ -2,7 +2,7 @@ spring:
   application:
     name: mercenary-ai
   profiles:
-    active: ${APP_PROFILE:dev}
+    active: ${APP_PROFILE:standard}
   # Disable static resource caching for development
   web:
     resources:
@@ -74,7 +74,7 @@ server:
       cookie:
         same-site: Lax
         http-only: true
-        secure: ${COOKIE_SECURE:false}  # Set true for HTTPS deployments
+        secure: ${COOKIE_SECURE:true}  # Set true for HTTPS deployments
 
 # ============================================
 # Logging (include correlation ID in default pattern)
@@ -89,7 +89,7 @@ logging:
 app:
   db-init: true
   # Authentication mode: DEV, OIDC, or CAC
-  auth-mode: ${AUTH_MODE:DEV}
+  auth-mode: ${AUTH_MODE:STANDARD}
   security:
     # Comma-separated list of trusted proxy IPs for X-Forwarded-For
     trusted-proxies: ${TRUSTED_PROXIES:}
@@ -368,14 +368,22 @@ springdoc:
 # ============================================
 
 ---
-# DEVELOPMENT PROFILE (default)
+# DEVELOPMENT PROFILE
 spring:
   config:
     activate:
       on-profile: dev
 
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
 app:
   auth-mode: DEV
+  dev:
+    allow-remote: ${DEV_ALLOW_REMOTE:false}
 
 # Enable Swagger UI for development
 springdoc:
@@ -418,6 +426,8 @@ app:
     # SECURITY: Disable auto-provisioning by default in govcloud
     # New CAC users must be pre-registered by an administrator
     auto-provision: ${CAC_AUTO_PROVISION:false}
+    # Require admin approval for any auto-provisioned CAC user
+    require-approval: ${CAC_REQUIRE_APPROVAL:true}
     # Least-privilege defaults if auto-provision is enabled
     default-role: ${CAC_DEFAULT_ROLE:VIEWER}
     default-clearance: ${CAC_DEFAULT_CLEARANCE:UNCLASSIFIED}

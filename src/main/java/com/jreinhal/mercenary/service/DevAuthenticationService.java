@@ -5,6 +5,7 @@ import com.jreinhal.mercenary.service.AuthenticationService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
 public class DevAuthenticationService
 implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(DevAuthenticationService.class);
+    @Value("${app.dev.allow-remote:false}")
+    private boolean allowRemote;
 
     public DevAuthenticationService() {
         log.warn(">>> DEVELOPMENT AUTH MODE ACTIVE - NO REAL AUTHENTICATION <<<");
@@ -21,6 +24,11 @@ implements AuthenticationService {
 
     @Override
     public User authenticate(HttpServletRequest request) {
+        String remoteAddr = request.getRemoteAddr();
+        if (!this.allowRemote && remoteAddr != null && !remoteAddr.equals("127.0.0.1") && !remoteAddr.equals("::1")) {
+            log.error("DEV auth blocked for remote address: {}", remoteAddr);
+            return null;
+        }
         String operatorId = request.getHeader("X-Operator-Id");
         if (operatorId == null || operatorId.isEmpty()) {
             operatorId = request.getParameter("operator");

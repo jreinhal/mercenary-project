@@ -1,6 +1,7 @@
 package com.jreinhal.mercenary.rag.hgmem;
 
 import com.jreinhal.mercenary.rag.hgmem.EntityExtractor;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -73,7 +74,7 @@ public class HyperGraphMemory {
             return HGQueryResult.empty();
         }
         long startTime = System.currentTimeMillis();
-        log.debug("HGMem: Querying hypergraph for: {}", query);
+        log.debug("HGMem: Querying hypergraph for {}", LogSanitizer.querySummary(query));
         List<EntityExtractor.Entity> queryEntities = this.entityExtractor.extract(query);
         log.debug("HGMem: Query contains {} entities", queryEntities.size());
         if (queryEntities.isEmpty()) {
