@@ -89,7 +89,7 @@ public class RagOrchestrationService {
     private final AtomicInteger queryCount = new AtomicInteger(0);
     private final AtomicLong totalLatencyMs = new AtomicLong(0L);
     private final Cache<String, String> secureDocCache;
-    private static final OllamaOptions LLM_OPTIONS = OllamaOptions.create().withModel("llama3.1:8b").withTemperature(0.0).withNumPredict(Integer.valueOf(512));
+    private final OllamaOptions llmOptions;
     private static final String NO_RELEVANT_RECORDS = "No relevant records found.";
     private static final Pattern STRICT_CITATION_PATTERN = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?[^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp)\\]", 2);
     private static final Pattern METRIC_HINT_PATTERN = Pattern.compile("\\b(metric|metrics|performance|availability|uptime|latency|sla|kpi|mttd|mttr|throughput|error rate|response time|accuracy|precision|recall|f1|cost|risk|budget|revenue|expense|income|profit|loss|spend|spending|amount|total|price|value|rate|percentage|count|number|quantity|allocation|funding|compliance)\\b", 2);
@@ -108,7 +108,10 @@ public class RagOrchestrationService {
     @Value("${sentinel.rag.max-docs:16}")
     private int maxDocs;
 
-    public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, Cache<String, String> secureDocCache) {
+    public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, Cache<String, String> secureDocCache,
+                                  @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
+                                  @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
+                                  @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
         this.chatClient = builder.defaultFunctions(new String[]{"calculator", "currentDate"}).build();
         this.vectorStore = vectorStore;
         this.sectorConfig = sectorConfig;
@@ -131,10 +134,14 @@ public class RagOrchestrationService {
         this.conversationMemoryService = conversationMemoryService;
         this.sessionPersistenceService = sessionPersistenceService;
         this.secureDocCache = secureDocCache;
+        this.llmOptions = OllamaOptions.create()
+                .withModel(llmModel)
+                .withTemperature(llmTemperature)
+                .withNumPredict(Integer.valueOf(llmNumPredict));
         log.info("=== LLM Configuration ===");
-        log.info("  Model: {}", LLM_OPTIONS.getModel());
-        log.info("  Temperature: {}", LLM_OPTIONS.getTemperature());
-        log.info("  Max Tokens (num_predict): {}", LLM_OPTIONS.getNumPredict());
+        log.info("  Model: {}", this.llmOptions.getModel());
+        log.info("  Temperature: {}", this.llmOptions.getTemperature());
+        log.info("  Max Tokens (num_predict): {}", this.llmOptions.getNumPredict());
         log.info("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
         log.info("=========================");
     }
@@ -260,7 +267,7 @@ public class RagOrchestrationService {
                 } else {
                     String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
                     String userQuery = query.replace("{", "[").replace("}", "]");
-                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
                     log.info("LLM RAW RESPONSE for /ask: {}", rawResponse != null ? rawResponse.substring(0, Math.min(500, rawResponse.length())) : "null");
                     response = cleanLlmResponse(rawResponse);
                 }
@@ -349,7 +356,7 @@ public class RagOrchestrationService {
                     try {
                         String sysMsg = retrySystemMessage.replace("{", "[").replace("}", "]");
                         String userQuery = query.replace("{", "[").replace("}", "]");
-                        String rawRetry = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                        String rawRetry = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
                         response = cleanLlmResponse(rawRetry);
                         citationCount = RagOrchestrationService.countCitations(response);
                         if (citationCount == 0) {
@@ -456,7 +463,7 @@ public class RagOrchestrationService {
                 log.info("AdaptiveRAG: ZeroHop path - skipping retrieval for conversational query");
                 try {
                     String userQuery = query.replace("{", "[").replace("}", "]");
-                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.").user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.").user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
                     directResponse = cleanLlmResponse(rawResponse);
                 }
                 catch (TimeoutException te) {
@@ -558,7 +565,7 @@ public class RagOrchestrationService {
                 } else {
                     String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
                     String userQuery = query.replace("{", "[").replace("}", "]");
-                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)LLM_OPTIONS).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
                     response = cleanLlmResponse(rawResponse);
                 }
             }

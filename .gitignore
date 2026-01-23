@@ -28,6 +28,7 @@ temp_gradle/
 META-INF/
 gradle_out.txt
 gradle-8.11-bin.zip
+tools/_tmp_*
 
 # Local tooling/config
 .claude/settings.local.json

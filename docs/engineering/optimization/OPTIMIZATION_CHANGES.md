@@ -171,6 +171,7 @@ This document explains the optimization-focused changes applied across the RAG p
 - Added performance thread pool settings under `sentinel.performance`.
 - Added context/prompt limits under `sentinel.rag`.
 - Added reranker and query-expander cache settings.
+- Added vector store selection flags and aligned Ollama output caps.
 
 **Why**
 - Exposes tuning controls for throughput vs. latency trade-offs without code changes.
@@ -185,12 +186,12 @@ These defaults were set to align with a 16‑logical‑CPU workstation and to re
 - `sentinel.performance.rag-max-threads: 16`
 - `sentinel.performance.rag-queue-capacity: 400`
 - `sentinel.performance.rag-future-timeout-seconds: 8`
-- `sentinel.rag.max-context-chars: 16000`
-- `sentinel.rag.max-doc-chars: 2500`
-- `sentinel.rag.max-visual-chars: 1500`
-- `sentinel.rag.max-overview-chars: 3000`
-- `sentinel.rag.max-docs: 16`
-- `sentinel.rag.max-visual-docs: 8`
+- `sentinel.rag.max-context-chars: 12000`
+- `sentinel.rag.max-doc-chars: 2000`
+- `sentinel.rag.max-visual-chars: 1200`
+- `sentinel.rag.max-overview-chars: 2400`
+- `sentinel.rag.max-docs: 12`
+- `sentinel.rag.max-visual-docs: 6`
 - `sentinel.hifirag.reranker.cache-size: 2000` (TTL 900s)
 - `sentinel.hybridrag.query-expansion-cache-size: 1500` (TTL 900s)
 
@@ -311,6 +312,7 @@ powershell -ExecutionPolicy Bypass -File tools/load_test.ps1 -Url http://localho
 
 ## Summary of modified files
 
+- `src/main/java/com/jreinhal/mercenary/MercenaryApplication.java`
 - `src/main/java/com/jreinhal/mercenary/config/RagPerformanceConfig.java` (new)
 - `src/main/java/com/jreinhal/mercenary/config/SecureDocCacheConfig.java` (new)
 - `src/main/java/com/jreinhal/mercenary/config/SecurityConfig.java`
@@ -324,6 +326,7 @@ powershell -ExecutionPolicy Bypass -File tools/load_test.ps1 -Url http://localho
 - `src/main/java/com/jreinhal/mercenary/rag/qucorag/InfiniGramClient.java`
 - `src/main/java/com/jreinhal/mercenary/controller/MercenaryController.java`
 - `src/main/java/com/jreinhal/mercenary/service/RagOrchestrationService.java` (new)
+- `src/main/java/com/jreinhal/mercenary/service/PiiRedactionService.java`
 - `src/main/java/com/jreinhal/mercenary/service/SecureIngestionService.java`
 - `src/main/java/com/jreinhal/mercenary/service/SecureIngestionException.java` (new)
 - `src/main/java/com/jreinhal/mercenary/filter/RateLimitFilter.java`
@@ -343,6 +346,9 @@ powershell -ExecutionPolicy Bypass -File tools/load_test.ps1 -Url http://localho
 - `src/test/java/com/jreinhal/mercenary/service/PromptGuardrailServiceTest.java`
 - `src/test/java/com/jreinhal/mercenary/rag/hybridrag/QueryExpanderTest.java` (new)
 - `src/test/java/com/jreinhal/mercenary/rag/hifirag/CrossEncoderRerankerTest.java` (new)
+- `src/test/resources/test_docs/operational_test.txt`
+- `src/test/resources/test_docs/operations_report_alpha.txt`
+- `src/test/resources/test_docs/operations_report_beta.txt`
 - `tools/load_test.ps1`
 - `docs/engineering/optimization/OPTIMIZATION_CHANGES.md`
 
@@ -389,3 +395,72 @@ powershell -ExecutionPolicy Bypass -File tools/load_test.ps1 -Url http://localho
 **Why**
 - Ensures the current defaults remain a good fit for the actual dev machine.
 
+---
+
+## 21) Vector store selection + local fallback
+
+**File:** `src/main/java/com/jreinhal/mercenary/MercenaryApplication.java`
+
+**What changed**
+- Auto-detects local Mongo URIs and prefers `LocalMongoVectorStore` for DEV/CAC or local Mongo.
+- Added explicit overrides: `sentinel.vectorstore.force-local` and `sentinel.vectorstore.force-atlas`.
+- Logs a warning if both overrides are set (local wins).
+
+**Why**
+- Prevents accidental Atlas vector store usage when running locally.
+- Avoids `SearchNotEnabled` failures for dev/test when Atlas search indexes are unavailable.
+
+**Knobs**
+- `sentinel.vectorstore.force-local`
+- `sentinel.vectorstore.force-atlas`
+
+---
+
+## 22) Ingestion hard‑fail on security violations
+
+**File:** `src/main/java/com/jreinhal/mercenary/controller/MercenaryController.java`
+
+**What changed**
+- `SecurityException` from ingestion now returns `BLOCKED: ...`, logs a warning, and writes an audit denial.
+- Only non‑security failures fall back to RAM‑only cache.
+
+**Why**
+- Prevents blocked file types from being cached or partially indexed.
+- Keeps the security posture fail‑closed for ingest policy violations.
+
+---
+
+## 23) PII pattern refinements
+
+**Files:** `src/main/java/com/jreinhal/mercenary/service/PiiRedactionService.java`, `src/test/java/com/jreinhal/mercenary/service/PiiRedactionServiceTest.java`
+
+**What changed**
+- Phone regex now requires 10‑digit patterns (area code) and avoids alphanumeric IDs.
+- DOB pattern now supports ISO dates (`YYYY‑MM‑DD`).
+- Medical ID pattern accepts dash‑separated IDs.
+- Tests updated with ISO DOB, dashed MRN, and a false‑positive guard for ClinicalTrials IDs.
+
+**Why**
+- Reduces false positives while improving coverage of real‑world formats.
+
+---
+
+## 24) LLM options wired to configuration
+
+**Files:** `src/main/java/com/jreinhal/mercenary/service/RagOrchestrationService.java`, `src/main/java/com/jreinhal/mercenary/controller/MercenaryController.java`
+
+**What changed**
+- LLM model, temperature, and `num-predict` now come from `spring.ai.ollama.chat.options.*`.
+- Logs now reflect the configured values instead of hard‑coded defaults.
+
+**Why**
+- Enables tuning without code changes and keeps prompt caps consistent with config.
+
+---
+
+## 25) Added gov/ops test fixtures
+
+**Files:** `src/test/resources/test_docs/operational_test.txt`, `src/test/resources/test_docs/operations_report_alpha.txt`, `src/test/resources/test_docs/operations_report_beta.txt`
+
+**Why**
+- Ensures gov/ops document tests have realistic fixtures for retrieval and redaction checks.

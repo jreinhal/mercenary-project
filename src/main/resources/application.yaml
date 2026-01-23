@@ -123,12 +123,17 @@ sentinel:
     rag-future-timeout-seconds: ${RAG_FUTURE_TIMEOUT_SECONDS:8}
   # RAG prompt/context limits
   rag:
-    max-context-chars: ${RAG_MAX_CONTEXT_CHARS:16000}
-    max-doc-chars: ${RAG_MAX_DOC_CHARS:2500}
-    max-visual-chars: ${RAG_MAX_VISUAL_CHARS:1500}
-    max-overview-chars: ${RAG_MAX_OVERVIEW_CHARS:3000}
-    max-docs: ${RAG_MAX_DOCS:16}
-    max-visual-docs: ${RAG_MAX_VISUAL_DOCS:8}
+    max-context-chars: ${RAG_MAX_CONTEXT_CHARS:12000}
+    max-doc-chars: ${RAG_MAX_DOC_CHARS:2000}
+    max-visual-chars: ${RAG_MAX_VISUAL_CHARS:1200}
+    max-overview-chars: ${RAG_MAX_OVERVIEW_CHARS:2400}
+    max-docs: ${RAG_MAX_DOCS:12}
+    max-visual-docs: ${RAG_MAX_VISUAL_DOCS:6}
+
+  # Vector store selection (local vs Atlas)
+  vectorstore:
+    force-local: ${SENTINEL_FORCE_LOCAL_VECTOR_STORE:false}
+    force-atlas: ${SENTINEL_FORCE_ATLAS_VECTOR_STORE:false}
 
 # ============================================
 # SENTINEL Advanced RAG Configuration

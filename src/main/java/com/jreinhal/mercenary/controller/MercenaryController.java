@@ -110,7 +110,7 @@ public class MercenaryController {
     private final RagOrchestrationService ragOrchestrationService;
     private final Cache<String, String> secureDocCache;
     private final AtomicInteger docCount = new AtomicInteger(0);
-    private static final OllamaOptions LLM_OPTIONS = OllamaOptions.create().withModel("llama3.1:8b").withTemperature(0.0).withNumPredict(Integer.valueOf(512));
+    private final OllamaOptions llmOptions;
     private static final String NO_RELEVANT_RECORDS = "No relevant records found.";
     private static final Pattern STRICT_CITATION_PATTERN = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?[^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp)\\]", 2);
     private static final Pattern RELATIONSHIP_PATTERN = Pattern.compile("\\b(relationship|relate|comparison|compare|versus|between|difference|differ|impact|effect|align|alignment|correlat|dependency|tradeoff|link)\\b", 2);
@@ -129,7 +129,10 @@ public class MercenaryController {
     @Value("${sentinel.rag.max-visual-docs:8}")
     private int maxVisualDocs;
 
-    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache) {
+    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache,
+                               @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
+                               @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
+                               @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
         this.chatClient = builder.defaultFunctions(new String[]{"calculator", "currentDate"}).build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;
@@ -156,6 +159,10 @@ public class MercenaryController {
         this.sessionPersistenceService = sessionPersistenceService;
         this.ragOrchestrationService = ragOrchestrationService;
         this.secureDocCache = secureDocCache;
+        this.llmOptions = OllamaOptions.create()
+                .withModel(llmModel)
+                .withTemperature(llmTemperature)
+                .withNumPredict(Integer.valueOf(llmNumPredict));
         try {
             long count = mongoTemplate.getCollection("vector_store").countDocuments();
             this.docCount.set((int)count);
@@ -164,9 +171,9 @@ public class MercenaryController {
             log.error("Failed to initialize doc count", (Throwable)e);
         }
         log.info("=== LLM Configuration ===");
-        log.info("  Model: {}", LLM_OPTIONS.getModel());
-        log.info("  Temperature: {}", LLM_OPTIONS.getTemperature());
-        log.info("  Max Tokens (num_predict): {}", LLM_OPTIONS.getNumPredict());
+        log.info("  Model: {}", this.llmOptions.getModel());
+        log.info("  Temperature: {}", this.llmOptions.getTemperature());
+        log.info("  Max Tokens (num_predict): {}", this.llmOptions.getNumPredict());
         log.info("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
         log.info("=========================");
     }
@@ -328,6 +335,11 @@ public class MercenaryController {
             String status = "COMPLETE";
             try {
                 this.ingestionService.ingest(file, department);
+            }
+            catch (SecurityException e) {
+                log.warn("SECURITY: Ingestion blocked for {}: {}", filename, e.getMessage());
+                this.auditService.logAccessDenied(user, "/api/ingest/file", "Blocked file type: " + e.getMessage(), request);
+                return "BLOCKED: " + e.getMessage();
             }
             catch (Exception e) {
                 log.warn("Persistence Failed (DB Offline). Proceeding with RAM Cache.", (Throwable)e);
@@ -494,7 +506,7 @@ public class MercenaryController {
                     this.chatClient.prompt()
                         .system(sysMsg)
                         .user(userQuery)
-                        .options((ChatOptions) LLM_OPTIONS)
+                        .options((ChatOptions) this.llmOptions)
                         .stream()
                         .content()
                         .doOnNext(token -> {

@@ -107,10 +107,29 @@ public class MercenaryApplication {
 
     @Bean
     public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel, @Value(value="${app.auth-mode:DEV}") String authMode) {
-        if ("CAC".equalsIgnoreCase(authMode) || "DEV".equalsIgnoreCase(authMode)) {
+        String mongoUri = this.environment.getProperty("spring.data.mongodb.uri", "");
+        boolean forceLocal = Boolean.parseBoolean(this.environment.getProperty("sentinel.vectorstore.force-local", "false"));
+        boolean forceAtlas = Boolean.parseBoolean(this.environment.getProperty("sentinel.vectorstore.force-atlas", "false"));
+        if (forceLocal && forceAtlas) {
+            log.warn("Both sentinel.vectorstore.force-local and force-atlas are true. Defaulting to local vector store.");
+            forceAtlas = false;
+        }
+        boolean isLocalMongo = this.isLocalMongoUri(mongoUri);
+        if (!forceAtlas && (forceLocal || isLocalMongo || "CAC".equalsIgnoreCase(authMode) || "DEV".equalsIgnoreCase(authMode))) {
+            if (forceLocal || isLocalMongo) {
+                log.info("Using LocalMongoVectorStore (local MongoDB detected).");
+            }
             return new LocalMongoVectorStore(mongoTemplate, embeddingModel);
         }
         MongoDBAtlasVectorStore.MongoDBVectorStoreConfig config = MongoDBAtlasVectorStore.MongoDBVectorStoreConfig.builder().withCollectionName("vector_store").withVectorIndexName("vector_index").withPathName("embedding").withMetadataFieldsToFilter(List.of("dept", "source")).build();
         return new MongoDBAtlasVectorStore(mongoTemplate, embeddingModel, config, false);
+    }
+
+    private boolean isLocalMongoUri(String mongoUri) {
+        if (mongoUri == null || mongoUri.isBlank()) {
+            return true;
+        }
+        String lower = mongoUri.toLowerCase();
+        return lower.contains("localhost") || lower.contains("127.0.0.1") || lower.contains("[::1]") || lower.contains("mongodb://localhost") || lower.contains("mongodb://127.0.0.1");
     }
 }

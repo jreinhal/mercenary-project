@@ -17,14 +17,14 @@ public class PiiRedactionService {
     private final TokenizationVault tokenizationVault;
     private static final Pattern SSN_PATTERN = Pattern.compile("\\b(?!000|666|9\\d{2})\\d{3}[- ]?(?!00)\\d{2}[- ]?(?!0000)\\d{4}\\b");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b", 2);
-    private static final Pattern PHONE_PATTERN = Pattern.compile("(?:\\+1[-.\\s]?)?(?:\\(?\\d{3}\\)?[-.\\s]?)?\\d{3}[-.\\s]?\\d{4}\\b");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("(?<![A-Za-z0-9])(?:\\+1[\\s.-]?)?(?:\\(\\d{3}\\)|\\d{3})[\\s.-]?\\d{3}[\\s.-]?\\d{4}\\b");
     private static final Pattern CREDIT_CARD_PATTERN = Pattern.compile("\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\\d{3})\\d{11})\\b|\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b");
-    private static final Pattern DOB_CONTEXT_PATTERN = Pattern.compile("(?:DOB|Date of Birth|Birth Date|Born|Birthday|D\\.O\\.B\\.)\\s*:?\\s*(\\d{1,2}[/\\-.]\\d{1,2}[/\\-.]\\d{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{1,2},?\\s+\\d{4})", 2);
+    private static final Pattern DOB_CONTEXT_PATTERN = Pattern.compile("(?:DOB|Date of Birth|Birth Date|Born|Birthday|D\\.O\\.B\\.)\\s*:?\\s*(\\d{4}[/\\-.]\\d{1,2}[/\\-.]\\d{1,2}|\\d{1,2}[/\\-.]\\d{1,2}[/\\-.]\\d{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{1,2},?\\s+\\d{4})", 2);
     private static final Pattern IPV4_PATTERN = Pattern.compile("\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b");
     private static final Pattern IPV6_PATTERN = Pattern.compile("\\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\\b|\\b(?:[0-9a-fA-F]{1,4}:){1,7}:\\b|\\b::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}\\b");
     private static final Pattern PASSPORT_PATTERN = Pattern.compile("(?:Passport(?:\\s+(?:No|Number|#))?\\s*:?\\s*)([A-Z]{1,2}\\d{6,9})", 2);
     private static final Pattern DRIVERS_LICENSE_PATTERN = Pattern.compile("(?:Driver'?s?\\s+License|DL|License\\s+(?:No|Number|#))\\s*:?\\s*([A-Z0-9]{5,15})", 2);
-    private static final Pattern MEDICAL_ID_PATTERN = Pattern.compile("(?:MRN|Medical\\s+Record|Patient\\s+ID|Health\\s+ID)\\s*:?\\s*([A-Z0-9]{6,12})", 2);
+    private static final Pattern MEDICAL_ID_PATTERN = Pattern.compile("(?:MRN|Medical\\s+Record|Patient\\s+ID|Health\\s+ID)\\s*:?\\s*([A-Z0-9][A-Z0-9-]{4,17})", 2);
     private static final Pattern NAME_CONTEXT_PATTERN = Pattern.compile("(?:Name|Patient|Employee|Client|Customer|Attn|Attention|Contact|Applicant|Recipient|Beneficiary|Account Holder)\\s*:?\\s*([A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,3})", 2);
     private static final Pattern NAME_HONORIFIC_PATTERN = Pattern.compile("\\b(?:Mr|Mrs|Ms|Miss|Dr|Prof|Rev|Hon)\\.?\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,2})\\b");
     private static final Pattern ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,5}\\s+[A-Za-z0-9\\s,]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Circle|Cir|Place|Pl)\\.?(?:\\s*,?\\s*(?:Apt|Suite|Unit|#)\\s*[A-Za-z0-9-]+)?\\s*,?\\s*[A-Za-z\\s]+,?\\s*[A-Z]{2}\\s*\\d{5}(?:-\\d{4})?\\b", 2);
