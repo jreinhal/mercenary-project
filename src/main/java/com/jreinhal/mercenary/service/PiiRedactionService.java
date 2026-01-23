@@ -123,7 +123,7 @@ public class PiiRedactionService {
 
     private String redactPattern(String content, Pattern pattern, PiiType type, RedactionMode mode, Map<PiiType, Integer> counts) {
         Matcher matcher = pattern.matcher(content);
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         int count = 0;
         while (matcher.find()) {
             String replacement = this.generateReplacement(matcher.group(), type, mode);
@@ -139,7 +139,7 @@ public class PiiRedactionService {
 
     private String redactContextPattern(String content, Pattern pattern, PiiType type, RedactionMode mode, Map<PiiType, Integer> counts) {
         Matcher matcher = pattern.matcher(content);
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         int count = 0;
         while (matcher.find()) {
             String fullMatch = matcher.group();
@@ -158,7 +158,7 @@ public class PiiRedactionService {
 
     private String generateReplacement(String original, PiiType type, RedactionMode mode) {
         return switch (mode.ordinal()) {
-            default -> throw new MatchException(null, null);
+            default -> throw new IllegalArgumentException("Unknown PII redaction mode: " + mode);
             case 0 -> "[REDACTED-" + type.name() + "]";
             case 1 -> this.generateToken(original, type);
             case 2 -> "";

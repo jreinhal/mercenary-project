@@ -5,6 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
+import com.jreinhal.mercenary.security.ClientIpResolver;
 import com.jreinhal.mercenary.service.AuditService;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
@@ -31,6 +32,7 @@ public class RateLimitFilter
 implements Filter {
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
     private final AuditService auditService;
+    private final ClientIpResolver clientIpResolver;
     @Value(value="${app.rate-limit.enabled:true}")
     private boolean enabled;
     @Value(value="${app.rate-limit.viewer-rpm:60}")
@@ -43,8 +45,9 @@ implements Filter {
     private int anonymousRpm;
     private final Cache<String, Bucket> bucketCache = Caffeine.newBuilder().maximumSize(10000L).expireAfterAccess(1L, TimeUnit.HOURS).build();
 
-    public RateLimitFilter(AuditService auditService) {
+    public RateLimitFilter(AuditService auditService, ClientIpResolver clientIpResolver) {
         this.auditService = auditService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
@@ -91,7 +94,7 @@ implements Filter {
         if (user != null && user.getId() != null) {
             return "user:" + user.getId();
         }
-        String ip = this.getClientIp(request);
+        String ip = this.clientIpResolver.resolveClientIp(request);
         return "ip:" + ip;
     }
 
@@ -107,14 +110,6 @@ implements Filter {
             return this.analystRpm;
         }
         return this.viewerRpm;
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isEmpty()) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private boolean isExemptPath(String path) {

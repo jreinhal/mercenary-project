@@ -1,5 +1,9 @@
 package com.jreinhal.mercenary.rag.hybridrag;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,6 +22,11 @@ public class QueryExpander {
     private final ChatClient chatClient;
     @Value(value="${sentinel.hybridrag.llm-expansion:false}")
     private boolean llmExpansionEnabled;
+    @Value(value="${sentinel.hybridrag.query-expansion-cache-size:1500}")
+    private int cacheSize;
+    @Value(value="${sentinel.hybridrag.query-expansion-cache-ttl-seconds:900}")
+    private long cacheTtlSeconds;
+    private Cache<String, List<String>> expansionCache;
     private static final Pattern VARIANT_PATTERN = Pattern.compile("^\\s*[-*\\d.)]?\\s*(.+?)\\s*$", 8);
     private static final String EXPANSION_PROMPT = "Generate %d alternative ways to ask this question. Each variant should:\n- Preserve the original meaning\n- Use different words or phrasing\n- Be a complete question or search query\n\nOutput each variant on a new line, numbered 1-N.\n\nOriginal query: %s\n";
     private static final Map<String, List<String>> SYNONYMS = Map.ofEntries(Map.entry("find", List.of("search", "locate", "discover", "identify")), Map.entry("show", List.of("display", "present", "reveal", "list")), Map.entry("explain", List.of("describe", "clarify", "elaborate", "detail")), Map.entry("create", List.of("make", "generate", "build", "produce")), Map.entry("delete", List.of("remove", "erase", "eliminate", "clear")), Map.entry("update", List.of("modify", "change", "edit", "revise")), Map.entry("error", List.of("issue", "problem", "bug", "fault")), Map.entry("security", List.of("protection", "safety", "defense", "safeguard")), Map.entry("data", List.of("information", "records", "content", "details")), Map.entry("user", List.of("person", "individual", "account", "member")), Map.entry("system", List.of("platform", "application", "software", "service")), Map.entry("access", List.of("permission", "authorization", "entry", "rights")));
@@ -26,9 +35,32 @@ public class QueryExpander {
         this.chatClient = builder.build();
     }
 
+    @PostConstruct
+    public void init() {
+        if (this.cacheSize > 0 && this.cacheTtlSeconds > 0) {
+            this.expansionCache = Caffeine.newBuilder()
+                    .maximumSize(this.cacheSize)
+                    .expireAfterWrite(Duration.ofSeconds(this.cacheTtlSeconds))
+                    .build();
+        }
+    }
+
     public List<String> expand(String query, int count) {
+        return this.expand(query, count, null);
+    }
+
+    public List<String> expand(String query, int count, String department) {
         if (query == null || query.isBlank() || count <= 0) {
             return List.of();
+        }
+        String normalizedKey = query.trim().toLowerCase();
+        String deptKey = department != null && !department.isBlank() ? department.trim().toUpperCase() : "GLOBAL";
+        String cacheKey = deptKey + "|" + normalizedKey + "|" + count;
+        if (this.expansionCache != null) {
+            List<String> cached = this.expansionCache.getIfPresent(cacheKey);
+            if (cached != null) {
+                return List.copyOf(cached);
+            }
         }
         ArrayList<String> variants = new ArrayList<String>();
         List<String> synonymVariants = this.generateSynonymVariants(query);
@@ -49,6 +81,9 @@ public class QueryExpander {
             result.add(variant);
             if (result.size() < count) continue;
             break;
+        }
+        if (this.expansionCache != null) {
+            this.expansionCache.put(cacheKey, List.copyOf(result));
         }
         log.debug("QueryExpander: Generated {} variants for query: '{}'", result.size(), query.length() > 50 ? query.substring(0, 50) + "..." : query);
         return result;

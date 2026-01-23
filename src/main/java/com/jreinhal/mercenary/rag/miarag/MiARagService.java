@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.rag.miarag;
 import com.jreinhal.mercenary.rag.miarag.MindscapeBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,11 +95,11 @@ public class MiARagService {
 
     public MindscapeRetrievalResult retrieve(String query, String department) {
         if (!this.enabled) {
-            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "'"));
+            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
             return new MindscapeRetrievalResult(docs, null, List.of());
         }
         long startTime = System.currentTimeMillis();
-        List<Document> mindscapeDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(3).withSimilarityThreshold(0.4).withFilterExpression("dept == '" + department + "' && type == 'mindscape'"));
+        List<Document> mindscapeDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(3).withSimilarityThreshold(0.4).withFilterExpression(FilterExpressionBuilder.forDepartmentAndType(department, "mindscape")));
         ArrayList<Mindscape> relevantMindscapes = new ArrayList<Mindscape>();
         for (Document doc : mindscapeDocs) {
             Query q;
@@ -109,7 +110,7 @@ public class MiARagService {
         }
         String globalContext = this.buildGlobalContext(relevantMindscapes);
         Set<String> relevantSources = relevantMindscapes.stream().map(Mindscape::filename).collect(Collectors.toSet());
-        List<Document> localDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.25).withFilterExpression("dept == '" + department + "' && type != 'mindscape'"));
+        List<Document> localDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.25).withFilterExpression(FilterExpressionBuilder.forDepartmentExcludingType(department, "mindscape")));
         ArrayList<ScoredChunk> scoredChunks = new ArrayList<ScoredChunk>();
         for (int i = 0; i < localDocs.size(); ++i) {
             Document doc = localDocs.get(i);

@@ -1,0 +1,34 @@
+spring:
+  config:
+    activate:
+      on-profile: foundation
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:demo-key}
+      chat:
+        options:
+          model: gpt-4o
+    
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:demo-key}
+      chat:
+        options:
+          model: claude-3-5-sonnet-20240620
+          
+    vertex:
+      ai:
+        gemini:
+          project-id: ${GEMINI_PROJECT_ID:demo-project}
+          location: ${GEMINI_LOCATION:us-central1}
+          chat:
+            options:
+              model: gemini-1.5-pro
+
+# Disable complex Sentinel features for the Foundation profile
+sentinel:
+  qucorag: { enabled: false }
+  megarag: { enabled: false }
+  hifirag: { enabled: false }
+  ragpart: { enabled: false }
+  pii: { enabled: false } # optional, maybe keep it?

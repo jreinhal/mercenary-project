@@ -7,6 +7,7 @@ import com.jreinhal.mercenary.rag.hyde.HydeService;
 import com.jreinhal.mercenary.rag.selfrag.SelfRagService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -130,7 +131,7 @@ public class AgenticRagOrchestrator {
     }
 
     private AgenticResult simpleRetrieval(String query, String department, long startTime) {
-        List docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(5).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "'"));
+        List docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(5).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         String response = this.generateStandardResponse(query, docs);
         long elapsed = System.currentTimeMillis() - startTime;
         return new AgenticResult(response, docs, 0.7, List.of("SIMPLE_RETRIEVAL"), 1, Map.of("totalMs", elapsed, "mode", "disabled"));
@@ -153,7 +154,7 @@ public class AgenticRagOrchestrator {
     private List<Document> standardRetrieval(String query, String department, AdaptiveRagService.RoutingResult routing) {
         int topK = this.adaptiveRag.getTopK(routing.decision());
         double threshold = this.adaptiveRag.getSimilarityThreshold(routing.decision());
-        return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(topK).withSimilarityThreshold(threshold).withFilterExpression("dept == '" + department + "'"));
+        return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(topK).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
     }
 
     private String generateStandardResponse(String query, List<Document> documents) {

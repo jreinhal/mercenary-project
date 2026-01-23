@@ -77,12 +77,34 @@ server:
         secure: ${COOKIE_SECURE:false}  # Set true for HTTPS deployments
 
 # ============================================
+# Logging (include correlation ID in default pattern)
+# ============================================
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
+
+# ============================================
 # Custom App Config
 # ============================================
 app:
   db-init: true
   # Authentication mode: DEV, OIDC, or CAC
   auth-mode: ${AUTH_MODE:DEV}
+  security:
+    # Comma-separated list of trusted proxy IPs for X-Forwarded-For
+    trusted-proxies: ${TRUSTED_PROXIES:}
+  guardrails:
+    enabled: ${GUARDRAILS_ENABLED:true}
+    llm-enabled: ${GUARDRAILS_LLM_ENABLED:true}
+    strict-mode: ${GUARDRAILS_STRICT_MODE:false}
+    llm-circuit-breaker:
+      enabled: ${GUARDRAILS_LLM_CB_ENABLED:true}
+      failure-threshold: ${GUARDRAILS_LLM_CB_FAILURE_THRESHOLD:3}
+      open-seconds: ${GUARDRAILS_LLM_CB_OPEN_SECONDS:30}
+      half-open-max-calls: ${GUARDRAILS_LLM_CB_HALF_OPEN_CALLS:1}
+  audit:
+    # Fail-closed is enforced in govcloud profile at runtime
+    fail-closed: ${AUDIT_FAIL_CLOSED:false}
 
 # ============================================
 # SENTINEL Configuration
@@ -92,6 +114,21 @@ sentinel:
   # LLM timeout for complex queries (default 120s, increase for slower hardware)
   llm:
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:120}
+  # Performance tuning knobs
+  performance:
+    rag-core-threads: ${RAG_CORE_THREADS:8}
+    rag-max-threads: ${RAG_MAX_THREADS:16}
+    rag-queue-capacity: ${RAG_QUEUE_CAPACITY:400}
+    reranker-threads: ${RERANKER_THREADS:4}
+    rag-future-timeout-seconds: ${RAG_FUTURE_TIMEOUT_SECONDS:8}
+  # RAG prompt/context limits
+  rag:
+    max-context-chars: ${RAG_MAX_CONTEXT_CHARS:16000}
+    max-doc-chars: ${RAG_MAX_DOC_CHARS:2500}
+    max-visual-chars: ${RAG_MAX_VISUAL_CHARS:1500}
+    max-overview-chars: ${RAG_MAX_OVERVIEW_CHARS:3000}
+    max-docs: ${RAG_MAX_DOCS:16}
+    max-visual-docs: ${RAG_MAX_VISUAL_DOCS:8}
 
 # ============================================
 # SENTINEL Advanced RAG Configuration
@@ -127,6 +164,8 @@ sentinel:
       batch-size: ${HIFIRAG_RERANKER_BATCH:5}
       timeout-seconds: ${HIFIRAG_RERANKER_TIMEOUT:30}
       use-llm: ${HIFIRAG_USE_LLM:true}
+      cache-size: ${HIFIRAG_RERANKER_CACHE_SIZE:2000}
+      cache-ttl-seconds: ${HIFIRAG_RERANKER_CACHE_TTL:900}
 
   # QuCo-RAG: Uncertainty Quantification (arXiv:2512.19134)
   # Detects hallucination risk by analyzing entity frequency
@@ -155,6 +194,8 @@ sentinel:
     chart-extraction: ${MEGARAG_CHART_EXTRACTION:true}
     # Enable OCR for image text
     ocr-enabled: ${MEGARAG_OCR:true}
+    # Extract embedded images from PDFs during ingestion
+    extract-images-from-pdf: ${MEGARAG_EXTRACT_IMAGES:true}
 
   # MiA-RAG: Mindscape-Aware Retrieval (arXiv:2512.17220)
   # Hierarchical summaries for long-document coherence
@@ -195,6 +236,9 @@ sentinel:
     ocr-tolerance: ${HYBRIDRAG_OCR_TOLERANCE:true}
     # LLM-based query expansion (higher quality, adds latency)
     llm-expansion: ${HYBRIDRAG_LLM_EXPANSION:false}
+    # Query expansion cache (reduces repeated LLM/expansion work)
+    query-expansion-cache-size: ${HYBRIDRAG_QE_CACHE_SIZE:1500}
+    query-expansion-cache-ttl-seconds: ${HYBRIDRAG_QE_CACHE_TTL:900}
 
   # Graph-O1: MCTS Graph Reasoning (arXiv:2512.17912)
   # Monte Carlo Tree Search for knowledge graph traversal

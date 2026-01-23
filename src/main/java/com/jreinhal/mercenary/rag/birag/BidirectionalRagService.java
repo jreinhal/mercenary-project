@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.rag.birag;
 import com.jreinhal.mercenary.rag.birag.GroundingVerifier;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -107,7 +108,7 @@ public class BidirectionalRagService {
         if (candidates.isEmpty()) {
             return List.of();
         }
-        List<Document> experienceDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(limit).withSimilarityThreshold(0.5).withFilterExpression("dept == '" + department + "' && type == 'experience'"));
+        List<Document> experienceDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(limit).withSimilarityThreshold(0.5).withFilterExpression(FilterExpressionBuilder.forDepartmentAndType(department, "experience")));
         Set<String> relevantIds = experienceDocs.stream().map(d -> (String)d.getMetadata().get("experienceId")).filter(Objects::nonNull).collect(Collectors.toSet());
         return candidates.stream().filter(e -> relevantIds.contains(e.id())).limit(limit).toList();
     }

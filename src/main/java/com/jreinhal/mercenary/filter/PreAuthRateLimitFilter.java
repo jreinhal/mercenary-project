@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.filter;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.jreinhal.mercenary.filter.SecurityContext;
+import com.jreinhal.mercenary.security.ClientIpResolver;
 import com.jreinhal.mercenary.service.AuditService;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
@@ -27,14 +28,16 @@ public class PreAuthRateLimitFilter
 extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(PreAuthRateLimitFilter.class);
     private final AuditService auditService;
+    private final ClientIpResolver clientIpResolver;
     @Value(value="${app.rate-limit.enabled:true}")
     private boolean enabled;
     @Value(value="${app.rate-limit.anonymous-rpm:30}")
     private int anonymousRpm;
     private final Cache<String, Bucket> bucketCache = Caffeine.newBuilder().maximumSize(10000L).expireAfterAccess(1L, TimeUnit.HOURS).build();
 
-    public PreAuthRateLimitFilter(AuditService auditService) {
+    public PreAuthRateLimitFilter(AuditService auditService, ClientIpResolver clientIpResolver) {
         this.auditService = auditService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
@@ -51,7 +54,7 @@ extends OncePerRequestFilter {
             chain.doFilter((ServletRequest)request, (ServletResponse)response);
             return;
         }
-        String rateLimitKey = "ip:" + this.getClientIp(request);
+        String rateLimitKey = "ip:" + this.clientIpResolver.resolveClientIp(request);
         Bucket bucket = this.bucketCache.get(rateLimitKey, k -> this.createBucket(this.anonymousRpm));
         if (bucket.tryConsume(1L)) {
             response.setHeader("X-RateLimit-Limit", String.valueOf(this.anonymousRpm));
@@ -72,14 +75,6 @@ extends OncePerRequestFilter {
     private Bucket createBucket(int requestsPerMinute) {
         Bandwidth limit = Bandwidth.classic((long)requestsPerMinute, (Refill)Refill.greedy((long)requestsPerMinute, (Duration)Duration.ofMinutes(1L)));
         return Bucket.builder().addLimit(limit).build();
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isEmpty()) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private boolean isExemptPath(String path) {

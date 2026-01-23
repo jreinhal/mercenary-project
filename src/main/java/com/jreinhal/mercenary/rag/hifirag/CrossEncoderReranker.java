@@ -1,12 +1,15 @@
 package com.jreinhal.mercenary.rag.hifirag;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.jreinhal.mercenary.rag.hifirag.HiFiRagService;
+import com.jreinhal.mercenary.constant.StopWords;
 import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -18,12 +21,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
 public class CrossEncoderReranker {
     private static final Logger log = LoggerFactory.getLogger(CrossEncoderReranker.class);
-    private static final int THREAD_POOL_SIZE = 4;
+    private static final Pattern SCORE_PATTERN = Pattern.compile("(0\\.\\d+|1\\.0|0|1)");
+    private static final Set<String> STOP_WORDS = StopWords.RERANKER;
     private final ChatClient chatClient;
     private final ExecutorService executor;
     @Value(value="${sentinel.hifirag.reranker.batch-size:5}")
@@ -32,14 +37,25 @@ public class CrossEncoderReranker {
     private int timeoutSeconds;
     @Value(value="${sentinel.hifirag.reranker.use-llm:true}")
     private boolean useLlm;
+    @Value(value="${sentinel.hifirag.reranker.cache-size:2000}")
+    private int cacheSize;
+    @Value(value="${sentinel.hifirag.reranker.cache-ttl-seconds:900}")
+    private long cacheTtlSeconds;
+    private Cache<String, Double> scoreCache;
 
-    public CrossEncoderReranker(ChatClient.Builder builder) {
+    public CrossEncoderReranker(ChatClient.Builder builder, @Qualifier("rerankerExecutor") ExecutorService executor) {
         this.chatClient = builder.build();
-        this.executor = Executors.newFixedThreadPool(4);
+        this.executor = executor;
     }
 
     @PostConstruct
     public void init() {
+        if (this.cacheSize > 0 && this.cacheTtlSeconds > 0) {
+            this.scoreCache = Caffeine.newBuilder()
+                    .maximumSize(this.cacheSize)
+                    .expireAfterWrite(Duration.ofSeconds(this.cacheTtlSeconds))
+                    .build();
+        }
         log.info("Cross-Encoder Reranker initialized (useLlm={})", this.useLlm);
     }
 
@@ -82,13 +98,26 @@ public class CrossEncoderReranker {
 
     private HiFiRagService.ScoredDocument scoreDocument(String query, Document doc) {
         try {
-            Object content = doc.getContent();
-            if (((String)content).length() > 1000) {
-                content = ((String)content).substring(0, 1000) + "...";
+            String cacheKey = this.buildCacheKey(query, doc);
+            if (this.scoreCache != null) {
+                Double cachedScore = this.scoreCache.getIfPresent(cacheKey);
+                if (cachedScore != null) {
+                    return new HiFiRagService.ScoredDocument(doc, cachedScore.doubleValue());
+                }
+            }
+            String content = doc.getContent();
+            if (content == null) {
+                content = "";
+            }
+            if (content.length() > 1000) {
+                content = content.substring(0, 1000) + "...";
             }
             String promptText = String.format("Rate the relevance of this document to the query on a scale of 0.0 to 1.0.\n\nQUERY: %s\n\nDOCUMENT:\n%s\n\nRespond with ONLY a number between 0.0 and 1.0, nothing else.\n0.0 = completely irrelevant\n0.5 = somewhat relevant\n1.0 = highly relevant\n\nScore:", query, content);
             String response = this.chatClient.prompt().user(promptText).call().content();
             double score = this.parseScore(response);
+            if (this.scoreCache != null) {
+                this.scoreCache.put(cacheKey, score);
+            }
             return new HiFiRagService.ScoredDocument(doc, score);
         }
         catch (Exception e) {
@@ -101,15 +130,14 @@ public class CrossEncoderReranker {
         if (response == null || response.isEmpty()) {
             return 0.5;
         }
-        Pattern pattern = Pattern.compile("(0\\.\\d+|1\\.0|0|1)");
-        Matcher matcher = pattern.matcher(response.trim());
+        Matcher matcher = SCORE_PATTERN.matcher(response.trim());
         if (matcher.find()) {
             try {
                 double score = Double.parseDouble(matcher.group(1));
                 return Math.max(0.0, Math.min(1.0, score));
             }
             catch (NumberFormatException numberFormatException) {
-                // empty catch block
+                log.debug("Cross-encoder score parse failed: {}", response);
             }
         }
         return 0.5;
@@ -120,9 +148,16 @@ public class CrossEncoderReranker {
     }
 
     private HiFiRagService.ScoredDocument scoreWithKeywords(String query, Document doc) {
+        String cacheKey = this.buildCacheKey(query, doc);
+        if (this.scoreCache != null) {
+            Double cachedScore = this.scoreCache.getIfPresent(cacheKey);
+            if (cachedScore != null) {
+                return new HiFiRagService.ScoredDocument(doc, cachedScore.doubleValue());
+            }
+        }
         String lowerQuery = query.toLowerCase();
-        String lowerContent = doc.getContent().toLowerCase();
-        Set<String> stopWords = Set.of("the", "a", "an", "is", "are", "was", "were", "what", "where", "when", "who", "how", "why", "which", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with");
+        String lowerContent = doc.getContent() != null ? doc.getContent().toLowerCase() : "";
+        Set<String> stopWords = STOP_WORDS;
         String[] queryTerms = lowerQuery.split("\\W+");
         int totalTerms = 0;
         int matchedTerms = 0;
@@ -141,6 +176,18 @@ public class CrossEncoderReranker {
                 score = Math.min(1.0, score + 0.1);
             }
         }
+        if (this.scoreCache != null) {
+            this.scoreCache.put(cacheKey, score);
+        }
         return new HiFiRagService.ScoredDocument(doc, score);
+    }
+
+    private String buildCacheKey(String query, Document doc) {
+        Object dept = doc.getMetadata().get("dept");
+        String deptValue = dept != null ? dept.toString() : "UNKNOWN";
+        Object source = doc.getMetadata().get("source");
+        String sourceStr = source != null ? source.toString() : "";
+        String content = doc.getContent() != null ? doc.getContent() : "";
+        return deptValue + "|" + query + "|" + sourceStr + "|" + content.hashCode();
     }
 }

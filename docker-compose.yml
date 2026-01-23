@@ -50,7 +50,7 @@ services:
     container_name: sentinel-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db
       - mongo_config:/data/configdb
@@ -79,7 +79,7 @@ services:
     container_name: sentinel-ollama
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     networks:

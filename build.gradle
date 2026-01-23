@@ -32,8 +32,14 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 
-    // Spring AI for Ollama
+    // Spring AI for Ollama (Local)
     implementation 'org.springframework.ai:spring-ai-ollama-spring-boot-starter:1.0.0-M4'
+    
+    // Spring AI for Cloud Models (Foundation)
+    implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter:1.0.0-M4'
+    implementation 'org.springframework.ai:spring-ai-anthropic-spring-boot-starter:1.0.0-M4'
+    implementation 'org.springframework.ai:spring-ai-vertex-ai-gemini-spring-boot-starter:1.0.0-M4'
+
     implementation 'org.springframework.ai:spring-ai-mongodb-atlas-store-spring-boot-starter:1.0.0-M4'
     implementation 'org.springframework.ai:spring-ai-pdf-document-reader:1.0.0-M4'
 
@@ -101,7 +107,24 @@ tasks.named('bootRun') {
     jvmArgs = ['--add-opens', 'java.base/java.nio.charset=ALL-UNNAMED']
 }
 
+def docsIndexSource = file('docs/README.md')
+def docsIndexTarget = file('src/main/resources/static/docs-index.md')
+
+tasks.register('syncDocsIndex') {
+    description = 'Sync docs/README.md into static docs-index.md for the UI.'
+    inputs.file(docsIndexSource)
+    outputs.file(docsIndexTarget)
+    doLast {
+        if (!docsIndexSource.exists()) {
+            throw new GradleException("Missing ${docsIndexSource}")
+        }
+        docsIndexTarget.parentFile.mkdirs()
+        docsIndexTarget.text = docsIndexSource.text
+    }
+}
+
 processResources {
+    dependsOn tasks.named('syncDocsIndex')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 

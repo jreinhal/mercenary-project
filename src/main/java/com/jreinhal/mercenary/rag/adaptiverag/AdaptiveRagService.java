@@ -132,7 +132,7 @@ public class AdaptiveRagService {
 
     public int getTopK(RoutingDecision decision) {
         return switch (decision.ordinal()) {
-            default -> throw new MatchException(null, null);
+            default -> throw new IllegalArgumentException("Unknown routing decision: " + decision);
             case 0 -> 0;
             case 1 -> this.chunkTopK;
             case 2 -> this.documentTopK;
@@ -141,7 +141,7 @@ public class AdaptiveRagService {
 
     public double getSimilarityThreshold(RoutingDecision decision) {
         return switch (decision.ordinal()) {
-            default -> throw new MatchException(null, null);
+            default -> throw new IllegalArgumentException("Unknown routing decision: " + decision);
             case 0 -> 0.0;
             case 1 -> 0.2;
             case 2 -> 0.1;

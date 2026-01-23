@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.rag.megarag;
 
 import com.jreinhal.mercenary.rag.megarag.ImageAnalyzer;
 import com.jreinhal.mercenary.rag.megarag.VisualEntityLinker;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -11,6 +12,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,11 +24,13 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.CriteriaDefinition;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import com.jreinhal.mercenary.Department;
 
 @Service
 public class MegaRagService {
@@ -34,6 +41,7 @@ public class MegaRagService {
     private final ImageAnalyzer imageAnalyzer;
     private final VisualEntityLinker visualEntityLinker;
     private final ReasoningTracer reasoningTracer;
+    private final ExecutorService ragExecutor;
     @Value(value="${sentinel.megarag.enabled:true}")
     private boolean enabled;
     @Value(value="${sentinel.megarag.visual-weight:0.3}")
@@ -42,16 +50,19 @@ public class MegaRagService {
     private double textWeight;
     @Value(value="${sentinel.megarag.cross-modal-threshold:0.5}")
     private double crossModalThreshold;
+    @Value(value="${sentinel.performance.rag-future-timeout-seconds:8}")
+    private int futureTimeoutSeconds;
     private static final String VISUAL_NODES_COLLECTION = "megarag_visual_nodes";
     private static final String CROSS_MODAL_EDGES_COLLECTION = "megarag_cross_modal_edges";
 
-    public MegaRagService(VectorStore vectorStore, MongoTemplate mongoTemplate, ChatClient.Builder chatClientBuilder, ImageAnalyzer imageAnalyzer, VisualEntityLinker visualEntityLinker, ReasoningTracer reasoningTracer) {
+    public MegaRagService(VectorStore vectorStore, MongoTemplate mongoTemplate, ChatClient.Builder chatClientBuilder, ImageAnalyzer imageAnalyzer, VisualEntityLinker visualEntityLinker, ReasoningTracer reasoningTracer, @Qualifier("ragExecutor") ExecutorService ragExecutor) {
         this.vectorStore = vectorStore;
         this.mongoTemplate = mongoTemplate;
         this.chatClient = chatClientBuilder.build();
         this.imageAnalyzer = imageAnalyzer;
         this.visualEntityLinker = visualEntityLinker;
         this.reasoningTracer = reasoningTracer;
+        this.ragExecutor = ragExecutor;
     }
 
     @PostConstruct
@@ -99,15 +110,57 @@ public class MegaRagService {
         if (!this.enabled) {
             return new CrossModalRetrievalResult(List.of(), List.of(), List.of());
         }
+        String normalizedDept = this.normalizeDepartment(department);
+        if (normalizedDept == null) {
+            log.warn("MegaRAG: Invalid department '{}'", department);
+            return new CrossModalRetrievalResult(List.of(), List.of(), List.of());
+        }
         long startTime = System.currentTimeMillis();
-        List<Document> textDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "' && type != 'visual'"));
-        List<Document> visualDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "' && type == 'visual'"));
+        CompletableFuture<List<Document>> textFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentExcludingType(normalizedDept, "visual"))), this.ragExecutor);
+        CompletableFuture<List<Document>> visualFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndType(normalizedDept, "visual"))), this.ragExecutor);
+        List<Document> textDocs;
+        List<Document> visualDocs;
+        try {
+            textDocs = textFuture.get(this.futureTimeoutSeconds, TimeUnit.SECONDS);
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("MegaRAG: Text retrieval interrupted");
+            textDocs = List.of();
+        }
+        catch (TimeoutException e) {
+            log.warn("MegaRAG: Text retrieval timed out");
+            textFuture.cancel(true);
+            textDocs = List.of();
+        }
+        catch (Exception e) {
+            log.warn("MegaRAG: Text retrieval failed: {}", e.getMessage());
+            textDocs = List.of();
+        }
+        try {
+            visualDocs = visualFuture.get(this.futureTimeoutSeconds, TimeUnit.SECONDS);
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("MegaRAG: Visual retrieval interrupted");
+            visualDocs = List.of();
+        }
+        catch (TimeoutException e) {
+            log.warn("MegaRAG: Visual retrieval timed out");
+            visualFuture.cancel(true);
+            visualDocs = List.of();
+        }
+        catch (Exception e) {
+            log.warn("MegaRAG: Visual retrieval failed: {}", e.getMessage());
+            visualDocs = List.of();
+        }
         Set<String> visualNodeIds = visualDocs.stream().map(d -> (String)d.getMetadata().get("visualNodeId")).filter(Objects::nonNull).collect(Collectors.toSet());
         List<CrossModalEdge> relevantEdges = new ArrayList<>();
         if (!visualNodeIds.isEmpty()) {
             Query edgeQuery = new Query((CriteriaDefinition)Criteria.where((String)"visualNodeId").in(visualNodeIds));
             relevantEdges = this.mongoTemplate.find(edgeQuery, CrossModalEdge.class, CROSS_MODAL_EDGES_COLLECTION);
         }
+        Set<String> linkedNodeIds = relevantEdges.stream().map(CrossModalEdge::visualNodeId).collect(Collectors.toSet());
         ArrayList<ScoredDocument> scoredResults = new ArrayList<ScoredDocument>();
         for (i = 0; i < textDocs.size(); ++i) {
             doc = (Document)textDocs.get(i);
@@ -117,7 +170,7 @@ public class MegaRagService {
         for (i = 0; i < visualDocs.size(); ++i) {
             doc = (Document)visualDocs.get(i);
             String nodeId = (String)doc.getMetadata().get("visualNodeId");
-            boolean hasCrossModalLink = relevantEdges.stream().anyMatch(e -> e.visualNodeId().equals(nodeId));
+            boolean hasCrossModalLink = nodeId != null && linkedNodeIds.contains(nodeId);
             double score = this.visualWeight * (1.0 - (double)i * 0.05);
             if (hasCrossModalLink) {
                 score *= 1.3;
@@ -172,6 +225,18 @@ public class MegaRagService {
 
     public boolean isEnabled() {
         return this.enabled;
+    }
+
+    private String normalizeDepartment(String department) {
+        if (department == null) {
+            return null;
+        }
+        try {
+            return Department.valueOf(department.trim().toUpperCase()).name();
+        }
+        catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public record VisualIngestionResult(boolean success, String message, List<VisualEntity> entities, String nodeId) {

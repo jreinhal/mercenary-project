@@ -1,6 +1,5 @@
 package com.jreinhal.mercenary.rag.hgmem;
 
-import java.lang.invoke.CallSite;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -8,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.jreinhal.mercenary.constant.StopWords;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -22,7 +22,7 @@ public class EntityExtractor {
     private static final Set<String> NAME_SUFFIXES = Set.of("jr", "sr", "ii", "iii", "iv", "phd", "md", "esq");
     private static final Set<String> ORG_INDICATORS = Set.of("inc", "corp", "corporation", "llc", "ltd", "company", "co", "agency", "department", "bureau", "division", "office", "institute", "university", "college", "school", "foundation", "association", "organization", "group", "team", "committee");
     private static final Set<String> LOCATION_INDICATORS = Set.of("city", "town", "village", "state", "province", "country", "region", "street", "avenue", "road", "drive", "lane", "blvd", "highway", "building", "floor", "room", "suite", "office");
-    private static final Set<String> STOP_WORDS = Set.of("the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "this", "that", "these", "those", "it", "its", "they", "them");
+    private static final Set<String> STOP_WORDS = StopWords.HGMEM_EXTRACTOR;
 
     public List<Entity> extract(String text) {
         if (text == null || text.isEmpty()) {

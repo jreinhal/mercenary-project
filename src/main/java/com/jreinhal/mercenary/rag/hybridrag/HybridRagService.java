@@ -1,8 +1,11 @@
 package com.jreinhal.mercenary.rag.hybridrag;
 
+import com.jreinhal.mercenary.constant.StopWords;
 import com.jreinhal.mercenary.rag.hybridrag.QueryExpander;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.Department;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,13 +27,17 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 @Service
 public class HybridRagService {
     private static final Logger log = LoggerFactory.getLogger(HybridRagService.class);
+    private static final Set<String> KEYWORD_STOP_WORDS = StopWords.HYBRID_KEYWORDS;
+    private static final Map<Character, char[]> OCR_SUBS = Map.of(Character.valueOf('0'), new char[]{'o', 'O'}, Character.valueOf('O'), new char[]{'0'}, Character.valueOf('o'), new char[]{'0'}, Character.valueOf('1'), new char[]{'l', 'I', 'i'}, Character.valueOf('l'), new char[]{'1', 'I'}, Character.valueOf('I'), new char[]{'1', 'l'}, Character.valueOf('5'), new char[]{'S', 's'}, Character.valueOf('S'), new char[]{'5'}, Character.valueOf('8'), new char[]{'B'}, Character.valueOf('B'), new char[]{'8'});
     private final VectorStore vectorStore;
     private final QueryExpander queryExpander;
     private final ReasoningTracer reasoningTracer;
+    private final ExecutorService ragExecutor;
     @Value(value="${sentinel.hybridrag.enabled:true}")
     private boolean enabled;
     @Value(value="${sentinel.hybridrag.rrf-k:60}")
@@ -39,11 +50,14 @@ public class HybridRagService {
     private int multiQueryCount;
     @Value(value="${sentinel.hybridrag.ocr-tolerance:true}")
     private boolean ocrTolerance;
+    @Value(value="${sentinel.performance.rag-future-timeout-seconds:8}")
+    private int futureTimeoutSeconds;
 
-    public HybridRagService(VectorStore vectorStore, QueryExpander queryExpander, ReasoningTracer reasoningTracer) {
+    public HybridRagService(VectorStore vectorStore, QueryExpander queryExpander, ReasoningTracer reasoningTracer, @Qualifier("ragExecutor") ExecutorService ragExecutor) {
         this.vectorStore = vectorStore;
         this.queryExpander = queryExpander;
         this.reasoningTracer = reasoningTracer;
+        this.ragExecutor = ragExecutor;
     }
 
     @PostConstruct
@@ -52,22 +66,42 @@ public class HybridRagService {
     }
 
     public HybridRetrievalResult retrieve(String query, String department) {
+        String normalizedDept = this.normalizeDepartment(department);
+        if (normalizedDept == null) {
+            log.warn("HybridRAG: Invalid department '{}'", department);
+            return new HybridRetrievalResult(List.of(), Map.of("mode", "invalid-dept"));
+        }
         if (!this.enabled) {
-            List docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression("dept == '" + department + "'"));
+            List docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(normalizedDept)));
             return new HybridRetrievalResult(docs, Map.of("mode", "fallback"));
         }
         long startTime = System.currentTimeMillis();
-        List<String> queryVariants = this.generateQueryVariants(query);
+        List<String> queryVariants = this.generateQueryVariants(query, normalizedDept);
         LinkedHashMap<String, List<RankedDoc>> semanticResults = new LinkedHashMap<String, List<RankedDoc>>();
+        LinkedHashMap<String, CompletableFuture<List<RankedDoc>>> futures = new LinkedHashMap<>();
         for (String variant : queryVariants) {
-            List results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression("dept == '" + department + "'"));
-            ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
-            for (int i = 0; i < results.size(); ++i) {
-                ranked.add(new RankedDoc((Document)results.get(i), i + 1, "semantic"));
-            }
-            semanticResults.put(variant, ranked);
+            futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept), this.ragExecutor));
         }
-        List<RankedDoc> keywordResults = this.performKeywordRetrieval(query, department);
+        for (Map.Entry<String, CompletableFuture<List<RankedDoc>>> entry : futures.entrySet()) {
+            try {
+                semanticResults.put(entry.getKey(), entry.getValue().get(this.futureTimeoutSeconds, TimeUnit.SECONDS));
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("HybridRAG semantic retrieval interrupted for variant '{}'", entry.getKey());
+                semanticResults.put(entry.getKey(), List.of());
+            }
+            catch (TimeoutException e) {
+                log.warn("HybridRAG semantic retrieval timed out for variant '{}'", entry.getKey());
+                entry.getValue().cancel(true);
+                semanticResults.put(entry.getKey(), List.of());
+            }
+            catch (Exception e) {
+                log.warn("HybridRAG semantic retrieval failed for variant '{}': {}", entry.getKey(), e.getMessage());
+                semanticResults.put(entry.getKey(), List.of());
+            }
+        }
+        List<RankedDoc> keywordResults = this.performKeywordRetrieval(query, normalizedDept);
         if (this.ocrTolerance) {
             keywordResults = this.applyOcrTolerance(keywordResults, query);
         }
@@ -79,10 +113,10 @@ public class HybridRagService {
         return new HybridRetrievalResult(fusedResults, Map.of("queryVariants", queryVariants, "semanticCount", semanticResults.values().stream().mapToInt(List::size).sum(), "keywordCount", keywordResults.size(), "elapsed", elapsed));
     }
 
-    private List<String> generateQueryVariants(String query) {
+    private List<String> generateQueryVariants(String query, String department) {
         ArrayList<String> variants = new ArrayList<String>();
         variants.add(query);
-        List<String> expansions = this.queryExpander.expand(query, this.multiQueryCount - 1);
+        List<String> expansions = this.queryExpander.expand(query, this.multiQueryCount - 1, department);
         variants.addAll(expansions);
         return variants;
     }
@@ -92,7 +126,7 @@ public class HybridRagService {
         if (keywords.isEmpty()) {
             return List.of();
         }
-        List<Document> candidates = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.1).withFilterExpression("dept == '" + department + "'"));
+        List<Document> candidates = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.1).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
         for (Document doc : candidates) {
             int keywordScore = this.countKeywordMatches(doc.getContent(), keywords);
@@ -136,10 +170,9 @@ public class HybridRagService {
         HashSet<String> variants = new HashSet<String>();
         variants.add(term);
         String lower = term.toLowerCase();
-        Map<Character, char[]> ocrSubs = Map.of(Character.valueOf('0'), new char[]{'o', 'O'}, Character.valueOf('O'), new char[]{'0'}, Character.valueOf('o'), new char[]{'0'}, Character.valueOf('1'), new char[]{'l', 'I', 'i'}, Character.valueOf('l'), new char[]{'1', 'I'}, Character.valueOf('I'), new char[]{'1', 'l'}, Character.valueOf('5'), new char[]{'S', 's'}, Character.valueOf('S'), new char[]{'5'}, Character.valueOf('8'), new char[]{'B'}, Character.valueOf('B'), new char[]{'8'});
         for (int i = 0; i < lower.length(); ++i) {
             char c = lower.charAt(i);
-            char[] subs = ocrSubs.get(Character.valueOf(c));
+            char[] subs = OCR_SUBS.get(Character.valueOf(c));
             if (subs == null) continue;
             for (char sub : subs) {
                 String variant = lower.substring(0, i) + sub + lower.substring(i + 1);
@@ -174,13 +207,15 @@ public class HybridRagService {
     private String getDocId(Document doc) {
         Object source = doc.getMetadata().get("source");
         int contentHash = doc.getContent().hashCode();
-        return String.valueOf(source) + "_" + contentHash;
+        Object dept = doc.getMetadata().get("dept");
+        String deptValue = dept != null ? dept.toString() : "UNKNOWN";
+        return deptValue + "_" + String.valueOf(source) + "_" + contentHash;
     }
 
     private Set<String> extractKeywords(String text) {
         HashSet<String> keywords = new HashSet<String>();
         String lower = text.toLowerCase();
-        Set<String> stopWords = Set.of("the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from", "as", "is", "was", "are", "were", "been", "be", "have", "has", "had", "what", "where", "when", "who", "how", "why", "tell", "me", "about", "describe", "find", "show", "give", "also");
+        Set<String> stopWords = KEYWORD_STOP_WORDS;
         for (String word : lower.split("\\s+")) {
             String cleaned = word.replaceAll("[^a-z0-9]", "");
             if (cleaned.length() < 3 || stopWords.contains(cleaned)) continue;
@@ -209,6 +244,27 @@ public class HybridRagService {
     private record RankedDoc(Document document, int rank, String source, int keywordScore) {
         RankedDoc(Document document, int rank, String source) {
             this(document, rank, source, 0);
+        }
+    }
+
+    private List<RankedDoc> retrieveSemantic(String variant, String department) {
+        List results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+        ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
+        for (int i = 0; i < results.size(); ++i) {
+            ranked.add(new RankedDoc((Document)results.get(i), i + 1, "semantic"));
+        }
+        return ranked;
+    }
+
+    private String normalizeDepartment(String department) {
+        if (department == null) {
+            return null;
+        }
+        try {
+            return Department.valueOf(department.trim().toUpperCase()).name();
+        }
+        catch (IllegalArgumentException e) {
+            return null;
         }
     }
 }

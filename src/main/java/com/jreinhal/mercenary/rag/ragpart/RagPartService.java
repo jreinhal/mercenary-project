@@ -4,6 +4,7 @@ import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
 import com.jreinhal.mercenary.rag.ragpart.SuspicionScorer;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -113,7 +114,7 @@ public class RagPartService {
 
     private String buildPartitionFilter(Set<Integer> partitions, String department) {
         String partitionIn = partitions.stream().map(String::valueOf).collect(Collectors.joining(","));
-        return String.format("dept == '%s' && partition_id in [%s]", department, partitionIn);
+        return FilterExpressionBuilder.forDepartment(department) + " && partition_id in [" + partitionIn + "]";
     }
 
     private List<Document> retrieveWithFilter(String query, String filter) {
@@ -128,7 +129,7 @@ public class RagPartService {
 
     private List<Document> standardRetrieval(String query, String department) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.retrievalK).withSimilarityThreshold(0.15).withFilterExpression("dept == '" + department + "'"));
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.retrievalK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         }
         catch (Exception e) {
             log.error("Standard retrieval failed", (Throwable)e);

@@ -1,6 +1,7 @@
 package com.jreinhal.mercenary.rag.hgmem;
 
 import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import jakarta.annotation.PostConstruct;
@@ -90,7 +91,7 @@ public class HGMemQueryEngine {
 
     private List<Document> vectorSearch(String query, String department) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.topK).withSimilarityThreshold(0.15).withFilterExpression("dept == '" + department + "'"));
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.topK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         }
         catch (Exception e) {
             log.error("Vector search failed", (Throwable)e);

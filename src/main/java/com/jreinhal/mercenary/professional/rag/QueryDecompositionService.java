@@ -69,7 +69,7 @@ public class QueryDecompositionService {
 
     private String buildDecompositionPrompt(String query, DecompositionStrategy strategy) {
         String strategyInstructions = switch (strategy.ordinal()) {
-            default -> throw new MatchException(null, null);
+            default -> throw new IllegalArgumentException("Unknown decomposition strategy: " + strategy);
             case 0 -> "Break this into sequential steps where each question builds on previous answers.\nThe first question should establish foundational knowledge.\n";
             case 1 -> "Break this into independent questions that can be answered separately.\nEach question should cover a distinct aspect of the query.\n";
             case 2 -> "Break this into questions that gather information about each entity being compared.\nInclude a final question about key differences/similarities.\n";
@@ -116,7 +116,7 @@ public class QueryDecompositionService {
 
     private String generateSynthesisPrompt(String originalQuery, DecompositionStrategy strategy, List<SubQuery> subQueries) {
         String instructions = switch (strategy.ordinal()) {
-            default -> throw new MatchException(null, null);
+            default -> throw new IllegalArgumentException("Unknown decomposition strategy: " + strategy);
             case 0 -> "Combine these answers in order, showing how each builds on the previous.";
             case 1 -> "Synthesize these parallel answers into a comprehensive response.";
             case 2 -> "Create a comparison highlighting similarities and differences.";

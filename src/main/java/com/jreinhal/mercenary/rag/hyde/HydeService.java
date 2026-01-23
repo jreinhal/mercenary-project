@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.rag.hyde;
 
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -59,7 +60,7 @@ public class HydeService {
         }
         log.debug("HyDE: Generated hypothetical ({}ms): {}", hypoTime, this.truncate(hypothetical, 100));
         long searchStart = System.currentTimeMillis();
-        List hydeResults = this.vectorStore.similaritySearch(SearchRequest.query((String)hypothetical).withTopK(this.topK).withSimilarityThreshold(this.similarityThreshold).withFilterExpression("dept == '" + department + "'"));
+        List hydeResults = this.vectorStore.similaritySearch(SearchRequest.query((String)hypothetical).withTopK(this.topK).withSimilarityThreshold(this.similarityThreshold).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         long searchTime = System.currentTimeMillis() - searchStart;
         List<Document> standardResults = this.standardRetrieval(query, department);
         List<Document> fusedResults = this.fuseResults(hydeResults, standardResults);
@@ -86,7 +87,7 @@ public class HydeService {
 
     private List<Document> standardRetrieval(String query, String department) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.topK).withSimilarityThreshold(this.similarityThreshold).withFilterExpression("dept == '" + department + "'"));
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.topK).withSimilarityThreshold(this.similarityThreshold).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         }
         catch (Exception e) {
             log.error("HyDE: Standard retrieval failed: {}", e.getMessage());

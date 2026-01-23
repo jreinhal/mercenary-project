@@ -50,9 +50,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # JVM memory settings - adjust based on deployment
 ENV JAVA_OPTS="-Xms512m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 
-# Default environment variables
-ENV APP_PROFILE=dev
-ENV AUTH_MODE=DEV
+# Default environment variables (set via deployment)
 ENV SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sentinel
 ENV SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
 

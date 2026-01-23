@@ -4,6 +4,7 @@ import com.jreinhal.mercenary.rag.hifirag.CrossEncoderReranker;
 import com.jreinhal.mercenary.rag.hifirag.GapDetector;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import jakarta.annotation.PostConstruct;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -17,13 +18,13 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.jreinhal.mercenary.Department;
 
 @Service
 public class HiFiRagService {
     private static final Logger log = LoggerFactory.getLogger(HiFiRagService.class);
     private static final double BROAD_RETRIEVAL_THRESHOLD = 0.1;
     private static final double STANDARD_RETRIEVAL_THRESHOLD = 0.15;
-    private static final String DEPT_FILTER_PATTERN = "dept == '%s'";
     private final VectorStore vectorStore;
     private final CrossEncoderReranker reranker;
     private final GapDetector gapDetector;
@@ -52,9 +53,14 @@ public class HiFiRagService {
     }
 
     public List<Document> retrieve(String query, String department) {
+        String normalizedDept = this.normalizeDepartment(department);
+        if (normalizedDept == null) {
+            log.warn("HiFi-RAG: Invalid department '{}'", department);
+            return List.of();
+        }
         if (!this.enabled) {
             log.debug("HiFi-RAG disabled, falling back to standard retrieval");
-            return this.standardRetrieval(query, department);
+            return this.standardRetrieval(query, normalizedDept);
         }
         long startTime = System.currentTimeMillis();
         log.info("HiFi-RAG: Starting iterative retrieval for query: {}", query);
@@ -66,7 +72,7 @@ public class HiFiRagService {
         for (int iteration = 0; iteration < this.maxIterations; ++iteration) {
             log.info("HiFi-RAG: Iteration {}/{}", (iteration + 1), this.maxIterations);
             long iterStart = System.currentTimeMillis();
-            List<Document> candidates = this.broadRetrieval(currentQuery, department, this.initialK);
+            List<Document> candidates = this.broadRetrieval(currentQuery, normalizedDept, this.initialK);
             log.debug("HiFi-RAG: Pass 1 retrieved {} candidates", candidates.size());
             if (candidates.isEmpty()) {
                 log.warn("HiFi-RAG: No candidates found in iteration {}", (iteration + 1));
@@ -100,7 +106,7 @@ public class HiFiRagService {
 
     private List<Document> broadRetrieval(String query, String department, int topK) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(topK).withSimilarityThreshold(0.1).withFilterExpression(String.format(DEPT_FILTER_PATTERN, department)));
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(topK).withSimilarityThreshold(0.1).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         }
         catch (Exception e) {
             log.error("HiFi-RAG: Broad retrieval failed", (Throwable)e);
@@ -110,7 +116,7 @@ public class HiFiRagService {
 
     private List<Document> standardRetrieval(String query, String department) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.filteredK).withSimilarityThreshold(0.15).withFilterExpression(String.format(DEPT_FILTER_PATTERN, department)));
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.filteredK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         }
         catch (Exception e) {
             log.error("Standard retrieval failed", (Throwable)e);
@@ -120,14 +126,28 @@ public class HiFiRagService {
 
     private String getDocumentId(Document doc) {
         Object source = doc.getMetadata().get("source");
+        Object dept = doc.getMetadata().get("dept");
+        String deptValue = dept != null ? dept.toString() : "UNKNOWN";
         if (source != null) {
-            return source.toString() + "_" + doc.getContent().hashCode();
+            return deptValue + "_" + source.toString() + "_" + doc.getContent().hashCode();
         }
-        return String.valueOf(doc.getContent().hashCode());
+        return deptValue + "_" + String.valueOf(doc.getContent().hashCode());
     }
 
     public boolean isEnabled() {
         return this.enabled;
+    }
+
+    private String normalizeDepartment(String department) {
+        if (department == null) {
+            return null;
+        }
+        try {
+            return Department.valueOf(department.trim().toUpperCase()).name();
+        }
+        catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public record ScoredDocument(Document document, double score) {

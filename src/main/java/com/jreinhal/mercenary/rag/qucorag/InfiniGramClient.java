@@ -1,15 +1,14 @@
 package com.jreinhal.mercenary.rag.qucorag;
 
 import jakarta.annotation.PostConstruct;
+import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,17 +24,29 @@ public class InfiniGramClient {
     private static final String DEFAULT_INDEX = "v4_olmo-2-0325-32b-instruct_llama";
     @Value(value="${sentinel.qucorag.infini-gram-enabled:false}")
     private boolean enabled;
-    @Value(value="${sentinel.qucorag.infini-gram-timeout-ms:5000}")
-    private int timeoutMs;
     @Value(value="${sentinel.qucorag.infini-gram-index:v4_olmo-2-0325-32b-instruct_llama}")
     private String indexName;
-    private RestTemplate restTemplate;
-    private ExecutorService executor;
+    private final Environment environment;
+    private final RestTemplate restTemplate;
+    private final int timeoutMs;
+
+    public InfiniGramClient(RestTemplateBuilder restTemplateBuilder, Environment environment, @Value("${sentinel.qucorag.infini-gram-timeout-ms:5000}") int timeoutMs) {
+        this.environment = environment;
+        this.timeoutMs = timeoutMs;
+        this.restTemplate = restTemplateBuilder
+                .connectTimeout(Duration.ofMillis(timeoutMs))
+                .readTimeout(Duration.ofMillis(timeoutMs))
+                .build();
+    }
 
     @PostConstruct
     public void init() {
-        this.restTemplate = new RestTemplate();
-        this.executor = Executors.newCachedThreadPool();
+        boolean govcloudProfile = Arrays.stream(this.environment.getActiveProfiles())
+                .anyMatch(profile -> "govcloud".equalsIgnoreCase(profile));
+        if (govcloudProfile && this.enabled) {
+            log.warn("InfiniGram disabled in govcloud profile (air-gapped mode enforced).");
+            this.enabled = false;
+        }
         log.info("InfiniGramClient initialized (enabled={}, timeout={}ms, index={})", new Object[]{this.enabled, this.timeoutMs, this.indexName});
     }
 
@@ -48,12 +59,7 @@ public class InfiniGramClient {
             return -1L;
         }
         try {
-            Future<Long> future = this.executor.submit(() -> this.queryInfiniGram(query, "count"));
-            return future.get(this.timeoutMs, TimeUnit.MILLISECONDS);
-        }
-        catch (TimeoutException e) {
-            log.warn("Infini-gram timeout for query: {}", query);
-            return -1L;
+            return this.queryInfiniGram(query, "count");
         }
         catch (Exception e) {
             log.error("Infini-gram error for query: {}", query, e);
@@ -67,12 +73,7 @@ public class InfiniGramClient {
         }
         String query = String.format("\"%s\" AND \"%s\"", this.escapeQuery(entity1), this.escapeQuery(entity2));
         try {
-            Future<Long> future = this.executor.submit(() -> this.queryInfiniGram(query, "count"));
-            return future.get(this.timeoutMs, TimeUnit.MILLISECONDS);
-        }
-        catch (TimeoutException e) {
-            log.warn("Infini-gram timeout for co-occurrence: {} AND {}", entity1, entity2);
-            return -1L;
+            return this.queryInfiniGram(query, "count");
         }
         catch (Exception e) {
             log.error("Infini-gram error for co-occurrence: {} AND {}", new Object[]{entity1, entity2, e});
@@ -111,12 +112,7 @@ public class InfiniGramClient {
         if (query == null) {
             return "";
         }
-        return query.replace("\"", "\\\"").replace("\\", "\\\\");
+        return query.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    public void shutdown() {
-        if (this.executor != null) {
-            this.executor.shutdown();
-        }
-    }
 }

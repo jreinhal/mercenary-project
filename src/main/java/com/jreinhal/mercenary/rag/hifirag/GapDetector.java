@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import com.jreinhal.mercenary.constant.StopWords;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class GapDetector {
     private static final Logger log = LoggerFactory.getLogger(GapDetector.class);
-    private static final Set<String> STOP_WORDS = Set.of("a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "shall", "can", "need", "dare", "ought", "used", "and", "but", "or", "nor", "for", "yet", "so", "as", "if", "when", "where", "what", "which", "who", "whom", "whose", "why", "how", "whether", "while", "that", "this", "these", "those", "then", "than", "in", "on", "at", "by", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "out", "off", "over", "under", "again", "further", "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs", "themselves", "all", "each", "few", "more", "most", "other", "some", "such", "no", "not", "only", "own", "same", "any", "both", "just", "tell", "find", "show", "give", "get", "make", "know", "take", "see", "come", "think", "look", "want", "use", "work", "also", "new", "like");
+    private static final Set<String> STOP_WORDS = StopWords.HIFIRAG_GAP;
     private static final Pattern QUOTED_PHRASE = Pattern.compile("\"([^\"]+)\"|'([^']+)'");
     private static final Pattern CAPITALIZED_WORDS = Pattern.compile("\\b([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)\\b");
     private static final Pattern TECHNICAL_TERM = Pattern.compile("\\b([A-Z]{2,}(?:-[A-Z]+)*)\\b");
