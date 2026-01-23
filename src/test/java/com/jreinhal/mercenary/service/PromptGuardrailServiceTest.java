@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -21,6 +22,9 @@ class PromptGuardrailServiceTest {
         org.mockito.Mockito.when(mockBuilder.build()).thenReturn(mockClient);
 
         guardrailService = new PromptGuardrailService(mockBuilder);
+        ReflectionTestUtils.setField(guardrailService, "enabled", true);
+        ReflectionTestUtils.setField(guardrailService, "llmEnabled", false);
+        ReflectionTestUtils.setField(guardrailService, "strictMode", false);
     }
 
     @Test

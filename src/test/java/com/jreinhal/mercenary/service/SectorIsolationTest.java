@@ -57,7 +57,7 @@ class SectorIsolationTest {
         medicalUser.setId("med-1");
         medicalUser.setUsername("medical_analyst");
         medicalUser.setRoles(Set.of(UserRole.ANALYST));
-        medicalUser.setClearance(ClearanceLevel.CONFIDENTIAL);
+        medicalUser.setClearance(ClearanceLevel.CUI);
         medicalUser.setAllowedSectors(Set.of(Department.MEDICAL));
         medicalUser.setActive(true);
     }
@@ -100,7 +100,7 @@ class SectorIsolationTest {
     @DisplayName("Top Secret clearance can access all classification levels")
     void topSecretClearanceAccessesAll() {
         assertTrue(adminUser.canAccessClassification(ClearanceLevel.UNCLASSIFIED));
-        assertTrue(adminUser.canAccessClassification(ClearanceLevel.CONFIDENTIAL));
+        assertTrue(adminUser.canAccessClassification(ClearanceLevel.CUI));
         assertTrue(adminUser.canAccessClassification(ClearanceLevel.SECRET));
         assertTrue(adminUser.canAccessClassification(ClearanceLevel.TOP_SECRET));
     }
@@ -109,7 +109,7 @@ class SectorIsolationTest {
     @DisplayName("Secret clearance cannot access Top Secret")
     void secretClearanceCannotAccessTopSecret() {
         assertTrue(governmentUser.canAccessClassification(ClearanceLevel.UNCLASSIFIED));
-        assertTrue(governmentUser.canAccessClassification(ClearanceLevel.CONFIDENTIAL));
+        assertTrue(governmentUser.canAccessClassification(ClearanceLevel.CUI));
         assertTrue(governmentUser.canAccessClassification(ClearanceLevel.SECRET));
         assertFalse(governmentUser.canAccessClassification(ClearanceLevel.TOP_SECRET));
     }
@@ -118,7 +118,7 @@ class SectorIsolationTest {
     @DisplayName("Unclassified clearance can only access Unclassified")
     void unclassifiedClearanceIsLimited() {
         assertTrue(viewerUser.canAccessClassification(ClearanceLevel.UNCLASSIFIED));
-        assertFalse(viewerUser.canAccessClassification(ClearanceLevel.CONFIDENTIAL));
+        assertFalse(viewerUser.canAccessClassification(ClearanceLevel.CUI));
         assertFalse(viewerUser.canAccessClassification(ClearanceLevel.SECRET));
         assertFalse(viewerUser.canAccessClassification(ClearanceLevel.TOP_SECRET));
     }

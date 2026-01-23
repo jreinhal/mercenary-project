@@ -1,6 +1,10 @@
 package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.Department;
+import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
+import com.jreinhal.mercenary.rag.megarag.MegaRagService;
+import com.jreinhal.mercenary.rag.miarag.MiARagService;
+import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -20,12 +24,27 @@ class SecureIngestionServiceTest {
     @Mock
     private PiiRedactionService piiRedactionService;
 
+    @Mock
+    private PartitionAssigner partitionAssigner;
+
+    @Mock
+    private MiARagService miARagService;
+
+    @Mock
+    private MegaRagService megaRagService;
+
+    @Mock
+    private HyperGraphMemory hyperGraphMemory;
+
     private SecureIngestionService ingestionService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService);
+        when(miARagService.isEnabled()).thenReturn(false);
+        when(megaRagService.isEnabled()).thenReturn(false);
+        when(hyperGraphMemory.isEnabled()).thenReturn(false);
+        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory);
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -16,6 +17,20 @@ class PiiRedactionServiceTest {
     void setUp() {
         mockVault = mock(TokenizationVault.class);
         redactionService = new PiiRedactionService(mockVault);
+        ReflectionTestUtils.setField(redactionService, "enabled", true);
+        ReflectionTestUtils.setField(redactionService, "mode", "MASK");
+        ReflectionTestUtils.setField(redactionService, "auditRedactions", false);
+        ReflectionTestUtils.setField(redactionService, "redactSsn", true);
+        ReflectionTestUtils.setField(redactionService, "redactEmail", true);
+        ReflectionTestUtils.setField(redactionService, "redactPhone", true);
+        ReflectionTestUtils.setField(redactionService, "redactCreditCard", true);
+        ReflectionTestUtils.setField(redactionService, "redactDob", true);
+        ReflectionTestUtils.setField(redactionService, "redactIpAddress", true);
+        ReflectionTestUtils.setField(redactionService, "redactPassport", true);
+        ReflectionTestUtils.setField(redactionService, "redactDriversLicense", true);
+        ReflectionTestUtils.setField(redactionService, "redactNames", true);
+        ReflectionTestUtils.setField(redactionService, "redactAddress", true);
+        ReflectionTestUtils.setField(redactionService, "redactMedicalId", true);
     }
 
     @Test
