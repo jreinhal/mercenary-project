@@ -1,7 +1,6 @@
 # Gradle
 .gradle/
 build/
-!build/libs/*.jar
 
 # IDE
 .idea/
@@ -53,4 +52,3 @@ bin/
 
 # Build artifacts in root
 *.jar
-!build/libs/*.jar
