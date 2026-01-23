@@ -1,0 +1,50 @@
+OPERATIONAL TEST REPORT
+System Validation Exercise - Sentinel RAG
+Classification: SECRET//NOFORN
+Document Date: November 2025
+
+================================================================================
+TEST OVERVIEW
+================================================================================
+
+This operational test evaluated Sentinel RAG performance under mission-like
+conditions using mixed intelligence, logistics, and cyber artifacts.
+
+TEST NAME: Operational Readiness Validation (ORV-25)
+TEST WINDOW: November 6-9, 2025 (4 days)
+TEST LOCATION: Joint Operations Lab - Site Bravo
+
+================================================================================
+TEST LEADERSHIP
+================================================================================
+
+Test Director: LTC Rebecca Alvarez
+Security Officer: Maj. Daniel Brooks
+Systems Lead: Ms. Priya Patel
+Data Custodian: Mr. Alan Reyes
+
+================================================================================
+OBJECTIVES
+================================================================================
+
+1. Verify sector isolation under concurrent queries.
+2. Validate ingestion of classified PDF and text artifacts.
+3. Confirm CAC/PIV enforcement on protected endpoints.
+4. Measure retrieval latency for CHUNK and DOCUMENT routes.
+
+================================================================================
+RESULTS SUMMARY
+================================================================================
+
+Average CHUNK latency: 5.2s
+Average DOCUMENT latency: 18.7s
+Prompt injection attempts blocked: 100%
+PII redaction incidents recorded: 14
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+- Reduce max context for DOCUMENT routing under constrained hardware.
+- Expand prompt-guardrail logging for forensic review.
+- Add additional gov-sector test documents for cross-sector checks.

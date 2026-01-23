@@ -1,0 +1,34 @@
+OPERATIONS REPORT ALPHA
+Mission Systems Status Summary
+Classification: SECRET//NOFORN
+Report Date: October 28, 2025
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+Operations systems are stable with minor degradation in archival retrieval.
+No mission-critical outages reported during the reporting window.
+
+================================================================================
+KEY CONTACTS
+================================================================================
+
+Operations Commander: Col. Marcus Thompson
+Deputy Ops Chief: Lt. Col. Ingrid Shaw
+Cyber Liaison: Capt. Samuel Pierce
+
+================================================================================
+STATUS HIGHLIGHTS
+================================================================================
+
+- Secure ingestion throughput: 220 docs/hour
+- Vector store integrity: PASS
+- Incident response drills completed: 3
+
+================================================================================
+RISK NOTES
+================================================================================
+
+- Increased queue depth observed during multi-sector summarization.
+- Recommend reducing document cap for discovery queries on limited hardware.

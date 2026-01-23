@@ -116,6 +116,39 @@ class PiiRedactionServiceTest {
     }
 
     @Test
+    @DisplayName("Should redact Date of Birth in YYYY-MM-DD format")
+    void shouldRedactDateOfBirthIsoFormat() {
+        String input = "DOB: 1985-07-04";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertFalse(result.getRedactedContent().contains("1985-07-04"));
+        assertTrue(result.hasRedactions());
+    }
+
+    @Test
+    @DisplayName("Should redact Medical Record Numbers with dashes")
+    void shouldRedactMedicalRecordNumbersWithDash() {
+        String input = "MRN: MRN-778899";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertFalse(result.getRedactedContent().contains("MRN-778899"));
+        assertTrue(result.hasRedactions());
+    }
+
+    @Test
+    @DisplayName("Should not redact clinical trial IDs as phone numbers")
+    void shouldNotRedactClinicalTrialIdAsPhone() {
+        String input = "ClinicalTrials.gov ID: NCT05234567";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertEquals(input, result.getRedactedContent());
+        assertFalse(result.hasRedactions());
+    }
+
+    @Test
     @DisplayName("Should handle null input gracefully")
     void shouldHandleNullInput() {
         PiiRedactionService.RedactionResult result = redactionService.redact(null);

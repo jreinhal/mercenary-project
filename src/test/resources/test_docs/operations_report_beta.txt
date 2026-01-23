@@ -1,0 +1,26 @@
+OPERATIONS REPORT BETA
+Mission Systems Performance Snapshot
+Classification: SECRET//NOFORN
+Report Date: November 12, 2025
+
+================================================================================
+SUMMARY
+================================================================================
+
+Performance improved after thread and context tuning. No unauthorized access
+events detected. All sectors operational.
+
+================================================================================
+PERFORMANCE METRICS
+================================================================================
+
+CHUNK Route P50: 3.8s
+DOCUMENT Route P50: 12.4s
+Reranker Timeout Rate: 1.5%
+
+================================================================================
+NOTES
+================================================================================
+
+- Multi-hop queries showed stable retrieval with HybridRAG enabled.
+- Recommend adding Atlas Search only for enterprise deployments.
