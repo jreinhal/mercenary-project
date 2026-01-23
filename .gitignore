@@ -25,6 +25,13 @@ logs/
 tmp/
 temp/
 *.tmp
+temp_gradle/
+META-INF/
+gradle_out.txt
+gradle-8.11-bin.zip
+
+# Local tooling/config
+.claude/settings.local.json
 
 # Secrets - NEVER commit these
 .env

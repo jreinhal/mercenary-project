@@ -1,0 +1,136 @@
+Q4 2025 EARNINGS REPORT
+Quarterly Financial Performance Summary
+Classification: INTERNAL - FINANCIAL DATA
+Report Period: October 1 - December 31, 2025
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+This report presents the Q4 2025 financial performance including revenue,
+expenses, and key financial metrics for the enterprise.
+
+Chief Financial Officer: Sarah Mitchell, CFA
+Chief Investment Officer: Dr. David Park
+Prepared For: Board of Directors and Executive Leadership
+
+================================================================================
+REVENUE PERFORMANCE
+================================================================================
+
+TOTAL REVENUE Q4 2025: $850 Million
+
+Year-over-Year Performance:
+- Q4 2024 Revenue: $742 Million
+- Q4 2025 Revenue: $850 Million
+- YoY Increase: $108 Million (14.6% growth)
+
+Revenue Breakdown by Vertical:
+1. Enterprise Software: $340 Million (40.0%)
+2. Cloud Services: $255 Million (30.0%)
+3. Professional Services: $127.5 Million (15.0%)
+4. Maintenance & Support: $85 Million (10.0%)
+5. Other Revenue: $42.5 Million (5.0%)
+
+Quarterly Trend:
+- Q1 2025: $723 Million
+- Q2 2025: $768 Million
+- Q3 2025: $812 Million
+- Q4 2025: $850 Million
+- Full Year 2025: $3.153 Billion
+
+================================================================================
+EXPENSE ANALYSIS
+================================================================================
+
+TOTAL OPERATING EXPENSES: $612 Million
+
+Expense Categories:
+1. Cost of Revenue: $297 Million (35.0% of revenue)
+2. Research & Development: $127.5 Million (15.0% of revenue)
+3. Sales & Marketing: $110.5 Million (13.0% of revenue)
+4. General & Administrative: $76.5 Million (9.0% of revenue)
+
+Operating Expense Efficiency:
+- Operating Expense Ratio: 72.0%
+- Improvement from Q4 2024: -2.3 percentage points
+
+================================================================================
+PROFITABILITY METRICS
+================================================================================
+
+OPERATING INCOME: $238 Million
+
+Profitability Analysis:
+- Gross Profit: $553 Million
+- Gross Margin: 65.1%
+- Operating Income: $238 Million
+- Operating Margin: 28.0%
+- Net Income: $191 Million
+- Net Margin: 22.5%
+
+Earnings Per Share (EPS):
+- Basic EPS: $3.82
+- Diluted EPS: $3.76
+- Consensus Estimate: $3.65
+- Beat/(Miss): +$0.11 (3.0% beat)
+
+================================================================================
+INVESTMENT INCOME
+================================================================================
+
+INVESTMENT INCOME CONTRIBUTION: $28.5 Million
+
+Investment Portfolio Performance:
+- Fixed Income Securities: $12.3 Million
+- Equity Investments: $9.8 Million
+- Alternative Investments: $4.2 Million
+- Money Market/Cash: $2.2 Million
+
+================================================================================
+COMPLIANCE AUDITS
+================================================================================
+
+COMPLETED COMPLIANCE AUDITS:
+
+1. PCI-DSS Certification
+   Status: PASSED (Level 1 Service Provider)
+   Audit Date: November 2025
+   Auditor: Qualified Security Assessor (QSA)
+   Findings: Zero critical findings
+
+2. SOC 2 Type II Audit
+   Status: PASSED
+   Audit Period: May - October 2025
+   Auditor: Independent CPA Firm
+   Trust Service Criteria: Security, Availability, Confidentiality
+   Findings: 2 minor observations (remediated)
+
+3. SOX Compliance
+   Status: COMPLIANT
+   Audit Date: December 2025
+   Internal Controls: Effective
+   Material Weaknesses: None identified
+
+================================================================================
+FORWARD GUIDANCE
+================================================================================
+
+Q1 2026 Guidance:
+- Revenue: $870-890 Million
+- Operating Margin: 27-29%
+- EPS: $3.85-3.95
+
+Full Year 2026 Guidance:
+- Revenue: $3.5-3.6 Billion
+- Revenue Growth: 11-14%
+- Operating Margin: 28-30%
+
+================================================================================
+DOCUMENT METADATA
+================================================================================
+Document ID: FIN-2025-Q4-001
+Author: Sarah Mitchell, CFA, Chief Financial Officer
+Classification: Internal - Financial Data
+Review Date: January 15, 2026
+Distribution: Board of Directors, Executive Leadership

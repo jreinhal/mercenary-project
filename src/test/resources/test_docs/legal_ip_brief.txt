@@ -1,0 +1,105 @@
+INTELLECTUAL PROPERTY BRIEF
+Enterprise IP Portfolio Summary
+Classification: CONFIDENTIAL - LEGAL
+Document Date: November 2025
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+This brief summarizes the intellectual property position of the enterprise,
+including patents, trademarks, trade secrets, and compliance considerations.
+
+Prepared By: IP Counsel
+Department: Corporate Legal
+
+================================================================================
+PATENT PORTFOLIO
+================================================================================
+
+ACTIVE PATENTS: 47 Patents
+
+Patent Categories:
+- Software/Algorithm Patents: 23
+- Process Patents: 12
+- Design Patents: 8
+- Utility Patents: 4
+
+Key Patents:
+1. US Patent 10,234,567 - Machine Learning Data Processing System
+   Expiration: 2038
+   Status: Active, Fully Maintained
+   Licensing Revenue: $2.3 Million annually
+
+2. US Patent 10,567,890 - Secure Cloud Communication Protocol
+   Expiration: 2039
+   Status: Active, Fully Maintained
+   Strategic Value: Core to product differentiation
+
+3. US Patent 10,789,012 - Automated Compliance Verification System
+   Expiration: 2040
+   Status: Active, Fully Maintained
+   Competitive Advantage: High
+
+PENDING APPLICATIONS: 12 Applications
+
+================================================================================
+TRADEMARK PORTFOLIO
+================================================================================
+
+REGISTERED TRADEMARKS: 34 Marks
+
+Key Trademarks:
+- SENTINEL (Word Mark) - US Registration #5,234,567
+- SENTINEL Logo (Design Mark) - US Registration #5,234,568
+- "Intelligence That Matters" (Tagline) - US Registration #5,345,678
+
+International Registrations:
+- EU: 28 marks registered
+- UK: 15 marks registered
+- Canada: 12 marks registered
+- Australia: 8 marks registered
+
+================================================================================
+IP COMPLIANCE ITEMS
+================================================================================
+
+HIGHLIGHTED COMPLIANCE REQUIREMENTS:
+
+1. Open Source Software Compliance
+   - 127 open source components in use
+   - License types: MIT (67), Apache 2.0 (45), GPL (15)
+   - GPL components isolated in separate modules
+   - Quarterly audit schedule in place
+
+2. Third-Party IP Clearance
+   - All vendor software cleared for enterprise use
+   - Patent landscape analysis completed for new products
+   - Freedom-to-operate opinions current for core products
+
+3. Trade Secret Protection
+   - Employee confidentiality agreements: 100% compliance
+   - Vendor NDAs: All active vendors covered
+   - Physical security controls: Verified quarterly
+
+4. Export Control Compliance
+   - EAR classification completed for all software
+   - ITAR review not applicable (no defense articles)
+   - Encryption export licenses current
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+1. Continue aggressive patent prosecution in AI/ML space
+2. Expand trademark protection in emerging markets (India, Brazil)
+3. Conduct annual trade secret inventory review
+4. Update open source policy for new license types
+
+================================================================================
+DOCUMENT METADATA
+================================================================================
+Document ID: LEG-IP-2025-001
+Author: IP Counsel
+Classification: Confidential - Legal
+Review Date: November 15, 2025

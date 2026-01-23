@@ -1,0 +1,132 @@
+OPERATION DIAMOND SHIELD
+After Action Report - Cyber Defense Exercise
+Classification: SECRET//NOFORN
+Document Date: October 2025
+
+================================================================================
+EXERCISE OVERVIEW
+================================================================================
+
+Operation Diamond Shield was a comprehensive multi-domain cyber defense
+exercise conducted to validate defensive capabilities against advanced
+persistent threats (APT) and assess interoperability between defense
+organizations.
+
+EXERCISE CLASSIFICATION: SECRET//NOFORN
+EXERCISE TYPE: Simulated APT Attack / Red Team vs Blue Team
+DURATION: September 15-22, 2025 (7 days)
+
+================================================================================
+EXERCISE LEADERSHIP
+================================================================================
+
+Exercise Director: Colonel James Morrison
+Deputy Director: Commander Sarah Wells, USN
+Red Team Lead: Special Agent Michael Torres, NSA
+Blue Team Lead: Dr. Elizabeth Harper, CISA
+Technical Director: Robert Kim, DISA
+
+================================================================================
+KEY OBJECTIVES
+================================================================================
+
+1. PRIMARY OBJECTIVES:
+   - Validate threat detection capabilities against nation-state level TTPs
+   - Test incident response coordination across agencies
+   - Assess zero-trust architecture implementation
+   - Evaluate classified network segmentation
+
+2. SECONDARY OBJECTIVES:
+   - Test CAC/PIV authentication under stress conditions
+   - Validate STIG compliance across endpoints
+   - Assess threat hunting capabilities
+   - Evaluate communication protocols during cyber incidents
+
+================================================================================
+EXERCISE DATES AND PHASES
+================================================================================
+
+Phase 1: Reconnaissance (September 15-16, 2025)
+Phase 2: Initial Compromise (September 17-18, 2025)
+Phase 3: Lateral Movement (September 19-20, 2025)
+Phase 4: Data Exfiltration Attempt (September 21, 2025)
+Phase 5: Recovery and Remediation (September 22, 2025)
+
+================================================================================
+PERFORMANCE METRICS
+================================================================================
+
+THREAT CORRELATION ACCURACY: 94.7%
+
+Detection Metrics:
+- Time to Initial Detection: 4.2 hours (Target: <6 hours) - EXCEEDED
+- False Positive Rate: 3.2% (Target: <5%) - PASSED
+- Threat Attribution Accuracy: 89% (Target: >85%) - PASSED
+- Containment Time: 2.1 hours (Target: <4 hours) - EXCEEDED
+
+Response Metrics:
+- Incident Escalation Time: 18 minutes (Target: <30 minutes) - PASSED
+- Cross-Agency Coordination: 92% effectiveness rating
+- Communication Protocol Adherence: 97%
+- Recovery Time Objective (RTO): Met for 95% of systems
+
+================================================================================
+SIMULATED THREAT ACTORS
+================================================================================
+
+The exercise simulated attacks from the following threat profiles:
+
+1. APT-29 (Cozy Bear) - Russian SVR
+   - Tactics: Spear phishing, supply chain compromise
+   - Tools: Custom malware, legitimate admin tools
+
+2. APT-41 (Double Dragon) - Chinese MSS
+   - Tactics: Exploitation of public-facing applications
+   - Tools: Cobalt Strike, custom backdoors
+
+3. APT-33 (Elfin) - Iranian IRGC
+   - Tactics: Password spraying, VPN exploitation
+   - Tools: Shamoon variants, wipers
+
+================================================================================
+DEFENSE-IN-DEPTH MEASURES TESTED
+================================================================================
+
+ZERO-TRUST MEASURES:
+- Continuous authentication verification
+- Micro-segmentation between network zones
+- Least privilege access enforcement
+- Encrypted communications (TLS 1.3 minimum)
+
+SECURITY CONTROLS:
+- CAC/PIV authentication for all access
+- STIG-compliant endpoint configurations
+- Network-based intrusion detection (NIDS)
+- Host-based intrusion prevention (HIPS)
+- Security Information and Event Management (SIEM)
+
+================================================================================
+RECOMMENDATIONS AND NEXT STEPS
+================================================================================
+
+PHASE 2 RECOMMENDATIONS:
+
+1. Enhance threat hunting capabilities with ML-based anomaly detection
+2. Improve cross-domain solution integration
+3. Accelerate zero-trust network access (ZTNA) deployment
+4. Conduct quarterly red team exercises
+5. Update incident response playbooks based on lessons learned
+
+TIMELINE FOR IMPLEMENTATION:
+- Q4 2025: Complete after-action review dissemination
+- Q1 2026: Begin Phase 2 capability enhancements
+- Q2 2026: Conduct follow-on validation exercise
+
+================================================================================
+DOCUMENT METADATA
+================================================================================
+Document ID: GOV-OPS-2025-DS-001
+Classification: SECRET//NOFORN
+Author: Colonel James Morrison, Exercise Director
+Distribution: FOUO - Exercise Participants Only
+Declassification Date: October 2035

@@ -1,0 +1,130 @@
+CLINICAL TRIAL STATUS REPORT
+Protocol SENT-2025-001: AI-Assisted Diagnostic System Validation
+Classification: HIPAA PROTECTED - PHI REDACTED
+Document Date: November 2025
+
+================================================================================
+STUDY OVERVIEW
+================================================================================
+
+Protocol Number: SENT-2025-001
+Study Title: Validation of AI-Assisted Diagnostic Platform for Early Cancer Detection
+Trial Phase: Phase III Pivotal Trial
+ClinicalTrials.gov ID: NCT05234567
+
+Principal Investigator: Dr. Amanda Chen, MD, PhD
+Safety Officer: Dr. James Wilson, MD
+Biostatistician: Dr. Maria Rodriguez, PhD
+Sponsor: SENTINEL Medical Division
+
+================================================================================
+ENROLLMENT SUMMARY
+================================================================================
+
+Target Enrollment: 500 patients
+Patients Enrolled: 487 patients
+Patients Completed Treatment: 412 patients
+Patients Currently Active: 52 patients
+Patients Withdrawn: 23 patients (4.7% dropout rate)
+
+Enrollment by Site:
+- Site 001 (University Medical Center): 156 patients
+- Site 002 (Regional Cancer Center): 134 patients
+- Site 003 (Academic Medical Center): 112 patients
+- Site 004 (Community Hospital): 85 patients
+
+================================================================================
+PRIMARY ENDPOINT RESULTS
+================================================================================
+
+PRIMARY ENDPOINT: Improvement in Early Detection Rate
+
+Target Improvement: 20% increase in early-stage detection
+Achieved Improvement: 25% improvement in early detection rate
+
+Statistical Analysis:
+- p-value: <0.001
+- Confidence Interval (95%): 22.3% - 27.8%
+- Statistical Significance: ACHIEVED
+
+Primary Endpoint Status: MET - Study achieved primary objective
+
+SECONDARY ENDPOINTS:
+
+1. Sensitivity: 94.2% (Target: >90%) - MET
+2. Specificity: 91.8% (Target: >85%) - MET
+3. False Positive Rate: 8.2% (Target: <15%) - MET
+4. Time to Diagnosis: Reduced by 47% (Target: >30%) - EXCEEDED
+
+================================================================================
+SAFETY DATA
+================================================================================
+
+ADVERSE EVENTS REPORTED:
+
+Serious Adverse Events (SAEs): 12 events (2.5% of patients)
+- Related to study procedure: 2 events
+- Unrelated (underlying condition): 10 events
+- Deaths: 3 (all unrelated to study - underlying cancer progression)
+
+Common Adverse Events:
+1. Anxiety related to screening: 67 patients (13.8%)
+2. Minor discomfort during imaging: 34 patients (7.0%)
+3. Allergic reaction to contrast (mild): 8 patients (1.6%)
+
+Safety Assessment: ACCEPTABLE SAFETY PROFILE
+No safety signals identified requiring study modification.
+
+================================================================================
+DATA CLASSIFICATION
+================================================================================
+
+Data Classification: HIPAA Protected Health Information
+De-identification: All PHI removed per HIPAA Safe Harbor method
+IRB Approval: Protocol approved by Central IRB (IRB-2024-0892)
+Data Monitoring: Independent Data Safety Monitoring Board (DSMB) oversight
+
+================================================================================
+REGULATORY STATUS
+================================================================================
+
+FDA Communications:
+- Pre-submission meeting: Completed March 2024
+- Breakthrough Device Designation: Granted May 2024
+- 510(k) Submission: Planned Q1 2026
+
+Current Phase: Data lock and statistical analysis
+Database Lock Date: October 31, 2025
+
+================================================================================
+PUBLICATION TIMELINE
+================================================================================
+
+Manuscript Preparation:
+- Primary Analysis Manuscript: In preparation
+- Target Journal: New England Journal of Medicine (NEJM)
+- Planned Submission: Q1 2026
+- Conference Presentation: ASCO 2026 Annual Meeting (abstract submitted)
+
+================================================================================
+KEY PERSONNEL
+================================================================================
+
+Principal Investigator: Dr. Amanda Chen, MD, PhD
+Co-Investigators:
+- Dr. Michael Park, MD (Radiology)
+- Dr. Sarah Thompson, MD (Oncology)
+- Dr. Robert Lee, PhD (Biomedical Engineering)
+
+Safety Officer: Dr. James Wilson, MD
+Study Coordinator: Jennifer Martinez, RN, BSN
+Data Manager: Thomas Brown, MS
+
+================================================================================
+DOCUMENT METADATA
+================================================================================
+Document ID: MED-CT-2025-001
+Author: Dr. Amanda Chen, Principal Investigator
+Classification: HIPAA Protected
+IRB Protocol: SENT-2025-001
+Review Date: November 30, 2025

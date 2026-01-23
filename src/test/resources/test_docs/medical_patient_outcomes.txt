@@ -1,0 +1,130 @@
+PATIENT OUTCOMES ANALYSIS REPORT
+AI-Assisted Diagnostic Platform Clinical Outcomes Study
+Classification: HIPAA PROTECTED - PHI REDACTED
+Analysis Date: November 2025
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+This report presents the patient outcomes analysis from the SENT-2025-001
+clinical trial, focusing on disease-free survival, quality of life metrics,
+and subgroup analyses by demographic factors.
+
+Principal Investigator: Dr. Amanda Chen, MD, PhD
+Biostatistician: Dr. Maria Rodriguez, PhD
+
+================================================================================
+SURVIVAL OUTCOMES
+================================================================================
+
+6-MONTH DISEASE-FREE SURVIVAL: 89.3%
+
+Survival Analysis by Stage at Detection:
+- Stage I Detection: 96.2% disease-free survival at 6 months
+- Stage II Detection: 88.4% disease-free survival at 6 months
+- Stage III Detection: 71.2% disease-free survival at 6 months
+
+Comparison to Historical Controls:
+- AI-Assisted Detection Group: 89.3% DFS
+- Standard Screening Historical Rate: 78.1% DFS
+- Improvement: 11.2 percentage points (p<0.001)
+
+================================================================================
+QUALITY OF LIFE METRICS
+================================================================================
+
+OVERALL QUALITY OF LIFE IMPROVEMENT: 23%
+
+Measured using validated instruments:
+- EORTC QLQ-C30 (European Organisation for Research and Treatment of Cancer)
+- FACT-G (Functional Assessment of Cancer Therapy - General)
+- SF-36 (Short Form Health Survey)
+
+Quality of Life Domains:
+1. Physical Functioning: +18% improvement
+2. Emotional Well-being: +27% improvement
+3. Social Functioning: +22% improvement
+4. Cognitive Functioning: +15% improvement
+5. Fatigue Reduction: -31% (improvement)
+
+Patient Satisfaction Score: 4.7/5.0 (94% satisfaction rate)
+
+================================================================================
+DIAGNOSIS TIME IMPROVEMENT BY AGE GROUP
+================================================================================
+
+Overall Time to Diagnosis Improvement: 47% reduction
+
+Improvement by Age Group:
+- Ages 18-40: 52% reduction in time to diagnosis
+- Ages 41-55: 49% reduction in time to diagnosis
+- Ages 56-70: 45% reduction in time to diagnosis
+- Ages 71+: 38% reduction in time to diagnosis
+
+Analysis Notes:
+Younger patients showed greater improvement, potentially due to:
+- Higher digital literacy and engagement with AI-assisted platform
+- More complete imaging data availability
+- Fewer comorbidities affecting diagnostic clarity
+
+================================================================================
+SUBGROUP ANALYSES
+================================================================================
+
+BY GENDER:
+- Female patients: 90.1% disease-free survival
+- Male patients: 88.4% disease-free survival
+- No statistically significant difference (p=0.34)
+
+BY CANCER TYPE:
+- Breast cancer: 92.3% DFS (n=145)
+- Lung cancer: 85.7% DFS (n=98)
+- Colorectal cancer: 88.9% DFS (n=76)
+- Prostate cancer: 91.2% DFS (n=68)
+- Other: 86.4% DFS (n=100)
+
+BY SOCIOECONOMIC STATUS:
+- Access disparity noted: Rural patients 6% lower early detection rate
+- Recommendation: Expand telemedicine access for underserved populations
+
+================================================================================
+COST-EFFECTIVENESS ANALYSIS
+================================================================================
+
+Healthcare Cost Reduction:
+- Average cost savings per patient: $12,400
+- Total projected annual savings: $6.2 Million (at current enrollment)
+- Cost per QALY gained: $18,200 (highly cost-effective threshold: <$50,000)
+
+Resource Utilization:
+- Reduced unnecessary biopsies: 34%
+- Reduced repeat imaging: 28%
+- Shorter hospital stays: 2.1 days average reduction
+
+================================================================================
+PUBLICATION TIMELINE
+================================================================================
+
+Primary Manuscript:
+- Status: Final draft under review
+- Target Journal: New England Journal of Medicine
+- Planned Submission Date: January 15, 2026
+
+Secondary Publications Planned:
+1. Subgroup analysis manuscript - Journal of Clinical Oncology
+2. Cost-effectiveness analysis - Health Affairs
+3. Quality of life outcomes - Quality of Life Research
+
+Conference Presentations:
+- ASCO 2026 Annual Meeting - Oral presentation (accepted)
+- ESMO 2026 - Poster presentation (submitted)
+
+================================================================================
+DOCUMENT METADATA
+================================================================================
+Document ID: MED-OUT-2025-001
+Author: Dr. Maria Rodriguez, PhD, Biostatistician
+Classification: HIPAA Protected
+IRB Protocol: SENT-2025-001
+Review Date: December 1, 2025
