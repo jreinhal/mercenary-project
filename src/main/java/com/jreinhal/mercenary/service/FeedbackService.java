@@ -7,6 +7,7 @@ import com.jreinhal.mercenary.util.LogSanitizer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -109,7 +110,6 @@ public class FeedbackService {
         return feedback.stream().filter(f -> f.getQuery() != null && f.getResponse() != null).map(f -> new TrainingExample(f.getQuery(), f.getResponse(), f.getSector(), f.getSourceDocuments(), f.getFeedbackType() == Feedback.FeedbackType.POSITIVE ? 1.0 : 0.0)).collect(Collectors.toList());
     }
 
-    @SuppressWarnings("unchecked")
     private List<String> castToStringList(Object obj) {
         if (obj instanceof List) {
             return ((List<?>)obj).stream().filter(String.class::isInstance).map(String.class::cast).collect(Collectors.toList());
@@ -119,8 +119,14 @@ public class FeedbackService {
 
     private Map<String, Object> getMapOrEmpty(Map<String, Object> map, String key) {
         Object val = map.get(key);
-        if (val instanceof Map) {
-            return (Map)val;
+        if (val instanceof Map<?, ?> mapVal) {
+            Map<String, Object> result = new HashMap<>();
+            for (Map.Entry<?, ?> entry : mapVal.entrySet()) {
+                if (entry.getKey() instanceof String) {
+                    result.put((String)entry.getKey(), entry.getValue());
+                }
+            }
+            return result;
         }
         return Collections.emptyMap();
     }

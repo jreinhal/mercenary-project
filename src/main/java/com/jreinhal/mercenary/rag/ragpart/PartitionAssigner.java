@@ -40,7 +40,7 @@ public class PartitionAssigner {
 
     public Document assignAndTag(Document document) {
         int partitionId = this.assignPartition(document);
-        Map metadata = document.getMetadata();
+        Map<String, Object> metadata = document.getMetadata();
         metadata.put("partition_id", partitionId);
         log.debug("Tagged document with partition_id={}", partitionId);
         return document;

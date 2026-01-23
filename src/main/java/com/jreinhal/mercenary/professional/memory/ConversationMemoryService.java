@@ -69,7 +69,7 @@ public class ConversationMemoryService {
         query.limit(10);
         query.with(Sort.by((Sort.Direction)Sort.Direction.DESC, (String[])new String[]{"timestamp"}));
         try {
-            List messages = this.mongoTemplate.find(query, ConversationMessage.class, COLLECTION_NAME);
+            List<ConversationMessage> messages = this.mongoTemplate.find(query, ConversationMessage.class, COLLECTION_NAME);
             Collections.reverse(messages);
             return messages;
         }

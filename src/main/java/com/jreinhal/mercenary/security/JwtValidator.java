@@ -5,7 +5,6 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.BadJOSEException;
-import com.nimbusds.jose.proc.JWSKeySelector;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -57,9 +56,9 @@ public class JwtValidator {
             if (keySource == null) {
                 return ValidationResult.failure("JWKS not available - cannot validate signature");
             }
-            DefaultJWTProcessor processor = new DefaultJWTProcessor();
-            JWSVerificationKeySelector keySelector = new JWSVerificationKeySelector(algorithm, keySource);
-            processor.setJWSKeySelector((JWSKeySelector)keySelector);
+            DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
+            JWSVerificationKeySelector<SecurityContext> keySelector = new JWSVerificationKeySelector<>(algorithm, keySource);
+            processor.setJWSKeySelector(keySelector);
             JWTClaimsSet claims = processor.process(signedJWT, null);
             ValidationResult claimsValidation = this.validateClaims(claims);
             if (!claimsValidation.isValid()) {
@@ -83,7 +82,7 @@ public class JwtValidator {
     }
 
     private ValidationResult validateClaims(JWTClaimsSet claims) {
-        List audience;
+        List<String> audience;
         String issuer;
         Instant issuedAt;
         Instant notBefore;

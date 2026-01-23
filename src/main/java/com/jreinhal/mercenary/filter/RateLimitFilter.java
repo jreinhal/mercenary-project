@@ -9,7 +9,6 @@ import com.jreinhal.mercenary.security.ClientIpResolver;
 import com.jreinhal.mercenary.service.AuditService;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -85,7 +84,8 @@ implements Filter {
     }
 
     private Bucket createBucket(int requestsPerMinute) {
-        Bandwidth limit = Bandwidth.classic((long)requestsPerMinute, (Refill)Refill.greedy((long)requestsPerMinute, (Duration)Duration.ofMinutes(1L)));
+        long capacity = requestsPerMinute;
+        Bandwidth limit = Bandwidth.builder().capacity(capacity).refillGreedy(capacity, Duration.ofMinutes(1L)).build();
         return Bucket.builder().addLimit(limit).build();
     }
 

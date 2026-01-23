@@ -60,7 +60,7 @@ public class HydeService {
         }
         log.debug("HyDE: Generated hypothetical ({}ms): {}", hypoTime, this.truncate(hypothetical, 100));
         long searchStart = System.currentTimeMillis();
-        List hydeResults = this.vectorStore.similaritySearch(SearchRequest.query((String)hypothetical).withTopK(this.topK).withSimilarityThreshold(this.similarityThreshold).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+        List<Document> hydeResults = this.vectorStore.similaritySearch(SearchRequest.query((String)hypothetical).withTopK(this.topK).withSimilarityThreshold(this.similarityThreshold).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         long searchTime = System.currentTimeMillis() - searchStart;
         List<Document> standardResults = this.standardRetrieval(query, department);
         List<Document> fusedResults = this.fuseResults(hydeResults, standardResults);

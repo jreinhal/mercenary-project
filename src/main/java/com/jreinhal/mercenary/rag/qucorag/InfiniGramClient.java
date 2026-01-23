@@ -15,7 +15,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 @Component
@@ -87,8 +86,8 @@ public class InfiniGramClient {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             Map<String, String> payload = Map.of("index", this.indexName, "query_type", queryType, "query", query);
-            HttpEntity request = new HttpEntity(payload, (MultiValueMap)headers);
-            ResponseEntity response = this.restTemplate.postForEntity(API_URL, request, Map.class, new Object[0]);
+            HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
+            ResponseEntity<Map> response = this.restTemplate.postForEntity(API_URL, request, Map.class, new Object[0]);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Map body = (Map)response.getBody();
                 if (body.containsKey("error")) {

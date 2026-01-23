@@ -91,7 +91,7 @@ public class ReasoningTrace {
         map.put("department", this.department);
         map.put("totalDurationMs", this.totalDurationMs);
         map.put("completed", this.completed);
-        ArrayList stepMaps = new ArrayList();
+        List<Map<String, Object>> stepMaps = new ArrayList<>();
         for (ReasoningStep step : this.steps) {
             LinkedHashMap<String, Object> stepMap = new LinkedHashMap<String, Object>();
             stepMap.put("type", step.type().name());

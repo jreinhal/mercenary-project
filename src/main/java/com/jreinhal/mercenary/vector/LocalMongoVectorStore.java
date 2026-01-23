@@ -35,6 +35,7 @@ implements VectorStore {
         log.info("Initialized LocalMongoVectorStore (Off-Grid Persistence Mode)");
     }
 
+    @SuppressWarnings("deprecation")
     public void add(List<Document> documents) {
         if (documents == null || documents.isEmpty()) {
             return;
@@ -96,7 +97,7 @@ implements VectorStore {
         log.debug("Total documents found in vector store: {}", allDocs.size());
         FilterEvaluator evaluator = this.buildFilterEvaluator(filterExpression);
         return allDocs.stream().filter(md -> evaluator.matches(md.getMetadata())).map(md -> {
-            HashMap<String, Object> metadata = md.getMetadata() != null ? new HashMap<String, Object>(md.getMetadata()) : new HashMap();
+            HashMap<String, Object> metadata = md.getMetadata() != null ? new HashMap<String, Object>(md.getMetadata()) : new HashMap<>();
             Document doc = new Document(md.getId(), md.getContent(), metadata);
             return new ScoredDocument(doc, this.calculateCosineSimilarity(embeddingArray, queryNorm, md.getEmbedding(), md.getEmbeddingNorm()));
         }).filter(scored -> scored.score >= threshold).sorted((a, b) -> Double.compare(b.score, a.score)).limit(topK).map(scored -> {

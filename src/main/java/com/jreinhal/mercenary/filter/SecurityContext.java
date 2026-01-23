@@ -3,7 +3,7 @@ package com.jreinhal.mercenary.filter;
 import com.jreinhal.mercenary.model.User;
 
 public class SecurityContext {
-    private static final ThreadLocal<User> currentUser = new ThreadLocal();
+    private static final ThreadLocal<User> currentUser = new ThreadLocal<>();
 
     public static void setCurrentUser(User user) {
         currentUser.set(user);

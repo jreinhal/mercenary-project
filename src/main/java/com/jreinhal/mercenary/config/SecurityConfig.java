@@ -8,7 +8,6 @@ import com.jreinhal.mercenary.security.CacUserDetailsService;
 import jakarta.servlet.Filter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -49,28 +48,28 @@ public class SecurityConfig {
 
     @Bean
     public FilterRegistrationBean<SecurityFilter> securityFilterRegistration(SecurityFilter filter) {
-        FilterRegistrationBean registration = new FilterRegistrationBean((Filter)filter, new ServletRegistrationBean[0]);
+        FilterRegistrationBean<SecurityFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }
 
     @Bean
     public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
-        FilterRegistrationBean registration = new FilterRegistrationBean((Filter)filter, new ServletRegistrationBean[0]);
+        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }
 
     @Bean
     public FilterRegistrationBean<PreAuthRateLimitFilter> preAuthRateLimitFilterRegistration(PreAuthRateLimitFilter filter) {
-        FilterRegistrationBean registration = new FilterRegistrationBean((Filter)filter, new ServletRegistrationBean[0]);
+        FilterRegistrationBean<PreAuthRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }
 
     @Bean
     public FilterRegistrationBean<CorrelationIdFilter> correlationIdFilterRegistration(CorrelationIdFilter filter) {
-        FilterRegistrationBean registration = new FilterRegistrationBean((Filter)filter, new ServletRegistrationBean[0]);
+        FilterRegistrationBean<CorrelationIdFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

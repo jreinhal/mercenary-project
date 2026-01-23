@@ -901,7 +901,7 @@ public class MercenaryController {
             if (docCount >= this.maxDocs || remaining <= 0) {
                 break;
             }
-            Map meta = doc.getMetadata();
+            Map<String, Object> meta = doc.getMetadata();
             String filename = (String) meta.get("source");
             if (filename == null) {
                 filename = (String) meta.get("filename");
@@ -942,7 +942,7 @@ public class MercenaryController {
             if (docCount >= this.maxVisualDocs || remaining <= 0) {
                 break;
             }
-            Map meta = doc.getMetadata();
+            Map<String, Object> meta = doc.getMetadata();
             String filename = (String) meta.get("source");
             if (filename == null) {
                 filename = (String) meta.get("filename");
@@ -1053,7 +1053,7 @@ public class MercenaryController {
             return docs;
         }
         return docs.stream().filter(doc -> {
-            Map meta = doc.getMetadata();
+            Map<String, Object> meta = doc.getMetadata();
             for (String file : activeFiles) {
                 if (!this.apiKeyMatch(file, meta)) continue;
                 return true;

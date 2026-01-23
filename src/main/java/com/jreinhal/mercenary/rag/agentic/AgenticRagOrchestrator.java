@@ -132,7 +132,7 @@ public class AgenticRagOrchestrator {
     }
 
     private AgenticResult simpleRetrieval(String query, String department, long startTime) {
-        List docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(5).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+        List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(5).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         String response = this.generateStandardResponse(query, docs);
         long elapsed = System.currentTimeMillis() - startTime;
         return new AgenticResult(response, docs, 0.7, List.of("SIMPLE_RETRIEVAL"), 1, Map.of("totalMs", elapsed, "mode", "disabled"));

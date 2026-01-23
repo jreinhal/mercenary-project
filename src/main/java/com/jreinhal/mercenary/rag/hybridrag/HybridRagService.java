@@ -72,7 +72,7 @@ public class HybridRagService {
             return new HybridRetrievalResult(List.of(), Map.of("mode", "invalid-dept"));
         }
         if (!this.enabled) {
-            List docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(normalizedDept)));
+            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(normalizedDept)));
             return new HybridRetrievalResult(docs, Map.of("mode", "fallback"));
         }
         long startTime = System.currentTimeMillis();
@@ -248,10 +248,10 @@ public class HybridRagService {
     }
 
     private List<RankedDoc> retrieveSemantic(String variant, String department) {
-        List results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+        List<Document> results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
         ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
         for (int i = 0; i < results.size(); ++i) {
-            ranked.add(new RankedDoc((Document)results.get(i), i + 1, "semantic"));
+            ranked.add(new RankedDoc(results.get(i), i + 1, "semantic"));
         }
         return ranked;
     }

@@ -16,8 +16,8 @@ public class ReasoningTracer {
     private boolean enabled;
     @Value(value="${sentinel.reasoning.detailed-traces:false}")
     private boolean detailedTraces;
-    private final ThreadLocal<ReasoningTrace> currentTrace = new ThreadLocal();
-    private final Map<String, ReasoningTrace> traceCache = new ConcurrentHashMap<String, ReasoningTrace>();
+    private final ThreadLocal<ReasoningTrace> currentTrace = new ThreadLocal<>();
+    private final Map<String, ReasoningTrace> traceCache = new ConcurrentHashMap<>();
     private static final int MAX_CACHED_TRACES = 1000;
 
     public ReasoningTrace startTrace(String query, String department) {

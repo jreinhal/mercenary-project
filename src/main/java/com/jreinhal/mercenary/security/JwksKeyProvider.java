@@ -7,6 +7,7 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -39,7 +40,7 @@ public class JwksKeyProvider {
         this.lock.readLock().lock();
         try {
             if (this.cachedKeySet != null && Instant.now().isBefore(this.cacheExpiry)) {
-                ImmutableJWKSet immutableJWKSet = new ImmutableJWKSet(this.cachedKeySet);
+                ImmutableJWKSet<SecurityContext> immutableJWKSet = new ImmutableJWKSet<>(this.cachedKeySet);
                 return immutableJWKSet;
             }
         }
@@ -49,7 +50,7 @@ public class JwksKeyProvider {
         this.lock.writeLock().lock();
         try {
             if (this.cachedKeySet != null && Instant.now().isBefore(this.cacheExpiry)) {
-                ImmutableJWKSet immutableJWKSet = new ImmutableJWKSet(this.cachedKeySet);
+                ImmutableJWKSet<SecurityContext> immutableJWKSet = new ImmutableJWKSet<>(this.cachedKeySet);
                 return immutableJWKSet;
             }
             JWKSet newKeySet = this.loadKeys();
@@ -58,7 +59,7 @@ public class JwksKeyProvider {
                 this.cacheExpiry = Instant.now().plusSeconds(this.cacheTtlSeconds);
                 log.info("JWKS refreshed: {} keys loaded, cache expires at {}", newKeySet.getKeys().size(), this.cacheExpiry);
             }
-            ImmutableJWKSet immutableJWKSet = this.cachedKeySet != null ? new ImmutableJWKSet(this.cachedKeySet) : null;
+            ImmutableJWKSet<SecurityContext> immutableJWKSet = this.cachedKeySet != null ? new ImmutableJWKSet<>(this.cachedKeySet) : null;
             return immutableJWKSet;
         }
         finally {
@@ -109,12 +110,12 @@ public class JwksKeyProvider {
     private JWKSet loadFromUri(String uri) {
         try {
             log.debug("Fetching JWKS from: {}", uri);
-            URL url = new URL(uri);
+            URL url = URI.create(uri).toURL();
             JWKSet keySet = JWKSet.load((URL)url);
             log.info("Loaded {} keys from remote JWKS endpoint", keySet.getKeys().size());
             return keySet;
         }
-        catch (IOException | ParseException e) {
+        catch (IOException | ParseException | IllegalArgumentException e) {
             log.warn("Failed to load JWKS from {}: {}", uri, e.getMessage());
             return null;
         }

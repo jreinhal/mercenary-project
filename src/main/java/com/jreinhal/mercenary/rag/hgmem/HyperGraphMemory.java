@@ -149,7 +149,7 @@ public class HyperGraphMemory {
 
     private List<HGNode> findNodesByEntity(EntityExtractor.Entity entity, String department) {
         Query exactQuery = new Query((CriteriaDefinition)Criteria.where((String)"type").is(HGNode.NodeType.ENTITY.name()).and("value").regex("^" + this.escapeRegex(entity.value()) + "$", "i").and("department").is(department));
-        List results = this.mongoTemplate.find(exactQuery, HGNode.class, NODES_COLLECTION);
+        List<HGNode> results = this.mongoTemplate.find(exactQuery, HGNode.class, NODES_COLLECTION);
         if (results.isEmpty()) {
             Query partialQuery = new Query((CriteriaDefinition)Criteria.where((String)"type").is(HGNode.NodeType.ENTITY.name()).and("value").regex(this.escapeRegex(entity.value()), "i").and("department").is(department));
             results = this.mongoTemplate.find(partialQuery, HGNode.class, NODES_COLLECTION);
