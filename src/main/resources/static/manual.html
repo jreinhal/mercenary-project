@@ -23,7 +23,7 @@
                     </div>
                     <div>
                         <div class="sidebar-logo-text">SENTINEL</div>
-                        <div class="sidebar-version">Documentation v2.1</div>
+                        <div class="sidebar-version">Documentation v2.2</div>
                     </div>
                 </a>
             </div>
@@ -62,6 +62,7 @@
 
                 <div class="nav-section">
                     <div class="nav-section-title">Support</div>
+                    <a href="#docs" class="nav-item">Documentation</a>
                     <a href="#troubleshooting" class="nav-item">Troubleshooting</a>
                 </div>
             </nav>
@@ -475,8 +476,18 @@
                                 <td>Local LLM endpoint</td>
                             </tr>
                             <tr>
+                                <td><code>LLM_MODEL</code></td>
+                                <td><code>llama3.1:8b</code></td>
+                                <td>Chat model</td>
+                            </tr>
+                            <tr>
+                                <td><code>EMBEDDING_MODEL</code></td>
+                                <td><code>nomic-embed-text</code></td>
+                                <td>Embedding model</td>
+                            </tr>
+                            <tr>
                                 <td><code>MONGODB_URI</code></td>
-                                <td><code>mongodb://localhost:27017</code></td>
+                                <td><code>mongodb://localhost:27017/mercenary</code></td>
                                 <td>Local vector store</td>
                             </tr>
                         </tbody>
@@ -489,6 +500,25 @@
                         <li><strong>Network:</strong> None required for air-gap</li>
                         <li><strong>Ports:</strong> 8080, 11434, 27017</li>
                     </ul>
+                </div>
+
+                <!-- TROUBLESHOOTING SECTION -->
+                <span class="section-anchor" id="docs"></span>
+                <div class="content-section">
+                    <h2>Documentation</h2>
+                    <p>
+                        Full customer and engineering documentation is available in the repository:
+                    </p>
+                    <ul>
+                        <li><strong>In-app index:</strong> <code>/docs-index.html</code></li>
+                        <li><strong>Index:</strong> <code>docs/README.md</code></li>
+                        <li><strong>Customer docs:</strong> <code>docs/customer/</code></li>
+                        <li><strong>Engineering docs:</strong> <code>docs/engineering/</code></li>
+                    </ul>
+                    <p>
+                        This in-app manual focuses on operator workflows. Use the docs index and repository docs for
+                        deployment, security hardening, MongoDB setup, and SCIF guidance.
+                    </p>
                 </div>
 
                 <!-- TROUBLESHOOTING SECTION -->
@@ -556,7 +586,7 @@
                 <!-- FOOTER -->
                 <div class="docs-footer">
                     <p class="docs-footer-text">
-                        SENTINEL Intelligence Platform v2.1.0 | Build 2026.01<br>
+                        SENTINEL Intelligence Platform v2.2.0 | Build 2026.01<br>
                         Powered by 9 Research-Backed RAG Engines
                     </p>
                 </div>
@@ -576,6 +606,7 @@
                 <li><a href="#rag">RAG Features</a></li>
                 <li><a href="#sectors">Sector Reference</a></li>
                 <li data-sector="GOVERNMENT"><a href="#airgap">Air-Gap Deployment</a></li>
+                <li><a href="#docs">Documentation</a></li>
                 <li><a href="#troubleshooting">Troubleshooting</a></li>
             </ul>
         </nav>
@@ -583,3 +614,4 @@
     <script src="js/manual.js" defer></script>
 </body>
 </html>
+

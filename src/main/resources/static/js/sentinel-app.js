@@ -293,6 +293,7 @@
                     case 'switchMainTab': switchMainTab(el.dataset.tab); break;
                     case 'toggleResourcesMenu': toggleResourcesMenu(e); break;
                     case 'openManual': openManual(); break;
+                    case 'openDocsIndex': openDocsIndex(); break;
                     case 'openReadme': openReadme(); break;
                     case 'startNewChat': startNewChat(); break;
                     case 'toggleConversationList': toggleConversationList(); break;
@@ -1025,6 +1026,11 @@
 
         function openReadme() {
             window.open('readme.html', '_blank');
+            closeResourcesDropdown({ target: document.body });
+        }
+
+        function openDocsIndex() {
+            window.open('docs-index.html', '_blank');
             closeResourcesDropdown({ target: document.body });
         }
 
@@ -3551,16 +3557,8 @@
             appendUserMessage(query);
             queryInput.value = '';
 
-            // Detect if query is complex (use SSE for complex queries)
-            const wordCount = query.split(/\s+/).length;
-            const isComplex = wordCount > 8 ||
-                /summary|detailed|comprehensive|all|compare|analyze|explain/i.test(query);
-
-            if (isComplex && typeof EventSource !== 'undefined') {
-                // Use SSE streaming for complex queries
-                await executeQueryWithStreaming(query, sector, activeFiles, params);
-                return;
-            }
+            // SSE streaming disabled - using standard endpoint for consistent response quality
+            // Re-enable after LLM response quality is improved
 
             const loadingId = appendLoadingIndicator(query);
 
