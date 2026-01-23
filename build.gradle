@@ -19,6 +19,16 @@ java {
     targetCompatibility = '21'
 }
 
+def enableLint = project.hasProperty('lint') || (System.getenv('CI') != null && !System.getenv('CI').isBlank())
+if (enableLint) {
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked']
+        if (project.hasProperty('lintWerror')) {
+            options.compilerArgs += ['-Werror']
+        }
+    }
+}
+
 repositories {
     mavenCentral()
     maven { url 'https://repo.spring.io/milestone' }
