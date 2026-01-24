@@ -23,11 +23,17 @@ This directory is the source of record for customer and engineering documentatio
 - docs/engineering/CONFIGURATION.md
 - docs/engineering/DEVELOPMENT.md
 - docs/engineering/TESTING.md
+- docs/engineering/E2E_TESTING.md
 - docs/engineering/RAG_FEATURES.md
 - docs/engineering/CHANGELOG.md
 - docs/engineering/optimization/OPTIMIZATION_CHANGES.md
 - docs/engineering/optimization/REVIEW_2026-01-21.md
 - docs/engineering/plans/RAG_EVOLUTION_IMPLEMENTATION_PLAN.md
+
+## Research notes
+- docs/research/README.md
+- docs/research/GIST-evaluation.md
+- docs/research/agentic-reasoning-alignment.md
 
 ## In-app documentation (served by the UI)
 - src/main/resources/static/manual.html

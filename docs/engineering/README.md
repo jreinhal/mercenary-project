@@ -7,6 +7,7 @@ This section is for developers and maintainers.
 - CONFIGURATION.md
 - DEVELOPMENT.md
 - TESTING.md
+- E2E_TESTING.md
 - RAG_FEATURES.md
 - CHANGELOG.md
 - optimization/OPTIMIZATION_CHANGES.md

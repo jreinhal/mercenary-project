@@ -28,6 +28,10 @@ This file summarizes the most important configuration keys.
 ## Bootstrap (STANDARD profile)
 - SENTINEL_BOOTSTRAP_ENABLED=true|false
 - SENTINEL_ADMIN_PASSWORD=<password>
+- SENTINEL_BOOTSTRAP_RESET_ADMIN=true|false (test only; force admin password reset)
+
+## CSRF testing helpers
+- APP_CSRF_BYPASS_INGEST=true|false (test only; disables CSRF on /api/ingest/**)
 
 ## Performance tuning
 - RAG_CORE_THREADS
