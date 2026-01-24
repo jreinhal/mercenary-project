@@ -26,7 +26,12 @@ spring:
   # --- THE BAN HAMMER ---
   # This tells Spring: "Do NOT load your default MongoDB Vector Store logic. I have my own."
   autoconfigure:
-    exclude: org.springframework.ai.autoconfigure.vectorstore.mongo.MongoDBAtlasVectorStoreAutoConfiguration
+    exclude:
+      - org.springframework.ai.autoconfigure.vectorstore.mongo.MongoDBAtlasVectorStoreAutoConfiguration
+      - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
+      - org.springframework.ai.autoconfigure.azure.openai.AzureOpenAiAutoConfiguration
+      - org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration
+      - org.springframework.ai.autoconfigure.vertexai.palm2.VertexAiPalm2AutoConfiguration
 
   data:
     mongodb:
