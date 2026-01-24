@@ -50,6 +50,7 @@ mercenary-extracted/
 # Temporary directories
 temp_inner/
 bin/
+%TEMP%everything-claude-code/
 
 # Build artifacts in root
 *.jar
