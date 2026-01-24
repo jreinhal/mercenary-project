@@ -6,7 +6,8 @@ import java.util.regex.Pattern;
 public final class PromptInjectionPatterns {
     private static final List<Pattern> PATTERNS = List.of(
             Pattern.compile("ignore\\s+(all\\s+)?(previous|prior|above)\\s+(instructions?|prompts?|rules?)", 2),
-            Pattern.compile("disregard\\s+(all\\s+)?(previous|prior|above)", 2),
+            Pattern.compile("ignore\\s+(all\\s+)?instructions?", 2),
+            Pattern.compile("disregard\\s+(all\\s+)?(previous|prior|above|instructions?)", 2),
             Pattern.compile("forget\\s+(all\\s+)?(previous|prior|your)\\s+(instructions?|context|rules?)", 2),
             Pattern.compile("(show|reveal|display|print|output)\\s+(me\\s+)?(the\\s+)?(system|initial)\\s+prompt", 2),
             Pattern.compile("what\\s+(is|are)\\s+your\\s+(system\\s+)?(instructions?|rules?|prompt)", 2),
@@ -19,11 +20,14 @@ public final class PromptInjectionPatterns {
             Pattern.compile("bypass\\s+(your\\s+)?(safety|security|restrictions?|filters?)", 2),
             Pattern.compile("```\\s*(system|assistant)\\s*:", 2),
             Pattern.compile("\\[INST\\]|\\[/INST\\]|<<SYS>>|<</SYS>>", 2),
+            Pattern.compile("</?\\s*(system|instruction|prompt|assistant|user|admin|root)\\s*/?>", 2),
             Pattern.compile("(start|begin)\\s+(your\\s+)?response\\s+with", 2),
             Pattern.compile("(what|tell|show|reveal|repeat|print|display).{0,15}(your|system|internal|hidden).{0,10}(prompt|instructions?|directives?|rules|guidelines)", 2),
             Pattern.compile("(what|how).{0,10}(are|were).{0,10}you.{0,10}(programmed|instructed|told|prompted)", 2),
             Pattern.compile("(ignore|forget|disregard).{0,20}(previous|above|prior|all).{0,20}(instructions?|prompt|rules|context)", 2),
-            Pattern.compile("(repeat|echo|output).{0,15}(everything|all).{0,10}(above|before|prior)", 2)
+            Pattern.compile("(repeat|echo|output).{0,15}(everything|all).{0,10}(above|before|prior)", 2),
+            Pattern.compile("new\\s+(instructions?|rules?|prompt)\\s*:", 2),
+            Pattern.compile("override\\s+(previous|system|all)\\s+(instructions?|rules?|prompt)", 2)
     );
 
     private PromptInjectionPatterns() {
