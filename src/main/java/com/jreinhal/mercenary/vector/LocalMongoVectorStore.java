@@ -137,13 +137,16 @@ implements VectorStore {
             return null;
         }
         // Backward compatibility for Spring AI expression string formatting
-        if (filter.contains("key=") && filter.contains("value=")) {
+        // Format: Expression[type=EQ, left=Key[key=dept], right=Value[value=ENTERPRISE]]
+        if (filter.contains("Key[key=") && filter.contains("Value[value=")) {
             try {
-                String key = this.extractBetween(filter, "key=", ",");
-                String value = this.extractBetween(filter, "value=", "]");
+                String key = this.extractBetween(filter, "Key[key=", "]");
+                String value = this.extractBetween(filter, "Value[value=", "]");
+                log.debug("Parsed Spring AI Expression: key={}, value={}", key, value);
                 return new ParsedFilter(List.of(List.of(new Condition(key, "==", List.of(this.stripQuotes(value))))));
             }
             catch (Exception e) {
+                log.warn("Failed to parse Spring AI Expression: {}", filter, e);
                 return null;
             }
         }
