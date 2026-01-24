@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.repository.UserRepository;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,8 @@ public class DataInitializer {
     private String adminPassword;
     @Value(value="${sentinel.bootstrap.enabled:false}")
     private boolean bootstrapEnabled;
+    @Value(value="${sentinel.bootstrap.reset-admin:false}")
+    private boolean resetAdmin;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -71,6 +74,30 @@ public class DataInitializer {
                 log.warn("  Set SENTINEL_ADMIN_PASSWORD environment variable for");
                 log.warn("  automated deployments. Default password is insecure.");
                 log.info("==========================================================");
+            } else if (this.resetAdmin) {
+                log.warn("==========================================================");
+                log.warn(">>> ADMIN PASSWORD RESET ENABLED <<<");
+                log.warn(">>> Resetting admin password for test bootstrap <<<");
+                log.warn("==========================================================");
+                Optional<User> adminOpt = userRepository.findByUsername("admin");
+                User admin = adminOpt.orElseGet(() -> {
+                    User created = new User();
+                    created.setUsername("admin");
+                    created.setDisplayName("Recovery Administrator");
+                    created.setEmail("admin@sentinel.local");
+                    created.setRoles(Set.of(UserRole.ADMIN));
+                    created.setClearance(ClearanceLevel.TOP_SECRET);
+                    created.setAllowedSectors(Set.of(Department.values()));
+                    created.setAuthProvider(User.AuthProvider.LOCAL);
+                    created.setCreatedAt(Instant.now());
+                    created.setActive(true);
+                    return created;
+                });
+                admin.setPasswordHash(passwordEncoder.encode((CharSequence)this.adminPassword));
+                admin.setActive(true);
+                admin.setPendingApproval(false);
+                userRepository.save(admin);
+                log.warn("Admin password reset complete.");
             } else {
                 log.info("Database already initialized ({} users found)", userRepository.count());
             }

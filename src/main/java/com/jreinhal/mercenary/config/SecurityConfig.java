@@ -37,6 +37,8 @@ public class SecurityConfig {
     private final CorrelationIdFilter correlationIdFilter;
     @Value(value="${app.auth-mode:DEV}")
     private String authMode;
+    @Value(value="${app.csrf.bypass-ingest:false}")
+    private boolean csrfBypassIngest;
 
     public SecurityConfig(CacUserDetailsService cacUserDetailsService, SecurityFilter securityFilter, RateLimitFilter rateLimitFilter, PreAuthRateLimitFilter preAuthRateLimitFilter, CorrelationIdFilter correlationIdFilter) {
         this.cacUserDetailsService = cacUserDetailsService;
@@ -83,7 +85,13 @@ public class SecurityConfig {
                 .addFilterBefore((Filter)this.rateLimitFilter, AuthorizationFilter.class)
                 .x509(x509 -> x509.subjectPrincipalRegex("CN=(.*?)(?:,|$)").userDetailsService((UserDetailsService)this.cacUserDetailsService))
                 .requiresChannel(channel -> ((ChannelSecurityConfigurer.RequiresChannelUrl)channel.anyRequest()).requiresSecure())
-                .csrf(csrf -> csrf.csrfTokenRepository((CsrfTokenRepository)CookieCsrfTokenRepository.withHttpOnlyFalse()).ignoringRequestMatchers(new String[]{"/api/health", "/api/status"}))
+                .csrf(csrf -> {
+                    csrf.csrfTokenRepository((CsrfTokenRepository)CookieCsrfTokenRepository.withHttpOnlyFalse())
+                            .ignoringRequestMatchers(new String[]{"/api/health", "/api/status"});
+                    if (this.csrfBypassIngest) {
+                        csrf.ignoringRequestMatchers(new String[]{"/api/ingest/**"});
+                    }
+                })
                 .headers(headers -> headers.httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31536000L).includeSubDomains(true).preload(true)).frameOptions(HeadersConfigurer.FrameOptionsConfig::deny).contentTypeOptions(contentType -> {}).xssProtection(xss -> xss.disable()))
                 .authorizeHttpRequests(auth -> ((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)auth.requestMatchers(new String[]{"/api/health", "/api/status"})).permitAll().requestMatchers(new String[]{"/", "/index.html", "/manual.html"})).permitAll().requestMatchers(new String[]{"/css/**", "/js/**", "/favicon.ico"})).permitAll().requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"})).permitAll().requestMatchers(new String[]{"/api/admin/**"})).hasAuthority("ADMIN").requestMatchers(new String[]{"/api/ingest/**"})).hasAnyAuthority(new String[]{"OPERATOR", "ADMIN"}).requestMatchers(new String[]{"/api/ask/**", "/api/reasoning/**"})).authenticated().requestMatchers(new String[]{"/api/**"})).authenticated().anyRequest()).authenticated());
         return (SecurityFilterChain)http.build();
@@ -109,7 +117,13 @@ public class SecurityConfig {
                 .addFilterBefore((Filter)this.preAuthRateLimitFilter, SecurityContextHolderFilter.class)
                 .addFilterBefore((Filter)this.securityFilter, AnonymousAuthenticationFilter.class)
                 .addFilterBefore((Filter)this.rateLimitFilter, AuthorizationFilter.class)
-                .csrf(csrf -> csrf.csrfTokenRepository((CsrfTokenRepository)CookieCsrfTokenRepository.withHttpOnlyFalse()).ignoringRequestMatchers(new String[]{"/api/health", "/api/status"}))
+                .csrf(csrf -> {
+                    csrf.csrfTokenRepository((CsrfTokenRepository)CookieCsrfTokenRepository.withHttpOnlyFalse())
+                            .ignoringRequestMatchers(new String[]{"/api/health", "/api/status"});
+                    if (this.csrfBypassIngest) {
+                        csrf.ignoringRequestMatchers(new String[]{"/api/ingest/**"});
+                    }
+                })
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny).contentTypeOptions(contentType -> {}).referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)).addHeaderWriter(new PermissionsPolicyHeaderWriter("geolocation=(), microphone=(), camera=()")))
                 .authorizeHttpRequests(auth -> ((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)auth.requestMatchers(new String[]{"/api/health", "/api/status"})).permitAll().requestMatchers(new String[]{"/api/auth/**"})).permitAll().requestMatchers(new String[]{"/", "/index.html", "/manual.html"})).permitAll().requestMatchers(new String[]{"/css/**", "/js/**", "/images/**", "/favicon.ico"})).permitAll().requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"})).permitAll().requestMatchers(new String[]{"/api/admin/**"})).hasAuthority("ADMIN").requestMatchers(new String[]{"/api/**"})).authenticated().anyRequest()).permitAll())
                 .formLogin(AbstractHttpConfigurer::disable)
