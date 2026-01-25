@@ -40,26 +40,31 @@ import org.xml.sax.SAXException;
 public class SecureIngestionService {
     private static final Logger log = LoggerFactory.getLogger(SecureIngestionService.class);
     private static final int MAX_EMBEDDED_IMAGES = 10;
+    private static final int MIN_TEXT_LENGTH_FOR_VALID_PDF = 100; // Threshold for scanned PDF detection
     private final VectorStore vectorStore;
     private final PiiRedactionService piiRedactionService;
     private final PartitionAssigner partitionAssigner;
     private final MiARagService miARagService;
     private final MegaRagService megaRagService;
     private final HyperGraphMemory hyperGraphMemory;
+    private final LightOnOcrService lightOnOcrService;
     private final Tika tika;
     private static final Set<String> BLOCKED_MIME_TYPES = Set.of("application/x-executable", "application/x-msdos-program", "application/x-msdownload", "application/x-sh", "application/x-shellscript", "application/java-archive", "application/x-httpd-php");
     @Value(value="${sentinel.miarag.min-chunks-for-mindscape:10}")
     private int minChunksForMindscape;
     @Value(value="${sentinel.megarag.extract-images-from-pdf:true}")
     private boolean extractImagesFromPdf;
+    @Value(value="${sentinel.ocr.fallback-for-scanned-pdf:true}")
+    private boolean ocrFallbackForScannedPdf;
 
-    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory) {
+    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService) {
         this.vectorStore = vectorStore;
         this.piiRedactionService = piiRedactionService;
         this.partitionAssigner = partitionAssigner;
         this.miARagService = miARagService;
         this.megaRagService = megaRagService;
         this.hyperGraphMemory = hyperGraphMemory;
+        this.lightOnOcrService = lightOnOcrService;
         this.tika = new Tika();
     }
 
@@ -86,6 +91,22 @@ public class SecureIngestionService {
                 log.info(">> DETECTED PDF: Engaging Optical Character Recognition / PDF Stream...");
                 PagePdfDocumentReader pdfReader = new PagePdfDocumentReader((Resource)resource);
                 rawDocuments = pdfReader.get();
+
+                // Check if this might be a scanned PDF (little extractable text)
+                int totalTextLength = rawDocuments.stream()
+                    .mapToInt(doc -> doc.getContent() != null ? doc.getContent().length() : 0)
+                    .sum();
+
+                if (totalTextLength < MIN_TEXT_LENGTH_FOR_VALID_PDF && this.ocrFallbackForScannedPdf
+                        && this.lightOnOcrService != null && this.lightOnOcrService.isEnabled()) {
+                    log.info(">> SCANNED PDF DETECTED: Text extraction yielded only {} chars. Engaging LightOnOCR...", totalTextLength);
+                    String ocrText = this.lightOnOcrService.ocrPdf(fileBytes, filename);
+                    if (ocrText != null && !ocrText.isEmpty()) {
+                        rawDocuments = List.of(new Document(ocrText, java.util.Map.of("source", filename, "ocr", "true")));
+                        log.info(">> LightOnOCR: Successfully extracted {} chars from scanned PDF", ocrText.length());
+                    }
+                }
+
                 if (this.extractImagesFromPdf && this.megaRagService != null && this.megaRagService.isEnabled()) {
                     this.ingestEmbeddedImages(fileBytes, filename, dept.name(), rawDocuments);
                 }

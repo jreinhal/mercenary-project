@@ -32,6 +32,7 @@ spring:
       - org.springframework.ai.autoconfigure.azure.openai.AzureOpenAiAutoConfiguration
       - org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration
       - org.springframework.ai.autoconfigure.vertexai.palm2.VertexAiPalm2AutoConfiguration
+      - org.springframework.ai.autoconfigure.anthropic.AnthropicAutoConfiguration
 
   data:
     mongodb:
@@ -101,6 +102,7 @@ app:
   guardrails:
     enabled: ${GUARDRAILS_ENABLED:true}
     llm-enabled: ${GUARDRAILS_LLM_ENABLED:true}
+    llm-timeout-ms: ${GUARDRAILS_LLM_TIMEOUT_MS:3000}
     strict-mode: ${GUARDRAILS_STRICT_MODE:false}
     llm-circuit-breaker:
       enabled: ${GUARDRAILS_LLM_CB_ENABLED:true}
@@ -224,6 +226,10 @@ sentinel:
     enabled: ${BIRAG_ENABLED:true}
     # Minimum grounding score for auto-validation
     grounding-threshold: ${BIRAG_GROUNDING_THRESHOLD:0.8}
+    # Use LLM for semantic grounding checks (disable to avoid extra LLM latency)
+    use-llm-verification: ${BIRAG_LLM_VERIFICATION:true}
+    # LLM verification timeout (ms) for grounding checks
+    llm-timeout-ms: ${BIRAG_LLM_TIMEOUT_MS:4000}
     # Novelty detection threshold
     novelty-threshold: ${BIRAG_NOVELTY_THRESHOLD:0.7}
     # Require admin approval for pending experiences
@@ -273,6 +279,8 @@ sentinel:
     # Use LLM for semantic routing (higher accuracy, +3-5s latency)
     # Default false: uses fast heuristics only to avoid per-query LLM overhead
     semantic-router-enabled: ${ADAPTIVERAG_SEMANTIC_ROUTER:false}
+    # LLM semantic router timeout (ms)
+    semantic-router-timeout-ms: ${ADAPTIVERAG_ROUTER_TIMEOUT_MS:3000}
     chunk-top-k: ${ADAPTIVERAG_CHUNK_K:5}
     document-top-k: ${ADAPTIVERAG_DOCUMENT_K:3}
 
@@ -285,6 +293,8 @@ sentinel:
     min-correct-threshold: ${CRAG_MIN_CORRECT:0.5}
     # Use LLM for document grading (higher accuracy, higher latency)
     use-llm-grading: ${CRAG_LLM_GRADING:false}
+    # Query rewrite timeout (ms) when retrieval fails
+    rewrite-timeout-ms: ${CRAG_REWRITE_TIMEOUT_MS:2000}
     # Confidence threshold for accepting retrieval results
     confidence-threshold: ${CRAG_CONFIDENCE:0.6}
 
@@ -317,6 +327,17 @@ sentinel:
     use-hyde: ${AGENTIC_USE_HYDE:true}
     use-selfrag: ${AGENTIC_USE_SELFRAG:true}
     confidence-threshold: ${AGENTIC_CONFIDENCE:0.6}
+
+  # LightOnOCR Service Integration
+  # AI-powered OCR for scanned PDFs and document images
+  ocr:
+    enabled: ${OCR_ENABLED:false}
+    service-url: ${OCR_SERVICE_URL:http://localhost:8090}
+    timeout-seconds: ${OCR_TIMEOUT_SECONDS:60}
+    max-tokens-per-page: ${OCR_MAX_TOKENS:2048}
+    max-pages: ${OCR_MAX_PAGES:50}
+    # Automatically use OCR for PDFs with little extractable text
+    fallback-for-scanned-pdf: ${OCR_FALLBACK_SCANNED:true}
 
   # PII Redaction Engine
   # Industry-standard compliance: NIST 800-122, GDPR, HIPAA Safe Harbor, PCI-DSS
