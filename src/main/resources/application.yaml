@@ -2,7 +2,7 @@ spring:
   application:
     name: mercenary-ai
   profiles:
-    active: ${APP_PROFILE:standard}
+    active: ${APP_PROFILE:dev}
   # Disable static resource caching for development
   web:
     resources:
@@ -155,13 +155,25 @@ sentinel:
     suspicion-threshold: ${RAGPART_SUSPICION_THRESHOLD:0.4}
 
   # HGMem - HyperGraph Memory (arXiv:2512.23959v2)
-  # Multi-step RAG with complex relational modeling
-  # WARNING: HGMem is very slow with large document sets (5+ min per query)
-  # Disable by default - enable only for small corpora or demo environments
+  # Entity extraction and knowledge graph for document analysis
+  #
+  # indexing-enabled: Extract entities during document upload (enables Entity Network UI)
+  # query-enabled: Multi-hop graph traversal at query time (slow - 5+ min for large corpora)
+  #
+  # Recommended: indexing=true, query=false (fast entity viz, no query slowdown)
+  # For deep analysis: Enable query per-request via UI toggle
   hgmem:
-    enabled: ${HGMEM_ENABLED:false}
+    indexing-enabled: ${HGMEM_INDEXING:true}
+    query-enabled: ${HGMEM_QUERY:false}
     max-memory-points: ${HGMEM_MAX_POINTS:50}
     merge-similarity-threshold: ${HGMEM_MERGE_THRESHOLD:0.7}
+
+  # Sample Data Loader (dev mode only)
+  # Auto-loads test documents into HyperGraphMemory for Entity Network visualization
+  # Enable: SAMPLE_DATA_LOAD=true (requires dev profile)
+  sample-data:
+    load: ${SAMPLE_DATA_LOAD:false}
+    path: classpath:test_docs/*.txt
 
   # HiFi-RAG Pipeline (arXiv:2512.22442v1)
   # Hierarchical filtering + two-pass generation

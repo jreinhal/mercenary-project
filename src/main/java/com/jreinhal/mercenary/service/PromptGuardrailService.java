@@ -6,6 +6,9 @@ import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +26,8 @@ public class PromptGuardrailService {
     private boolean llmEnabled;
     @Value(value="${app.guardrails.strict-mode:false}")
     private boolean strictMode;
+    @Value(value="${app.guardrails.llm-timeout-ms:3000}")
+    private long llmTimeoutMs;
     @Value(value="${app.guardrails.llm-circuit-breaker.enabled:true}")
     private boolean llmCircuitBreakerEnabled;
     @Value(value="${app.guardrails.llm-circuit-breaker.failure-threshold:3}")
@@ -120,9 +125,11 @@ public class PromptGuardrailService {
             }
             return GuardrailResult.safe();
         }
+        CompletableFuture<String> future = null;
         try {
             String prompt = String.format(CLASSIFICATION_PROMPT, query);
-            String response = this.chatClient.prompt().user(prompt).call().content();
+            future = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().user(prompt).call().content());
+            String response = future.get(this.llmTimeoutMs, TimeUnit.MILLISECONDS);
             String classification = response.trim().toUpperCase();
             if (this.llmCircuitBreakerEnabled && this.llmCircuitBreaker != null) {
                 this.llmCircuitBreaker.recordSuccess();
@@ -132,6 +139,19 @@ public class PromptGuardrailService {
             }
             if (classification.contains("SUSPICIOUS") && this.strictMode) {
                 return GuardrailResult.blocked("LLM classifier flagged query as suspicious (strict mode)", "SUSPICIOUS", 0.7, Map.of("layer", "llm", "llmResponse", response, "strictMode", true));
+            }
+            return GuardrailResult.safe();
+        }
+        catch (TimeoutException e) {
+            if (future != null) {
+                future.cancel(true);
+            }
+            log.warn("LLM guardrail check timed out after {}ms", this.llmTimeoutMs);
+            if (this.llmCircuitBreakerEnabled && this.llmCircuitBreaker != null) {
+                this.llmCircuitBreaker.recordFailure(e);
+            }
+            if (this.strictMode) {
+                return GuardrailResult.blocked("LLM guardrail check timed out", "UNKNOWN", 0.5, Map.of("layer", "llm", "error", "timeout", "timeoutMs", this.llmTimeoutMs));
             }
             return GuardrailResult.safe();
         }

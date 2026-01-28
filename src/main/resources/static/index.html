@@ -7,9 +7,12 @@
     <!-- Immediate theme application to prevent flash -->
     <script src="js/theme-init.js"></script>
     <link rel="stylesheet" href="css/fonts.css?v=20260116f">
-    <link rel="stylesheet" href="css/sentinel.css?v=20260118r" id="sentinel-css">
+    <link rel="stylesheet" href="css/sentinel.css?v=20260127h" id="sentinel-css">
     <script src="js/css-bust.js"></script>
-    <!-- Knowledge graph rendering (CSP-safe, no external libs) -->
+    <!-- D3.js for force simulation and collision detection -->
+    <script src="https://unpkg.com/d3@7"></script>
+    <!-- Force Graph library for Entity Network visualization -->
+    <script src="https://unpkg.com/force-graph"></script>
 </head>
 
 <body>
@@ -508,6 +511,28 @@
                 <div class="chat-input-wrapper">
                     <input type="text" class="chat-input" id="query-input" placeholder="Chat input"
                         autocomplete="off" aria-label="Chat input">
+                    <button class="deep-analysis-btn" id="deep-analysis-btn" data-action="toggleDeepAnalysis"
+                            aria-label="Toggle deep analysis" aria-pressed="false" title="Deep Analysis">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>
+                            <path d="M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                        </svg>
+                        <span class="deep-analysis-label">Deep</span>
+                    </button>
+                    <div class="deep-analysis-tooltip" id="deep-analysis-tooltip">
+                        <div class="tooltip-title">Deep Entity Analysis</div>
+                        <div class="tooltip-content">
+                            Enables multi-hop reasoning across entity relationships in the knowledge graph.
+                            Finds documents connected through shared entities even without similar text.
+                        </div>
+                        <div class="tooltip-warning">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                                <path d="M12 2L2 22h20L12 2zm0 15a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0-8a1 1 0 011 1v4a1 1 0 11-2 0v-4a1 1 0 011-1z"/>
+                            </svg>
+                            Significantly slower queries (may take several minutes)
+                        </div>
+                    </div>
                     <button class="send-btn" id="send-btn" data-action="executeQuery" aria-label="Send message">
                         Send
                     </button>
@@ -531,7 +556,13 @@
 
             <!-- Plot Tab (Graph Visualization) -->
             <div class="right-panel-content" id="right-tab-plot">
-                <!-- Knowledge Graph Container -->
+                <!-- Graph Sub-Tabs -->
+                <div class="graph-subtabs">
+                    <button class="graph-subtab active" data-action="switchGraphTab" data-graph-tab="query">Query Results</button>
+                    <button class="graph-subtab" data-action="switchGraphTab" data-graph-tab="entity">Entity Network</button>
+                </div>
+
+                <!-- Query Results Graph (default) -->
                 <div class="graph-container" id="graph-container">
                     <div id="plotly-graph" class="w-full h-full"></div>
                     <div class="graph-placeholder" id="graph-placeholder">
@@ -547,6 +578,69 @@
                             <line x1="17" y1="17" x2="14" y2="14"/>
                         </svg>
                         <div class="graph-placeholder-text">Knowledge graph will appear here</div>
+                    </div>
+                </div>
+
+                <!-- Entity Network Graph (hidden by default) -->
+                <div class="entity-explorer-container hidden" id="entity-explorer-container">
+                    <div class="entity-explorer-toolbar">
+                        <input type="text" class="entity-search-input" id="entity-search-input"
+                               placeholder="Search entities..." autocomplete="off">
+                        <div class="entity-limit-control">
+                            <label for="entity-limit-slider" title="Max nodes to display">Nodes:</label>
+                            <input type="range" id="entity-limit-slider" min="10" max="100" value="30" step="5">
+                            <span id="entity-limit-value">30</span>
+                        </div>
+                        <button class="entity-refresh-btn" data-action="refreshEntityGraph" title="Refresh">⟳</button>
+                        <button class="entity-collapse-btn" data-action="collapseEntityExplorer" title="Collapse view">◀ Collapse</button>
+                    </div>
+                    <div class="entity-explorer-stats" id="entity-explorer-stats">
+                        <span class="stat-item"><strong id="entity-node-count">0</strong> entities</span>
+                        <span class="stat-item"><strong id="entity-edge-count">0</strong> relationships</span>
+                    </div>
+                    <!-- Entity Type Filters (clickable) -->
+                    <div class="entity-type-filters" id="entity-type-filters">
+                        <label class="type-filter" data-type="PERSON">
+                            <input type="checkbox" checked data-entity-type="PERSON">
+                            <span class="filter-dot" style="background: #0077bb;"></span>Person
+                        </label>
+                        <label class="type-filter" data-type="ORGANIZATION">
+                            <input type="checkbox" checked data-entity-type="ORGANIZATION">
+                            <span class="filter-dot" style="background: #ee7733;"></span>Organization
+                        </label>
+                        <label class="type-filter" data-type="LOCATION">
+                            <input type="checkbox" checked data-entity-type="LOCATION">
+                            <span class="filter-dot" style="background: #009988;"></span>Location
+                        </label>
+                        <label class="type-filter" data-type="TECHNICAL">
+                            <input type="checkbox" checked data-entity-type="TECHNICAL">
+                            <span class="filter-dot" style="background: #D55E00;"></span>Technical
+                        </label>
+                        <label class="type-filter" data-type="DATE">
+                            <input type="checkbox" checked data-entity-type="DATE">
+                            <span class="filter-dot" style="background: #33bbee;"></span>Date
+                        </label>
+                        <label class="type-filter" data-type="REFERENCE">
+                            <input type="checkbox" data-entity-type="REFERENCE">
+                            <span class="filter-dot" style="background: #F0E442;"></span>Reference
+                        </label>
+                    </div>
+                    <div id="entity-graph" class="entity-graph">
+                        <div class="entity-placeholder" id="entity-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="6" cy="6" r="2"/>
+                                <circle cx="18" cy="6" r="2"/>
+                                <circle cx="6" cy="18" r="2"/>
+                                <circle cx="18" cy="18" r="2"/>
+                                <circle cx="12" cy="12" r="3"/>
+                                <line x1="8" y1="6" x2="10" y2="10"/>
+                                <line x1="16" y1="6" x2="14" y2="10"/>
+                                <line x1="8" y1="18" x2="10" y2="14"/>
+                                <line x1="16" y1="18" x2="14" y2="14"/>
+                            </svg>
+                            <div class="entity-placeholder-text">Entity network will appear here</div>
+                            <div class="entity-placeholder-hint">Entities are extracted during document upload. Enable Deep Analysis to query the entity graph.</div>
+                        </div>
                     </div>
                 </div>
 
@@ -648,6 +742,6 @@
         <div>Powered by AdaptiveRAG &amp; HGMem</div>
     </footer>
 
-    <script src="js/sentinel-app.js?v=20260118r" defer></script>
+    <script src="js/sentinel-app.js?v=20260127e" defer></script>
 </body>
 </html>

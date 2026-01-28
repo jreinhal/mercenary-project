@@ -67,12 +67,12 @@
             --radius-md: 6px;
             --radius-lg: 8px;
 
-            /* Knowledge graph palette */
+            /* Knowledge graph palette - Okabe-Ito harmonized for accessibility */
             --graph-edge-primary: rgba(71, 85, 105, 0.35);
             --graph-text: #334155;
-            --graph-center-node: #10b981;
-            --graph-source-node: #3b82f6;
-            --graph-entity-node: #8b5cf6;
+            --graph-center-node: #009E73;  /* Teal-green - neutral query origin */
+            --graph-source-node: #56B4E9;  /* Sky blue - documents/sources */
+            --graph-entity-node: #0072B2;  /* Blue - entities (matches Entity Network Person) */
             --graph-node-border: rgba(15, 23, 42, 0.12);
             --graph-panel-bg: #edf2f9;
             --graph-panel-border: #d7e1ec;
@@ -91,12 +91,12 @@
             --bg-elevated: #2a3346;      /* Elevated surfaces */
             --bg-header: #0a0d12;        /* Even darker header */
 
-            /* Knowledge graph palette */
+            /* Knowledge graph palette - Okabe-Ito harmonized for accessibility */
             --graph-edge-primary: rgba(148, 163, 184, 0.35);
             --graph-text: #e2e8f0;
-            --graph-center-node: #34d399;
-            --graph-source-node: #60a5fa;
-            --graph-entity-node: #a78bfa;
+            --graph-center-node: #2DD4BF;  /* Brighter teal for dark mode */
+            --graph-source-node: #7DD3FC;  /* Lighter sky blue for dark mode */
+            --graph-entity-node: #38BDF8;  /* Lighter blue for dark mode */
             --graph-node-border: rgba(255, 255, 255, 0.25);
             --graph-panel-bg: #1c2532;
             --graph-panel-border: #2b3848;
@@ -375,11 +375,84 @@
             }
         }
 
+        /* Expanded Entity Explorer view - right panel takes 65% of screen */
+        .workspace.entity-explorer-expanded {
+            --right-panel-width: 65vw;
+            grid-template-columns: var(--left-panel-width) 1fr var(--right-panel-width);
+        }
+
+        .workspace.entity-explorer-expanded .main-content {
+            min-width: 280px;
+        }
+
         /* Right panel scales with available space for graph readability */
         .right-panel {
             width: 100%;
             min-width: 0;
             max-width: none;
+        }
+
+        /* Collapse button for expanded view */
+        .entity-collapse-btn {
+            display: none;
+            padding: 4px 10px;
+            font-size: 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            margin-left: auto;
+            transition: all 0.15s ease;
+        }
+
+        .entity-collapse-btn:hover {
+            background: var(--accent-muted);
+            color: var(--accent-primary);
+        }
+
+        .workspace.entity-explorer-expanded .entity-collapse-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Compact chat input when entity explorer is expanded */
+        .workspace.entity-explorer-expanded .chat-input-wrapper {
+            padding: 4px 8px 4px 12px !important;
+            gap: 4px !important;
+        }
+
+        .workspace.entity-explorer-expanded .chat-input {
+            flex: 1 1 60px !important;
+            min-width: 50px !important;
+            font-size: 12px !important;
+            padding: 6px 0 !important;
+        }
+
+        .workspace.entity-explorer-expanded .deep-analysis-btn {
+            padding: 6px 6px !important;
+            font-size: 10px !important;
+        }
+
+        .workspace.entity-explorer-expanded .deep-analysis-label {
+            display: none !important;  /* Hide "Deep" text, show only icon */
+        }
+
+        .workspace.entity-explorer-expanded .send-btn {
+            padding: 6px 10px !important;
+            font-size: 0 !important;  /* Hide text */
+            min-width: 32px;
+        }
+
+        /* Add arrow icon via pseudo-element when text is hidden */
+        .workspace.entity-explorer-expanded .send-btn::after {
+            content: '→';
+            font-size: 14px;
+        }
+
+        .workspace.entity-explorer-expanded .regen-btn {
+            display: none !important;  /* Hide Regen button entirely */
         }
 
         /* === LEFT SIDEBAR: Navigation & Collections === */
@@ -1121,6 +1194,10 @@
             box-shadow: inset 0 0 0 1px var(--graph-panel-glow);
         }
 
+        .graph-container.hidden {
+            display: none !important;
+        }
+
         /* Dynamic graph sizing based on node count (set via JS) */
         .graph-container[data-node-count="large"] {
             min-height: 500px;
@@ -1151,6 +1228,20 @@
             stroke-dasharray: none;
             stroke-dashoffset: 0;
             opacity: 0.7;
+            /* Research: smooth transitions for hover highlighting */
+            transition: stroke 0.15s ease-out, stroke-width 0.15s ease-out, opacity 0.15s ease-out;
+        }
+
+        /* Highlight edges on connected node hover */
+        .graph-node:hover ~ .graph-edges .graph-edge,
+        .graph-node.is-highlighted ~ .graph-edges .graph-edge {
+            opacity: 0.3;
+        }
+
+        .graph-edge.is-highlighted {
+            stroke: var(--accent-primary);
+            stroke-width: 1.8;
+            opacity: 1;
         }
 
         .graph-node {
@@ -1169,6 +1260,8 @@
             transform-origin: center;
             opacity: 1;
             filter: drop-shadow(0 1px 2px var(--graph-node-shadow));
+            /* Research-based: 150ms hover transitions for responsive feel */
+            transition: transform 0.15s ease-out, filter 0.15s ease-out;
         }
 
         .graph-node--query .graph-node-dot {
@@ -1199,12 +1292,28 @@
 
         .graph-node:hover .graph-node-dot,
         .graph-node:focus-within .graph-node-dot {
-            animation: graph-node-pulse 1.1s ease-in-out infinite;
+            /* Research: subtle scale + enhanced glow for professional intelligence UX */
+            transform: scale(1.12);
+            filter: drop-shadow(0 2px 6px var(--graph-node-shadow))
+                    drop-shadow(0 0 8px currentColor);
+        }
+
+        /* Subtle pulse only for selected/active nodes - less distracting than hover pulse */
+        .graph-node.is-selected .graph-node-dot {
+            animation: graph-node-pulse 2s ease-in-out infinite;
         }
 
         .graph-node:focus,
         .graph-node:focus-visible {
             outline: none;
+        }
+
+        /* Keyboard focus: high-visibility ring for Section 508 / WCAG 2.1 AA */
+        .graph-node:focus-visible .graph-node-dot {
+            stroke: var(--focus-ring);
+            stroke-width: 2;
+            filter: drop-shadow(0 0 0 2px var(--focus-ring))
+                    drop-shadow(0 2px 6px var(--graph-node-shadow));
         }
 
         .graph-tooltip {
@@ -1221,7 +1330,8 @@
             pointer-events: none;
             opacity: 0;
             transform: translateY(4px);
-            transition: opacity 0.12s ease, transform 0.12s ease;
+            /* Research: 100ms appear, 150ms fade for snappy response without jarring */
+            transition: opacity 0.1s ease-out, transform 0.1s ease-out;
             z-index: 6;
         }
 
@@ -1362,6 +1472,391 @@
 
         .graph-placeholder-text {
             font-size: 11px;
+        }
+
+        /* Graph Sub-Tabs (Query Results vs Entity Network) */
+        .graph-subtabs {
+            display: flex;
+            gap: 4px;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .graph-subtab {
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 500;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .graph-subtab:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .graph-subtab.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: var(--text-inverse);
+        }
+
+        /* Entity Explorer Container */
+        .entity-explorer-container {
+            display: flex;
+            flex-direction: column;
+            position: relative;  /* Contain absolutely positioned placeholder */
+            min-height: 500px;
+            height: clamp(500px, 70vh, 800px);
+            background: var(--graph-panel-bg);
+            border: 1px solid var(--graph-panel-border);
+            border-radius: var(--radius-md);
+        }
+
+        /* Expand entity explorer to fill available height when expanded */
+        .workspace.entity-explorer-expanded .entity-explorer-container {
+            height: calc(100vh - 140px) !important;  /* Full viewport minus header/toolbar */
+            max-height: none !important;
+            min-height: 600px;
+        }
+
+        /* Reduce padding on right panel content when expanded */
+        .workspace.entity-explorer-expanded .right-panel-content {
+            padding: 8px !important;
+        }
+
+        /* Ensure entity graph fills the expanded container */
+        .workspace.entity-explorer-expanded .entity-graph {
+            flex: 1 1 auto !important;
+            min-height: 500px !important;
+            height: 100% !important;
+        }
+
+        .entity-explorer-container.hidden {
+            display: none;
+        }
+
+        .entity-explorer-toolbar {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .entity-search-input {
+            flex: 1;
+            padding: 6px 10px;
+            font-size: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+        }
+
+        .entity-search-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .entity-search-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .entity-refresh-btn {
+            padding: 6px 10px;
+            font-size: 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .entity-refresh-btn:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: var(--text-inverse);
+        }
+
+        .entity-limit-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .entity-limit-control label {
+            white-space: nowrap;
+        }
+
+        .entity-limit-control input[type="range"] {
+            width: 60px;
+            height: 4px;
+            cursor: pointer;
+            accent-color: var(--accent-primary);
+        }
+
+        .entity-limit-control span {
+            min-width: 24px;
+            text-align: right;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .entity-explorer-stats {
+            display: flex;
+            gap: 16px;
+            padding: 8px 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .entity-explorer-stats .stat-item strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* Entity Type Legend */
+        /* Entity Type Filters (clickable legend) */
+        .entity-type-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .type-filter {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .type-filter:hover {
+            border-color: var(--border-strong);
+        }
+
+        .type-filter:has(input:checked) {
+            background: var(--accent-muted);
+            border-color: var(--accent-primary);
+        }
+
+        .type-filter:has(input:not(:checked)) {
+            opacity: 0.5;
+        }
+
+        .type-filter input[type="checkbox"] {
+            display: none;
+        }
+
+        .filter-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Keep legacy legend styles for backwards compatibility */
+        .entity-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 6px 12px;
+            font-size: 10px;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .entity-graph {
+            flex: 1;
+            min-height: 450px;
+            position: relative;
+            background: var(--graph-panel-bg);
+            overflow: visible;
+        }
+
+        .entity-placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--text-tertiary);
+        }
+
+        .entity-placeholder.hidden {
+            display: none;
+        }
+
+        .entity-placeholder svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .entity-placeholder-text {
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .entity-placeholder-hint {
+            font-size: 10px;
+            opacity: 0.7;
+        }
+
+        /* Entity Graph SVG Styles */
+        .entity-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .entity-node {
+            cursor: pointer;
+        }
+
+        .entity-node-circle {
+            stroke: var(--border-subtle);
+            stroke-width: 1.5px;
+        }
+
+        .entity-node:hover .entity-node-circle {
+            stroke: var(--accent-primary);
+        }
+
+        .entity-node--PERSON .entity-node-circle {
+            fill: var(--color-person, #4f8cf7);
+        }
+
+        .entity-node--ORGANIZATION .entity-node-circle {
+            fill: var(--color-org, #f59e0b);
+        }
+
+        .entity-node--LOCATION .entity-node-circle {
+            fill: var(--color-location, #10b981);
+        }
+
+        .entity-node--TECHNOLOGY .entity-node-circle {
+            fill: var(--color-tech, #8b5cf6);
+        }
+
+        .entity-node--DATE .entity-node-circle {
+            fill: var(--color-date, #6b7280);
+        }
+
+        .entity-node--default .entity-node-circle {
+            fill: var(--color-default, #64748b);
+        }
+
+        .entity-node-label {
+            font-size: 10px;
+            fill: var(--text-primary);
+            text-anchor: middle;
+            dominant-baseline: hanging;
+            pointer-events: none;
+        }
+
+        .entity-edge {
+            stroke: var(--accent-secondary, #6b7280);
+            stroke-width: 1.5px;
+            stroke-opacity: 0.6;
+            fill: none;
+        }
+
+        .entity-edge:hover {
+            stroke: var(--accent-primary);
+            stroke-opacity: 1;
+        }
+
+        /* Node expanding animation - disabled to prevent transform issues */
+        /*
+        .entity-node.expanding .entity-node-circle {
+            animation: pulse-expand 0.6s ease-in-out;
+        }
+
+        @keyframes pulse-expand {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+        }
+        */
+
+        /* Entity Tooltip */
+        .entity-tooltip {
+            position: absolute;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 10px 12px;
+            font-size: 11px;
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            min-width: 150px;
+            max-width: 250px;
+            white-space: nowrap;
+        }
+
+        .entity-tooltip.visible {
+            opacity: 1;
+        }
+
+        .entity-tooltip-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .entity-tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 2px 0;
+        }
+
+        .entity-tooltip-key {
+            color: var(--text-secondary);
+        }
+
+        .entity-tooltip-value {
+            color: var(--text-primary);
+            font-weight: 500;
         }
 
         /* Collapsible info sections (Kotaemon-style) */
@@ -3322,13 +3817,15 @@
 
         .chat-input-wrapper {
             display: flex;
-            gap: 10px;
+            flex-wrap: wrap;  /* Allow wrapping on narrow screens */
+            gap: 8px;
             align-items: center;
             background: var(--bg-secondary);
             border: 1px solid var(--border-subtle);
             border-radius: 24px;
             padding: 4px 4px 4px 16px;
             transition: border-color 0.2s, box-shadow 0.2s;
+            min-width: 200px;  /* Minimum width before wrapping */
         }
 
         .chat-input-wrapper:focus-within {
@@ -3337,7 +3834,8 @@
         }
 
         .chat-input {
-            flex: 1;
+            flex: 1 1 150px;  /* Grow, shrink, min-basis 150px */
+            min-width: 100px;  /* Absolute minimum width */
             background: transparent;
             border: none;
             padding: 10px 0;
@@ -3348,6 +3846,8 @@
             min-height: 20px;
             max-height: 120px;
             line-height: 1.4;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .chat-input:focus {
@@ -3359,6 +3859,7 @@
         }
 
         .send-btn {
+            flex-shrink: 0;  /* Prevent button from shrinking */
             background: #1f4e79;
             border: none;
             border-radius: 20px;
@@ -3400,6 +3901,117 @@
             background: var(--bg-tertiary);
             color: var(--text-primary);
             border-color: var(--text-tertiary);
+        }
+
+        /* Deep Analysis Toggle Button */
+        .deep-analysis-btn {
+            position: relative;
+            flex-shrink: 0;  /* Prevent button from shrinking */
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 8px 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .deep-analysis-btn svg {
+            width: 14px;
+            height: 14px;
+            transition: transform 0.3s;
+        }
+
+        .deep-analysis-btn:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--text-tertiary);
+        }
+
+        .deep-analysis-btn[aria-pressed="true"] {
+            background: rgba(139, 92, 246, 0.15);
+            border-color: #8b5cf6;
+            color: #a78bfa;
+        }
+
+        .deep-analysis-btn[aria-pressed="true"] svg {
+            stroke: #a78bfa;
+            transform: rotate(45deg);
+        }
+
+        .deep-analysis-label {
+            font-size: 11px;
+        }
+
+        /* Deep Analysis Tooltip */
+        .deep-analysis-tooltip {
+            position: absolute;
+            bottom: calc(100% + 12px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .deep-analysis-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: var(--border-subtle);
+        }
+
+        .chat-input-wrapper:has(.deep-analysis-btn:hover) .deep-analysis-tooltip,
+        .chat-input-wrapper:has(.deep-analysis-btn:focus) .deep-analysis-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .tooltip-title {
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .tooltip-content {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+
+        .tooltip-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            font-size: 10px;
+            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+            padding: 8px 10px;
+            border-radius: var(--radius-sm);
+            line-height: 1.4;
+        }
+
+        .tooltip-warning svg {
+            flex-shrink: 0;
+            margin-top: 1px;
         }
 
         /* === RIGHT PANEL: SOURCE VIEWER === */

@@ -369,8 +369,8 @@ public class MercenaryController {
     }
 
     @RequestMapping(value={"/ask/enhanced"}, method={RequestMethod.GET, RequestMethod.POST})
-    public EnhancedAskResponse askEnhanced(@RequestParam(value="q") String query, @RequestParam(value="dept") String dept, @RequestParam(value="file", required=false) List<String> fileParams, @RequestParam(value="files", required=false) String filesParam, @RequestParam(value="sessionId", required=false) String sessionId, HttpServletRequest request) {
-        return this.ragOrchestrationService.askEnhanced(query, dept, fileParams, filesParam, sessionId, request);
+    public EnhancedAskResponse askEnhanced(@RequestParam(value="q") String query, @RequestParam(value="dept") String dept, @RequestParam(value="file", required=false) List<String> fileParams, @RequestParam(value="files", required=false) String filesParam, @RequestParam(value="sessionId", required=false) String sessionId, @RequestParam(value="deepAnalysis", defaultValue="false") boolean deepAnalysis, HttpServletRequest request) {
+        return this.ragOrchestrationService.askEnhanced(query, dept, fileParams, filesParam, sessionId, deepAnalysis, request);
     }
 
     @GetMapping(value={"/reasoning/{traceId}"})
@@ -405,6 +405,7 @@ public class MercenaryController {
             @RequestParam(value = "file", required = false) List<String> fileParams,
             @RequestParam(value = "files", required = false) String filesParam,
             @RequestParam(value = "sessionId", required = false) String sessionId,
+            @RequestParam(value = "deepAnalysis", defaultValue = "false") boolean deepAnalysis,
             HttpServletRequest request) {
 
         SseEmitter emitter = new SseEmitter(180000L); // 3 minute timeout
@@ -461,7 +462,7 @@ public class MercenaryController {
 
                 // Step 3: Retrieval
                 sendSseStep(emitter, "vector_search", "Retrieval", "Running hybrid retrieval...");
-                RetrievalContext context = this.retrieveContext(query, dept, activeFiles, routing, highUncertainty);
+                RetrievalContext context = this.retrieveContext(query, dept, activeFiles, routing, highUncertainty, deepAnalysis);
                 List<Document> docs = context.textDocuments();
                 List<Document> visualDocs = context.visualDocuments();
                 sendSseStep(emitter, "vector_search", "Retrieval", "Found " + docs.size() + " text documents and " + visualDocs.size() + " visual documents");
@@ -767,7 +768,7 @@ public class MercenaryController {
         return this.sortDocumentsDeterministically(scoped);
     }
 
-    private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty) {
+    private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty, boolean deepAnalysis) {
         boolean complexQuery = routing != null && routing.decision() == AdaptiveRagService.RoutingDecision.DOCUMENT;
         boolean relationshipQuery = RELATIONSHIP_PATTERN.matcher(query).find();
         boolean longQuery = query.split("\\s+").length > 15;
@@ -818,11 +819,13 @@ public class MercenaryController {
             }
         }
 
-        if (this.hgMemQueryEngine != null && this.hgMemQueryEngine.isEnabled() && advancedNeeded) {
-            HGMemQueryEngine.HGMemResult hgResult = this.hgMemQueryEngine.query(query, dept);
+        // HGMem deep analysis: controlled by UI toggle (deepAnalysis parameter)
+        // Only runs graph traversal when explicitly requested - otherwise just vector search
+        if (this.hgMemQueryEngine != null && (deepAnalysis || advancedNeeded)) {
+            HGMemQueryEngine.HGMemResult hgResult = this.hgMemQueryEngine.query(query, dept, deepAnalysis);
             if (!hgResult.documents().isEmpty()) {
                 textDocs.addAll(hgResult.documents());
-                strategies.add("HGMem");
+                strategies.add(deepAnalysis ? "HGMem-Deep" : "HGMem");
             }
         }
 

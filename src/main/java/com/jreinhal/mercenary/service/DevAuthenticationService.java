@@ -25,7 +25,7 @@ implements AuthenticationService {
     @Override
     public User authenticate(HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
-        if (!this.allowRemote && remoteAddr != null && !remoteAddr.equals("127.0.0.1") && !remoteAddr.equals("::1")) {
+        if (!this.allowRemote && remoteAddr != null && !remoteAddr.equals("127.0.0.1") && !remoteAddr.equals("::1") && !remoteAddr.equals("0:0:0:0:0:0:0:1")) {
             log.error("DEV auth blocked for remote address: {}", remoteAddr);
             return null;
         }

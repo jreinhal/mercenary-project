@@ -82,9 +82,17 @@ public class HybridRagService {
         for (String variant : queryVariants) {
             futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept), this.ragExecutor));
         }
+        long semanticDeadlineMs = startTime + TimeUnit.SECONDS.toMillis(this.futureTimeoutSeconds);
         for (Map.Entry<String, CompletableFuture<List<RankedDoc>>> entry : futures.entrySet()) {
+            long remainingMs = semanticDeadlineMs - System.currentTimeMillis();
+            if (remainingMs <= 0L) {
+                log.warn("HybridRAG semantic retrieval exceeded global timeout ({}s); canceling remaining variants", this.futureTimeoutSeconds);
+                entry.getValue().cancel(true);
+                semanticResults.put(entry.getKey(), List.of());
+                continue;
+            }
             try {
-                semanticResults.put(entry.getKey(), entry.getValue().get(this.futureTimeoutSeconds, TimeUnit.SECONDS));
+                semanticResults.put(entry.getKey(), entry.getValue().get(remainingMs, TimeUnit.MILLISECONDS));
             }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -92,7 +100,7 @@ public class HybridRagService {
                 semanticResults.put(entry.getKey(), List.of());
             }
             catch (TimeoutException e) {
-                log.warn("HybridRAG semantic retrieval timed out for variant '{}'", entry.getKey());
+                log.warn("HybridRAG semantic retrieval timed out for variant '{}' (remaining {}ms)", entry.getKey(), remainingMs);
                 entry.getValue().cancel(true);
                 semanticResults.put(entry.getKey(), List.of());
             }

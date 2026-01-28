@@ -25,8 +25,8 @@ public class HGMemQueryEngine {
     private final HyperGraphMemory hypergraph;
     private final VectorStore vectorStore;
     private final ReasoningTracer reasoningTracer;
-    @Value(value="${sentinel.hgmem.enabled:true}")
-    private boolean enabled;
+    @Value(value="${sentinel.hgmem.query-enabled:false}")
+    private boolean queryEnabledDefault;
     @Value(value="${sentinel.hgmem.max-hops:3}")
     private int maxHops;
     @Value(value="${sentinel.hgmem.vector-weight:0.6}")
@@ -44,13 +44,24 @@ public class HGMemQueryEngine {
 
     @PostConstruct
     public void init() {
-        log.info("HGMem Query Engine initialized (enabled={}, maxHops={}, vectorWeight={}, graphWeight={})", new Object[]{this.enabled, this.maxHops, this.vectorWeight, this.graphWeight});
+        log.info("HGMem Query Engine initialized (queryDefault={}, maxHops={}, vectorWeight={}, graphWeight={})", new Object[]{this.queryEnabledDefault, this.maxHops, this.vectorWeight, this.graphWeight});
     }
 
+    /**
+     * Query with default deep analysis setting from config.
+     */
     public HGMemResult query(String query, String department) {
+        return query(query, department, this.queryEnabledDefault);
+    }
+
+    /**
+     * Query with explicit deep analysis control.
+     * @param deepAnalysis if true, performs multi-hop graph traversal (slow but thorough)
+     */
+    public HGMemResult query(String query, String department, boolean deepAnalysis) {
         String docId;
-        if (!this.enabled) {
-            log.debug("HGMem disabled, using vector search only");
+        if (!deepAnalysis) {
+            log.debug("HGMem deep analysis disabled, using vector search only");
             List<Document> vectorResults = this.vectorSearch(query, department);
             return new HGMemResult(vectorResults, List.of(), List.of(), 0);
         }
@@ -120,8 +131,8 @@ public class HGMemQueryEngine {
         return String.valueOf(Math.abs(doc.getContent().hashCode()));
     }
 
-    public boolean isEnabled() {
-        return this.enabled;
+    public boolean isQueryEnabledByDefault() {
+        return this.queryEnabledDefault;
     }
 
     public HyperGraphMemory.HGStats getGraphStats() {

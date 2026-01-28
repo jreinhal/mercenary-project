@@ -135,7 +135,7 @@ public class SecureIngestionService {
             }
             this.partitionAssigner.assignBatch(finalDocuments);
             this.vectorStore.add(finalDocuments);
-            if (this.hyperGraphMemory != null && this.hyperGraphMemory.isEnabled()) {
+            if (this.hyperGraphMemory != null && this.hyperGraphMemory.isIndexingEnabled()) {
                 for (Document doc : finalDocuments) {
                     this.hyperGraphMemory.indexDocument(doc, dept.name());
                 }

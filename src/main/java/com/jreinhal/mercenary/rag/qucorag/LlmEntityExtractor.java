@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -42,7 +45,16 @@ public class LlmEntityExtractor {
             long startTime = System.currentTimeMillis();
             String truncatedText = text.length() > 2000 ? text.substring(0, 2000) + "..." : text;
             String prompt = EXTRACTION_PROMPT.formatted(truncatedText);
-            String response = this.chatClient.prompt().user(prompt).call().content();
+            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().user(prompt).call().content());
+            String response;
+            try {
+                response = future.get(this.timeoutMs, TimeUnit.MILLISECONDS);
+            }
+            catch (TimeoutException e) {
+                future.cancel(true);
+                log.warn("LLM entity extraction timed out after {}ms", this.timeoutMs);
+                return this.patternExtractor.extractEntityStrings(text);
+            }
             Set<String> entities = this.parseEntityResponse(response);
             long elapsed = System.currentTimeMillis() - startTime;
             log.debug("LLM entity extraction: {} entities in {}ms", entities.size(), elapsed);
@@ -63,7 +75,16 @@ public class LlmEntityExtractor {
         try {
             String truncatedText = text.length() > 2000 ? text.substring(0, 2000) + "..." : text;
             String prompt = EXTRACTION_PROMPT.formatted(truncatedText);
-            String response = this.chatClient.prompt().user(prompt).call().content();
+            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().user(prompt).call().content());
+            String response;
+            try {
+                response = future.get(this.timeoutMs, TimeUnit.MILLISECONDS);
+            }
+            catch (TimeoutException e) {
+                future.cancel(true);
+                log.warn("LLM entity extraction (typed) timed out after {}ms", this.timeoutMs);
+                return this.patternExtractor.extractEntities(text).stream().map(ent -> new ExtractedEntity(ent.text(), ent.type().name())).toList();
+            }
             return this.parseEntityResponseWithTypes(response);
         }
         catch (Exception ex) {

@@ -6,6 +6,9 @@ import jakarta.annotation.PostConstruct;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +24,8 @@ public class AdaptiveRagService {
     private boolean enabled;
     @Value(value="${sentinel.adaptiverag.semantic-router-enabled:false}")
     private boolean semanticRouterEnabled;
+    @Value(value="${sentinel.adaptiverag.semantic-router-timeout-ms:3000}")
+    private long semanticRouterTimeoutMs;
     @Value(value="${sentinel.adaptiverag.chunk-top-k:5}")
     private int chunkTopK;
     @Value(value="${sentinel.adaptiverag.document-top-k:3}")
@@ -85,11 +90,13 @@ public class AdaptiveRagService {
             signals.put("semanticRouter", "disabled");
         }
         if (this.semanticRouterEnabled) {
+            CompletableFuture<String> future = null;
             try {
                 String reason2;
                 RoutingDecision decision2;
                 long llmStart = System.currentTimeMillis();
-                String classification = this.chatClient.prompt().system(ROUTER_SYSTEM_PROMPT).user(normalizedQuery).call().content().trim().toUpperCase();
+                future = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(ROUTER_SYSTEM_PROMPT).user(normalizedQuery).call().content());
+                String classification = future.get(this.semanticRouterTimeoutMs, TimeUnit.MILLISECONDS).trim().toUpperCase();
                 long llmDuration = System.currentTimeMillis() - llmStart;
                 signals.put("llmDuration", llmDuration);
                 if (classification.contains("NO_RETRIEVAL")) {
@@ -104,6 +111,13 @@ public class AdaptiveRagService {
                 }
                 long totalDuration = System.currentTimeMillis() - startTime;
                 return this.logAndReturn(decision2, reason2, 0.9, signals, totalDuration);
+            }
+            catch (TimeoutException e) {
+                if (future != null) {
+                    future.cancel(true);
+                }
+                log.warn("Semantic router timed out after {}ms", this.semanticRouterTimeoutMs);
+                signals.put("routerError", "timeout");
             }
             catch (Exception e) {
                 log.error("Semantic Router failed, falling back to heuristics: {}", e.getMessage());

@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -21,6 +24,8 @@ public class GroundingVerifier {
     private final ChatClient chatClient;
     @Value(value="${sentinel.birag.use-llm-verification:true}")
     private boolean useLlmVerification;
+    @Value(value="${sentinel.birag.llm-timeout-ms:4000}")
+    private long llmTimeoutMs;
     @Value(value="${sentinel.birag.lexical-weight:0.4}")
     private double lexicalWeight;
     @Value(value="${sentinel.birag.semantic-weight:0.6}")
@@ -94,7 +99,16 @@ public class GroundingVerifier {
         try {
             String truncatedEvidence = evidence.length() > 3000 ? evidence.substring(0, 3000) + "..." : evidence;
             String prompt = ENTAILMENT_PROMPT.formatted(truncatedEvidence, statement);
-            String response = this.chatClient.prompt().user(prompt).call().content();
+            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().user(prompt).call().content());
+            String response;
+            try {
+                response = future.get(this.llmTimeoutMs, TimeUnit.MILLISECONDS);
+            }
+            catch (TimeoutException e) {
+                future.cancel(true);
+                log.warn("Semantic grounding check timed out after {}ms", this.llmTimeoutMs);
+                return 0.5;
+            }
             if (response == null) {
                 return 0.5;
             }

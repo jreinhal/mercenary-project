@@ -30,8 +30,8 @@ public class HyperGraphMemory {
     private static final String EDGES_COLLECTION = "hypergraph_edges";
     private final MongoTemplate mongoTemplate;
     private final EntityExtractor entityExtractor;
-    @Value(value="${sentinel.hgmem.enabled:true}")
-    private boolean enabled;
+    @Value(value="${sentinel.hgmem.indexing-enabled:true}")
+    private boolean indexingEnabled;
     @Value(value="${sentinel.hgmem.max-memory-points:50}")
     private int maxMemoryPoints;
     @Value(value="${sentinel.hgmem.merge-similarity-threshold:0.7}")
@@ -46,11 +46,11 @@ public class HyperGraphMemory {
 
     @PostConstruct
     public void init() {
-        log.info("HGMem initialized (enabled={}, maxPoints={}, maxHops={})", new Object[]{this.enabled, this.maxMemoryPoints, this.maxHops});
+        log.info("HGMem initialized (indexing={}, maxPoints={}, maxHops={})", new Object[]{this.indexingEnabled, this.maxMemoryPoints, this.maxHops});
     }
 
     public void indexDocument(Document document, String department) {
-        if (!this.enabled) {
+        if (!this.indexingEnabled) {
             return;
         }
         log.debug("HGMem: Indexing document for department {}", department);
@@ -64,15 +64,14 @@ public class HyperGraphMemory {
         HGNode chunkNode = this.createChunkNode(document, department);
         nodeIds.add(chunkNode.getId());
         if (nodeIds.size() > 1) {
-            this.createHyperedge(nodeIds, "co_occurrence", document.getMetadata().get("source"));
+            this.createHyperedge(nodeIds, "co_occurrence", document.getMetadata().get("source"), department);
         }
         log.info("HGMem: Indexed document with {} nodes and 1 hyperedge", nodeIds.size());
     }
 
     public HGQueryResult query(String query, String department, int hops) {
-        if (!this.enabled) {
-            return HGQueryResult.empty();
-        }
+        // Note: Query-time enabling is controlled by HGMemQueryEngine
+        // This method just performs the graph traversal
         long startTime = System.currentTimeMillis();
         log.debug("HGMem: Querying hypergraph for {}", LogSanitizer.querySummary(query));
         List<EntityExtractor.Entity> queryEntities = this.entityExtractor.extract(query);
@@ -86,7 +85,7 @@ public class HyperGraphMemory {
         for (EntityExtractor.Entity entity : queryEntities) {
             List<HGNode> matchingNodes = this.findNodesByEntity(entity, department);
             for (HGNode node : matchingNodes) {
-                this.traverseGraph(node.getId(), hops, visitedNodes, relevantChunkIds, entityScores, 1.0);
+                this.traverseGraph(node.getId(), hops, visitedNodes, relevantChunkIds, entityScores, 1.0, department);
             }
         }
         List<HGNode> relatedChunks = relevantChunkIds.stream().map(this::getNode).filter(Objects::nonNull).filter(n -> n.getType() == HGNode.NodeType.CHUNK).limit(this.maxMemoryPoints).toList();
@@ -95,7 +94,7 @@ public class HyperGraphMemory {
         return new HGQueryResult(relatedChunks, queryEntities.stream().map(EntityExtractor.Entity::value).toList(), entityScores, visitedNodes.size(), duration);
     }
 
-    private void traverseGraph(String nodeId, int remainingHops, Set<String> visited, Set<String> chunkIds, Map<String, Double> scores, double currentScore) {
+    private void traverseGraph(String nodeId, int remainingHops, Set<String> visited, Set<String> chunkIds, Map<String, Double> scores, double currentScore, String department) {
         if (remainingHops < 0 || visited.contains(nodeId)) {
             return;
         }
@@ -104,18 +103,24 @@ public class HyperGraphMemory {
         if (node == null) {
             return;
         }
+        // SECURITY: Enforce sector boundary - block cross-department traversal
+        if (!department.equals(node.getDepartment())) {
+            log.debug("HGMem: Blocked cross-sector traversal from {} to {}", department, node.getDepartment());
+            return;
+        }
         if (node.getType() == HGNode.NodeType.CHUNK) {
             chunkIds.add(nodeId);
         }
         if (node.getType() == HGNode.NodeType.ENTITY) {
             scores.merge(node.getValue(), currentScore, Math::max);
         }
-        List<HGEdge> edges = this.findEdgesContaining(nodeId);
+        // SECURITY: Filter edges by department
+        List<HGEdge> edges = this.findEdgesContaining(nodeId, department);
         for (HGEdge edge : edges) {
             double edgeWeight = edge.getWeight();
             for (String connectedId : edge.getNodeIds()) {
                 if (connectedId.equals(nodeId)) continue;
-                this.traverseGraph(connectedId, remainingHops - 1, visited, chunkIds, scores, currentScore * edgeWeight * 0.8);
+                this.traverseGraph(connectedId, remainingHops - 1, visited, chunkIds, scores, currentScore * edgeWeight * 0.8, department);
             }
         }
     }
@@ -142,8 +147,8 @@ public class HyperGraphMemory {
         return node;
     }
 
-    private void createHyperedge(List<String> nodeIds, String relation, Object source) {
-        HGEdge edge = new HGEdge(UUID.randomUUID().toString(), new ArrayList<String>(nodeIds), relation, 1.0, source != null ? source.toString() : null, Instant.now());
+    private void createHyperedge(List<String> nodeIds, String relation, Object source, String department) {
+        HGEdge edge = new HGEdge(UUID.randomUUID().toString(), new ArrayList<String>(nodeIds), relation, 1.0, source != null ? source.toString() : null, department, Instant.now());
         this.mongoTemplate.save(edge, EDGES_COLLECTION);
     }
 
@@ -157,8 +162,9 @@ public class HyperGraphMemory {
         return results;
     }
 
-    private List<HGEdge> findEdgesContaining(String nodeId) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"nodeIds").is(nodeId));
+    private List<HGEdge> findEdgesContaining(String nodeId, String department) {
+        // SECURITY: Filter edges by department to prevent cross-sector traversal
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"nodeIds").is(nodeId).and("department").is(department));
         return this.mongoTemplate.find(query, HGEdge.class, EDGES_COLLECTION);
     }
 
@@ -170,8 +176,8 @@ public class HyperGraphMemory {
         return text.replaceAll("([\\\\\\^\\$\\.\\|\\?\\*\\+\\(\\)\\[\\]\\{\\}])", "\\\\$1");
     }
 
-    public boolean isEnabled() {
-        return this.enabled;
+    public boolean isIndexingEnabled() {
+        return this.indexingEnabled;
     }
 
     public HGStats getStats() {
@@ -264,17 +270,19 @@ public class HyperGraphMemory {
         private String relation;
         private double weight;
         private String sourceDoc;
+        private String department;  // SECURITY: Sector isolation for edges
         private Instant createdAt;
 
         public HGEdge() {
         }
 
-        public HGEdge(String id, List<String> nodeIds, String relation, double weight, String sourceDoc, Instant createdAt) {
+        public HGEdge(String id, List<String> nodeIds, String relation, double weight, String sourceDoc, String department, Instant createdAt) {
             this.id = id;
             this.nodeIds = nodeIds;
             this.relation = relation;
             this.weight = weight;
             this.sourceDoc = sourceDoc;
+            this.department = department;
             this.createdAt = createdAt;
         }
 
@@ -296,6 +304,10 @@ public class HyperGraphMemory {
 
         public String getSourceDoc() {
             return this.sourceDoc;
+        }
+
+        public String getDepartment() {
+            return this.department;
         }
 
         public Instant getCreatedAt() {

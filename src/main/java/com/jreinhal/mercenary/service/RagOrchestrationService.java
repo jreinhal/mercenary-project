@@ -221,12 +221,12 @@ public class RagOrchestrationService {
             ArrayList<String> globalContexts = new ArrayList<>();
             ArrayList<String> retrievalStrategies = new ArrayList<>();
             for (String subQuery : subQueries) {
-                RetrievalContext context = this.retrieveContext(subQuery, dept, activeFiles, routing, highUncertainty);
+                RetrievalContext context = this.retrieveContext(subQuery, dept, activeFiles, routing, highUncertainty, false);
                 if (context.textDocuments().isEmpty() && context.visualDocuments().isEmpty()) {
                     log.info("CRAG: Retrieval failed for '{}'. Initiating Corrective Loop.", subQuery);
                     String rewritten = this.rewriteService.rewriteQuery(subQuery);
                     if (!rewritten.equals(subQuery)) {
-                        context = this.retrieveContext(rewritten, dept, activeFiles, routing, highUncertainty);
+                        context = this.retrieveContext(rewritten, dept, activeFiles, routing, highUncertainty, false);
                         log.info("CRAG: Retry with '{}' found {} docs.", rewritten, context.textDocuments().size());
                     }
                 }
@@ -337,38 +337,44 @@ public class RagOrchestrationService {
             } else if (excerptFallbackApplied) {
                 log.info("Excerpt fallback applied (no direct answer) for query {}", LogSanitizer.querySummary(query));
             }
-            QuCoRagService.HallucinationResult hallucinationResult = this.quCoRagService.detectHallucinationRisk(response, query);
-            if (hallucinationResult.isHighRisk()) {
-                log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}", hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
-                RetrievalContext retryContext = this.retrieveContext(query, dept, activeFiles, routing, true);
-                if (!retryContext.textDocuments().isEmpty()) {
-                    String retryInfo = this.buildInformation(retryContext.textDocuments(), retryContext.globalContext());
-                    String retrySystem = retryInfo.isEmpty() ? "You are a helpful assistant. No documents are available. Respond: 'No internal records found for this query.'" : String.format(
-                        "You are a helpful assistant that answers questions based on the provided documents.\n\n" +
-                        "INSTRUCTIONS:\n" +
-                        "1. Read the documents below carefully\n" +
-                        "2. Answer the question using ONLY information from these documents\n" +
-                        "3. Cite sources using [filename] after each fact\n" +
-                        "4. If the answer is not in the documents, say \"No relevant records found.\"\n\n" +
-                        "DOCUMENTS:\n%s\n\n" +
-                        "Answer the user's question based on the documents above.", retryInfo);
-                    String retrySystemMessage = retrySystem.replace("{information}", retryInfo);
-                    try {
-                        String sysMsg = retrySystemMessage.replace("{", "[").replace("}", "]");
-                        String userQuery = query.replace("{", "[").replace("}", "]");
-                        String rawRetry = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
-                        response = cleanLlmResponse(rawRetry);
-                        citationCount = RagOrchestrationService.countCitations(response);
-                        if (citationCount == 0) {
-                            response = NO_RELEVANT_RECORDS;
+            // Skip hallucination check for extractive responses (they come directly from documents)
+            boolean skipHallucinationCheckAsk = rescueApplied || excerptFallbackApplied;
+            if (!skipHallucinationCheckAsk) {
+                QuCoRagService.HallucinationResult hallucinationResult = this.quCoRagService.detectHallucinationRisk(response, query);
+                if (hallucinationResult.isHighRisk()) {
+                    log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}", hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
+                    RetrievalContext retryContext = this.retrieveContext(query, dept, activeFiles, routing, true, false);
+                    if (!retryContext.textDocuments().isEmpty()) {
+                        String retryInfo = this.buildInformation(retryContext.textDocuments(), retryContext.globalContext());
+                        String retrySystem = retryInfo.isEmpty() ? "You are a helpful assistant. No documents are available. Respond: 'No internal records found for this query.'" : String.format(
+                            "You are a helpful assistant that answers questions based on the provided documents.\n\n" +
+                            "INSTRUCTIONS:\n" +
+                            "1. Read the documents below carefully\n" +
+                            "2. Answer the question using ONLY information from these documents\n" +
+                            "3. Cite sources using [filename] after each fact\n" +
+                            "4. If the answer is not in the documents, say \"No relevant records found.\"\n\n" +
+                            "DOCUMENTS:\n%s\n\n" +
+                            "Answer the user's question based on the documents above.", retryInfo);
+                        String retrySystemMessage = retrySystem.replace("{information}", retryInfo);
+                        try {
+                            String sysMsg = retrySystemMessage.replace("{", "[").replace("}", "]");
+                            String userQuery = query.replace("{", "[").replace("}", "]");
+                            String rawRetry = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                            response = cleanLlmResponse(rawRetry);
+                            citationCount = RagOrchestrationService.countCitations(response);
+                            if (citationCount == 0) {
+                                response = NO_RELEVANT_RECORDS;
+                            }
                         }
+                        catch (Exception retryError) {
+                            log.warn("QuCo-RAG retry generation failed: {}", retryError.getMessage());
+                        }
+                    } else {
+                        response = NO_RELEVANT_RECORDS;
                     }
-                    catch (Exception retryError) {
-                        log.warn("QuCo-RAG retry generation failed: {}", retryError.getMessage());
-                    }
-                } else {
-                    response = NO_RELEVANT_RECORDS;
                 }
+            } else {
+                log.debug("QuCo-RAG: Skipping hallucination check for extractive response");
             }
             if (this.bidirectionalRagService != null && this.bidirectionalRagService.isEnabled() && hasEvidence) {
                 String userId = user != null ? user.getUsername() : "unknown";
@@ -387,7 +393,7 @@ public class RagOrchestrationService {
             throw e;
         }
     }
-    public EnhancedAskResponse askEnhanced(String query, String dept, List<String> fileParams, String filesParam, String sessionId, HttpServletRequest request) {
+    public EnhancedAskResponse askEnhanced(String query, String dept, List<String> fileParams, String filesParam, String sessionId, boolean deepAnalysis, HttpServletRequest request) {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
@@ -499,12 +505,12 @@ public class RagOrchestrationService {
             for (int i = 0; i < subQueries.size(); ++i) {
                 String subQuery = subQueries.get(i);
                 stepStart = System.currentTimeMillis();
-                RetrievalContext context = this.retrieveContext(subQuery, dept, activeFiles, routingResult, highUncertainty);
+                RetrievalContext context = this.retrieveContext(subQuery, dept, activeFiles, routingResult, highUncertainty, deepAnalysis);
                 if (context.textDocuments().isEmpty() && context.visualDocuments().isEmpty()) {
                     log.info("CRAG: Retrieval failed for '{}'. Initiating Corrective Loop.", subQuery);
                     String rewritten = this.rewriteService.rewriteQuery(subQuery);
                     if (!rewritten.equals(subQuery)) {
-                        context = this.retrieveContext(rewritten, dept, activeFiles, routingResult, highUncertainty);
+                        context = this.retrieveContext(rewritten, dept, activeFiles, routingResult, highUncertainty, deepAnalysis);
                     }
                 }
                 allDocs.addAll(context.textDocuments());
@@ -632,7 +638,11 @@ public class RagOrchestrationService {
             String gateDetail = isTimeoutResponse ? "System response (timeout)" : (rescueApplied ? "Citation rescue applied (extractive evidence)" : (excerptFallbackApplied ? "No direct answer; showing excerpts" : (usedAnswerabilityGate ? "No answer returned (missing citations or no evidence)" : "Answerable with citations")));
             this.reasoningTracer.addStep(ReasoningStep.StepType.CITATION_VERIFICATION, "Answerability Gate", gateDetail, System.currentTimeMillis() - stepStart, Map.of("answerable", answerable, "citationCount", citationCount, "gateApplied", usedAnswerabilityGate, "rescueApplied", rescueApplied, "excerptFallbackApplied", excerptFallbackApplied));
             stepStart = System.currentTimeMillis();
-            QuCoRagService.HallucinationResult hallucinationResult = this.quCoRagService.detectHallucinationRisk(response, query);
+            // Skip hallucination check for extractive responses (they come directly from documents)
+            boolean skipHallucinationCheck = rescueApplied || excerptFallbackApplied;
+            QuCoRagService.HallucinationResult hallucinationResult = skipHallucinationCheck
+                ? new QuCoRagService.HallucinationResult(0.0, List.of(), false)
+                : this.quCoRagService.detectHallucinationRisk(response, query);
             boolean hasHallucinationRisk = hallucinationResult.isHighRisk();
             if (hasHallucinationRisk) {
                 log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}", hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
@@ -640,10 +650,12 @@ public class RagOrchestrationService {
                 answerable = false;
                 citationCount = 0;
             }
-            String hallucinationDetail = hasHallucinationRisk
-                ? "High risk detected; response abstained (" + hallucinationResult.flaggedEntities().size() + " novel entities, risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")"
-                : "Passed (risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")";
-            this.reasoningTracer.addStep(ReasoningStep.StepType.UNCERTAINTY_ANALYSIS, "Hallucination Check", hallucinationDetail, System.currentTimeMillis() - stepStart, Map.of("riskScore", hallucinationResult.riskScore(), "flaggedEntities", hallucinationResult.flaggedEntities(), "isHighRisk", hasHallucinationRisk));
+            String hallucinationDetail = skipHallucinationCheck
+                ? "Skipped (extractive response from documents)"
+                : (hasHallucinationRisk
+                    ? "High risk detected; response abstained (" + hallucinationResult.flaggedEntities().size() + " novel entities, risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")"
+                    : "Passed (risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")");
+            this.reasoningTracer.addStep(ReasoningStep.StepType.UNCERTAINTY_ANALYSIS, "Hallucination Check", hallucinationDetail, System.currentTimeMillis() - stepStart, Map.of("riskScore", hallucinationResult.riskScore(), "flaggedEntities", hallucinationResult.flaggedEntities(), "isHighRisk", hasHallucinationRisk, "skipped", skipHallucinationCheck));
             if (this.bidirectionalRagService != null && this.bidirectionalRagService.isEnabled() && hasEvidence) {
                 String userId = user != null ? user.getUsername() : "unknown";
                 this.bidirectionalRagService.validateAndLearn(query, response, topDocs, department.name(), userId);
@@ -1265,7 +1277,7 @@ public class RagOrchestrationService {
         return this.sortDocumentsDeterministically(scoped);
     }
 
-    private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty) {
+    private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty, boolean deepAnalysis) {
         boolean complexQuery = routing != null && routing.decision() == AdaptiveRagService.RoutingDecision.DOCUMENT;
         boolean relationshipQuery = RELATIONSHIP_PATTERN.matcher(query).find();
         boolean longQuery = query.split("\\s+").length > 15;
@@ -1316,11 +1328,12 @@ public class RagOrchestrationService {
             }
         }
 
-        if (this.hgMemQueryEngine != null && this.hgMemQueryEngine.isEnabled() && advancedNeeded) {
-            HGMemQueryEngine.HGMemResult hgResult = this.hgMemQueryEngine.query(query, dept);
+        // HGMem: use deepAnalysis param or fallback to advancedNeeded heuristic
+        if (this.hgMemQueryEngine != null && (deepAnalysis || advancedNeeded)) {
+            HGMemQueryEngine.HGMemResult hgResult = this.hgMemQueryEngine.query(query, dept, deepAnalysis);
             if (!hgResult.documents().isEmpty()) {
                 textDocs.addAll(hgResult.documents());
-                strategies.add("HGMem");
+                strategies.add(deepAnalysis ? "HGMem-Deep" : "HGMem");
             }
         }
 

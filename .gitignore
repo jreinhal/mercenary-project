@@ -32,6 +32,8 @@ tools/_tmp_*
 
 # Local tooling/config
 .claude/settings.local.json
+start-entity-explorer.bat
+start-entity-explorer.ps1
 
 # Secrets - NEVER commit these
 .env

@@ -3,7 +3,8 @@
             openSources: [],
             activeSource: null,
             currentFeedbackMsgId: null,
-            messageIndex: new Map()
+            messageIndex: new Map(),
+            deepAnalysisEnabled: false
         };
 
         const API_BASE = window.location.origin + '/api';
@@ -151,8 +152,9 @@
             return error;
         }
 
-        async function guardedFetch(url, options) {
-            const response = await fetch(url, options);
+        async function guardedFetch(url, options = {}) {
+            const mergedOptions = { credentials: 'same-origin', ...options };
+            const response = await fetch(url, mergedOptions);
             if (response.status === 401) {
                 showAuthModal('Sign in to continue.');
                 throw authError();
@@ -270,8 +272,23 @@
             startStatusPolling();
             initFileUpload();
             initSectorSelector();
+            initDeepAnalysisState();
             runDomIdSanityCheck();
         });
+
+        function initDeepAnalysisState() {
+            // Ensure Entity Network tab is hidden on load (Deep Analysis defaults to off)
+            const entityTab = document.querySelector('[data-graph-tab="entity"]');
+            if (entityTab) {
+                entityTab.style.display = 'none';
+            }
+            // Ensure Deep Analysis button shows correct initial state
+            const btn = document.getElementById('deep-analysis-btn');
+            if (btn) {
+                btn.setAttribute('aria-pressed', 'false');
+                btn.classList.remove('active');
+            }
+        }
 
         function initEventDelegation() {
             document.addEventListener('click', (e) => {
@@ -303,8 +320,12 @@
                     case 'triggerFileInput': document.getElementById('file-input').click(); break;
                     case 'clearChat': clearChat(); break;
                     case 'executeQuery': executeQuery(); break;
+                    case 'toggleDeepAnalysis': toggleDeepAnalysis(); break;
                     case 'regenerateResponse': regenerateResponse(); break;
                     case 'switchRightTab': switchRightTab(el.dataset.tab); break;
+                    case 'switchGraphTab': switchGraphTab(el.dataset.graphTab); break;
+                    case 'refreshEntityGraph': refreshEntityGraph(); break;
+                    case 'collapseEntityExplorer': collapseEntityExplorer(); break;
                     case 'toggleInfoSection': toggleInfoSection(el); break;
                     case 'navigateHighlight': navigateHighlight(el.dataset.direction); break;
                     case 'toggleReasoning': toggleReasoning(el); break;
@@ -1056,6 +1077,1044 @@
             }
         }
 
+        // ==================== Entity Explorer ====================
+        let entityGraphState = {
+            entities: [],
+            edges: [],
+            simulation: null,
+            selectedNode: null,
+            searchFilter: ''
+        };
+
+        function switchGraphTab(tabName) {
+            const graphContainer = document.getElementById('graph-container');
+            const entityContainer = document.getElementById('entity-explorer-container');
+            const infoSections = document.querySelectorAll('#right-tab-plot .info-section');
+            const workspace = document.querySelector('.workspace');
+
+            // Update sub-tab buttons
+            document.querySelectorAll('.graph-subtab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.querySelector(`.graph-subtab[data-graph-tab="${tabName}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+
+            if (tabName === 'entity') {
+                setHidden(graphContainer, true);
+                setHidden(entityContainer, false);
+                infoSections.forEach(section => setHidden(section, true));
+                // Expand the right panel for better graph visualization
+                workspace?.classList.add('entity-explorer-expanded');
+                // Load entities if not already loaded
+                if (entityGraphState.entities.length === 0) {
+                    loadEntityGraph();
+                } else {
+                    // Resize graph to fit new container size
+                    setTimeout(() => {
+                        if (entityGraphState.graph) {
+                            const container = document.getElementById('entity-graph');
+                            if (container) {
+                                entityGraphState.graph.width(container.clientWidth);
+                                entityGraphState.graph.height(container.clientHeight);
+                            }
+                        }
+                    }, 250);
+                }
+            } else {
+                setHidden(graphContainer, false);
+                setHidden(entityContainer, true);
+                infoSections.forEach(section => setHidden(section, false));
+                // Collapse the right panel back to normal
+                workspace?.classList.remove('entity-explorer-expanded');
+            }
+        }
+
+        function collapseEntityExplorer() {
+            // Switch back to Query Results tab and collapse the panel
+            switchGraphTab('query');
+        }
+
+        async function loadEntityGraph() {
+            const dept = sectorSelect?.value || 'ENTERPRISE';
+            const statsEl = document.getElementById('entity-explorer-stats');
+            const nodeCountEl = document.getElementById('entity-node-count');
+            const edgeCountEl = document.getElementById('entity-edge-count');
+            const placeholder = document.getElementById('entity-placeholder');
+            const graphEl = document.getElementById('entity-graph');
+
+            try {
+                // Fetch stats first
+                const statsRes = await guardedFetch(`${API_BASE}/graph/stats?dept=${encodeURIComponent(dept)}`);
+                const stats = await statsRes.json();
+
+                if (stats.error) {
+                    console.warn('Entity graph stats error:', stats.error);
+                    setText(nodeCountEl, '0');
+                    setText(edgeCountEl, '0');
+                    return;
+                }
+
+                setText(nodeCountEl, String(stats.entityCount || 0));
+                setText(edgeCountEl, String(stats.totalEdges || 0));
+
+                if (!stats.enabled || stats.entityCount === 0) {
+                    setHidden(placeholder, false);
+                    graphEl.innerHTML = '';
+                    return;
+                }
+
+                // Fetch entities and edges in parallel
+                const [entitiesRes, edgesRes] = await Promise.all([
+                    guardedFetch(`${API_BASE}/graph/entities?dept=${encodeURIComponent(dept)}&limit=100`),
+                    guardedFetch(`${API_BASE}/graph/edges?dept=${encodeURIComponent(dept)}&limit=200`)
+                ]);
+
+                const entitiesData = await entitiesRes.json();
+                const edgesData = await edgesRes.json();
+
+                if (entitiesData.error) {
+                    console.warn('Entity graph entities error:', entitiesData.error);
+                    return;
+                }
+
+                entityGraphState.entities = entitiesData.entities || [];
+                entityGraphState.edges = edgesData.edges || [];
+
+                if (entityGraphState.entities.length === 0) {
+                    setHidden(placeholder, false);
+                    graphEl.innerHTML = '';
+                    return;
+                }
+
+                setHidden(placeholder, true);
+                renderEntityGraph();
+
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                console.error('Failed to load entity graph:', error);
+            }
+        }
+
+        function refreshEntityGraph() {
+            entityGraphState.entities = [];
+            entityGraphState.edges = [];
+            loadEntityGraph();
+        }
+
+        // ============================================================
+        // ENTITY GRAPH RENDERER (2D)
+        // ============================================================
+
+        // Graph instance
+        let entity2DGraph = null;
+
+        // Color palette for entity types
+        // Okabe-Ito colorblind-safe palette - matches filter buttons in index.html
+        const entityTypeColors = {
+            'PERSON': '#0077bb',       // Blue - people
+            'ORGANIZATION': '#ee7733', // Orange - organizations
+            'LOCATION': '#009988',     // Teal - locations
+            'TECHNICAL': '#8b5cf6',    // Violet - technical terms (backend type)
+            'TECHNOLOGY': '#8b5cf6',   // Violet - technology (filter alias)
+            'DATE': '#33bbee',         // Cyan - dates
+            'REFERENCE': '#94a3b8',    // Gray - references/documents
+            'default': '#64748b'       // Slate - unknown
+        };
+
+        // Get current node limit from slider
+        function getEntityNodeLimit() {
+            const slider = document.getElementById('entity-limit-slider');
+            return slider ? parseInt(slider.value, 10) : 50;
+        }
+
+        // Prepare graph data from entity state with node limiting
+        // Get enabled entity types from filter checkboxes
+        function getEnabledEntityTypes() {
+            const checkboxes = document.querySelectorAll('[data-entity-type]:checked');
+            const types = new Set();
+            checkboxes.forEach(cb => types.add(cb.dataset.entityType));
+            return types;
+        }
+
+        function prepareEntityGraphData() {
+            let entities = entityGraphState.entities;
+            if (entities.length === 0) return null;
+
+            const nodeLimit = getEntityNodeLimit();
+            const enabledTypes = getEnabledEntityTypes();
+
+            // Type mapping: backend type -> filter type
+            // Backend uses TECHNICAL, filter uses TECHNOLOGY (and vice versa)
+            const typeAliases = {
+                'TECHNICAL': 'TECHNOLOGY',
+                'TECHNOLOGY': 'TECHNICAL'
+            };
+
+            // Filter by enabled entity types first
+            entities = entities.filter(e => {
+                const type = (e.entityType || 'default').toUpperCase();
+                // Check if type matches directly, or via alias, or without underscores
+                return enabledTypes.has(type) ||
+                       enabledTypes.has(typeAliases[type] || '') ||
+                       enabledTypes.has(type.replace('_', ''));
+            });
+
+            // Sort by referenceCount (importance) and limit nodes
+            // This prevents overcrowding while showing the most relevant entities
+            entities = [...entities]
+                .sort((a, b) => (b.referenceCount || 1) - (a.referenceCount || 1))
+                .slice(0, nodeLimit);
+
+            const nodes = entities.map(e => ({
+                id: e.id,
+                name: e.value,
+                type: e.entityType || 'default',
+                val: Math.max(1, e.referenceCount || 1),
+                color: entityTypeColors[e.entityType] || entityTypeColors.default
+            }));
+
+            const nodeIdSet = new Set(nodes.map(n => n.id));
+            const links = [];
+            const edges = entityGraphState.edges || [];
+
+            for (const edge of edges) {
+                const nodeIds = (edge.nodeIds || []).filter(id => nodeIdSet.has(id));
+                // For large hyperedges (>4 nodes), use star topology from first node
+                // For small hyperedges, use full pairwise connections
+                if (nodeIds.length > 4) {
+                    // Star: first node connects to all others (reduces clutter)
+                    const hubId = nodeIds[0];
+                    for (let i = 1; i < nodeIds.length; i++) {
+                        links.push({
+                            source: hubId,
+                            target: nodeIds[i],
+                            edgeId: edge.id
+                        });
+                    }
+                } else {
+                    // Small group: full pairwise for clarity
+                    for (let i = 0; i < nodeIds.length - 1; i++) {
+                        for (let j = i + 1; j < nodeIds.length; j++) {
+                            links.push({
+                                source: nodeIds[i],
+                                target: nodeIds[j],
+                                edgeId: edge.id
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Deduplicate links
+            const linkSet = new Set();
+            const uniqueLinks = links.filter(link => {
+                const key = [link.source, link.target].sort().join('|');
+                if (linkSet.has(key)) return false;
+                linkSet.add(key);
+                return true;
+            });
+
+            return { nodes, links: uniqueLinks };
+        }
+
+        // Create/get shared tooltip element
+        function getEntityTooltip() {
+            let tooltip = document.getElementById('entity-graph-tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.id = 'entity-graph-tooltip';
+                tooltip.style.cssText = `
+                    position: fixed;
+                    background: rgba(30,41,59,0.95);
+                    padding: 10px 14px;
+                    border-radius: 6px;
+                    border: 1px solid rgba(100,116,139,0.3);
+                    font-size: 12px;
+                    color: #e2e8f0;
+                    pointer-events: none;
+                    opacity: 0;
+                    transition: opacity 0.15s ease;
+                    z-index: 1000;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+                    max-width: 220px;
+                    font-family: var(--font-mono, monospace);
+                `;
+                document.body.appendChild(tooltip);
+            }
+            return tooltip;
+        }
+
+        // Show tooltip with entity info
+        function showEntityTooltip(node, x, y) {
+            const tooltip = getEntityTooltip();
+            // Count connections for this node
+            const connections = (entityGraphState.edges || []).filter(edge =>
+                (edge.nodeIds || []).includes(node.id)
+            ).length;
+
+            tooltip.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 6px; color: #f1f5f9; font-size: 13px;">${escapeHtml(node.name)}</div>
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${node.color};"></span>
+                    <span style="color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">${node.type}</span>
+                </div>
+                <div style="border-top: 1px solid rgba(100,116,139,0.3); padding-top: 6px; margin-top: 4px;">
+                    <div style="color: #94a3b8; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Mentions:</span><span style="color: #e2e8f0; font-weight: 500;">${node.val}</span>
+                    </div>
+                    <div style="color: #94a3b8; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Connections:</span><span style="color: #e2e8f0; font-weight: 500;">${connections}</span>
+                    </div>
+                </div>
+                <div style="color: #64748b; font-size: 10px; margin-top: 6px; font-style: italic;">Click to explore relationships</div>
+            `;
+            tooltip.style.left = (x + 12) + 'px';
+            tooltip.style.top = (y + 12) + 'px';
+            tooltip.style.opacity = '1';
+        }
+
+        // Hide tooltip
+        function hideEntityTooltip() {
+            const tooltip = getEntityTooltip();
+            tooltip.style.opacity = '0';
+        }
+
+        // Cleanup existing graph instance
+        function cleanupEntityGraph() {
+            if (entity2DGraph) {
+                entity2DGraph._destructor && entity2DGraph._destructor();
+                entity2DGraph = null;
+            }
+        }
+
+        // ============================================================
+        // 2D GRAPH RENDERER
+        // ============================================================
+        function renderEntityGraph() {
+            const graphEl = document.getElementById('entity-graph');
+            if (!graphEl) return;
+
+            const graphData = prepareEntityGraphData();
+            if (!graphData) return;
+
+            if (typeof ForceGraph === 'undefined') {
+                console.warn('2D force-graph not loaded');
+                return;
+            }
+
+            cleanupEntityGraph();
+            graphEl.innerHTML = '';
+
+            const width = graphEl.offsetWidth || 400;
+            const height = graphEl.offsetHeight || 350;
+
+            // Track mouse for tooltip
+            let mouseX = 0, mouseY = 0;
+            graphEl.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            // Highlight state for hover effects
+            let hoverNode = null;
+            let highlightNodes = new Set();
+            let highlightLinks = new Set();
+            let selectedNode = null;  // Clicked node stays selected until clicked again
+
+            // Track if simulation has stabilized (for fixed positions)
+            let simulationStable = false;
+
+            // Animation state for smooth transitions
+            const nodeAnimState = new Map();  // Track per-node animation progress
+            let lastRenderTime = performance.now();
+
+            // Interpolation helper for smooth transitions
+            function lerp(start, end, t) {
+                return start + (end - start) * t;
+            }
+
+            // Ease-out cubic for smooth deceleration
+            function easeOutCubic(t) {
+                return 1 - Math.pow(1 - t, 3);
+            }
+
+            // Color manipulation helpers for gradient depth effect
+            function lightenColor(color, percent) {
+                // Parse hex or rgb color and lighten
+                const num = parseInt(color.replace('#', ''), 16);
+                const r = Math.min(255, ((num >> 16) & 0xff) + Math.round(255 * percent / 100));
+                const g = Math.min(255, ((num >> 8) & 0xff) + Math.round(255 * percent / 100));
+                const b = Math.min(255, (num & 0xff) + Math.round(255 * percent / 100));
+                return `rgb(${r},${g},${b})`;
+            }
+
+            function darkenColor(color, percent) {
+                const num = parseInt(color.replace('#', ''), 16);
+                const r = Math.max(0, ((num >> 16) & 0xff) - Math.round(255 * percent / 100));
+                const g = Math.max(0, ((num >> 8) & 0xff) - Math.round(255 * percent / 100));
+                const b = Math.max(0, (num & 0xff) - Math.round(255 * percent / 100));
+                return `rgb(${r},${g},${b})`;
+            }
+
+            // Okabe-Ito colorblind-safe palette for entity types
+            const entityColors = {
+                PERSON: '#0072B2',       // Blue - trustworthy, human
+                ORGANIZATION: '#E69F00', // Orange - institutional
+                LOCATION: '#009E73',     // Teal-green - geographic
+                EVENT: '#CC79A7',        // Pink/purple - temporal
+                DOCUMENT: '#56B4E9',     // Sky blue - informational
+                TECHNOLOGY: '#D55E00',   // Vermillion - technical
+                TECHNICAL: '#D55E00',    // Vermillion - technical (backend type alias)
+                DATE: '#33bbee',         // Cyan - dates/temporal
+                REFERENCE: '#F0E442',    // Yellow - reference material
+                DEFAULT: '#999999'       // Gray - fallback
+            };
+
+            // Apply colorblind-safe colors to nodes
+            graphData.nodes.forEach(node => {
+                const nodeType = (node.type || '').toUpperCase();
+                node.color = entityColors[nodeType] || entityColors.DEFAULT;
+            });
+
+            entity2DGraph = ForceGraph()(graphEl)
+                .width(width)
+                .height(height)
+                .backgroundColor('transparent')
+                .nodeId('id')
+                .nodeVal('val')
+                .nodeLabel('')
+                .minZoom(0.25)
+                .maxZoom(5)
+                .nodeColor(node => {
+                    if (highlightNodes.size > 0) {
+                        return highlightNodes.has(node) ? node.color : 'rgba(100,116,139,0.15)';
+                    }
+                    return node.color;
+                })
+                .nodeCanvasObject((node, ctx, globalScale) => {
+                    // Guard: skip rendering if node position is not valid (during simulation warmup)
+                    if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) {
+                        return;
+                    }
+
+                    // Get/initialize animation state for this node
+                    if (!nodeAnimState.has(node.id)) {
+                        nodeAnimState.set(node.id, { highlight: 0, scale: 1 });
+                    }
+                    const anim = nodeAnimState.get(node.id);
+
+                    // Calculate target states
+                    const targetHighlight = highlightNodes.has(node) ? 1 : (highlightNodes.size > 0 ? -1 : 0);
+                    const isHovered = hoverNode === node;
+                    const targetScale = isHovered ? 1.08 : 1;
+
+                    // Smooth interpolation - 150ms transitions at 60fps (~9 frames)
+                    // Research: 150ms hover, 300-500ms major transitions
+                    const animSpeed = 0.18;  // ~150ms at 60fps
+                    anim.highlight = lerp(anim.highlight, targetHighlight, animSpeed);
+                    anim.scale = lerp(anim.scale, targetScale, animSpeed);
+
+                    // Derived states from animation
+                    const isHighlighted = anim.highlight > 0.5;
+                    const isDimmed = anim.highlight < -0.3;
+                    const highlightIntensity = Math.max(0, anim.highlight);  // 0-1 for glow
+                    const dimAmount = Math.max(0, -anim.highlight);  // 0-1 for dimming
+
+                    // Size based on importance - KeyLines style: smaller nodes for cleaner look
+                    // Hub nodes slightly larger, but overall compact
+                    const baseSize = Math.max(24, Math.min(36, 22 + Math.sqrt(node.val) * 2));
+                    const nodeSize = baseSize * anim.scale;
+
+                    // Label settings - Inter font for professional look, responsive to zoom
+                    // Semantic zoom: hide labels at low zoom for cleaner overview
+                    const zoomLevel = globalScale;
+                    const showLabel = zoomLevel > 0.5;  // Hide labels when zoomed out
+                    const fontSize = Math.max(9, Math.min(12, 9 / Math.sqrt(zoomLevel)));
+                    const maxChars = zoomLevel > 1.5 ? 20 : (zoomLevel > 0.8 ? 14 : 10);
+                    const label = node.name.length > maxChars ? node.name.substring(0, maxChars) + '…' : node.name;
+
+                    // Draw rounded square node with subtle depth shadow - KeyLines style
+                    const cornerRadius = 6;
+
+                    // Subtle drop shadow for depth (KeyLines uses minimal shadows)
+                    ctx.save();
+                    ctx.shadowColor = 'rgba(0,0,0,0.25)';
+                    ctx.shadowBlur = 6;
+                    ctx.shadowOffsetX = 1;
+                    ctx.shadowOffsetY = 2;
+                    ctx.beginPath();
+                    ctx.roundRect(node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius);
+                    ctx.fillStyle = 'rgba(0,0,0,0.01)';  // Nearly invisible, just for shadow
+                    ctx.fill();
+                    ctx.restore();
+
+                    // Main node fill
+                    ctx.beginPath();
+                    ctx.roundRect(node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius);
+
+                    // Fill with gradient for subtle 3D effect
+                    const fillOpacity = 1 - (dimAmount * 0.7);
+                    if (dimAmount > 0.1) {
+                        ctx.fillStyle = `rgba(40,50,60,${0.3 + dimAmount * 0.2})`;
+                    } else {
+                        // Create subtle gradient for depth
+                        const gradient = ctx.createLinearGradient(
+                            node.x - nodeSize/2, node.y - nodeSize/2,
+                            node.x + nodeSize/2, node.y + nodeSize/2
+                        );
+                        // Lighter top-left, darker bottom-right
+                        gradient.addColorStop(0, lightenColor(node.color, 15));
+                        gradient.addColorStop(1, darkenColor(node.color, 10));
+                        ctx.fillStyle = gradient;
+                    }
+                    ctx.globalAlpha = fillOpacity;
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+
+                    // Subtle inner highlight (top edge)
+                    ctx.beginPath();
+                    ctx.roundRect(node.x - nodeSize/2 + 2, node.y - nodeSize/2 + 2, nodeSize - 4, nodeSize/3, [cornerRadius - 2, cornerRadius - 2, 0, 0]);
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.fill();
+
+                    // Border with animated intensity
+                    ctx.beginPath();
+                    ctx.roundRect(node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius);
+                    const borderOpacity = 0.2 + (highlightIntensity * 0.7);
+                    ctx.strokeStyle = `rgba(255,255,255,${borderOpacity})`;
+                    ctx.lineWidth = 1 + (highlightIntensity * 1.5);
+                    ctx.stroke();
+
+                    // Glow effect with animated intensity
+                    if (highlightIntensity > 0.1) {
+                        ctx.save();
+                        ctx.shadowColor = node.color;
+                        ctx.shadowBlur = 10 + (highlightIntensity * 15);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+
+                    // Draw professional geometric icon based on type
+                    const iconOpacity = 0.9 - (dimAmount * 0.6);
+                    const iconColor = `rgba(255,255,255,${iconOpacity})`;
+                    ctx.strokeStyle = iconColor;
+                    ctx.fillStyle = iconColor;
+                    ctx.lineWidth = 1.5;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+
+                    const iconScale = nodeSize * 0.4;  // Slightly larger icon ratio for smaller nodes
+                    const cx = node.x;
+                    const cy = node.y;
+
+                    const nodeType = (node.type || '').toUpperCase();
+
+                    if (nodeType === 'PERSON') {
+                        // Person: simple head circle + body shape (like Feather user icon)
+                        const headR = iconScale * 0.28;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy - iconScale * 0.25, headR, 0, Math.PI * 2);
+                        ctx.fill();
+                        // Body: rounded bottom rectangle
+                        ctx.beginPath();
+                        ctx.moveTo(cx - iconScale * 0.35, cy + iconScale * 0.45);
+                        ctx.lineTo(cx - iconScale * 0.35, cy + iconScale * 0.1);
+                        ctx.quadraticCurveTo(cx - iconScale * 0.35, cy - iconScale * 0.05, cx - iconScale * 0.15, cy - iconScale * 0.05);
+                        ctx.lineTo(cx + iconScale * 0.15, cy - iconScale * 0.05);
+                        ctx.quadraticCurveTo(cx + iconScale * 0.35, cy - iconScale * 0.05, cx + iconScale * 0.35, cy + iconScale * 0.1);
+                        ctx.lineTo(cx + iconScale * 0.35, cy + iconScale * 0.45);
+                        ctx.fill();
+                    } else if (nodeType === 'ORGANIZATION') {
+                        // Building: clean outline with windows
+                        const bw = iconScale * 0.65;
+                        const bh = iconScale * 0.8;
+                        // Main building outline
+                        ctx.beginPath();
+                        ctx.rect(cx - bw/2, cy - bh/2, bw, bh);
+                        ctx.stroke();
+                        // Roof line
+                        ctx.beginPath();
+                        ctx.moveTo(cx - bw/2 - iconScale * 0.1, cy - bh/2);
+                        ctx.lineTo(cx, cy - bh/2 - iconScale * 0.2);
+                        ctx.lineTo(cx + bw/2 + iconScale * 0.1, cy - bh/2);
+                        ctx.stroke();
+                        // Windows - 2x2 grid
+                        const winSize = iconScale * 0.15;
+                        const winGap = iconScale * 0.08;
+                        ctx.fillRect(cx - winSize - winGap/2, cy - winSize - winGap/2, winSize, winSize);
+                        ctx.fillRect(cx + winGap/2, cy - winSize - winGap/2, winSize, winSize);
+                        ctx.fillRect(cx - winSize - winGap/2, cy + winGap/2, winSize, winSize);
+                        ctx.fillRect(cx + winGap/2, cy + winGap/2, winSize, winSize);
+                    } else if (nodeType === 'LOCATION') {
+                        // Location pin: teardrop shape
+                        ctx.beginPath();
+                        ctx.arc(cx, cy - iconScale * 0.15, iconScale * 0.35, Math.PI, 0);
+                        ctx.lineTo(cx, cy + iconScale * 0.45);
+                        ctx.closePath();
+                        ctx.stroke();
+                        // Inner dot
+                        ctx.beginPath();
+                        ctx.arc(cx, cy - iconScale * 0.15, iconScale * 0.12, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (nodeType === 'TECHNOLOGY' || nodeType === 'TECHNICAL') {
+                        // Gear/cog: circle with notches (handles both TECHNOLOGY and TECHNICAL types)
+                        const gr = iconScale * 0.35;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, gr, 0, Math.PI * 2);
+                        ctx.stroke();
+                        // Inner circle
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, gr * 0.4, 0, Math.PI * 2);
+                        ctx.fill();
+                        // Notches
+                        for (let i = 0; i < 6; i++) {
+                            const angle = (i / 6) * Math.PI * 2;
+                            ctx.beginPath();
+                            ctx.moveTo(cx + Math.cos(angle) * gr, cy + Math.sin(angle) * gr);
+                            ctx.lineTo(cx + Math.cos(angle) * (gr + iconScale * 0.15), cy + Math.sin(angle) * (gr + iconScale * 0.15));
+                            ctx.stroke();
+                        }
+                    } else if (nodeType === 'REFERENCE') {
+                        // Document: rectangle with folded corner
+                        const dw = iconScale * 0.6;
+                        const dh = iconScale * 0.8;
+                        const fold = iconScale * 0.2;
+                        ctx.beginPath();
+                        ctx.moveTo(cx - dw/2, cy - dh/2);
+                        ctx.lineTo(cx + dw/2 - fold, cy - dh/2);
+                        ctx.lineTo(cx + dw/2, cy - dh/2 + fold);
+                        ctx.lineTo(cx + dw/2, cy + dh/2);
+                        ctx.lineTo(cx - dw/2, cy + dh/2);
+                        ctx.closePath();
+                        ctx.stroke();
+                        // Fold triangle
+                        ctx.beginPath();
+                        ctx.moveTo(cx + dw/2 - fold, cy - dh/2);
+                        ctx.lineTo(cx + dw/2 - fold, cy - dh/2 + fold);
+                        ctx.lineTo(cx + dw/2, cy - dh/2 + fold);
+                        ctx.stroke();
+                        // Text lines
+                        ctx.beginPath();
+                        ctx.moveTo(cx - dw/2 + iconScale * 0.1, cy);
+                        ctx.lineTo(cx + dw/2 - iconScale * 0.1, cy);
+                        ctx.moveTo(cx - dw/2 + iconScale * 0.1, cy + iconScale * 0.2);
+                        ctx.lineTo(cx + dw/2 - iconScale * 0.1, cy + iconScale * 0.2);
+                        ctx.stroke();
+                    } else if (nodeType === 'DATE') {
+                        // Calendar icon: rectangle with header and grid
+                        const cw = iconScale * 0.7;
+                        const ch = iconScale * 0.7;
+                        const headerH = iconScale * 0.18;
+                        // Calendar body
+                        ctx.beginPath();
+                        ctx.rect(cx - cw/2, cy - ch/2, cw, ch);
+                        ctx.stroke();
+                        // Header bar
+                        ctx.beginPath();
+                        ctx.moveTo(cx - cw/2, cy - ch/2 + headerH);
+                        ctx.lineTo(cx + cw/2, cy - ch/2 + headerH);
+                        ctx.stroke();
+                        // Calendar tabs (binding rings)
+                        const tabW = iconScale * 0.08;
+                        ctx.beginPath();
+                        ctx.moveTo(cx - cw/4, cy - ch/2 - iconScale * 0.1);
+                        ctx.lineTo(cx - cw/4, cy - ch/2 + iconScale * 0.05);
+                        ctx.moveTo(cx + cw/4, cy - ch/2 - iconScale * 0.1);
+                        ctx.lineTo(cx + cw/4, cy - ch/2 + iconScale * 0.05);
+                        ctx.stroke();
+                    } else {
+                        // Default: simple diamond
+                        const ds = iconScale * 0.4;
+                        ctx.beginPath();
+                        ctx.moveTo(cx, cy - ds);
+                        ctx.lineTo(cx + ds, cy);
+                        ctx.lineTo(cx, cy + ds);
+                        ctx.lineTo(cx - ds, cy);
+                        ctx.closePath();
+                        ctx.stroke();
+                    }
+
+                    // Draw label text BELOW the node - KeyLines style: compact labels
+                    // Use Inter font with system fallbacks for professional typography
+                    ctx.font = `500 ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+
+                    const labelMetrics = ctx.measureText(label);
+                    const labelWidth = labelMetrics.width + 6;  // Tighter padding
+                    const labelHeight = fontSize + 4;  // Tighter vertical
+                    const labelX = node.x;
+                    const labelY = node.y + nodeSize/2 + 3;  // Closer to node
+
+                    // Semantic zoom: only show labels at reasonable zoom levels
+                    if (showLabel) {
+                        // Label background pill - KeyLines style: semi-transparent
+                        const labelBgOpacity = 0.75 - (dimAmount * 0.5);
+                        ctx.fillStyle = `rgba(15,23,42,${labelBgOpacity})`;
+                        ctx.beginPath();
+                        ctx.roundRect(labelX - labelWidth/2, labelY - 1, labelWidth, labelHeight, 3);
+                        ctx.fill();
+
+                        // Label text - slightly smaller weight
+                        const labelTextOpacity = 0.9 - (dimAmount * 0.5);
+                        ctx.fillStyle = `rgba(226,232,240,${labelTextOpacity})`;  // Slightly dimmer white
+                        ctx.fillText(label, labelX, labelY);
+                    }
+
+                    // Store dimensions for collision detection - tighter for compact layout
+                    node.__bWidth = Math.max(nodeSize, showLabel ? labelWidth : nodeSize);
+                    node.__bHeight = nodeSize + (showLabel ? labelHeight + 4 : 0);
+                })
+                .nodeCanvasObjectMode(() => 'replace')
+                // KeyLines style links - colored to match source node, very thin default
+                .linkColor(link => {
+                    const sourceNode = typeof link.source === 'object' ? link.source :
+                        graphData.nodes.find(n => n.id === link.source);
+
+                    if (highlightLinks.size > 0) {
+                        if (highlightLinks.has(link) && sourceNode) {
+                            // Highlighted: vibrant source color
+                            return sourceNode.color + 'dd';  // 87% opacity
+                        }
+                        return 'rgba(70,80,90,0.04)';  // Nearly invisible
+                    }
+                    // Default: very subtle source color tint
+                    if (sourceNode) {
+                        return sourceNode.color + '20';  // 12% opacity - more subtle
+                    }
+                    return 'rgba(100,116,139,0.08)';
+                })
+                .linkWidth(link => highlightLinks.has(link) ? 1.5 : 0.5)  // KeyLines: thin links
+                .linkDirectionalArrowLength(link => highlightLinks.has(link) ? 3 : 0)
+                .linkDirectionalArrowRelPos(1)
+                .linkCurvature(0.05)  // Very subtle curve for cleaner look
+                // Relationship labels on highlighted links - KeyLines style
+                .linkCanvasObjectMode(() => 'after')
+                .linkCanvasObject((link, ctx, globalScale) => {
+                    // Only show relationship labels on highlighted links
+                    if (!highlightLinks.has(link)) return;
+                    if (!link.type) return;  // No relationship type defined
+
+                    const source = link.source;
+                    const target = link.target;
+                    if (!source || !target || typeof source !== 'object') return;
+
+                    // Position label at midpoint of link
+                    const midX = (source.x + target.x) / 2;
+                    const midY = (source.y + target.y) / 2;
+
+                    // Style: small, semi-transparent pill
+                    const fontSize = 8;
+                    const labelText = link.type.length > 12 ? link.type.substring(0, 12) + '…' : link.type;
+                    ctx.font = `400 ${fontSize}px Inter, system-ui, sans-serif`;
+                    const textWidth = ctx.measureText(labelText).width;
+                    const padding = 4;
+
+                    // Background pill
+                    ctx.fillStyle = 'rgba(30,41,59,0.85)';
+                    ctx.beginPath();
+                    ctx.roundRect(midX - textWidth/2 - padding, midY - fontSize/2 - 2, textWidth + padding*2, fontSize + 4, 3);
+                    ctx.fill();
+
+                    // Border
+                    ctx.strokeStyle = 'rgba(148,163,184,0.3)';
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+
+                    // Text
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'rgba(203,213,225,0.9)';
+                    ctx.fillText(labelText, midX, midY);
+                })
+                .onNodeClick(node => {
+                    // Toggle selection - click to lock highlight, click again to deselect
+                    if (selectedNode === node) {
+                        // Deselect
+                        selectedNode = null;
+                        highlightNodes.clear();
+                        highlightLinks.clear();
+                    } else {
+                        // Select and highlight path
+                        selectedNode = node;
+                        highlightNodes.clear();
+                        highlightLinks.clear();
+                        highlightNodes.add(node);
+
+                        // Add all connected nodes and their links
+                        graphData.links.forEach(link => {
+                            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                            if (sourceId === node.id || targetId === node.id) {
+                                highlightLinks.add(link);
+                                const connectedNode = graphData.nodes.find(n =>
+                                    n.id === (sourceId === node.id ? targetId : sourceId)
+                                );
+                                if (connectedNode) highlightNodes.add(connectedNode);
+                            }
+                        });
+
+                        // Run a query about this entity (same as Query Results graph)
+                        if (node.name) {
+                            runEntityQuery(node.name);
+                        }
+                    }
+                })
+                .onNodeHover(node => {
+                    graphEl.style.cursor = node ? 'pointer' : 'default';
+                    hoverNode = node;
+
+                    // Don't override click selection with hover
+                    if (selectedNode) {
+                        // Show tooltip for hovered node but keep selection highlight
+                        if (node) {
+                            showEntityTooltip(node, mouseX, mouseY);
+                        } else {
+                            hideEntityTooltip();
+                        }
+                        return;
+                    }
+
+                    // No selection - hover highlights connections
+                    highlightNodes.clear();
+                    highlightLinks.clear();
+
+                    if (node) {
+                        highlightNodes.add(node);
+                        // Add connected nodes and links
+                        graphData.links.forEach(link => {
+                            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                            if (sourceId === node.id || targetId === node.id) {
+                                highlightLinks.add(link);
+                                const connectedNode = graphData.nodes.find(n =>
+                                    n.id === (sourceId === node.id ? targetId : sourceId)
+                                );
+                                if (connectedNode) highlightNodes.add(connectedNode);
+                            }
+                        });
+                        showEntityTooltip(node, mouseX, mouseY);
+                    } else {
+                        hideEntityTooltip();
+                    }
+                })
+                .onBackgroundClick(() => {
+                    // Click on background clears selection
+                    selectedNode = null;
+                    highlightNodes.clear();
+                    highlightLinks.clear();
+                })
+                // Smooth animation parameters - KeyLines-inspired fluidity
+                .cooldownTicks(300)  // More ticks for smoother settling
+                .cooldownTime(4000)  // Longer settling time
+                .warmupTicks(100)    // Initial warmup for smooth start
+                .onEngineStop(() => {
+                    // Fix all node positions once simulation stabilizes
+                    simulationStable = true;
+                    graphData.nodes.forEach(node => {
+                        node.fx = node.x;
+                        node.fy = node.y;
+                    });
+                })
+                .enableNodeDrag(true)  // Allow manual repositioning
+                .onNodeDragEnd(node => {
+                    // Keep node at dragged position
+                    node.fx = node.x;
+                    node.fy = node.y;
+                })
+                // Gentle physics for fluid motion
+                .d3AlphaDecay(0.015)      // Slower decay = smoother settling
+                .d3VelocityDecay(0.25)    // Lower friction = more fluid movement
+                .graphData(graphData);
+
+            // Configure forces for smooth, professional layout - KeyLines style
+            const nodeCount = graphData.nodes.length;
+
+            // Charge force: balanced repulsion for cluster separation
+            const chargeStrength = Math.max(-3500, -700 - (nodeCount * 35));
+            entity2DGraph.d3Force('charge')
+                .strength(chargeStrength)
+                .distanceMax(600)        // Moderate repulsion range
+                .distanceMin(15);        // Compact for smaller nodes
+
+            // Link force: variable distance based on connection count (star hubs get longer links)
+            entity2DGraph.d3Force('link')
+                .distance(link => {
+                    // Hub nodes (high degree) get longer links for cleaner radial spread
+                    const sourceNode = typeof link.source === 'object' ? link.source :
+                        graphData.nodes.find(n => n.id === link.source);
+                    const targetNode = typeof link.target === 'object' ? link.target :
+                        graphData.nodes.find(n => n.id === link.target);
+                    const maxVal = Math.max(sourceNode?.val || 1, targetNode?.val || 1);
+                    return 180 + (maxVal * 15);  // Scale distance with hub importance
+                })
+                .strength(0.2);          // Soft springs for fluidity
+
+            // Remove center force for organic spread
+            entity2DGraph.d3Force('center', null);
+
+            // Gentle centering to keep graph visible
+            entity2DGraph.d3Force('x', d3.forceX(width / 2).strength(0.015));
+            entity2DGraph.d3Force('y', d3.forceY(height / 2).strength(0.015));
+
+            // Collision detection - tighter for smaller nodes
+            entity2DGraph.d3Force('collide', d3.forceCollide()
+                .radius(node => {
+                    const w = node.__bWidth || 30;
+                    const h = node.__bHeight || 20;
+                    return Math.max(w, h) / 2 + 8;  // Less padding for compact nodes
+                })
+                .strength(0.9)           // Firmer collisions to prevent overlap
+                .iterations(3)
+            );
+
+            // Smooth animated zoom to fit after layout settles
+            setTimeout(() => {
+                if (entity2DGraph) {
+                    entity2DGraph.zoomToFit(800, 80);  // 800ms animation, 80px padding
+                }
+            }, 1500);
+        }
+
+        // Initialize node limit slider and entity type filters
+        document.addEventListener('DOMContentLoaded', () => {
+            // Node limit slider
+            const slider = document.getElementById('entity-limit-slider');
+            const valueDisplay = document.getElementById('entity-limit-value');
+            if (slider && valueDisplay) {
+                slider.addEventListener('input', () => {
+                    valueDisplay.textContent = slider.value;
+                });
+                slider.addEventListener('change', () => {
+                    // Re-render graph with new limit
+                    renderEntityGraph();
+                });
+            }
+
+            // Entity type filter checkboxes
+            const typeFilters = document.querySelectorAll('[data-entity-type]');
+            typeFilters.forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    // Re-render graph with new type filter
+                    renderEntityGraph();
+                });
+            });
+        });
+
+        // Update graph data without full re-render
+        function updateEntityGraphData() {
+            const graphData = prepareEntityGraphData();
+            if (!graphData) return;
+
+            if (entity2DGraph) {
+                // Preserve existing node positions to prevent graph rearrangement
+                const currentData = entity2DGraph.graphData();
+                const positionMap = new Map();
+                currentData.nodes.forEach(node => {
+                    if (node.x !== undefined && node.y !== undefined) {
+                        positionMap.set(node.id, { x: node.x, y: node.y, fx: node.fx, fy: node.fy });
+                    }
+                });
+
+                // Apply saved positions to new data
+                graphData.nodes.forEach(node => {
+                    const savedPos = positionMap.get(node.id);
+                    if (savedPos) {
+                        node.x = savedPos.x;
+                        node.y = savedPos.y;
+                        node.fx = savedPos.fx;
+                        node.fy = savedPos.fy;
+                    }
+                });
+
+                entity2DGraph.graphData(graphData);
+            } else {
+                renderEntityGraph();
+            }
+        }
+
+        async function expandEntityNode(nodeId) {
+            const dept = sectorSelect?.value || 'ENTERPRISE';
+
+            try {
+                const res = await guardedFetch(`${API_BASE}/graph/neighbors?nodeId=${encodeURIComponent(nodeId)}&dept=${encodeURIComponent(dept)}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    console.warn('Expand node error:', data.error);
+                    return;
+                }
+
+                // Add new neighbors to entities if not already present
+                const existingIds = new Set(entityGraphState.entities.map(e => e.id));
+                const newEntities = (data.neighbors || []).filter(n => !existingIds.has(n.id));
+
+                // Add new edges
+                const existingEdgeIds = new Set(entityGraphState.edges.map(e => e.id));
+                const newEdges = (data.edges || []).filter(e => !existingEdgeIds.has(e.id));
+
+                if (newEntities.length > 0 || newEdges.length > 0) {
+                    entityGraphState.entities = [...entityGraphState.entities, ...newEntities];
+                    entityGraphState.edges = [...entityGraphState.edges, ...newEdges];
+                    updateEntityGraphData();
+                }
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                console.error('Failed to expand node:', error);
+            }
+        }
+
+        // Entity search filter
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('entity-search-input');
+            if (searchInput) {
+                let debounceTimer;
+                searchInput.addEventListener('input', (e) => {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        searchEntities(e.target.value);
+                    }, 300);
+                });
+            }
+        });
+
+        async function searchEntities(query) {
+            if (!query || query.length < 2) {
+                // Reset to full list
+                loadEntityGraph();
+                return;
+            }
+
+            const dept = sectorSelect?.value || 'ENTERPRISE';
+            try {
+                const res = await guardedFetch(`${API_BASE}/graph/search?q=${encodeURIComponent(query)}&dept=${encodeURIComponent(dept)}&limit=50`);
+                const data = await res.json();
+
+                if (data.error) {
+                    console.warn('Entity search error:', data.error);
+                    return;
+                }
+
+                entityGraphState.entities = data.entities || [];
+                const placeholder = document.getElementById('entity-placeholder');
+                const graphEl = document.getElementById('entity-graph');
+
+                if (entityGraphState.entities.length === 0) {
+                    setHidden(placeholder, false);
+                    graphEl.innerHTML = '';
+                } else {
+                    setHidden(placeholder, true);
+                    renderEntityGraph();
+                }
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                console.error('Entity search failed:', error);
+            }
+        }
+        // ==================== End Entity Explorer ====================
+
         function toggleInfoSection(btn) {
             const isExpanded = btn.getAttribute('aria-expanded') === 'true';
             btn.setAttribute('aria-expanded', !isExpanded);
@@ -1100,7 +2159,8 @@
 
             lastResponseText = safeResponse;
 
-            if (responseIndicatesNoInfo || metricsIndicateNoInfo) {
+            const hasSources = sources && sources.length > 0;
+            if ((responseIndicatesNoInfo || metricsIndicateNoInfo) && !hasSources) {
                 setRightPanelNoInfo(true);
                 clearInfoPanel();
                 return;
@@ -2138,7 +3198,8 @@
             queryInput.value = `Tell me more about "${entityName}"`;
             queryInput.focus();
 
-            handleQuery();
+            // Trigger the query execution (same as pressing Enter)
+            executeQuery();
         }
 
         function extractEntities(text, excludeDocuments = false) {
@@ -3531,6 +4592,26 @@
             content.classList.toggle('visible');
         }
 
+        function toggleDeepAnalysis() {
+            state.deepAnalysisEnabled = !state.deepAnalysisEnabled;
+            const btn = document.getElementById('deep-analysis-btn');
+            const tooltip = document.getElementById('deep-analysis-tooltip');
+            if (btn) {
+                btn.setAttribute('aria-pressed', state.deepAnalysisEnabled);
+                btn.classList.toggle('active', state.deepAnalysisEnabled);
+            }
+            // Show/hide Entity Network tab based on deep analysis state
+            const entityTab = document.querySelector('[data-graph-tab="entity"]');
+            if (entityTab) {
+                entityTab.style.display = state.deepAnalysisEnabled ? '' : 'none';
+                // If entity tab was active but deep analysis is now off, switch to query tab
+                if (!state.deepAnalysisEnabled && entityTab.classList.contains('active')) {
+                    switchGraphTab('query');
+                }
+            }
+            console.log('Deep Analysis:', state.deepAnalysisEnabled ? 'enabled' : 'disabled');
+        }
+
         let lastQuery = '';
         let lastQueryMeta = {};
         let lastResponseText = '';
@@ -3553,6 +4634,9 @@
             const activeFiles = getActiveContextFiles();
             const params = new URLSearchParams({ q: query, dept: sector });
             activeFiles.forEach((file) => params.append('file', file));
+            if (state.deepAnalysisEnabled) {
+                params.append('deepAnalysis', 'true');
+            }
 
             appendUserMessage(query);
             queryInput.value = '';
