@@ -25,3 +25,17 @@ jobs:
 
       - name: Test with lint warnings as errors
         run: ./gradlew clean test -Plint -PlintWerror
+
+      - name: CI-lite pipeline E2E
+        run: ./gradlew ciE2eTest
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts
+          path: |
+            build/reports/tests
+            build/test-results
+            build/e2e-results
+          if-no-files-found: ignore

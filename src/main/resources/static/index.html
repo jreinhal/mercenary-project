@@ -7,7 +7,7 @@
     <!-- Immediate theme application to prevent flash -->
     <script src="js/theme-init.js"></script>
     <link rel="stylesheet" href="css/fonts.css?v=20260116f">
-    <link rel="stylesheet" href="css/sentinel.css?v=20260127h" id="sentinel-css">
+    <link rel="stylesheet" href="css/sentinel.css?v=20260128b" id="sentinel-css">
     <script src="js/css-bust.js"></script>
     <!-- D3.js for force simulation and collision detection -->
     <script src="https://unpkg.com/d3@7"></script>
@@ -710,6 +710,10 @@
                                 <span>Type:</span>
                                 <span class="value" id="source-type">-</span>
                             </div>
+                            <div class="source-info-item">
+                                <span>PII:</span>
+                                <span class="source-redaction-badge hidden" id="source-redaction" title="Content returned is redacted">Redacted</span>
+                            </div>
                         </div>
                     </div>
                     <!-- Highlight Navigation Bar -->
@@ -742,6 +746,6 @@
         <div>Powered by AdaptiveRAG &amp; HGMem</div>
     </footer>
 
-    <script src="js/sentinel-app.js?v=20260127e" defer></script>
+    <script src="js/sentinel-app.js?v=20260128a" defer></script>
 </body>
 </html>

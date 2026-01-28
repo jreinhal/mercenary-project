@@ -150,3 +150,10 @@ bootJar {
 test {
     useJUnitPlatform()
 }
+
+tasks.register('ciE2eTest', Test) {
+    description = 'Run CI-lite pipeline E2E tests.'
+    group = 'verification'
+    useJUnitPlatform()
+    include '**/PipelineE2eTest.class'
+}

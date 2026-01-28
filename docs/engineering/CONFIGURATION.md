@@ -91,9 +91,63 @@ docker run -p 8090:8090 -v ./models:/app/models lightonocr-service
 ### Scanned PDF Detection
 When `OCR_FALLBACK_SCANNED=true`, SENTINEL automatically detects scanned PDFs (documents where Tika extracts minimal text) and routes them through LightOnOCR for visual text extraction.
 
+## HyperGraph Memory (Entity Explorer)
+
+HyperGraph Memory extracts entities and relationships from documents during ingestion.
+
+### Configuration
+- **HGMEM_INDEXING** (default: true) - Extract entities when documents are uploaded. Fast operation using NLP, no LLM calls.
+- **HGMEM_QUERY** (default: false) - Enable multi-hop graph traversal at query time. Can be slow (minutes) for large corpora.
+- HGMEM_MAX_POINTS (default: 50) - max entities returned per query
+- HGMEM_MERGE_THRESHOLD (default: 0.7) - similarity threshold for entity deduplication
+- HGMEM_MAX_HOPS (default: 3) - traversal depth for relationship discovery
+
+### Deep Analysis Toggle (UI)
+Users can enable **Deep Analysis** on a per-query basis using the toggle button in the chat input area.
+
+- When **OFF** (default): Standard vector search only. Fast queries (~1-2 seconds).
+- When **ON**: Multi-hop graph traversal finds documents connected through shared entities, even without similar text. Queries may take several minutes.
+
+The **Entity Network** tab in the right panel only appears when Deep Analysis is enabled.
+
+**Performance Note:** Entity extraction during document upload is fast and always enabled by default. The slow operation is the graph traversal at query time, which is now opt-in per query.
+
+### Entity Explorer UI
+The Entity Explorer provides interactive visualization of entity relationships extracted from documents:
+- **Access:** Enable Deep Analysis toggle, then select "Entity Network" tab in Plot panel
+- **Features:**
+  - Force-directed graph layout showing entities as colored nodes
+  - Node colors indicate entity type (blue=technical, orange=dates, etc.)
+  - Node size reflects reference count (how often entity appears)
+  - Search bar to filter entities by name
+  - Refresh button to reload the graph
+- **Security:** All endpoints enforce sector isolation and clearance checks
+
+### Quick Start with Entity Explorer
+Use the provided startup scripts to run SENTINEL with HGMem enabled:
+
+**Windows (Batch):**
+```batch
+start-entity-explorer.bat
+```
+
+**Windows (PowerShell):**
+```powershell
+.\start-entity-explorer.ps1
+```
+
+These scripts set `APP_PROFILE=dev` and enable entity indexing automatically.
+
+### API Endpoints
+- GET /api/graph/entities?dept=<sector>&limit=100&type=<entityType>
+- GET /api/graph/neighbors?nodeId=<id>&dept=<sector>
+- GET /api/graph/search?q=<query>&dept=<sector>&limit=20
+- GET /api/graph/stats?dept=<sector>
+
 ## Feature flags (selected)
 - RAGPART_ENABLED
-- HGMEM_ENABLED
+- HGMEM_INDEXING (default: true) - entity extraction during upload
+- HGMEM_QUERY (default: false) - graph traversal at query time
 - HIFIRAG_ENABLED
 - QUCORAG_ENABLED
 - MEGARAG_ENABLED

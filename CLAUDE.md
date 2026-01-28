@@ -152,6 +152,7 @@ AUTH_MODE=DEV|STANDARD|OIDC|CAC
 - **Conversation Memory**: Context-aware follow-up questions with session persistence
 - **Multi-Sector Support**: Department-based document isolation with clearance enforcement
 - **User Feedback System**: Thumbs up/down collection with RLHF training data export
+- **Entity Explorer**: Interactive visualization of entity relationships extracted from documents (HyperGraph Memory)
 
 ### Deployment Options
 - **Air-Gapped/SCIF**: Full functionality without internet (local Ollama + MongoDB)

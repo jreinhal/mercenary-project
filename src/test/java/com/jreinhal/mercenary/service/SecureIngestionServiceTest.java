@@ -36,6 +36,9 @@ class SecureIngestionServiceTest {
     @Mock
     private HyperGraphMemory hyperGraphMemory;
 
+    @Mock
+    private LightOnOcrService lightOnOcrService;
+
     private SecureIngestionService ingestionService;
 
     @BeforeEach
@@ -43,8 +46,9 @@ class SecureIngestionServiceTest {
         MockitoAnnotations.openMocks(this);
         when(miARagService.isEnabled()).thenReturn(false);
         when(megaRagService.isEnabled()).thenReturn(false);
-        when(hyperGraphMemory.isEnabled()).thenReturn(false);
-        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory);
+        when(hyperGraphMemory.isIndexingEnabled()).thenReturn(false);
+        when(lightOnOcrService.isEnabled()).thenReturn(false);
+        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService);
     }
 
     @Test

@@ -4956,6 +4956,12 @@
             document.getElementById('source-filename').textContent = filename;
             document.getElementById('source-sector').textContent = sectorSelect.value;
             document.getElementById('source-type').textContent = filename.endsWith('.pdf') ? 'PDF Document' : 'Text Document';
+            const redactionBadge = document.getElementById('source-redaction');
+            if (redactionBadge) {
+                redactionBadge.textContent = '';
+                redactionBadge.removeAttribute('title');
+                setHidden(redactionBadge, true);
+            }
 
             const viewer = document.getElementById('source-viewer');
             viewer.textContent = 'Loading document content...';
@@ -4969,6 +4975,16 @@
                 const data = await res.json();
 
                 viewer.innerHTML = formatSourceContent(data.content, data.highlights);
+                if (redactionBadge) {
+                    const count = Number(data.redactionCount || 0);
+                    if (data.redacted) {
+                        redactionBadge.textContent = count > 0 ? `Redacted (${count})` : 'Redacted';
+                        redactionBadge.setAttribute('title', count > 0 ? `${count} redactions applied` : 'Content returned is redacted');
+                        setHidden(redactionBadge, false);
+                    } else {
+                        setHidden(redactionBadge, true);
+                    }
+                }
 
             } catch (error) {
                 if (error && error.code === 'auth') {

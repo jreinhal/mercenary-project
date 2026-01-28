@@ -1512,7 +1512,8 @@
             flex-direction: column;
             position: relative;  /* Contain absolutely positioned placeholder */
             min-height: 500px;
-            height: clamp(500px, 70vh, 800px);
+            height: calc(100vh - 200px);  /* Fill viewport minus header/padding */
+            max-height: none;
             background: var(--graph-panel-bg);
             border: 1px solid var(--graph-panel-border);
             border-radius: var(--radius-md);
@@ -4135,6 +4136,21 @@
 
         .source-info-item .value {
             color: var(--text-primary);
+        }
+
+        .source-redaction-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: var(--warning);
+            background: var(--warning-muted);
+            border: 1px solid rgba(217, 119, 6, 0.35);
         }
 
         .source-viewer {

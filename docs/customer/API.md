@@ -10,6 +10,7 @@ Base path: /api
 Optional query parameters:
 - file (repeatable) or files (comma-separated) for active file focus
 - sessionId for session-aware retrieval
+- deepAnalysis=true|false - Enable multi-hop entity graph traversal (slower but finds related documents through shared entities)
 
 Sectors (dept): GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
 
@@ -20,6 +21,8 @@ Sectors (dept): GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
 
 ## Document inspection
 - GET /api/inspect?fileName=<name>&dept=<sector>&query=<optional>
+  - Response content is PII-redacted by default
+  - Response fields: content, highlights, redacted, redactionCount
 
 ## Reasoning
 - GET /api/reasoning/{traceId}
@@ -29,6 +32,17 @@ Sectors (dept): GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
 - GET /api/status
 - GET /api/telemetry
 - GET /api/user/context
+
+## Entity Explorer (HyperGraph Memory)
+- GET /api/graph/entities?dept=<sector>&limit=100&type=<entityType>
+  - Returns entity nodes for visualization
+  - Optional type filter: PERSON, ORGANIZATION, LOCATION, TECHNOLOGY, DATE
+- GET /api/graph/neighbors?nodeId=<id>&dept=<sector>
+  - Returns connected nodes and edges for graph expansion
+- GET /api/graph/search?q=<query>&dept=<sector>&limit=20
+  - Search entities by name
+- GET /api/graph/stats?dept=<sector>
+  - Returns entity/edge counts and HGMem status
 
 ## Audit
 - GET /api/audit/events?limit=100

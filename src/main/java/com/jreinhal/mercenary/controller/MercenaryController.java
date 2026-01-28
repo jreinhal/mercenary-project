@@ -227,39 +227,44 @@ public class MercenaryController {
 
     @GetMapping(value={"/inspect"})
     public InspectResponse inspectDocument(@RequestParam(value="fileName") String fileName, @RequestParam(value="query", required=false) String query, @RequestParam(value="dept", defaultValue="ENTERPRISE") String deptParam) {
-        Object content = "";
+        String content = "";
+        String header = "";
+        String body = "";
+        boolean redacted = false;
+        int redactionCount = 0;
         String dept = deptParam.toUpperCase();
         if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
             log.warn("SECURITY: Invalid department in inspect request: {}", deptParam);
-            return new InspectResponse("ERROR: Invalid sector.", List.of());
+            return new InspectResponse("ERROR: Invalid sector.", List.of(), false, 0);
         }
         User user = SecurityContext.getCurrentUser();
         Department department = Department.valueOf(dept);
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/inspect", "Unauthenticated access attempt", null);
-            return new InspectResponse("ACCESS DENIED: Authentication required.", List.of());
+            return new InspectResponse("ACCESS DENIED: Authentication required.", List.of(), false, 0);
         }
         if (!user.hasPermission(UserRole.Permission.QUERY)) {
             this.auditService.logAccessDenied(user, "/api/inspect", "Missing QUERY permission", null);
-            return new InspectResponse("ACCESS DENIED: Insufficient permissions.", List.of());
+            return new InspectResponse("ACCESS DENIED: Insufficient permissions.", List.of(), false, 0);
         }
         if (this.sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
             this.auditService.logAccessDenied(user, "/api/inspect", "Insufficient clearance for " + dept, null);
-            return new InspectResponse("ACCESS DENIED: Insufficient clearance for " + dept, List.of());
+            return new InspectResponse("ACCESS DENIED: Insufficient clearance for " + dept, List.of(), false, 0);
         }
         if (!user.canAccessSector(department)) {
             this.auditService.logAccessDenied(user, "/api/inspect", "Not authorized for sector " + dept, null);
-            return new InspectResponse("ACCESS DENIED: Unauthorized sector access.", List.of());
+            return new InspectResponse("ACCESS DENIED: Unauthorized sector access.", List.of(), false, 0);
         }
         String normalizedFileName = fileName.replaceFirst("(?i)^filename:\\s*", "").replaceFirst("(?i)^source:\\s*", "").replaceFirst("(?i)^citation:\\s*", "").trim();
         if (normalizedFileName.contains("..") || normalizedFileName.contains("/") || normalizedFileName.contains("\\") || normalizedFileName.contains("\u0000") || !normalizedFileName.matches("^[a-zA-Z0-9._\\-\\s]+$")) {
             log.warn("SECURITY: Path traversal attempt detected in filename: {}", fileName);
-            return new InspectResponse("ERROR: Invalid filename. Path traversal not allowed.", List.of());
+            return new InspectResponse("ERROR: Invalid filename. Path traversal not allowed.", List.of(), false, 0);
         }
         String cacheKey = dept + ":" + normalizedFileName;
         String cachedContent = (String)this.secureDocCache.getIfPresent(cacheKey);
         if (cachedContent != null) {
-            content = "--- SECURE DOCUMENT VIEWER (CACHE) ---\nFILE: " + fileName + "\nSTATUS: DECRYPTED [RAM]\n----------------------------------\n\n" + cachedContent;
+            header = "--- SECURE DOCUMENT VIEWER (CACHE) ---\nFILE: " + fileName + "\nSTATUS: DECRYPTED [RAM]\n----------------------------------\n\n";
+            body = cachedContent;
         } else {
             try {
                 List<Document> potentialDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)normalizedFileName).withTopK(20).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
@@ -267,22 +272,35 @@ public class MercenaryController {
                 potentialDocs.forEach(d -> log.info("  >> Candidate Meta: {}", d.getMetadata()));
                 Optional<Document> match = potentialDocs.stream().filter(doc -> normalizedFileName.equals(doc.getMetadata().get("source")) || this.apiKeyMatch(normalizedFileName, doc.getMetadata())).findFirst();
                 if (!match.isPresent()) {
-                    return new InspectResponse("ERROR: Document archived in Deep Storage.\nPlease re-ingest file to refresh active cache.", List.of());
+                    return new InspectResponse("ERROR: Document archived in Deep Storage.\nPlease re-ingest file to refresh active cache.", List.of(), false, 0);
                 }
                 String recoveredContent = match.get().getContent();
-                this.secureDocCache.put(cacheKey, recoveredContent);
-                content = "--- SECURE DOCUMENT VIEWER (ARCHIVE) ---\nFILE: " + normalizedFileName + "\nSECTOR: " + dept + "\nSTATUS: RECONSTRUCTED FROM VECTOR STORE\n----------------------------------\n\n" + recoveredContent;
+                header = "--- SECURE DOCUMENT VIEWER (ARCHIVE) ---\nFILE: " + normalizedFileName + "\nSECTOR: " + dept + "\nSTATUS: RECONSTRUCTED FROM VECTOR STORE\n----------------------------------\n\n";
+                body = recoveredContent;
             }
             catch (Exception e) {
                 log.error(">> RECOVERY FAILED: {}", e.getMessage(), e);
-                return new InspectResponse("ERROR: Document recovery failed. Please contact support if this persists. [ERR-1001]", List.of());
+                return new InspectResponse("ERROR: Document recovery failed. Please contact support if this persists. [ERR-1001]", List.of(), false, 0);
             }
         }
+        if (body == null) {
+            body = "";
+        }
+        PiiRedactionService.RedactionResult redactionResult = this.piiRedactionService.redact(body);
+        if (redactionResult != null) {
+            body = redactionResult.getRedactedContent();
+            redacted = redactionResult.hasRedactions();
+            redactionCount = redactionResult.getTotalRedactions();
+        }
+        if (cachedContent == null || redacted) {
+            this.secureDocCache.put(cacheKey, body);
+        }
+        content = header + body;
         ArrayList<String> highlights = new ArrayList<String>();
-        if (query != null && !query.isEmpty() && !((String)content).isEmpty()) {
+        if (query != null && !query.isEmpty() && !content.isEmpty()) {
             String[] paragraphs;
             String[] keywords = query.toLowerCase().split("\\s+");
-            for (String p : paragraphs = ((String)content).split("\n\n")) {
+            for (String p : paragraphs = content.split("\n\n")) {
                 if (p.startsWith("---")) continue;
                 int matches = 0;
                 String lowerP = p.toLowerCase();
@@ -295,7 +313,7 @@ public class MercenaryController {
                 if (highlights.size() >= 3) break;
             }
         }
-        return new InspectResponse((String)content, highlights);
+        return new InspectResponse(content, highlights, redacted, redactionCount);
     }
 
     @GetMapping(value={"/health"})
@@ -1216,7 +1234,7 @@ public class MercenaryController {
     public record UserContextResponse(String displayName, String clearance, List<String> allowedSectors, boolean isAdmin) {
     }
 
-    public record InspectResponse(String content, List<String> highlights) {
+    public record InspectResponse(String content, List<String> highlights, boolean redacted, int redactionCount) {
     }
 
 }

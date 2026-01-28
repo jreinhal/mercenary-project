@@ -22,6 +22,33 @@ $env:SENTINEL_ADMIN_PASSWORD="***"
 pwsh -File tools/run_e2e_profiles.ps1
 ```
 
+## One-click full checklist
+```
+pwsh -File tools/run_full_checklist.ps1
+```
+Runs bootstrap + E2E profiles + query matrix + UI matrix.
+Defaults to the same scope as the **Full E2E Checklist** workflow (dev/ENTERPRISE matrix).
+Use `-FullMatrix` to run all profiles/sectors and include no-results UI checks.
+Use `-IncludeNoResults` to run the empty-dataset UI checks without the full matrix.
+
+## Bootstrap helper
+```
+pwsh -File tools/dev_bootstrap.ps1
+```
+Starts/validates MongoDB and Ollama, and pulls required models if missing.
+
+## Docker-based local setup
+```
+docker compose -f docker-compose.e2e.yml up -d
+```
+Use `.env.example` as a starting point for local env vars.
+
+## CI-lite pipeline E2E (no external services)
+```
+./gradlew ciE2eTest
+```
+Uses the `ci-e2e` + `dev` test profiles (`src/test/resources/application-ci-e2e.yml`) with in-memory vector store and stubbed LLM.
+
 ## Profile notes
 ### dev
 - Auth mode: DEV
@@ -54,3 +81,24 @@ Files per run:
 - Govcloud 403 on ingest: confirm `APP_CSRF_BYPASS_INGEST=true` was set for the run.
 - Connection refused: ensure MongoDB and Ollama are running.
 - `pwsh` not found: install PowerShell 7 or run profiles individually without govcloud.
+
+## Full checklist workflow (self-hosted)
+`.github/workflows/full-e2e.yml` runs the full checklist on a self-hosted Windows runner (manual + scheduled).
+Prereqs for the runner:
+- MongoDB + `mongosh`
+- Ollama + required models
+- Node.js + Microsoft Edge (for UI matrix)
+- Secrets: `MONGODB_URI`, `SENTINEL_ADMIN_PASSWORD`, `OLLAMA_URL` (optional if default)
+
+Artifacts uploaded by the workflow:
+- `build/e2e-results`
+- `build/query-matrix-results.json`
+- `build/query-matrix-traces`
+- `build/ui-matrix-results.json`
+- `build/ui-matrix-screenshots`
+
+### Merge gate (recommended)
+Configure branch protection to require the **Full E2E Checklist** status check before merging to `master`.
+
+## Tier0 PII note
+The Tier0 PII check expects redaction in storage. If `/api/inspect` doesn't surface the redaction, verify `vector_store` directly (see `tools/run_tier0_checks.ps1`).

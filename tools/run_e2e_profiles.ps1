@@ -36,6 +36,35 @@ if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
     throw "SENTINEL_ADMIN_PASSWORD is required for STANDARD auth profiles. Set env SENTINEL_ADMIN_PASSWORD or pass -AdminPassword."
 }
 
+function Ensure-Ollama($ollamaUrl) {
+    $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+    if ($null -eq $ollamaCmd) {
+        throw "ollama CLI not found. Install Ollama and ensure it is in PATH."
+    }
+    $tagsUrl = "$ollamaUrl/api/tags"
+    try {
+        Invoke-WebRequest -Uri $tagsUrl -UseBasicParsing -TimeoutSec 5 | Out-Null
+        return $true
+    } catch {
+        Write-Log "Ollama not reachable. Starting 'ollama serve'..."
+        Start-Process -FilePath "ollama" -ArgumentList "serve" | Out-Null
+        $deadline = (Get-Date).AddSeconds(30)
+        while ((Get-Date) -lt $deadline) {
+            try {
+                Invoke-WebRequest -Uri $tagsUrl -UseBasicParsing -TimeoutSec 5 | Out-Null
+                return $true
+            } catch {
+                Start-Sleep -Seconds 2
+            }
+        }
+    }
+    return $false
+}
+
+if (-not (Ensure-Ollama $OllamaUrl)) {
+    throw "Ollama is not available at $OllamaUrl"
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $sectors = @("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE")

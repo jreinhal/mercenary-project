@@ -1,6 +1,9 @@
 package com.jreinhal.mercenary.controller;
 
+import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.config.SectorConfig;
+import com.jreinhal.mercenary.filter.SecurityContext;
+import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
 import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
 import com.jreinhal.mercenary.rag.ModalityRouter;
@@ -25,7 +28,13 @@ import com.jreinhal.mercenary.service.SecureIngestionService;
 import com.jreinhal.mercenary.service.AuthenticationService;
 import com.jreinhal.mercenary.core.license.LicenseService;
 import com.jreinhal.mercenary.security.ClientIpResolver;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +53,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MercenaryController.class)
@@ -121,10 +131,41 @@ class MercenaryControllerTest {
     }
 }
 
+    @BeforeEach
+    void setUpUserContext() {
+        SecurityContext.setCurrentUser(User.devUser("test"));
+    }
+
+    @AfterEach
+    void clearUserContext() {
+        SecurityContext.clear();
+    }
+
     @Test
     void healthEndpointReturnsNominal() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("SYSTEMS NOMINAL"));
+    }
+
+    @Test
+    void inspectRedactsPiiContent() throws Exception {
+        Document doc = new Document("SSN: 123-45-6789", Map.of("source", "pii_doc.txt", "dept", "ENTERPRISE"));
+        when(vectorStore.similaritySearch(ArgumentMatchers.any(SearchRequest.class))).thenReturn(List.of(doc));
+        when(secureDocCache.getIfPresent(ArgumentMatchers.anyString())).thenReturn(null);
+        when(sectorConfig.requiresElevatedClearance(ArgumentMatchers.any())).thenReturn(false);
+        when(piiRedactionService.redact(ArgumentMatchers.anyString()))
+                .thenReturn(new PiiRedactionService.RedactionResult(
+                        "SSN: [REDACTED-SSN]",
+                        Map.of(PiiRedactionService.PiiType.SSN, 1)
+                ));
+
+        mockMvc.perform(get("/api/inspect")
+                        .param("fileName", "pii_doc.txt")
+                        .param("dept", Department.ENTERPRISE.name()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value(org.hamcrest.Matchers.containsString("[REDACTED-SSN]")))
+                .andExpect(jsonPath("$.redacted").value(true))
+                .andExpect(jsonPath("$.redactionCount").value(1));
     }
 }
