@@ -554,7 +554,7 @@
                     e.preventDefault();
                     document.getElementById('file-input').click();
                 }
-                if (e.ctrlKey && e.key === 'k') {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
                     e.preventDefault();
                     clearChat();
                 }
@@ -4157,6 +4157,9 @@
                 <p class="welcome-hint">Press <kbd>/</kbd> to focus input</p>
             </div>
         `;
+            if (queryInput) {
+                queryInput.value = '';
+            }
             closeAllSources();
             state.messageIndex.clear();
         }

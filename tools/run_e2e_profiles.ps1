@@ -9,6 +9,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Write-Log($message) {
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Write-Host "[$timestamp] $message"
+}
+
 $tls12 = [System.Net.SecurityProtocolType]::Tls12
 if ([enum]::GetNames([System.Net.SecurityProtocolType]) -contains "Tls13") {
     $tls12 = $tls12 -bor [System.Net.SecurityProtocolType]::Tls13
@@ -77,11 +82,6 @@ $sectorFiles = @{
 }
 
 $cacSubjectDn = "CN=E2E_TEST, OU=E2E, O=Mercenary, L=Local, S=NA, C=US"
-
-function Write-Log($message) {
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Write-Host "[$timestamp] $message"
-}
 
 $netHttpLoaded = $false
 try {
