@@ -76,7 +76,7 @@ public class SecureIngestionService {
             byte[] fileBytes = file.getBytes();
             String detectedMimeType = this.detectMimeType(fileBytes, filename);
             log.info(">> Magic byte detection: {} -> {}", filename, detectedMimeType);
-            this.validateFileType(filename, detectedMimeType);
+            this.validateFileType(filename, detectedMimeType, fileBytes);
             if (detectedMimeType.startsWith("image/")) {
                 log.info(">> DETECTED IMAGE: Engaging MegaRAG Visual Ingestion...");
                 if (this.megaRagService != null && this.megaRagService.isEnabled()) {
@@ -157,10 +157,14 @@ public class SecureIngestionService {
         }
     }
 
-    private void validateFileType(String filename, String detectedMimeType) {
+    private void validateFileType(String filename, String detectedMimeType, byte[] bytes) {
         if (BLOCKED_MIME_TYPES.contains(detectedMimeType)) {
             log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", filename, detectedMimeType);
             throw new SecurityException("File type not allowed: " + detectedMimeType + ". Executable and script files are blocked.");
+        }
+        if (this.hasExecutableMagic(bytes)) {
+            log.error("SECURITY: Blocked executable magic bytes. File: {}", filename);
+            throw new SecurityException("File content appears to be an executable and is not allowed: " + filename);
         }
         String extension = this.getExtension(filename).toLowerCase();
         if (extension.equals("pdf") && !detectedMimeType.equals("application/pdf")) {
@@ -170,6 +174,21 @@ public class SecureIngestionService {
             log.error("SECURITY: Executable extension blocked: {}", filename);
             throw new SecurityException("Executable files are not allowed: " + filename);
         }
+    }
+
+    private boolean hasExecutableMagic(byte[] bytes) {
+        if (bytes == null || bytes.length < 2) {
+            return false;
+        }
+        // Windows EXE/DLL: 'MZ'
+        if (bytes[0] == 0x4D && bytes[1] == 0x5A) {
+            return true;
+        }
+        // ELF: 0x7F 'E' 'L' 'F'
+        if (bytes.length >= 4 && bytes[0] == 0x7F && bytes[1] == 0x45 && bytes[2] == 0x4C && bytes[3] == 0x46) {
+            return true;
+        }
+        return false;
     }
 
     private String getExtension(String filename) {

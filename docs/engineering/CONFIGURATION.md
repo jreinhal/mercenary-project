@@ -25,6 +25,10 @@ This file summarizes the most important configuration keys.
 ## Swagger
 - SWAGGER_ENABLED (default false, true in dev profile)
 
+## UI Testing (Manual, Headed)
+- Manual UI testing is supported via Playwright (headed browser mode) and can be run against the local UI.
+- Use `tools/playwright-runner/run-ui-tests.js` (or related scripts) to drive real UI interactions.
+
 ## Guardrails
 - GUARDRAILS_ENABLED
 - GUARDRAILS_LLM_ENABLED

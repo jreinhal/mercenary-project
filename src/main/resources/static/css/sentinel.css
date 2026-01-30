@@ -179,11 +179,13 @@
             padding: 0;
         }
 
+        html,
         body {
             background: var(--bg-primary);
             color: var(--text-primary);
             font-family: var(--font-ui);
             height: 100vh;
+            width: 100%;
             display: grid;
             grid-template-rows: auto 1fr auto;
             overflow: hidden;
@@ -365,6 +367,8 @@
             --right-panel-width: clamp(400px, 36vw, 720px);
             grid-template-columns: var(--left-panel-width) 1fr var(--right-panel-width);
             height: 100%;
+            width: 100%;
+            min-width: 100%;
             overflow: hidden;
             transition: grid-template-columns 0.2s ease;
         }

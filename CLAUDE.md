@@ -99,6 +99,11 @@ For EVERY `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`:
    - CAC/PIV authentication is government-only
    - OIDC approval workflow enabled for all editions
 
+## Manual UI Testing Capability
+
+- Manual UI testing is available via Playwright in headed browser mode.
+- Use the local Playwright runner (`tools/playwright-runner`) to drive real UI interactions when requested.
+
 ## Commit Guidelines
 
 - All commits go to this single mercenary repo

@@ -259,6 +259,7 @@ public class RagOrchestrationService {
                 "DOCUMENTS:\n%s\n\n" +
                 "Answer the user's question based on the documents above.", information);
             String systemMessage = systemText.replace("{information}", information);
+            List<Document> extractiveDocs = this.expandDocsFromCache(topDocs, dept, query);
             boolean llmSuccess = true;
             try {
                 if (useVisual) {
@@ -299,11 +300,11 @@ public class RagOrchestrationService {
                 response = sim.toString();
             }
             boolean isTimeoutResponse = response != null && response.toLowerCase(Locale.ROOT).contains("response timeout");
-            boolean hasEvidence = RagOrchestrationService.hasRelevantEvidence(topDocs, query) || !visualDocs.isEmpty();
+            boolean hasEvidence = RagOrchestrationService.hasRelevantEvidence(extractiveDocs, query) || !visualDocs.isEmpty();
             int citationCount = RagOrchestrationService.countCitations(response);
             boolean rescueApplied = false;
             boolean excerptFallbackApplied = false;
-            if (llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(topDocs, query))) {
+            if (llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
                 response = rescued;
                 rescueApplied = true;
                 citationCount = RagOrchestrationService.countCitations(response);
@@ -312,7 +313,7 @@ public class RagOrchestrationService {
             boolean usedAnswerabilityGate = false;
             if (!answerable || RagOrchestrationService.isNoInfoResponse(response)) {
                 if (!isTimeoutResponse) {
-                    String fallback = RagOrchestrationService.buildEvidenceFallbackResponse(topDocs, query);
+                    String fallback = RagOrchestrationService.buildEvidenceFallbackResponse(extractiveDocs, query);
                     if (!NO_RELEVANT_RECORDS.equals(fallback)) {
                         response = fallback;
                         excerptFallbackApplied = true;
@@ -563,6 +564,7 @@ public class RagOrchestrationService {
                 "- If information is not in the documents, respond: \"No relevant records found.\"\n\n" +
                 "DOCUMENTS:\n%s\n", dept, information);
             String systemMessage = systemText.replace("{information}", information);
+            List<Document> extractiveDocs = this.expandDocsFromCache(topDocs, dept, query);
             boolean llmSuccess = true;
             try {
                 if (useVisual) {
@@ -604,11 +606,11 @@ public class RagOrchestrationService {
             this.reasoningTracer.addStep(ReasoningStep.StepType.LLM_GENERATION, "Response Synthesis", (String)(llmSuccess ? "Generated response (" + response.length() + " chars)" : "Fallback mode (LLM offline)"), System.currentTimeMillis() - stepStart, Map.of("success", llmSuccess, "responseLength", response.length()));
             stepStart = System.currentTimeMillis();
             boolean isTimeoutResponse = response != null && response.toLowerCase(Locale.ROOT).contains("response timeout");
-            boolean hasEvidence = RagOrchestrationService.hasRelevantEvidence(topDocs, query) || !visualDocs.isEmpty();
+            boolean hasEvidence = RagOrchestrationService.hasRelevantEvidence(extractiveDocs, query) || !visualDocs.isEmpty();
             int citationCount = RagOrchestrationService.countCitations(response);
             boolean rescueApplied = false;
             boolean excerptFallbackApplied = false;
-            if (llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(topDocs, query))) {
+            if (llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
                 response = rescued;
                 rescueApplied = true;
                 citationCount = RagOrchestrationService.countCitations(response);
@@ -617,7 +619,7 @@ public class RagOrchestrationService {
             boolean usedAnswerabilityGate = false;
             if (!answerable || RagOrchestrationService.isNoInfoResponse(response)) {
                 if (!isTimeoutResponse) {
-                    String fallback = RagOrchestrationService.buildEvidenceFallbackResponse(topDocs, query);
+                    String fallback = RagOrchestrationService.buildEvidenceFallbackResponse(extractiveDocs, query);
                     if (!NO_RELEVANT_RECORDS.equals(fallback)) {
                         response = fallback;
                         excerptFallbackApplied = true;
@@ -836,7 +838,7 @@ public class RagOrchestrationService {
         int minKeywordHits = RagOrchestrationService.requiredKeywordHits(query, keywords);
         for (Document doc : docs) {
             String source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown_Document.txt"));
-            String snippet = RagOrchestrationService.extractSnippet(doc.getContent(), keywords, wantsMetrics, minKeywordHits);
+            String snippet = RagOrchestrationService.extractSnippet(doc.getContent(), keywords, wantsMetrics, minKeywordHits, query);
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
             summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]\n");
             if (++added < 5) continue;
@@ -862,7 +864,7 @@ public class RagOrchestrationService {
         int minKeywordHits = Math.max(1, RagOrchestrationService.requiredKeywordHits(query, keywords) - 1);
         for (Document doc : docs) {
             source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown_Document.txt"));
-            snippet = RagOrchestrationService.extractSnippet(doc.getContent(), keywords, wantsMetrics, minKeywordHits);
+            snippet = RagOrchestrationService.extractSnippet(doc.getContent(), keywords, wantsMetrics, minKeywordHits, query);
             if (snippet.isBlank()) {
                 snippet = RagOrchestrationService.extractSnippetLenient(doc.getContent(), keywords);
             }
@@ -961,13 +963,15 @@ public class RagOrchestrationService {
         return false;
     }
 
-    private static String extractSnippet(String content, Set<String> keywords, boolean wantsMetrics, int minKeywordHits) {
+    private static String extractSnippet(String content, Set<String> keywords, boolean wantsMetrics, int minKeywordHits, String query) {
         if (content == null) {
             return "";
         }
         String[] lines = content.split("\\R");
         String bestCandidate = "";
         int bestScore = -1;
+        List<String> idTokens = RagOrchestrationService.extractIdentifierTokens(query);
+        List<String> phraseHints = RagOrchestrationService.extractProperNounPhrases(query);
 
         // Check if query is looking for a person/name (contains name-context keywords)
         boolean wantsName = keywords.stream().anyMatch(k ->
@@ -983,6 +987,8 @@ public class RagOrchestrationService {
 
             // Count keyword hits in this line
             int keywordHits = RagOrchestrationService.countKeywordHits(trimmed, keywords);
+            boolean hasIdToken = RagOrchestrationService.containsAnyToken(trimmed, idTokens);
+            boolean hasPhraseHint = RagOrchestrationService.containsAnyPhrase(trimmed, phraseHints);
 
             // Check if this line contains a metric value (dollar amounts, numbers, percentages)
             boolean hasMetric = NUMERIC_PATTERN.matcher(trimmed).find() ||
@@ -995,7 +1001,7 @@ public class RagOrchestrationService {
             boolean hasNameContext = NAME_CONTEXT_PATTERN.matcher(trimmed.toLowerCase()).find();
 
             // Skip lines without keywords (unless they have metrics/names and we want those)
-            if (keywordHits < minKeywordHits && !(wantsMetrics && hasMetric) && !(wantsName && hasNameContext)) {
+            if (keywordHits < minKeywordHits && !(wantsMetrics && hasMetric) && !(wantsName && hasNameContext) && !hasIdToken && !hasPhraseHint) {
                 continue;
             }
 
@@ -1012,6 +1018,12 @@ public class RagOrchestrationService {
             }
             if (hasNameContext) {
                 score += wantsName ? 10 : 4;
+            }
+            if (hasIdToken) {
+                score += 30;
+            }
+            if (hasPhraseHint) {
+                score += 20;
             }
             if (keywordHits >= minKeywordHits && minKeywordHits > 1) {
                 score += 2;
@@ -1241,6 +1253,13 @@ public class RagOrchestrationService {
         LinkedHashSet<Document> merged = new LinkedHashSet<>(semanticResults);
         merged.addAll(keywordResults);
         List<Document> scoped = this.filterDocumentsByFiles(new ArrayList<>(merged), activeFiles);
+        if (this.shouldAugmentWithCache(query)) {
+            List<Document> cachedMatches = this.searchInMemoryCache(query, dept, activeFiles);
+            if (!cachedMatches.isEmpty()) {
+                scoped = new ArrayList<>(new LinkedHashSet<>(scoped));
+                scoped.addAll(cachedMatches);
+            }
+        }
         if (scoped.isEmpty()) {
             List<Document> keywordSweep = this.attemptKeywordSweep(query, dept, activeFiles);
             if (!keywordSweep.isEmpty()) {
@@ -1252,6 +1271,67 @@ public class RagOrchestrationService {
         // Boost documents with exact phrase matches from query
         boostKeywordMatches(scoped, query);
         return this.sortDocumentsDeterministically(scoped);
+    }
+
+    private static List<String> extractIdentifierTokens(String query) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        List<String> tokens = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\\b[A-Z]{2,}[A-Z0-9]*-\\d{2,}(?:-\\d{1,})?\\b").matcher(query);
+        while (matcher.find()) {
+            tokens.add(matcher.group());
+        }
+        return tokens;
+    }
+
+    private static List<String> extractProperNounPhrases(String query) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        List<String> phrases = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\\b([A-Z][a-z0-9]+(?:\\s+[A-Z][a-z0-9]+)+)\\b").matcher(query);
+        while (matcher.find()) {
+            phrases.add(matcher.group());
+        }
+        return phrases;
+    }
+
+    private static boolean containsAnyToken(String text, List<String> tokens) {
+        if (text == null || tokens == null || tokens.isEmpty()) {
+            return false;
+        }
+        String lower = text.toLowerCase(Locale.ROOT);
+        for (String token : tokens) {
+            if (lower.contains(token.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsAnyPhrase(String text, List<String> phrases) {
+        if (text == null || phrases == null || phrases.isEmpty()) {
+            return false;
+        }
+        String lower = text.toLowerCase(Locale.ROOT);
+        for (String phrase : phrases) {
+            if (lower.contains(phrase.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean shouldAugmentWithCache(String query) {
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+        String lower = query.toLowerCase(Locale.ROOT);
+        if (NAME_CONTEXT_PATTERN.matcher(lower).find()) {
+            return true;
+        }
+        return !extractIdentifierTokens(query).isEmpty() || !extractProperNounPhrases(query).isEmpty();
     }
 
     private List<Document> attemptKeywordSweep(String query, String dept, List<String> activeFiles) {
@@ -1389,6 +1469,14 @@ public class RagOrchestrationService {
             textDocs = textDocs.stream().filter(doc -> !suspiciousIds.contains(buildDocumentId(doc))).collect(Collectors.toCollection(ArrayList::new));
         }
 
+        if (this.shouldAugmentWithCache(query)) {
+            List<Document> cachedMatches = this.searchInMemoryCache(query, dept, activeFiles);
+            if (!cachedMatches.isEmpty()) {
+                textDocs.addAll(cachedMatches);
+                strategies.add("CacheSweep");
+            }
+        }
+
         if (!textDocs.isEmpty() && !RagOrchestrationService.hasRelevantEvidence(textDocs, query)) {
             List<Document> keywordSweep = this.attemptKeywordSweep(query, dept, activeFiles);
             if (!keywordSweep.isEmpty()) {
@@ -1438,6 +1526,34 @@ public class RagOrchestrationService {
             return "";
         }
         return String.join("\n\n---\n\n", unique);
+    }
+
+    private List<Document> expandDocsFromCache(List<Document> docs, String dept, String query) {
+        if (docs == null || docs.isEmpty()) {
+            return docs;
+        }
+        if (!this.shouldAugmentWithCache(query) || dept == null || dept.isBlank()) {
+            return docs;
+        }
+        String prefix = dept.toUpperCase() + ":";
+        ArrayList<Document> expanded = new ArrayList<>();
+        for (Document doc : docs) {
+            if (doc == null) {
+                continue;
+            }
+            String source = RagOrchestrationService.getDocumentSource(doc);
+            if (source.isBlank()) {
+                expanded.add(doc);
+                continue;
+            }
+            String cached = this.secureDocCache.getIfPresent(prefix + source);
+            if (cached != null && !cached.isBlank()) {
+                expanded.add(new Document(cached, doc.getMetadata()));
+            } else {
+                expanded.add(doc);
+            }
+        }
+        return expanded;
     }
 
     private String buildInformation(List<Document> docs, String globalContext) {

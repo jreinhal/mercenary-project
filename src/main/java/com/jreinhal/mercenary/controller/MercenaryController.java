@@ -66,6 +66,8 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -322,30 +324,30 @@ public class MercenaryController {
     }
 
     @PostMapping(value={"/ingest/file"})
-    public String ingestFile(@RequestParam(value="file") MultipartFile file, @RequestParam(value="dept") String dept, HttpServletRequest request) {
+    public ResponseEntity<String> ingestFile(@RequestParam(value="file") MultipartFile file, @RequestParam(value="dept") String dept, HttpServletRequest request) {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
             department = Department.valueOf(dept.toUpperCase());
         }
         catch (IllegalArgumentException e) {
-            return "INVALID SECTOR: " + dept;
+            return ResponseEntity.badRequest().body("INVALID SECTOR: " + dept);
         }
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/ingest/file", "Unauthenticated access attempt", request);
-            return "ACCESS DENIED: Authentication required.";
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("ACCESS DENIED: Authentication required.");
         }
         if (!user.hasPermission(UserRole.Permission.INGEST)) {
             this.auditService.logAccessDenied(user, "/api/ingest/file", "Missing INGEST permission", request);
-            return "ACCESS DENIED: Insufficient permissions for document ingestion.";
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("ACCESS DENIED: Insufficient permissions for document ingestion.");
         }
         if (this.sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
             this.auditService.logAccessDenied(user, "/api/ingest/file", "Insufficient clearance for " + department.name(), request);
-            return "ACCESS DENIED: Insufficient clearance for " + department.name() + " sector.";
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("ACCESS DENIED: Insufficient clearance for " + department.name() + " sector.");
         }
         if (!user.canAccessSector(department)) {
             this.auditService.logAccessDenied(user, "/api/ingest/file", "Not authorized for sector " + department.name(), request);
-            return "ACCESS DENIED: You are not authorized to access the " + department.name() + " sector.";
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("ACCESS DENIED: You are not authorized to access the " + department.name() + " sector.");
         }
         try {
             long startTime = System.currentTimeMillis();
@@ -357,7 +359,7 @@ public class MercenaryController {
             catch (SecurityException e) {
                 log.warn("SECURITY: Ingestion blocked for {}: {}", filename, e.getMessage());
                 this.auditService.logAccessDenied(user, "/api/ingest/file", "Blocked file type: " + e.getMessage(), request);
-                return "BLOCKED: " + e.getMessage();
+                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body("BLOCKED: " + e.getMessage());
             }
             catch (Exception e) {
                 log.warn("Persistence Failed (DB Offline). Proceeding with RAM Cache.", (Throwable)e);
@@ -373,11 +375,11 @@ public class MercenaryController {
             if (user != null) {
                 this.auditService.logIngestion(user, filename, department, request);
             }
-            return "SECURE INGESTION " + status + ": " + filename + " (" + duration + "ms)";
+            return ResponseEntity.ok("SECURE INGESTION " + status + ": " + filename + " (" + duration + "ms)");
         }
         catch (Exception e) {
             log.error("CRITICAL FAILURE: Ingestion Protocol Failed.", (Throwable)e);
-            return "CRITICAL FAILURE: Ingestion Protocol Failed.";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("CRITICAL FAILURE: Ingestion Protocol Failed.");
         }
     }
 
