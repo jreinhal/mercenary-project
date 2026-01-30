@@ -4849,6 +4849,15 @@
             color: var(--error);
         }
 
+        .setting-toast-icon--info {
+            color: var(--accent);
+        }
+
+        .info-toast {
+            max-width: 400px;
+            text-align: left;
+        }
+
         .sector-select option {
             background: var(--bg-secondary);
             color: var(--text-primary);
