@@ -1,0 +1,52 @@
+ACADEMIC RESEARCH PROGRAM OVERVIEW
+=================================
+Program: Northbridge AI Safety Research Program (Code: NAISR-2024)
+Institution: Northbridge University
+Partners: Cedar Ridge Institute, Apex Research Lab
+Classification: INTERNAL RESEARCH USE ONLY
+Version: 1.3 | Last Updated: November 2025
+
+PROGRAM OBJECTIVES
+- Build a validated safety benchmark for large language models
+- Study adversarial robustness under real-world prompt injection
+- Publish reproducible evaluation protocols
+
+PROGRAM LEADERSHIP
+- Principal Investigator: Dr. Maya Chen
+- Co-Investigator: Prof. Daniel Ortiz
+- Program Manager: Dr. Priya Natarajan
+- Compliance Officer: Laura Kim
+
+TIMELINE
+- Phase 1 (Foundation): January 2024 - June 2024 | Completed June 30, 2024
+- Phase 2 (Experiments): July 2024 - December 2025 | In Progress (65%)
+- Phase 3 (Translation): January 2026 - December 2026 | Planned
+
+BUDGET SUMMARY
+- Total Program Budget: $18.7M (2024-2026)
+- FY2025 Allocation: $6.2M
+- Compute + Equipment: $2.1M
+- Data Collection + Annotation: $3.4M
+
+KEY WORKSTREAMS
+1) Safety Benchmark Construction
+   Lead: Dr. Maya Chen
+   Status: 80% complete
+   Deliverable: NAISR-Bench v1.0 (target Q4 2025)
+2) Adversarial Robustness
+   Lead: Prof. Daniel Ortiz
+   Status: 55% complete
+   Deliverable: Red-team evaluation protocol (target Q1 2026)
+3) Human Evaluation Study
+   Lead: Dr. Priya Natarajan
+   Status: 40% complete
+   IRB: IRB-2024-118 (approved March 2024)
+
+RISK NOTES
+- Dataset licensing review required before Phase 3
+- Partnership renewal with Cedar Ridge Institute due April 2026
+
+RELATED DOCUMENTS
+- Academic Publications Review (2024-2025)
+- Funding and Partnerships Summary
+- Compliance and IRB Log

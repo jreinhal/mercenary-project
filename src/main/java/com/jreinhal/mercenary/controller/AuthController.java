@@ -9,7 +9,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,11 +23,6 @@ public class AuthController {
 
     public AuthController(StandardAuthenticationService standardAuthenticationService) {
         this.standardAuthenticationService = standardAuthenticationService;
-    }
-
-    @GetMapping(value={"/csrf"})
-    public Map<String, String> csrf(CsrfToken token) {
-        return Map.of("token", token.getToken());
     }
 
     @PostMapping(value={"/login"})

@@ -966,10 +966,8 @@ public class RagOrchestrationService {
             return "";
         }
         String[] lines = content.split("\\R");
-        String candidate = "";
-        String metricCandidate = "";
-        String bestMatchCandidate = ""; // Line with BOTH keywords AND metric/name value
-        String nameContextCandidate = ""; // Line with name context pattern (Executive Sponsor:, Author:, etc.)
+        String bestCandidate = "";
+        int bestScore = -1;
 
         // Check if query is looking for a person/name (contains name-context keywords)
         boolean wantsName = keywords.stream().anyMatch(k ->
@@ -978,7 +976,7 @@ public class RagOrchestrationService {
             k.equalsIgnoreCase("lead") || k.equalsIgnoreCase("director") ||
             k.equalsIgnoreCase("officer") || k.equalsIgnoreCase("manager"));
 
-        // Search all lines, prioritizing those with actual metric/name values
+        // Search all lines, prioritizing those with the strongest keyword + value match
         for (String rawLine : lines) {
             String trimmed = rawLine.trim();
             if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed)) continue;
@@ -1001,61 +999,36 @@ public class RagOrchestrationService {
                 continue;
             }
 
+            String candidate = trimmed;
             if (trimmed.contains("|")) {
                 String summarized = RagOrchestrationService.summarizeTableRow(trimmed, keywords, wantsMetrics, minKeywordHits);
                 if (summarized.isBlank()) continue;
-                if (keywordHits > 0 && hasMetric && bestMatchCandidate.isEmpty()) {
-                    bestMatchCandidate = summarized;
-                } else if (hasMetric && metricCandidate.isEmpty()) {
-                    metricCandidate = summarized;
-                } else if (candidate.isEmpty()) {
-                    candidate = summarized;
-                }
-            } else {
-                // Best: line has BOTH keywords AND relevant value (metric or name context)
-                if (keywordHits > 0 && (hasMetric || hasNameContext)) {
-                    // For metric queries, prefer lines where keywords AND metrics appear together
-                    // For name queries, prefer lines where keywords AND name context appear together
-                    if (bestMatchCandidate.isEmpty()) {
-                        bestMatchCandidate = trimmed;
-                    }
-                }
-                // Good for name queries: line has name context pattern
-                else if (wantsName && hasNameContext && nameContextCandidate.isEmpty()) {
-                    nameContextCandidate = trimmed;
-                }
-                // Good for metric queries: line has metric value
-                else if (hasMetric && metricCandidate.isEmpty()) {
-                    metricCandidate = trimmed;
-                }
-                // Fallback: line has keywords only
-                else if (keywordHits > 0 && candidate.isEmpty()) {
-                    candidate = trimmed;
-                }
+                candidate = summarized;
             }
 
-            // If we found the ideal match (keywords + metric/name), stop searching
-            if (!bestMatchCandidate.isEmpty()) {
-                break;
+            int score = keywordHits * 10;
+            if (hasMetric) {
+                score += wantsMetrics ? 10 : 4;
+            }
+            if (hasNameContext) {
+                score += wantsName ? 10 : 4;
+            }
+            if (keywordHits >= minKeywordHits && minKeywordHits > 1) {
+                score += 2;
+            }
+            if (!candidate.isEmpty() && candidate.length() < 120) {
+                score += 1;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestCandidate = candidate;
             }
         }
 
-        // Priority: best (keyword+value) > name context > metric only > keyword only
-        String result;
-        if (!bestMatchCandidate.isEmpty()) {
-            result = bestMatchCandidate;
-        } else if (wantsName && !nameContextCandidate.isEmpty()) {
-            result = nameContextCandidate;
-        } else if (!metricCandidate.isEmpty()) {
-            result = metricCandidate;
-        } else {
-            result = candidate;
-        }
-
-        if (result.isEmpty()) {
+        if (bestCandidate.isEmpty()) {
             return "";
         }
-        result = RagOrchestrationService.sanitizeSnippet(result);
+        String result = RagOrchestrationService.sanitizeSnippet(bestCandidate);
         int maxLen = 240;
         if (result.length() > maxLen) {
             result = result.substring(0, maxLen - 3).trim() + "...";
@@ -1269,12 +1242,67 @@ public class RagOrchestrationService {
         merged.addAll(keywordResults);
         List<Document> scoped = this.filterDocumentsByFiles(new ArrayList<>(merged), activeFiles);
         if (scoped.isEmpty()) {
+            List<Document> keywordSweep = this.attemptKeywordSweep(query, dept, activeFiles);
+            if (!keywordSweep.isEmpty()) {
+                return keywordSweep;
+            }
             log.warn("Vector/Keyword search yielded 0 results. Engaging RAM Cache Fallback.");
             return this.searchInMemoryCache(query, dept, activeFiles);
         }
         // Boost documents with exact phrase matches from query
         boostKeywordMatches(scoped, query);
         return this.sortDocumentsDeterministically(scoped);
+    }
+
+    private List<Document> attemptKeywordSweep(String query, String dept, List<String> activeFiles) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        Set<String> keywords = RagOrchestrationService.buildQueryKeywords(query);
+        if (keywords.isEmpty()) {
+            return List.of();
+        }
+        int minKeywordHits = Math.max(1, RagOrchestrationService.requiredKeywordHits(query, keywords));
+        List<Document> sweepResults = List.of();
+        try {
+            sweepResults = this.vectorStore.similaritySearch(SearchRequest.query(query)
+                    .withTopK(100)
+                    .withSimilarityThreshold(-1.0)
+                    .withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+        } catch (Exception e) {
+            log.warn("Keyword sweep with negative threshold failed: {}", e.getMessage());
+            try {
+                sweepResults = this.vectorStore.similaritySearch(SearchRequest.query(query)
+                        .withTopK(100)
+                        .withSimilarityThreshold(0.0)
+                        .withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+            } catch (Exception retry) {
+                log.warn("Keyword sweep fallback failed: {}", retry.getMessage());
+                return List.of();
+            }
+        }
+        List<Document> scoped = this.filterDocumentsByFiles(sweepResults, activeFiles);
+        if (scoped.isEmpty()) {
+            return List.of();
+        }
+        List<Document> filtered = scoped.stream().filter(doc -> {
+            String content = doc.getContent();
+            String source = RagOrchestrationService.getDocumentSource(doc);
+            int hits = RagOrchestrationService.countKeywordHits(content, keywords) + RagOrchestrationService.countKeywordHits(source, keywords);
+            return hits >= minKeywordHits;
+        }).collect(Collectors.toList());
+        if (filtered.isEmpty()) {
+            return List.of();
+        }
+        for (Document doc : filtered) {
+            String content = doc.getContent();
+            String source = RagOrchestrationService.getDocumentSource(doc);
+            int hits = RagOrchestrationService.countKeywordHits(content, keywords) + RagOrchestrationService.countKeywordHits(source, keywords);
+            doc.getMetadata().put("score", (double)Math.max(hits, 1));
+        }
+        boostKeywordMatches(filtered, query);
+        log.warn("Keyword sweep recovered {} documents for query {}", filtered.size(), LogSanitizer.querySummary(query));
+        return this.sortDocumentsDeterministically(filtered);
     }
 
     private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty, boolean deepAnalysis) {
@@ -1359,6 +1387,14 @@ public class RagOrchestrationService {
         if (ragPartResult != null && ragPartResult.hasSuspiciousDocuments()) {
             Set<String> suspiciousIds = ragPartResult.suspiciousDocuments().stream().map(RagOrchestrationService::buildDocumentId).collect(Collectors.toSet());
             textDocs = textDocs.stream().filter(doc -> !suspiciousIds.contains(buildDocumentId(doc))).collect(Collectors.toCollection(ArrayList::new));
+        }
+
+        if (!textDocs.isEmpty() && !RagOrchestrationService.hasRelevantEvidence(textDocs, query)) {
+            List<Document> keywordSweep = this.attemptKeywordSweep(query, dept, activeFiles);
+            if (!keywordSweep.isEmpty()) {
+                textDocs.addAll(keywordSweep);
+                strategies.add("KeywordSweep");
+            }
         }
 
         textDocs = new ArrayList<>(this.filterDocumentsByFiles(textDocs, activeFiles));

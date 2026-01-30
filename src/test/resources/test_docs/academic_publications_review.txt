@@ -1,0 +1,32 @@
+ACADEMIC PUBLICATIONS REVIEW (2024-2025)
+=======================================
+Program Code: NAISR-2024
+Institution: Northbridge University
+
+PUBLICATIONS
+1) "Robustness Under Instruction Drift"
+   Authors: Maya Chen, Daniel Ortiz, Priya Natarajan
+   Venue: NeurIPS 2025
+   Submission: May 12, 2025 | Acceptance: Sep 18, 2025
+   Key Result: SafetyScore improved from 0.71 to 0.82 using NAISR-Bench v0.9
+
+2) "Benchmarking Prompt Injection Defense"
+   Authors: Daniel Ortiz, Laura Kim
+   Venue: ACL 2025
+   Submission: Apr 03, 2025 | Acceptance: Aug 22, 2025
+   Key Result: 38% reduction in successful injections vs. baseline
+
+3) "Human-in-the-Loop Evaluation for Safety"
+   Authors: Priya Natarajan, Maya Chen
+   Venue: CHI 2024
+   Publication Date: Nov 15, 2024
+   Key Result: Inter-annotator agreement 0.79
+
+CROSS-REFERENCES
+- Uses NAISR-Bench datasets from the Research Program Overview
+- IRB approvals referenced: IRB-2024-118 and IRB-2025-204
+- Partner acknowledgement: Cedar Ridge Institute, Apex Research Lab
+
+PLANNED OUTPUTS
+- NAISR-Bench v1.0 public release (Dec 2025)
+- Replication package for NeurIPS 2025 paper (Jan 2026)

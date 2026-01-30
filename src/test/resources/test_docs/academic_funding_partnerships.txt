@@ -1,0 +1,26 @@
+ACADEMIC FUNDING AND PARTNERSHIPS SUMMARY
+=========================================
+Program Code: NAISR-2024
+Fiscal Years: 2024-2026
+
+GRANTS AND SPONSORS
+- NSF Grant #NSF-2430112: $7.5M (2024-2026)
+- DOE Grant #DE-NA0001234: $4.8M (2024-2025)
+- Helios Foundation: $6.4M (2025-2026)
+
+PARTNERSHIPS
+- Cedar Ridge Institute (renewal due April 2026)
+- Apex Research Lab (compute credits, $1.1M in-kind)
+- Northbridge University Office of Research (admin support)
+
+ALLOCATION SUMMARY
+- Safety Benchmark Construction: $5.2M
+- Adversarial Robustness: $4.6M
+- Human Evaluation Study: $3.1M
+- Infrastructure + Compute: $3.8M
+- Compliance + Data Governance: $2.0M
+
+NOTES
+- Funding tied to NAISR-Bench v1.0 delivery in Q4 2025
+- Helios Foundation requires annual impact report (first due Feb 2026)
+- Partnership MOU with Cedar Ridge Institute references IRB-2024-118

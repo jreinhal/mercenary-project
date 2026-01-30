@@ -1,0 +1,25 @@
+ACADEMIC COMPLIANCE AND IRB LOG
+==============================
+Program Code: NAISR-2024
+Compliance Scope: Human subjects + data governance
+
+IRB APPROVALS
+- IRB-2024-118: Human evaluation study (approved March 10, 2024)
+  PI: Dr. Maya Chen | Co-I: Prof. Daniel Ortiz
+- IRB-2025-204: Survey instrument for model behavior (approved Feb 02, 2025)
+  PI: Dr. Priya Natarajan | Co-I: Laura Kim
+
+DATA HANDLING
+- Data classification: INTERNAL RESEARCH USE ONLY
+- De-identification required before external sharing
+- Retention policy: 7 years after study completion
+- Storage: Encrypted at rest, access limited to NAISR-2024 team
+
+AUDIT NOTES
+- Annual compliance review scheduled for Dec 2025
+- Data access log review required before Phase 3 (Jan 2026)
+
+LINKED DOCUMENTS
+- Research Program Overview (Phase 2 status)
+- Publications Review (human evaluation results)
+- Funding and Partnerships Summary (sponsor obligations)
