@@ -118,9 +118,11 @@ app:
 # Single-product with 5 sectors: GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
 # ============================================
 sentinel:
-  # LLM timeout for complex queries (default 120s, increase for slower hardware)
+  # LLM timeout for complex queries
+  # Default 180s - increased from 120s to handle DOCUMENT routing with local Ollama
+  # For faster hardware or cloud LLM, you can reduce this
   llm:
-    timeout-seconds: ${LLM_TIMEOUT_SECONDS:120}
+    timeout-seconds: ${LLM_TIMEOUT_SECONDS:180}
   # Performance tuning knobs
   performance:
     rag-core-threads: ${RAG_CORE_THREADS:8}
