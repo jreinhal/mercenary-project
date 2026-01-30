@@ -29,6 +29,11 @@ META-INF/
 gradle_out.txt
 gradle-8.11-bin.zip
 tools/_tmp_*
+test-results/
+tools/playwright-runner/node_modules/
+tools/playwright-runner/results_*.json
+tools/playwright-runner/screens/
+tools/playwright-runner/artifacts/
 
 # Local tooling/config
 .claude/settings.local.json

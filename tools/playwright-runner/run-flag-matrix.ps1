@@ -9,14 +9,25 @@ function Stop-App {
 }
 
 function Wait-Port {
-  param([int]$TimeoutSeconds = 180)
+  param(
+    [int]$Port,
+    [int]$TimeoutSeconds = 180
+  )
   $timeout = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   while ([DateTime]::UtcNow -lt $timeout) {
-    $conn = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($conn) { return $true }
     Start-Sleep -Seconds 2
   }
   return $false
+}
+
+function Ensure-Ollama {
+  if (Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue) { return }
+  Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden | Out-Null
+  if (-not (Wait-Port -Port 11434 -TimeoutSeconds 30)) {
+    throw "Ollama did not start on port 11434."
+  }
 }
 
 $baseEnv = @{
@@ -46,6 +57,8 @@ $scenarios = @(
 $runnerDir = 'D:\Projects\mercenary\tools\playwright-runner'
 $resultsDir = $runnerDir
 
+Ensure-Ollama
+
 foreach ($scenario in $scenarios) {
   Write-Host "=== Running scenario: $($scenario.Name) ==="
   Stop-App
@@ -61,7 +74,7 @@ foreach ($scenario in $scenarios) {
   $logErr = "D:\Projects\mercenary\bootrun-$($scenario.Name).err.log"
   Start-Process -FilePath "D:\Projects\mercenary\gradlew.bat" -ArgumentList "bootRun" -WorkingDirectory "D:\Projects\mercenary" -WindowStyle Hidden -RedirectStandardOutput $logOut -RedirectStandardError $logErr
 
-  if (-not (Wait-Port -TimeoutSeconds 240)) {
+  if (-not (Wait-Port -Port 8080 -TimeoutSeconds 240)) {
     throw "App did not start for scenario $($scenario.Name)."
   }
 

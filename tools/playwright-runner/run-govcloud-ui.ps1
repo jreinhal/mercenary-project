@@ -6,17 +6,29 @@ function Stop-App {
 }
 
 function Wait-Port {
-  param([int]$TimeoutSeconds = 240)
+  param(
+    [int]$Port,
+    [int]$TimeoutSeconds = 240
+  )
   $timeout = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   while ([DateTime]::UtcNow -lt $timeout) {
-    $conn = Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($conn) { return $true }
     Start-Sleep -Seconds 2
   }
   return $false
 }
 
+function Ensure-Ollama {
+  if (Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue) { return }
+  Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden | Out-Null
+  if (-not (Wait-Port -Port 11434 -TimeoutSeconds 30)) {
+    throw "Ollama did not start on port 11434."
+  }
+}
+
 Stop-App
+Ensure-Ollama
 
 $keystorePath = Join-Path $env:USERPROFILE ".keystore"
 $keystorePass = "changeit"
@@ -68,7 +80,7 @@ db.users.updateOne(
 
 Start-Process -FilePath "D:\Projects\mercenary\gradlew.bat" -ArgumentList "bootRun" -WorkingDirectory "D:\Projects\mercenary" -WindowStyle Hidden -RedirectStandardOutput "D:\Projects\mercenary\bootrun-govcloud-ui.log" -RedirectStandardError "D:\Projects\mercenary\bootrun-govcloud-ui.err.log"
 
-if (-not (Wait-Port -TimeoutSeconds 240)) {
+if (-not (Wait-Port -Port 8443 -TimeoutSeconds 240)) {
   throw "Govcloud app failed to start on 8443."
 }
 
