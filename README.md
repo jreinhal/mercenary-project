@@ -38,14 +38,32 @@ STANDARD profile bootstrap:
 - medical
 - government
 
+Edition-based response policy:
+- Professional/Trial: longer synthesized responses, evidence appended if citations are missing
+- Medical: HIPAA-aligned redaction + strict citations + evidence excerpts
+- Government: classified-environment posture with strict citations + evidence excerpts
+
 Build:
 ```
 ./gradlew build -Pedition=government
 ```
 
+## Testing
+```
+./gradlew test
+./gradlew ciE2eTest
+```
+`ciE2eTest` uses the `ci-e2e` + `dev` test profiles with an in-memory vector store and stubbed chat/embedding models.
+
 ## Documentation
 - docs/README.md
 - In-app manual: /manual.html
+
+## Supported file types
+- Text: .txt, .md, .log
+- Data: .csv, .json, .ndjson
+- Office: .docx, .pptx, .xlsx, .xls
+- PDF: .pdf
 
 ## Security notes
 - DEV mode auto-provisions admin access for development only
