@@ -1387,6 +1387,14 @@
                 entity2DGraph._destructor && entity2DGraph._destructor();
                 entity2DGraph = null;
             }
+            // Cleanup mouse listener
+            const graphEl = document.getElementById('entity-graph');
+            if (graphEl && graphEl._tooltipMouseHandler) {
+                document.removeEventListener('mousemove', graphEl._tooltipMouseHandler);
+                graphEl._tooltipMouseHandler = null;
+            }
+            // Hide any lingering tooltip
+            hideEntityTooltip();
         }
 
         // ============================================================
@@ -1410,12 +1418,21 @@
             const width = graphEl.offsetWidth || 400;
             const height = graphEl.offsetHeight || 350;
 
-            // Track mouse for tooltip
+            // Track mouse for tooltip - use document-level listener to capture all movements
+            // Store in graphEl dataset to avoid memory leak from multiple listeners
             let mouseX = 0, mouseY = 0;
-            graphEl.addEventListener('mousemove', (e) => {
+
+            // Remove any existing listener to prevent accumulation
+            if (graphEl._tooltipMouseHandler) {
+                document.removeEventListener('mousemove', graphEl._tooltipMouseHandler);
+            }
+
+            // Create and store the handler for cleanup
+            graphEl._tooltipMouseHandler = (e) => {
                 mouseX = e.clientX;
                 mouseY = e.clientY;
-            });
+            };
+            document.addEventListener('mousemove', graphEl._tooltipMouseHandler);
 
             // Highlight state for hover effects
             let hoverNode = null;
@@ -3829,6 +3846,26 @@
             }, 1500);
         }
 
+        // Show info toast for complex query warnings
+        function showInfoToast(message, duration = 4000) {
+            const toast = document.createElement('div');
+            toast.className = 'setting-toast info-toast';
+            toast.innerHTML = `
+                <span class="setting-toast-icon setting-toast-icon--info">ℹ</span>
+                <span>${message}</span>
+            `;
+            document.body.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 200);
+            }, duration);
+        }
+
         function saveSettingsWithConfirmation() {
             const hydeToggle = document.getElementById('hyde-toggle');
             const graphragToggle = document.getElementById('graphrag-toggle');
@@ -4215,12 +4252,34 @@
 
             // Estimate complexity based on query characteristics
             const wordCount = queryText.split(/\s+/).length;
-            const isComplex = wordCount > 10 ||
-                /summary|detailed|comprehensive|all|compare|analyze/i.test(queryText);
-            const estimatedTime = isComplex ? '30-120 seconds' : '5-15 seconds';
+            const isDocumentRoute = /summary|overview|comprehensive|all|compare|analyze|relationship|entire|full/i.test(queryText);
+            const isComplex = wordCount > 10 || isDocumentRoute;
+
+            // Check current sector for document count context
+            const currentSector = sectorSelect?.value || 'ENTERPRISE';
+            const isLargeSector = ['GOVERNMENT', 'ENTERPRISE'].includes(currentSector);
+
+            // Estimate time based on complexity and sector
+            let estimatedTime;
+            if (isDocumentRoute && isLargeSector) {
+                estimatedTime = '60-180 seconds';
+            } else if (isComplex) {
+                estimatedTime = '30-90 seconds';
+            } else {
+                estimatedTime = '5-20 seconds';
+            }
 
             // Progress stages for complex queries
-            const stages = [
+            const stages = isDocumentRoute ? [
+                'Scanning security protocols...',
+                'Analyzing query intent...',
+                'Identifying document routing...',
+                'Loading full documents...',
+                'Processing document content...',
+                'Cross-referencing sources...',
+                'Synthesizing comprehensive response...',
+                'Verifying citations...'
+            ] : [
                 'Scanning security protocols...',
                 'Analyzing query intent...',
                 'Searching document vectors...',
@@ -4639,6 +4698,13 @@
             activeFiles.forEach((file) => params.append('file', file));
             if (state.deepAnalysisEnabled) {
                 params.append('deepAnalysis', 'true');
+            }
+
+            // Show complexity warning for DOCUMENT routing queries
+            const isDocumentRoute = /summary|overview|comprehensive|all|compare|analyze|relationship|entire|full/i.test(query);
+            const isLargeSector = ['GOVERNMENT', 'ENTERPRISE'].includes(sector);
+            if (isDocumentRoute && isLargeSector) {
+                showInfoToast(`Complex query detected in ${sector} sector. This may take 1-3 minutes with local LLM.`, 5000);
             }
 
             appendUserMessage(query);
