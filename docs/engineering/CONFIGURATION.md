@@ -5,6 +5,10 @@ This file summarizes the most important configuration keys.
 ## Profiles
 - APP_PROFILE=dev|standard|enterprise|govcloud
 
+## Test profiles (Spring)
+- ci-e2e (tests only): disables Mongo auto-config and cloud AI auto-config, enables in-memory vector store.
+  - Defined in `src/test/resources/application-ci-e2e.yml`
+
 ## Authentication
 - AUTH_MODE=DEV|STANDARD|OIDC|CAC
 - TRUSTED_PROXIES: comma-separated proxy IPs for X-Forwarded-For
