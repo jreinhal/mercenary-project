@@ -84,7 +84,7 @@ public class InMemoryVectorStore implements VectorStore {
         List<Document> scoped = documents.stream()
                 .filter(doc -> dept.equalsIgnoreCase(String.valueOf(doc.getMetadata().get("dept"))))
                 .collect(Collectors.toList());
-        return scoped.isEmpty() ? new ArrayList<>(documents) : scoped;
+        return scoped;
     }
 
     private boolean matchesQuery(Document doc, String query) {
