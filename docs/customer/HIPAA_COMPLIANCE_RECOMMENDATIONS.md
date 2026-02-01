@@ -19,6 +19,12 @@ The following remediations are implemented in code for HIPAA strict mode and med
 - Visual ingestion and experience learning disabled when strict mode is active.
 - Expanded PII redaction patterns aligned with HIPAA Safe Harbor identifiers.
 - Optional TLS enforcement (HSTS + HTTPS redirect) when HIPAA strict mode requires it.
+- Medical-only security validator enforces strong auth (OIDC/CAC) and HTTPS/TLS service endpoints.
+- Integrity signing support added for session exports/traces (HMAC) with required key for medical.
+- Automatic logoff enforced via medical session timeout.
+- Audit fail-closed enforced for HIPAA strict mode.
+- Swagger/OpenAPI UI disabled for HIPAA strict mode.
+- Tokenization vault uses split/derived keys with HIPAA strict requiring configured key material.
 
 The gaps and checklist below still apply and should be validated in deployment (TLS for external services, encryption at rest, key management, BAAs, and formal risk analysis).
 
@@ -59,10 +65,10 @@ The gaps and checklist below still apply and should be validated in deployment (
 - Security posture guidance and compliance disclaimers are documented (docs/customer/SECURITY.md, docs/customer/COMPLIANCE_APPENDICES.md).
 
 ## High-risk gaps (likely compliance blockers)
-- PHI can be persisted and exported in clear text via conversation memory, reasoning traces, and session exports (ConversationMemoryService.java, SessionPersistenceService.java, SessionController.java).
-- Feedback storage/export keeps raw queries and responses (potential PHI) and exposes them for training export (FeedbackService.java).
-- De-identification is regex-based and incomplete vs HIPAA Safe Harbor; PHI detection is unused, and visual ingestion has no redaction pass (PiiRedactionService.java, PhiDetectionService.java, SecureIngestionService.java).
-- Transmission security is not enforced in standard/enterprise profiles and defaults to HTTP for LLM/OCR; Mongo TLS is not documented, increasing risk of ePHI exposure in transit (SecurityConfig.java, application.yaml, DEPLOYMENT_MODELS.md, MONGODB_*.md).
+- PHI can be persisted and exported in clear text via conversation memory, reasoning traces, and session exports. Mitigated in HIPAA strict mode via disablement and integrity signing; remains a risk for non-medical editions (ConversationMemoryService.java, SessionPersistenceService.java, SessionController.java).
+- Feedback storage/export keeps raw queries and responses (potential PHI) and exposes them for training export. Mitigated in HIPAA strict mode (FeedbackService.java).
+- De-identification is regex-based and incomplete vs HIPAA Safe Harbor; PHI detection is unused, and visual ingestion has no redaction pass. Mitigated in HIPAA strict mode by disabling visual ingestion, but still heuristic redaction (PiiRedactionService.java, PhiDetectionService.java, SecureIngestionService.java).
+- Transmission security defaults to HTTP for LLM/OCR and Mongo TLS is not enforced in non-medical editions. Enforced in HIPAA strict mode (SecurityConfig.java, MedicalSecurityValidator.java, application.yaml).
 
 ## Medium-risk gaps
 - HIPAA-specific audit logging is not wired to routine PHI queries/disclosures, and the HIPAA log is separate with no API access; this weakens auditability for ePHI access (HipaaAuditService.java, RagOrchestrationService.java, AuditController.java).
@@ -95,15 +101,15 @@ The gaps and checklist below still apply and should be validated in deployment (
 - 164.312(a)(1) Access control: Partial. RBAC/clearance exist, but PHI can persist in memory, exports, and feedback stores without a uniform PHI gate (ConversationMemoryService.java, SessionPersistenceService.java, FeedbackService.java).
 - 164.312(a)(2)(i) Unique user identification: Supported via OIDC/CAC/standard auth (SecurityConfig.java).
 - 164.312(a)(2)(ii) Emergency access procedure: Partial. PII reveal workflow exists but is not enforced for all PHI data paths (PiiRevealController.java).
-- 164.312(a)(2)(iii) Automatic logoff: Gap. No explicit session timeout or auto-logoff is configured (application.yaml).
+- 164.312(a)(2)(iii) Automatic logoff: Implemented for HIPAA strict mode via medical session timeout (application.yaml, MedicalSessionTimeoutCustomizer.java).
 - 164.312(a)(2)(iv) Encryption and decryption: Partial. Tokenization exists but key management is weak; encryption at rest and exports are not enforced by app (TokenizationVault.java, SessionPersistenceService.java).
 - 164.312(b) Audit controls: Partial. Audit logging exists but is fail-open outside govcloud and HIPAA audit is not wired to routine PHI events (AuditService.java, HipaaAuditService.java).
 - 164.312(c)(1) Integrity: Partial. Regex redaction is incomplete; no checksum or tamper-evident integrity for stored ePHI (PiiRedactionService.java).
-- 164.312(c)(2) Mechanism to authenticate ePHI: Gap. No digital signature or hash chain for stored PHI artifacts.
+- 164.312(c)(2) Mechanism to authenticate ePHI: Implemented for HIPAA strict mode via HMAC integrity signing of session exports/traces (SessionPersistenceService.java, IntegritySigner.java).
 - 164.312(d) Person or entity authentication: Partial. Auth modes exist, but auto-provision defaults and lack of MFA/lockout are not aligned with regulated expectations (OidcAuthenticationService.java, StandardAuthenticationService.java).
-- 164.312(e)(1) Transmission security: Gap. TLS is not enforced for LLM/OCR/Mongo in standard/enterprise (SecurityConfig.java, application.yaml).
-- 164.312(e)(2)(i) Integrity controls: Gap. Reliant on transport; no explicit integrity controls.
-- 164.312(e)(2)(ii) Encryption: Gap. TLS not enforced across external services and data paths.
+- 164.312(e)(1) Transmission security: Enforced in HIPAA strict mode (HSTS + HTTPS + TLS validation for LLM/OCR/Mongo; MedicalSecurityValidator.java, SecurityConfig.java).
+- 164.312(e)(2)(i) Integrity controls: Implemented for stored exports/traces via HMAC in HIPAA strict mode; transport integrity via TLS.
+- 164.312(e)(2)(ii) Encryption: Enforced for transport in HIPAA strict mode (TLS required for external services and Mongo).
 
 ## Hardened medical deployment checklist (configuration + operational)
 
@@ -125,6 +131,7 @@ The gaps and checklist below still apply and should be validated in deployment (
 - Disable or redact feedback/training exports for medical sector (FeedbackService.java).
 - Store only redacted text and minimal metadata in vector store; verify SecureIngestionService redacts before storage.
 - Enable encryption at rest at the storage layer (Mongo + disk) and verify key management/rotation.
+- Configure tokenization split keys (app.tokenization.hmac-key + app.tokenization.aes-key) or provide a strong base key for derived keys (app.tokenization.secret-key).
 
 ### Redaction and de-identification
 - Treat current redaction as heuristic, not Safe Harbor compliant. Expand to all 18 HIPAA identifiers or use a vetted PHI detection system.
@@ -142,21 +149,21 @@ The gaps and checklist below still apply and should be validated in deployment (
 - Disable BiRAG experience store or ensure redaction/encryption (BIRAG_ENABLED=false for medical).
 
 ### Session management
-- Configure server session timeouts and automatic logoff.
+- Configure server session timeouts and automatic logoff (HIPAA strict mode uses sentinel.hipaa.session-timeout-minutes).
 - Restrict or disable Swagger UI in medical deployments.
 
 ### UI and assets
 - Self-host UI assets to avoid external dependencies (CSP should not reference unpkg.com in HIPAA environments).
 
 ## Remediation backlog (code changes recommended)
-1) Enforce TLS and HSTS for all production profiles; document TLS-only configs.
-2) Add redaction or suppression for model outputs in medical sector.
-3) Disable/limit PHI persistence in conversation memory, reasoning traces, feedback, and export paths.
-4) Wire HipaaAuditService to all PHI access flows and make audit logs reviewable.
-5) Expand redaction to cover all HIPAA identifiers; integrate vetted PHI detection.
-6) Add key separation and rotation for tokenization vault; prefer KMS/HSM.
-7) Enforce audit fail-closed in medical profile.
-8) Add explicit medical profile or policy set to turn off unsafe features.
+1) Enforce TLS and HSTS for all production profiles; document TLS-only configs. (Implemented for HIPAA strict mode)
+2) Add redaction or suppression for model outputs in medical sector. (Implemented)
+3) Disable/limit PHI persistence in conversation memory, reasoning traces, feedback, and export paths. (Implemented)
+4) Wire HipaaAuditService to all PHI access flows and make audit logs reviewable. (Partially implemented; review endpoints remain)
+5) Expand redaction to cover all HIPAA identifiers; integrate vetted PHI detection. (Partially implemented; heuristic redaction remains)
+6) Add key separation and rotation for tokenization vault; prefer KMS/HSM. (Key separation implemented; rotation/KMS remains)
+7) Enforce audit fail-closed in medical profile. (Implemented)
+8) Add explicit medical profile or policy set to turn off unsafe features. (Implemented)
 
 ## HIPAA strict mode flags (now supported)
 These configuration keys are available to enforce medical-only behavior:
@@ -169,7 +176,8 @@ These configuration keys are available to enforce medical-only behavior:
 - sentinel.hipaa.disable-visual (bool; default true)
 - sentinel.hipaa.disable-experience-learning (bool; default true)
 - sentinel.hipaa.suppress-sensitive-logs (bool; default true)
-- sentinel.hipaa.enforce-tls (bool; default false; enable for production)
+- sentinel.hipaa.enforce-tls (bool; default true)
+- sentinel.hipaa.session-timeout-minutes (number; default 15)
 
 ## Notes and open questions
 - Are external services (LLM/OCR/Infini-gram) ever used in medical deployments without BAAs?

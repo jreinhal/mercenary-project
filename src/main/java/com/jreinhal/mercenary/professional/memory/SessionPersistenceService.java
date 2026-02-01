@@ -47,6 +47,7 @@ public class SessionPersistenceService {
     private final MongoTemplate mongoTemplate;
     private final ConversationMemoryService conversationMemoryService;
     private final HipaaPolicy hipaaPolicy;
+    private final com.jreinhal.mercenary.service.IntegritySigner integritySigner;
     private final ObjectMapper objectMapper;
     @Value(value="${sentinel.sessions.data-dir:${user.home}/.sentinel/sessions}")
     private String sessionDataDir;
@@ -59,15 +60,20 @@ public class SessionPersistenceService {
     @Value(value="${sentinel.sessions.max-traces-per-session:100}")
     private int maxTracesPerSession;
 
-    public SessionPersistenceService(MongoTemplate mongoTemplate, ConversationMemoryService conversationMemoryService, HipaaPolicy hipaaPolicy) {
+    public SessionPersistenceService(MongoTemplate mongoTemplate, ConversationMemoryService conversationMemoryService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.service.IntegritySigner integritySigner) {
         this.mongoTemplate = mongoTemplate;
         this.conversationMemoryService = conversationMemoryService;
         this.hipaaPolicy = hipaaPolicy;
-        this.objectMapper = new ObjectMapper().registerModule((Module)new JavaTimeModule()).enable(SerializationFeature.INDENT_OUTPUT).disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        this.integritySigner = integritySigner;
+        this.objectMapper = new ObjectMapper().registerModule((Module)new JavaTimeModule()).enable(SerializationFeature.INDENT_OUTPUT).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     @PostConstruct
     public void init() {
+        if (this.hipaaPolicy.isStrict(Department.MEDICAL) && this.fileBackupEnabled) {
+            log.warn("HIPAA strict: disabling session file backups.");
+            this.fileBackupEnabled = false;
+        }
         if (this.fileBackupEnabled) {
             try {
                 Path dataPath = Paths.get(this.sessionDataDir, new String[0]);
@@ -127,7 +133,8 @@ public class SessionPersistenceService {
             log.info("HIPAA strict: skipping trace persistence for {}", trace.getTraceId());
             return;
         }
-        PersistedTrace persisted = new PersistedTrace(trace.getTraceId(), sessionId, trace.getUserId(), trace.getDepartment(), trace.getQuery(), trace.getTimestamp(), trace.getTotalDurationMs(), trace.getSteps().size(), trace.getSteps().stream().map(step -> Map.of("type", step.type().name(), "label", step.label(), "detail", step.detail() != null ? step.detail() : "", "durationMs", step.durationMs(), "data", step.data() != null ? step.data() : Map.of())).toList(), trace.getMetrics(), trace.isCompleted());
+        PersistedTrace unsigned = new PersistedTrace(trace.getTraceId(), sessionId, trace.getUserId(), trace.getDepartment(), trace.getQuery(), trace.getTimestamp(), trace.getTotalDurationMs(), trace.getSteps().size(), trace.getSteps().stream().map(step -> Map.of("type", step.type().name(), "label", step.label(), "detail", step.detail() != null ? step.detail() : "", "durationMs", step.durationMs(), "data", step.data() != null ? step.data() : Map.of())).toList(), trace.getMetrics(), trace.isCompleted(), null);
+        PersistedTrace persisted = this.attachIntegrity(unsigned);
         try {
             this.mongoTemplate.save(persisted, TRACES_COLLECTION);
             log.debug("Persisted trace {} to MongoDB", trace.getTraceId());
@@ -197,7 +204,8 @@ public class SessionPersistenceService {
         summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
         summary.put("averageResponseTime", traces.isEmpty() ? 0.0 : traces.stream().mapToLong(PersistedTrace::durationMs).average().orElse(0.0));
         summary.put("topicsDiscussed", context.activeTopics());
-        SessionExport export = new SessionExport(sessionId, userId, session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary);
+        SessionExport unsigned = new SessionExport(sessionId, userId, session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary, null);
+        SessionExport export = this.attachIntegrity(unsigned);
         String filename = String.format("session_%s_%s.json", sessionId, FILE_DATE_FORMAT.format(Instant.now()));
         Path exportPath = Paths.get(this.sessionDataDir, "exports", filename);
         String json = this.objectMapper.writeValueAsString(export);
@@ -223,7 +231,8 @@ public class SessionPersistenceService {
         HashMap<String, Object> summary = new HashMap<String, Object>();
         summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
         summary.put("topicsDiscussed", context.activeTopics());
-        SessionExport export = new SessionExport(sessionId, userId, session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary);
+        SessionExport unsigned = new SessionExport(sessionId, userId, session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary, null);
+        SessionExport export = this.attachIntegrity(unsigned);
         return this.objectMapper.writeValueAsString(export);
     }
 
@@ -315,10 +324,36 @@ public class SessionPersistenceService {
     public record ActiveSession(String sessionId, String userId, String department, Instant createdAt, Instant lastActivityAt, int messageCount, int traceCount, List<String> traceIds, Map<String, Object> metadata) {
     }
 
-    public record PersistedTrace(String traceId, String sessionId, String userId, String department, String query, Instant timestamp, long durationMs, int stepCount, List<Map<String, Object>> steps, Map<String, Object> metrics, boolean completed) {
+    public record PersistedTrace(String traceId, String sessionId, String userId, String department, String query, Instant timestamp, long durationMs, int stepCount, List<Map<String, Object>> steps, Map<String, Object> metrics, boolean completed, String integrityHash) {
     }
 
-    public record SessionExport(String sessionId, String userId, String department, Instant startTime, Instant endTime, int totalMessages, int totalTraces, List<ConversationMemoryService.ConversationMessage> messages, List<PersistedTrace> traces, Map<String, Object> summary) {
+    public record SessionExport(String sessionId, String userId, String department, Instant startTime, Instant endTime, int totalMessages, int totalTraces, List<ConversationMemoryService.ConversationMessage> messages, List<PersistedTrace> traces, Map<String, Object> summary, String integrityHash) {
+    }
+
+    private PersistedTrace attachIntegrity(PersistedTrace unsigned) {
+        if (!this.integritySigner.isEnabled()) {
+            return unsigned;
+        }
+        try {
+            String payload = this.objectMapper.writeValueAsString(unsigned);
+            String hash = this.integritySigner.sign(payload);
+            return new PersistedTrace(unsigned.traceId(), unsigned.sessionId(), unsigned.userId(), unsigned.department(), unsigned.query(), unsigned.timestamp(), unsigned.durationMs(), unsigned.stepCount(), unsigned.steps(), unsigned.metrics(), unsigned.completed(), hash);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to sign trace integrity payload", e);
+        }
+    }
+
+    private SessionExport attachIntegrity(SessionExport unsigned) {
+        if (!this.integritySigner.isEnabled()) {
+            return unsigned;
+        }
+        try {
+            String payload = this.objectMapper.writeValueAsString(unsigned);
+            String hash = this.integritySigner.sign(payload);
+            return new SessionExport(unsigned.sessionId(), unsigned.userId(), unsigned.department(), unsigned.startTime(), unsigned.endTime(), unsigned.totalMessages(), unsigned.totalTraces(), unsigned.messages(), unsigned.traces(), unsigned.summary(), hash);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to sign session export integrity payload", e);
+        }
     }
 
     private Department safeDepartment(String dept) {

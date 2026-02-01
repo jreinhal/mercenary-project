@@ -42,6 +42,10 @@ public class AuditService {
             log.warn("Audit fail-closed enforced for govcloud profile.");
             this.failClosed = true;
         }
+        if (this.hipaaPolicy.isStrict(Department.MEDICAL) && !this.failClosed) {
+            log.warn("Audit fail-closed enforced for HIPAA medical strict mode.");
+            this.failClosed = true;
+        }
     }
 
     public void log(AuditEvent event) {
@@ -78,7 +82,11 @@ public class AuditService {
     }
 
     public void logIngestion(User user, String filename, Department sector, HttpServletRequest request) {
-        AuditEvent event = AuditEvent.create(AuditEvent.EventType.DOCUMENT_INGESTED, user.getId(), "Document ingested: " + filename).withUser(user).withRequest(this.clientIpResolver.resolveClientIp(request), request.getHeader("User-Agent"), request.getSession().getId()).withResource("DOCUMENT", filename).withMetadata("sector", sector.name());
+        String safeName = filename;
+        if (this.hipaaPolicy.isStrict(sector)) {
+            safeName = this.redactAuditText(filename);
+        }
+        AuditEvent event = AuditEvent.create(AuditEvent.EventType.DOCUMENT_INGESTED, user.getId(), "Document ingested: " + safeName).withUser(user).withRequest(this.clientIpResolver.resolveClientIp(request), request.getHeader("User-Agent"), request.getSession().getId()).withResource("DOCUMENT", safeName).withMetadata("sector", sector.name());
         this.log(event);
     }
 
