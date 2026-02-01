@@ -25,13 +25,18 @@ public class FeedbackService {
     private static final Logger log = LoggerFactory.getLogger(FeedbackService.class);
     private final FeedbackRepository feedbackRepository;
     private final AuditService auditService;
+    private final HipaaPolicy hipaaPolicy;
 
-    public FeedbackService(FeedbackRepository feedbackRepository, AuditService auditService) {
+    public FeedbackService(FeedbackRepository feedbackRepository, AuditService auditService, HipaaPolicy hipaaPolicy) {
         this.feedbackRepository = feedbackRepository;
         this.auditService = auditService;
+        this.hipaaPolicy = hipaaPolicy;
     }
 
     public FeedbackResult submitPositiveFeedback(String userId, String username, String sector, String messageId, String query, String response, Map<String, Object> ragMetadata) {
+        if (this.hipaaPolicy.shouldDisableFeedback(sector)) {
+            return FeedbackResult.disabled("Feedback storage is disabled for HIPAA medical deployments.");
+        }
         Feedback existing = this.feedbackRepository.findByUserIdAndMessageId(userId, messageId);
         if (existing != null) {
             if (existing.getFeedbackType() == Feedback.FeedbackType.POSITIVE) {
@@ -53,6 +58,9 @@ public class FeedbackService {
     }
 
     public FeedbackResult submitNegativeFeedback(String userId, String username, String sector, String messageId, String query, String response, Feedback.FeedbackCategory category, String comments, Map<String, Object> ragMetadata) {
+        if (this.hipaaPolicy.shouldDisableFeedback(sector)) {
+            return FeedbackResult.disabled("Feedback storage is disabled for HIPAA medical deployments.");
+        }
         Feedback existing = this.feedbackRepository.findByUserIdAndMessageId(userId, messageId);
         if (existing != null) {
             if (existing.getFeedbackType() == Feedback.FeedbackType.NEGATIVE && existing.getCategory() == category) {
@@ -77,6 +85,9 @@ public class FeedbackService {
     }
 
     public FeedbackAnalytics getAnalytics(String sector, int days) {
+        if (this.hipaaPolicy.shouldDisableFeedback(sector)) {
+            return new FeedbackAnalytics(0L, 0L, 0L, 0.0, Map.of(), 0L, 0.0, 0.0, List.of(), days, sector);
+        }
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
         List<Feedback> recentFeedback = sector != null ? this.feedbackRepository.findBySectorAndTimestampBetween(sector, since, Instant.now()) : this.feedbackRepository.findByTimestampBetween(since, Instant.now());
         long positive = recentFeedback.stream().filter(f -> f.getFeedbackType() == Feedback.FeedbackType.POSITIVE).count();
@@ -106,6 +117,9 @@ public class FeedbackService {
     }
 
     public List<TrainingExample> exportTrainingData(String sector, Feedback.FeedbackType type) {
+        if (this.hipaaPolicy.shouldDisableFeedback(sector) || (sector == null && this.hipaaPolicy.isStrict("MEDICAL"))) {
+            return List.of();
+        }
         List<Feedback> feedback = sector != null ? this.feedbackRepository.findByFeedbackTypeAndSector(type, sector) : this.feedbackRepository.findByFeedbackTypeOrderByTimestampDesc(type);
         return feedback.stream().filter(f -> f.getQuery() != null && f.getResponse() != null).map(f -> new TrainingExample(f.getQuery(), f.getResponse(), f.getSector(), f.getSourceDocuments(), f.getFeedbackType() == Feedback.FeedbackType.POSITIVE ? 1.0 : 0.0)).collect(Collectors.toList());
     }
@@ -168,20 +182,28 @@ public class FeedbackService {
         private final String feedbackId;
         private final Feedback.FeedbackType type;
         private final boolean removed;
+        private final boolean disabled;
+        private final String message;
 
-        private FeedbackResult(boolean success, String feedbackId, Feedback.FeedbackType type, boolean removed) {
+        private FeedbackResult(boolean success, String feedbackId, Feedback.FeedbackType type, boolean removed, boolean disabled, String message) {
             this.success = success;
             this.feedbackId = feedbackId;
             this.type = type;
             this.removed = removed;
+            this.disabled = disabled;
+            this.message = message;
         }
 
         public static FeedbackResult success(String id, Feedback.FeedbackType type) {
-            return new FeedbackResult(true, id, type, false);
+            return new FeedbackResult(true, id, type, false, false, null);
         }
 
         public static FeedbackResult removed() {
-            return new FeedbackResult(true, null, null, true);
+            return new FeedbackResult(true, null, null, true, false, null);
+        }
+
+        public static FeedbackResult disabled(String message) {
+            return new FeedbackResult(false, null, null, false, true, message);
         }
 
         public boolean isSuccess() {
@@ -198,6 +220,14 @@ public class FeedbackService {
 
         public boolean isRemoved() {
             return this.removed;
+        }
+
+        public boolean isDisabled() {
+            return this.disabled;
+        }
+
+        public String getMessage() {
+            return this.message;
         }
     }
 

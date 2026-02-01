@@ -1,0 +1,23 @@
+ENTERPRISE COMPLIANCE AUDIT REPORT
+Classification: INTERNAL USE ONLY
+Report Period: Q4 2025
+Document ID: ENT-COMP-2025-004
+
+EXECUTIVE SUMMARY
+The Enterprise Compliance Audit report evaluates adherence to internal policies,
+regulatory requirements, and control effectiveness across Finance, HR, and IT.
+
+KEY FINDINGS
+1. Access Control: 98% compliance across privileged accounts.
+2. Data Retention: 2 minor gaps identified in archival workflows.
+3. Vendor Oversight: Quarterly reviews completed for Tier 1 suppliers.
+4. Incident Response: Mean time to closure improved by 12%.
+
+REMEDIATION ACTIONS
+- Update retention workflows for legacy systems by March 2026.
+- Expand audit sampling for vendor contract renewals.
+- Conduct follow-up review within 90 days.
+
+APPROVALS
+Approved by: Jordan Ellis, Chief Compliance Officer
+Date: December 15, 2025

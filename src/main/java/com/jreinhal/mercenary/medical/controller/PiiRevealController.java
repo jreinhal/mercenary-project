@@ -1,6 +1,7 @@
 package com.jreinhal.mercenary.medical.controller;
 
 import com.jreinhal.mercenary.medical.hipaa.HipaaAuditService;
+import com.jreinhal.mercenary.service.PiiRedactionService;
 import com.jreinhal.mercenary.service.TokenizationVault;
 import java.time.Instant;
 import java.util.Map;
@@ -26,10 +27,12 @@ public class PiiRevealController {
     private static final Logger log = LoggerFactory.getLogger(PiiRevealController.class);
     private final TokenizationVault tokenizationVault;
     private final HipaaAuditService hipaaAuditService;
+    private final PiiRedactionService piiRedactionService;
 
-    public PiiRevealController(TokenizationVault tokenizationVault, HipaaAuditService hipaaAuditService) {
+    public PiiRevealController(TokenizationVault tokenizationVault, HipaaAuditService hipaaAuditService, PiiRedactionService piiRedactionService) {
         this.tokenizationVault = tokenizationVault;
         this.hipaaAuditService = hipaaAuditService;
+        this.piiRedactionService = piiRedactionService;
     }
 
     @PostMapping(value={"/reveal"})
@@ -47,14 +50,15 @@ public class PiiRevealController {
         if (!this.tokenizationVault.isToken(request.token())) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid token format", "timestamp", Instant.now().toString()));
         }
-        this.hipaaAuditService.logPhiAccess(userId, "PII_REVEAL_REQUEST", request.token(), request.reason(), request.breakTheGlass() != null && request.breakTheGlass() != false);
+        String sanitizedReason = this.sanitizeReason(request.reason());
+        this.hipaaAuditService.logPhiAccess(userId, "PII_REVEAL_REQUEST", request.token(), sanitizedReason, request.breakTheGlass() != null && request.breakTheGlass() != false);
         Optional<String> revealedValue = this.tokenizationVault.detokenize(request.token(), userId);
         if (revealedValue.isEmpty()) {
             log.warn("PII reveal failed for token {} by user {} - not found", this.maskToken(request.token()), userId);
             return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_FOUND).body(Map.of("error", "Token not found or expired", "timestamp", Instant.now().toString()));
         }
-        this.hipaaAuditService.logPhiAccess(userId, "PII_REVEAL_SUCCESS", request.token(), request.reason(), request.breakTheGlass() != null && request.breakTheGlass() != false);
-        log.info("HIPAA AUDIT: User {} revealed PII token {} for reason: {}", new Object[]{userId, this.maskToken(request.token()), request.reason()});
+        this.hipaaAuditService.logPhiAccess(userId, "PII_REVEAL_SUCCESS", request.token(), sanitizedReason, request.breakTheGlass() != null && request.breakTheGlass() != false);
+        log.info("HIPAA AUDIT: User {} revealed PII token {} for reason: {}", new Object[]{userId, this.maskToken(request.token()), sanitizedReason});
         return ResponseEntity.ok(Map.of("value", revealedValue.get(), "revealed_at", Instant.now().toString(), "revealed_by", userId, "warning", "This access has been logged for HIPAA compliance"));
     }
 
@@ -76,10 +80,10 @@ public class PiiRevealController {
         log.warn("=== BREAK-THE-GLASS EMERGENCY ACCESS ===");
         log.warn("User: {}", userId);
         log.warn("Token: {}", this.maskToken(request.token()));
-        log.warn("Patient: {}", request.patientId());
-        log.warn("Reason: {}", request.emergencyReason());
+        log.warn("Patient: {}", this.sanitizeReason(request.patientId()));
+        log.warn("Reason: {}", this.sanitizeReason(request.emergencyReason()));
         log.warn("=========================================");
-        this.hipaaAuditService.logBreakTheGlass(userId, request.token(), request.patientId(), request.emergencyReason());
+        this.hipaaAuditService.logBreakTheGlass(userId, request.token(), this.sanitizeReason(request.patientId()), this.sanitizeReason(request.emergencyReason()));
         Optional<String> revealedValue = this.tokenizationVault.detokenize(request.token(), userId);
         if (revealedValue.isEmpty()) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_FOUND).body(Map.of("error", "Token not found", "timestamp", Instant.now().toString()));
@@ -108,5 +112,16 @@ public class PiiRevealController {
     }
 
     public record EmergencyRevealRequest(String token, String emergencyReason, String patientId) {
+    }
+
+    private String sanitizeReason(String reason) {
+        if (reason == null) {
+            return "";
+        }
+        String redacted = this.piiRedactionService.redact(reason, Boolean.TRUE).getRedactedContent();
+        if (redacted.length() > 200) {
+            return redacted.substring(0, 200) + "...";
+        }
+        return redacted;
     }
 }

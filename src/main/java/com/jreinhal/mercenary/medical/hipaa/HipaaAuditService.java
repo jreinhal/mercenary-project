@@ -1,6 +1,7 @@
 package com.jreinhal.mercenary.medical.hipaa;
 
 import com.jreinhal.mercenary.model.User;
+import com.jreinhal.mercenary.service.PiiRedactionService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -14,9 +15,11 @@ public class HipaaAuditService {
     private static final Logger log = LoggerFactory.getLogger(HipaaAuditService.class);
     private static final String COLLECTION_NAME = "hipaa_audit_log";
     private final MongoTemplate mongoTemplate;
+    private final PiiRedactionService piiRedactionService;
 
-    public HipaaAuditService(MongoTemplate mongoTemplate) {
+    public HipaaAuditService(MongoTemplate mongoTemplate, PiiRedactionService piiRedactionService) {
         this.mongoTemplate = mongoTemplate;
+        this.piiRedactionService = piiRedactionService;
         log.info("HIPAA Audit Service initialized - PHI access logging enabled");
     }
 
@@ -43,18 +46,21 @@ public class HipaaAuditService {
     }
 
     public void logPhiAccess(String userId, String action, String resourceId, String reason, boolean breakTheGlass) {
-        HipaaAuditEvent event = new HipaaAuditEvent(AuditEventType.PHI_ACCESS, userId, null, null, Map.of("action", action, "resourceId", resourceId, "reason", reason, "breakTheGlass", breakTheGlass));
+        String sanitizedReason = this.sanitizeText(reason);
+        HipaaAuditEvent event = new HipaaAuditEvent(AuditEventType.PHI_ACCESS, userId, null, null, Map.of("action", action, "resourceId", resourceId, "reason", sanitizedReason, "breakTheGlass", breakTheGlass));
         this.saveEvent(event);
         if (breakTheGlass) {
-            log.warn("BREAK-THE-GLASS: PHI access by {} for resource {} - Reason: {}", new Object[]{userId, resourceId, reason});
+            log.warn("BREAK-THE-GLASS: PHI access by {} for resource {} - Reason: {}", new Object[]{userId, resourceId, sanitizedReason});
         }
     }
 
     public void logBreakTheGlass(String userId, String resourceId, String patientId, String emergencyReason) {
-        HipaaAuditEvent event = new HipaaAuditEvent(AuditEventType.PHI_ACCESS, userId, null, null, Map.of("action", "BREAK_THE_GLASS", "resourceId", resourceId, "patientId", patientId, "emergencyReason", emergencyReason, "requiresReview", true));
+        String sanitizedPatient = this.sanitizeText(patientId);
+        String sanitizedReason = this.sanitizeText(emergencyReason);
+        HipaaAuditEvent event = new HipaaAuditEvent(AuditEventType.PHI_ACCESS, userId, null, null, Map.of("action", "BREAK_THE_GLASS", "resourceId", resourceId, "patientId", sanitizedPatient, "emergencyReason", sanitizedReason, "requiresReview", true));
         this.saveEvent(event);
         log.error("!!! BREAK-THE-GLASS EMERGENCY ACCESS !!!");
-        log.error("User: {}, Patient: {}, Reason: {}", new Object[]{userId, patientId, emergencyReason});
+        log.error("User: {}, Patient: {}, Reason: {}", new Object[]{userId, sanitizedPatient, sanitizedReason});
     }
 
     private void logEvent(AuditEventType type, User user, Map<String, Object> details) {
@@ -80,6 +86,17 @@ public class HipaaAuditService {
         sanitized = sanitized.replaceAll("\\d{3}-\\d{2}-\\d{4}", "[SSN-REDACTED]");
         sanitized = sanitized.replaceAll("\\b[A-Z]{2,3}\\d{6,10}\\b", "[MRN-REDACTED]");
         return sanitized;
+    }
+
+    private String sanitizeText(String text) {
+        if (text == null) {
+            return "";
+        }
+        String redacted = this.piiRedactionService.redact(text, Boolean.TRUE).getRedactedContent();
+        if (redacted.length() > 200) {
+            return redacted.substring(0, 200) + "...";
+        }
+        return redacted;
     }
 
     public static enum AuditEventType {

@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
 import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
 import com.jreinhal.mercenary.service.AuditService;
+import com.jreinhal.mercenary.service.HipaaPolicy;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -32,11 +33,13 @@ public class SessionController {
     private final SessionPersistenceService sessionPersistenceService;
     private final ConversationMemoryService conversationMemoryService;
     private final AuditService auditService;
+    private final HipaaPolicy hipaaPolicy;
 
-    public SessionController(SessionPersistenceService sessionPersistenceService, ConversationMemoryService conversationMemoryService, AuditService auditService) {
+    public SessionController(SessionPersistenceService sessionPersistenceService, ConversationMemoryService conversationMemoryService, AuditService auditService, HipaaPolicy hipaaPolicy) {
         this.sessionPersistenceService = sessionPersistenceService;
         this.conversationMemoryService = conversationMemoryService;
         this.auditService = auditService;
+        this.hipaaPolicy = hipaaPolicy;
     }
 
     @PostMapping(value={"/create"})
@@ -116,6 +119,10 @@ public class SessionController {
         if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
+        Department dept = this.safeDepartment(session.get().department());
+        if (dept != null && this.hipaaPolicy.shouldDisableSessionMemory(dept)) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
         return ResponseEntity.ok(context);
     }
@@ -128,6 +135,10 @@ public class SessionController {
         }
         Optional<SessionPersistenceService.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
         if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
+        Department dept = this.safeDepartment(session.get().department());
+        if (dept != null && this.hipaaPolicy.shouldDisableSessionMemory(dept)) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
         List<SessionPersistenceService.PersistedTrace> traces = this.sessionPersistenceService.getSessionTraces(sessionId);
@@ -157,6 +168,13 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
+        Optional<SessionPersistenceService.ActiveSession> sessionOpt = this.sessionPersistenceService.getSession(sessionId);
+        if (sessionOpt.isPresent()) {
+            Department dept = this.safeDepartment(sessionOpt.get().department());
+            if (dept != null && this.hipaaPolicy.shouldDisableSessionExport(dept)) {
+                return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body("{\"error\": \"Session export disabled for HIPAA medical deployments\"}");
+            }
+        }
         try {
             String json = this.sessionPersistenceService.exportSessionToJson(sessionId, user.getId());
             this.auditService.logQuery(user, "session_export: " + sessionId, Department.ENTERPRISE, "Session exported", request);
@@ -179,6 +197,13 @@ public class SessionController {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        Optional<SessionPersistenceService.ActiveSession> sessionOpt = this.sessionPersistenceService.getSession(sessionId);
+        if (sessionOpt.isPresent()) {
+            Department dept = this.safeDepartment(sessionOpt.get().department());
+            if (dept != null && this.hipaaPolicy.shouldDisableSessionExport(dept)) {
+                return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body(Map.of("error", "Session export disabled for HIPAA medical deployments"));
+            }
         }
         try {
             Path exportPath = this.sessionPersistenceService.exportSession(sessionId, user.getId());
@@ -209,6 +234,17 @@ public class SessionController {
         stats.put("userTotalMessages", userSessions.stream().mapToInt(SessionPersistenceService.ActiveSession::messageCount).sum());
         stats.put("userTotalTraces", userSessions.stream().mapToInt(SessionPersistenceService.ActiveSession::traceCount).sum());
         return ResponseEntity.ok(stats);
+    }
+
+    private Department safeDepartment(String dept) {
+        if (dept == null || dept.isBlank()) {
+            return null;
+        }
+        try {
+            return Department.valueOf(dept.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public record SessionResponse(String sessionId, String department, String createdAt, String message) {

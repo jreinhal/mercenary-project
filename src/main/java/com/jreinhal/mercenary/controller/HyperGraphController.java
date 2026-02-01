@@ -476,11 +476,14 @@ public class HyperGraphController {
     // ==================== DTOs ====================
 
     private EntityNodeDto toEntityDto(HGNode node) {
+        String resolvedType = node.getEntityType() != null
+                ? node.getEntityType().name()
+                : EntityExtractor.EntityType.REFERENCE.name();
         return new EntityNodeDto(
                 node.getId(),
                 node.getValue(),
                 node.getType().name(),
-                node.getEntityType() != null ? node.getEntityType().name() : null,
+                resolvedType,
                 node.getReferenceCount(),
                 node.getSourceDoc()
         );

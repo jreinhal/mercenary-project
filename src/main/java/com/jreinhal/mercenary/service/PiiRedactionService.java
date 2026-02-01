@@ -25,6 +25,18 @@ public class PiiRedactionService {
     private static final Pattern PASSPORT_PATTERN = Pattern.compile("(?:Passport(?:\\s+(?:No|Number|#))?\\s*:?\\s*)([A-Z]{1,2}\\d{6,9})", 2);
     private static final Pattern DRIVERS_LICENSE_PATTERN = Pattern.compile("(?:Driver'?s?\\s+License|DL|License\\s+(?:No|Number|#))\\s*:?\\s*([A-Z0-9]{5,15})", 2);
     private static final Pattern MEDICAL_ID_PATTERN = Pattern.compile("(?:MRN|Medical\\s+Record|Patient\\s+ID|Health\\s+ID)\\s*:?\\s*([A-Z0-9][A-Z0-9-]{4,17})", 2);
+    private static final Pattern ACCOUNT_CONTEXT_PATTERN = Pattern.compile("(?:account|acct|account\\s+number|acct\\s+no|member\\s+id|subscriber\\s+id|policy\\s+number|insurance\\s+id|beneficiary\\s+id)\\s*:?\\s*([A-Z0-9-]{6,})", 2);
+    private static final Pattern HEALTH_PLAN_PATTERN = Pattern.compile("(?:health\\s+plan\\s+id|plan\\s+id|group\\s+number)\\s*:?\\s*([A-Z0-9-]{6,})", 2);
+    private static final Pattern CERTIFICATE_PATTERN = Pattern.compile("(?:certificate|cert|license)\\s*(?:no|number|#)?\\s*:?\\s*([A-Z0-9-]{5,})", 2);
+    private static final Pattern VIN_PATTERN = Pattern.compile("(?:VIN|Vehicle\\s+ID|Vehicle\\s+Identification\\s+Number)\\s*:?\\s*([A-HJ-NPR-Z0-9]{17})", 2);
+    private static final Pattern LICENSE_PLATE_PATTERN = Pattern.compile("(?:license\\s+plate|plate)\\s*:?\\s*([A-Z0-9-]{4,8})", 2);
+    private static final Pattern LICENSE_PLATE_VALUE_PATTERN = Pattern.compile("\\b[A-Z]{1,3}-\\d{3,4}\\b", 2);
+    private static final Pattern MAC_ADDRESS_PATTERN = Pattern.compile("\\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\\b");
+    private static final Pattern DEVICE_ID_PATTERN = Pattern.compile("(?:IMEI|MEID|ESN|Device\\s+ID|Device\\s+Serial|Serial\\s+Number)\\s*:?\\s*([A-Za-z0-9-]{6,})", 2);
+    private static final Pattern URL_PATTERN = Pattern.compile("\\bhttps?://[^\\s]+\\b|\\bwww\\.[^\\s]+\\b", 2);
+    private static final Pattern BIOMETRIC_PATTERN = Pattern.compile("(?:fingerprint|retina|iris|voiceprint|faceprint|biometric)\\s*(?:id|hash|template)?\\s*:?\\s*([A-Za-z0-9-]{6,})", 2);
+    private static final Pattern DATE_CONTEXT_PATTERN = Pattern.compile("(?:Admission|Discharge|Visit|Appointment|Service|Procedure|Encounter|Death)\\s*Date\\s*:?\\s*(\\d{1,2}[/\\-.]\\d{1,2}(?:[/\\-.]\\d{2,4})?|\\d{4}[/\\-.]\\d{1,2}[/\\-.]\\d{1,2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{1,2},?\\s+\\d{4})", 2);
+    private static final Pattern AGE_PATTERN = Pattern.compile("\\b(?:age|aged)\\s*(9\\d|[1-9]\\d{2,})\\b", 2);
     private static final Pattern NAME_CONTEXT_PATTERN = Pattern.compile("(?:Name|Patient|Employee|Client|Customer|Attn|Attention|Contact|Applicant|Recipient|Beneficiary|Account Holder)\\s*:?\\s*([A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,3})", 2);
     private static final Pattern NAME_HONORIFIC_PATTERN = Pattern.compile("\\b(?:Mr|Mrs|Ms|Miss|Dr|Prof|Rev|Hon)\\.?\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,2})\\b");
     private static final Pattern ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,5}\\s+[A-Za-z0-9\\s,]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Circle|Cir|Place|Pl)\\.?(?:\\s*,?\\s*(?:Apt|Suite|Unit|#)\\s*[A-Za-z0-9-]+)?\\s*,?\\s*[A-Za-z\\s]+,?\\s*[A-Z]{2}\\s*\\d{5}(?:-\\d{4})?\\b", 2);
@@ -56,15 +68,38 @@ public class PiiRedactionService {
     private boolean redactAddress;
     @Value(value="${sentinel.pii.patterns.medical-id:true}")
     private boolean redactMedicalId;
+    @Value(value="${sentinel.pii.patterns.account-number:true}")
+    private boolean redactAccountNumber;
+    @Value(value="${sentinel.pii.patterns.health-plan-id:true}")
+    private boolean redactHealthPlanId;
+    @Value(value="${sentinel.pii.patterns.certificate-number:true}")
+    private boolean redactCertificateNumber;
+    @Value(value="${sentinel.pii.patterns.vehicle-id:true}")
+    private boolean redactVehicleId;
+    @Value(value="${sentinel.pii.patterns.device-id:true}")
+    private boolean redactDeviceId;
+    @Value(value="${sentinel.pii.patterns.url:true}")
+    private boolean redactUrl;
+    @Value(value="${sentinel.pii.patterns.biometric:true}")
+    private boolean redactBiometric;
+    @Value(value="${sentinel.pii.patterns.date:true}")
+    private boolean redactDate;
+    @Value(value="${sentinel.pii.patterns.age:true}")
+    private boolean redactAge;
 
     public PiiRedactionService(TokenizationVault tokenizationVault) {
         this.tokenizationVault = tokenizationVault;
     }
 
     public RedactionResult redact(String content) {
+        return this.redact(content, null);
+    }
+
+    public RedactionResult redact(String content, Boolean redactNamesOverride) {
         if (!this.enabled || content == null || content.isEmpty()) {
             return new RedactionResult(content, Collections.emptyMap());
         }
+        boolean applyNames = redactNamesOverride != null ? redactNamesOverride : this.redactNames;
         RedactionMode redactionMode = this.parseMode(this.mode);
         EnumMap<PiiType, Integer> counts = new EnumMap<PiiType, Integer>(PiiType.class);
         String result = content;
@@ -86,7 +121,37 @@ public class PiiRedactionService {
         if (this.redactMedicalId) {
             result = this.redactContextPattern(result, MEDICAL_ID_PATTERN, PiiType.MEDICAL_ID, redactionMode, counts);
         }
-        if (this.redactNames) {
+        if (this.redactAccountNumber) {
+            result = this.redactContextPattern(result, ACCOUNT_CONTEXT_PATTERN, PiiType.ACCOUNT_NUMBER, redactionMode, counts);
+        }
+        if (this.redactHealthPlanId) {
+            result = this.redactContextPattern(result, HEALTH_PLAN_PATTERN, PiiType.HEALTH_PLAN_ID, redactionMode, counts);
+        }
+        if (this.redactCertificateNumber) {
+            result = this.redactContextPattern(result, CERTIFICATE_PATTERN, PiiType.CERTIFICATE_NUMBER, redactionMode, counts);
+        }
+        if (this.redactVehicleId) {
+            result = this.redactContextPattern(result, VIN_PATTERN, PiiType.VEHICLE_ID, redactionMode, counts);
+            result = this.redactContextPattern(result, LICENSE_PLATE_PATTERN, PiiType.VEHICLE_ID, redactionMode, counts);
+            result = this.redactPattern(result, LICENSE_PLATE_VALUE_PATTERN, PiiType.VEHICLE_ID, redactionMode, counts);
+        }
+        if (this.redactDeviceId) {
+            result = this.redactPattern(result, MAC_ADDRESS_PATTERN, PiiType.DEVICE_ID, redactionMode, counts);
+            result = this.redactContextPattern(result, DEVICE_ID_PATTERN, PiiType.DEVICE_ID, redactionMode, counts);
+        }
+        if (this.redactUrl) {
+            result = this.redactPattern(result, URL_PATTERN, PiiType.URL, redactionMode, counts);
+        }
+        if (this.redactBiometric) {
+            result = this.redactContextPattern(result, BIOMETRIC_PATTERN, PiiType.BIOMETRIC_ID, redactionMode, counts);
+        }
+        if (this.redactDate) {
+            result = this.redactContextPattern(result, DATE_CONTEXT_PATTERN, PiiType.DATE, redactionMode, counts);
+        }
+        if (this.redactAge) {
+            result = this.redactContextPattern(result, AGE_PATTERN, PiiType.AGE, redactionMode, counts);
+        }
+        if (applyNames) {
             result = this.redactContextPattern(result, NAME_CONTEXT_PATTERN, PiiType.NAME, redactionMode, counts);
             result = this.redactContextPattern(result, NAME_HONORIFIC_PATTERN, PiiType.NAME, redactionMode, counts);
         }
@@ -118,7 +183,27 @@ public class PiiRedactionService {
         if (!this.enabled || content == null || content.isEmpty()) {
             return false;
         }
-        return this.redactSsn && SSN_PATTERN.matcher(content).find() || this.redactEmail && EMAIL_PATTERN.matcher(content).find() || this.redactPhone && PHONE_PATTERN.matcher(content).find() || this.redactCreditCard && CREDIT_CARD_PATTERN.matcher(content).find() || this.redactDob && DOB_CONTEXT_PATTERN.matcher(content).find() || this.redactIpAddress && (IPV4_PATTERN.matcher(content).find() || IPV6_PATTERN.matcher(content).find()) || this.redactPassport && PASSPORT_PATTERN.matcher(content).find() || this.redactDriversLicense && DRIVERS_LICENSE_PATTERN.matcher(content).find() || this.redactMedicalId && MEDICAL_ID_PATTERN.matcher(content).find() || this.redactNames && (NAME_CONTEXT_PATTERN.matcher(content).find() || NAME_HONORIFIC_PATTERN.matcher(content).find()) || this.redactAddress && ADDRESS_PATTERN.matcher(content).find();
+        return this.redactSsn && SSN_PATTERN.matcher(content).find()
+            || this.redactEmail && EMAIL_PATTERN.matcher(content).find()
+            || this.redactPhone && PHONE_PATTERN.matcher(content).find()
+            || this.redactCreditCard && CREDIT_CARD_PATTERN.matcher(content).find()
+            || this.redactDob && DOB_CONTEXT_PATTERN.matcher(content).find()
+            || this.redactIpAddress && (IPV4_PATTERN.matcher(content).find() || IPV6_PATTERN.matcher(content).find())
+            || this.redactPassport && PASSPORT_PATTERN.matcher(content).find()
+            || this.redactDriversLicense && DRIVERS_LICENSE_PATTERN.matcher(content).find()
+            || this.redactMedicalId && MEDICAL_ID_PATTERN.matcher(content).find()
+            || this.redactAccountNumber && ACCOUNT_CONTEXT_PATTERN.matcher(content).find()
+            || this.redactHealthPlanId && HEALTH_PLAN_PATTERN.matcher(content).find()
+            || this.redactCertificateNumber && CERTIFICATE_PATTERN.matcher(content).find()
+            || this.redactVehicleId && (VIN_PATTERN.matcher(content).find() || LICENSE_PLATE_PATTERN.matcher(content).find())
+            || this.redactVehicleId && LICENSE_PLATE_VALUE_PATTERN.matcher(content).find()
+            || this.redactDeviceId && (MAC_ADDRESS_PATTERN.matcher(content).find() || DEVICE_ID_PATTERN.matcher(content).find())
+            || this.redactUrl && URL_PATTERN.matcher(content).find()
+            || this.redactBiometric && BIOMETRIC_PATTERN.matcher(content).find()
+            || this.redactDate && DATE_CONTEXT_PATTERN.matcher(content).find()
+            || this.redactAge && AGE_PATTERN.matcher(content).find()
+            || this.redactNames && (NAME_CONTEXT_PATTERN.matcher(content).find() || NAME_HONORIFIC_PATTERN.matcher(content).find())
+            || this.redactAddress && ADDRESS_PATTERN.matcher(content).find();
     }
 
     private String redactPattern(String content, Pattern pattern, PiiType type, RedactionMode mode, Map<PiiType, Integer> counts) {
@@ -255,9 +340,18 @@ public class PiiRedactionService {
         PHONE("Phone Number"),
         CREDIT_CARD("Credit Card Number"),
         DATE_OF_BIRTH("Date of Birth"),
+        DATE("Sensitive Date"),
+        AGE("Age 90+"),
         IP_ADDRESS("IP Address"),
         PASSPORT("Passport Number"),
         DRIVERS_LICENSE("Driver's License"),
+        ACCOUNT_NUMBER("Account Number"),
+        HEALTH_PLAN_ID("Health Plan Beneficiary Number"),
+        CERTIFICATE_NUMBER("Certificate/License Number"),
+        VEHICLE_ID("Vehicle Identifier"),
+        DEVICE_ID("Device Identifier"),
+        URL("URL"),
+        BIOMETRIC_ID("Biometric Identifier"),
         NAME("Personal Name"),
         ADDRESS("Physical Address"),
         MEDICAL_ID("Medical Record Number");

@@ -104,6 +104,12 @@ For EVERY `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`:
 - Manual UI testing is available via Playwright in headed browser mode.
 - Use the local Playwright runner (`tools/playwright-runner`) to drive real UI interactions when requested.
 
+## PR Workflow
+
+- Create a branch for every change (use `feature/`, `fix/`, or `chore/` prefixes).
+- Open a PR to `master` and enable auto-merge once CI passes.
+- Avoid direct pushes to `master`.
+
 ## Commit Guidelines
 
 - All commits go to this single mercenary repo

@@ -50,6 +50,7 @@ Recommended configuration:
 Notes:
 - Use local JWKS or CAC and keep all services on localhost or a protected enclave.
 - Keep Swagger disabled in production profiles.
+- Government edition enforces strict citations and evidence excerpts for auditability.
 
 ## Medical (MEDICAL)
 Common frameworks:
@@ -65,6 +66,7 @@ Recommended configuration:
 Notes:
 - PHI access requires appropriate role assignments and clearance.
 - Store logs and backups according to your retention policy.
+- Medical edition enforces strict citations and evidence excerpts; summaries must remain within redaction policy.
 
 ## Research / Academic (ACADEMIC)
 Common frameworks:

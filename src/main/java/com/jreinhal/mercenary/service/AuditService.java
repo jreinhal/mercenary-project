@@ -21,13 +21,17 @@ public class AuditService {
     private final MongoTemplate mongoTemplate;
     private final ClientIpResolver clientIpResolver;
     private final Environment environment;
+    private final HipaaPolicy hipaaPolicy;
+    private final PiiRedactionService piiRedactionService;
     @Value(value="${app.audit.fail-closed:false}")
     private boolean failClosed;
 
-    public AuditService(MongoTemplate mongoTemplate, ClientIpResolver clientIpResolver, Environment environment) {
+    public AuditService(MongoTemplate mongoTemplate, ClientIpResolver clientIpResolver, Environment environment, HipaaPolicy hipaaPolicy, PiiRedactionService piiRedactionService) {
         this.mongoTemplate = mongoTemplate;
         this.clientIpResolver = clientIpResolver;
         this.environment = environment;
+        this.hipaaPolicy = hipaaPolicy;
+        this.piiRedactionService = piiRedactionService;
     }
 
     @PostConstruct
@@ -65,7 +69,11 @@ public class AuditService {
     }
 
     public void logQuery(User user, String query, Department sector, String responseSummary, HttpServletRequest request) {
-        AuditEvent event = AuditEvent.create(AuditEvent.EventType.QUERY_EXECUTED, user.getId(), "Intelligence query executed").withUser(user).withRequest(this.clientIpResolver.resolveClientIp(request), request.getHeader("User-Agent"), request.getSession().getId()).withResource("QUERY", null).withResponseSummary(responseSummary).withMetadata("sector", sector.name()).withMetadata("queryLength", query.length());
+        String safeSummary = responseSummary;
+        if (this.hipaaPolicy.isStrict(sector)) {
+            safeSummary = this.redactAuditText(responseSummary);
+        }
+        AuditEvent event = AuditEvent.create(AuditEvent.EventType.QUERY_EXECUTED, user.getId(), "Intelligence query executed").withUser(user).withRequest(this.clientIpResolver.resolveClientIp(request), request.getHeader("User-Agent"), request.getSession().getId()).withResource("QUERY", null).withResponseSummary(safeSummary).withMetadata("sector", sector.name()).withMetadata("queryLength", query.length());
         this.log(event);
     }
 
@@ -80,12 +88,27 @@ public class AuditService {
     }
 
     public void logPromptInjection(User user, String query, HttpServletRequest request) {
-        AuditEvent event = AuditEvent.create(AuditEvent.EventType.PROMPT_INJECTION_DETECTED, user != null ? user.getId() : "ANONYMOUS", "Prompt injection attempt blocked").withUser(user).withRequest(this.clientIpResolver.resolveClientIp(request), request.getHeader("User-Agent"), request.getSession().getId()).withOutcome(AuditEvent.Outcome.DENIED, "Security filter triggered").withMetadata("queryPreview", query.substring(0, Math.min(50, query.length())));
+        String preview = query.substring(0, Math.min(50, query.length()));
+        if (this.hipaaPolicy.isStrict(Department.MEDICAL)) {
+            preview = this.redactAuditText(preview);
+        }
+        AuditEvent event = AuditEvent.create(AuditEvent.EventType.PROMPT_INJECTION_DETECTED, user != null ? user.getId() : "ANONYMOUS", "Prompt injection attempt blocked").withUser(user).withRequest(this.clientIpResolver.resolveClientIp(request), request.getHeader("User-Agent"), request.getSession().getId()).withOutcome(AuditEvent.Outcome.DENIED, "Security filter triggered").withMetadata("queryPreview", preview);
         this.log(event);
     }
 
     public List<AuditEvent> getRecentEvents(int limit) {
         return this.mongoTemplate.findAll(AuditEvent.class, "audit_log").stream().sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp())).limit(limit).toList();
+    }
+
+    private String redactAuditText(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String redacted = this.piiRedactionService.redact(text).getRedactedContent();
+        if (redacted.length() > 200) {
+            return redacted.substring(0, 200) + "...";
+        }
+        return redacted;
     }
 
     public static class AuditFailureException

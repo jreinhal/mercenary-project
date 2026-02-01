@@ -363,9 +363,10 @@
         /* === MAIN WORKSPACE (3-Column Kotaemon Layout) === */
         .workspace {
             display: grid;
-            --left-panel-width: 220px;
-            --right-panel-width: clamp(400px, 36vw, 720px);
-            grid-template-columns: var(--left-panel-width) 1fr var(--right-panel-width);
+            --left-panel-width: clamp(220px, 16vw, 280px);
+            --right-panel-width: clamp(420px, 40vw, 960px);
+            --center-panel-min: 320px;
+            grid-template-columns: var(--left-panel-width) minmax(var(--center-panel-min), 1fr) var(--right-panel-width);
             height: 100%;
             width: 100%;
             min-width: 100%;
@@ -379,14 +380,21 @@
             }
         }
 
+        @media (min-width: 1600px) {
+            .workspace {
+                --right-panel-width: clamp(480px, 42vw, 1100px);
+            }
+        }
+
         /* Expanded Entity Explorer view - right panel takes 65% of screen */
         .workspace.entity-explorer-expanded {
-            --right-panel-width: 65vw;
-            grid-template-columns: var(--left-panel-width) 1fr var(--right-panel-width);
+            --right-panel-width: min(60vw, 980px);
+            --center-panel-min: 360px;
+            grid-template-columns: var(--left-panel-width) minmax(var(--center-panel-min), 1fr) var(--right-panel-width);
         }
 
         .workspace.entity-explorer-expanded .main-content {
-            min-width: 280px;
+            min-width: 360px;
         }
 
         /* Right panel scales with available space for graph readability */
@@ -1552,6 +1560,38 @@
             padding: 8px 12px;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .entity-graph-mode {
+            display: inline-flex;
+            gap: 4px;
+            padding: 2px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+        }
+
+        .entity-mode-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .entity-mode-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--border-strong);
+        }
+
+        .entity-mode-btn.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: var(--text-inverse);
         }
 
         .entity-search-input {
@@ -5262,8 +5302,8 @@
         /* Large tablet - collapse right panel - v6: Updated for dynamic graph */
         @media (max-width: 1400px) {
             .workspace {
-                --right-panel-width: clamp(360px, 34vw, 620px);
-                grid-template-columns: 200px 1fr var(--right-panel-width);
+                --right-panel-width: clamp(380px, 36vw, 720px);
+                grid-template-columns: minmax(200px, 16vw) 1fr var(--right-panel-width);
             }
             .graph-container {
                 min-height: 340px;
@@ -5280,8 +5320,8 @@
 
         @media (max-width: 1200px) {
             .workspace {
-                --right-panel-width: clamp(340px, 36vw, 520px);
-                grid-template-columns: 200px 1fr var(--right-panel-width);
+                --right-panel-width: clamp(340px, 36vw, 620px);
+                grid-template-columns: minmax(200px, 16vw) 1fr var(--right-panel-width);
             }
             .graph-container {
                 min-height: 320px;

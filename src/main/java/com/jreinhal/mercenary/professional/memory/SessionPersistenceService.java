@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
 import com.jreinhal.mercenary.reasoning.ReasoningTrace;
+import com.jreinhal.mercenary.service.HipaaPolicy;
 import com.mongodb.client.result.DeleteResult;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
@@ -44,6 +46,7 @@ public class SessionPersistenceService {
     private static final DateTimeFormatter FILE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss").withZone(ZoneId.systemDefault());
     private final MongoTemplate mongoTemplate;
     private final ConversationMemoryService conversationMemoryService;
+    private final HipaaPolicy hipaaPolicy;
     private final ObjectMapper objectMapper;
     @Value(value="${sentinel.sessions.data-dir:${user.home}/.sentinel/sessions}")
     private String sessionDataDir;
@@ -56,9 +59,10 @@ public class SessionPersistenceService {
     @Value(value="${sentinel.sessions.max-traces-per-session:100}")
     private int maxTracesPerSession;
 
-    public SessionPersistenceService(MongoTemplate mongoTemplate, ConversationMemoryService conversationMemoryService) {
+    public SessionPersistenceService(MongoTemplate mongoTemplate, ConversationMemoryService conversationMemoryService, HipaaPolicy hipaaPolicy) {
         this.mongoTemplate = mongoTemplate;
         this.conversationMemoryService = conversationMemoryService;
+        this.hipaaPolicy = hipaaPolicy;
         this.objectMapper = new ObjectMapper().registerModule((Module)new JavaTimeModule()).enable(SerializationFeature.INDENT_OUTPUT).disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
@@ -119,6 +123,10 @@ public class SessionPersistenceService {
         if (trace == null) {
             return;
         }
+        if (this.hipaaPolicy.isStrict(trace.getDepartment())) {
+            log.info("HIPAA strict: skipping trace persistence for {}", trace.getTraceId());
+            return;
+        }
         PersistedTrace persisted = new PersistedTrace(trace.getTraceId(), sessionId, trace.getUserId(), trace.getDepartment(), trace.getQuery(), trace.getTimestamp(), trace.getTotalDurationMs(), trace.getSteps().size(), trace.getSteps().stream().map(step -> Map.of("type", step.type().name(), "label", step.label(), "detail", step.detail() != null ? step.detail() : "", "durationMs", step.durationMs(), "data", step.data() != null ? step.data() : Map.of())).toList(), trace.getMetrics(), trace.isCompleted());
         try {
             this.mongoTemplate.save(persisted, TRACES_COLLECTION);
@@ -177,6 +185,9 @@ public class SessionPersistenceService {
             throw new IllegalArgumentException("Session not found: " + sessionId);
         }
         ActiveSession session = sessionOpt.get();
+        if (this.hipaaPolicy.shouldDisableSessionExport(this.safeDepartment(session.department()))) {
+            throw new SecurityException("Session export disabled for HIPAA medical deployments");
+        }
         if (!session.userId().equals(userId)) {
             throw new SecurityException("User does not own this session");
         }
@@ -201,6 +212,9 @@ public class SessionPersistenceService {
             throw new IllegalArgumentException("Session not found: " + sessionId);
         }
         ActiveSession session = sessionOpt.get();
+        if (this.hipaaPolicy.shouldDisableSessionExport(this.safeDepartment(session.department()))) {
+            throw new SecurityException("Session export disabled for HIPAA medical deployments");
+        }
         if (!session.userId().equals(userId)) {
             throw new SecurityException("User does not own this session");
         }
@@ -220,7 +234,7 @@ public class SessionPersistenceService {
         List<ActiveSession> inactiveSessions = this.mongoTemplate.find(query, ActiveSession.class, SESSIONS_COLLECTION);
         for (ActiveSession session : inactiveSessions) {
             try {
-                if (this.fileBackupEnabled) {
+                if (this.fileBackupEnabled && !this.hipaaPolicy.shouldDisableSessionExport(this.safeDepartment(session.department()))) {
                     this.exportSession(session.sessionId(), session.userId());
                 }
                 this.mongoTemplate.remove(new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(session.sessionId())), SESSIONS_COLLECTION);
@@ -305,5 +319,16 @@ public class SessionPersistenceService {
     }
 
     public record SessionExport(String sessionId, String userId, String department, Instant startTime, Instant endTime, int totalMessages, int totalTraces, List<ConversationMemoryService.ConversationMessage> messages, List<PersistedTrace> traces, Map<String, Object> summary) {
+    }
+
+    private Department safeDepartment(String dept) {
+        if (dept == null || dept.isBlank()) {
+            return null;
+        }
+        try {
+            return Department.valueOf(dept.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }
