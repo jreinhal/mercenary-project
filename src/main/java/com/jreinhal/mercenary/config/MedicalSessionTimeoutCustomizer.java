@@ -4,12 +4,12 @@ import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.HipaaPolicy;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
-import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
-public class MedicalSessionTimeoutCustomizer implements WebServerFactoryCustomizer<ConfigurableServletWebServerFactory> {
+public class MedicalSessionTimeoutCustomizer implements WebServerFactoryCustomizer<TomcatServletWebServerFactory> {
     private final HipaaPolicy hipaaPolicy;
     @Value("${sentinel.hipaa.session-timeout-minutes:15}")
     private long sessionTimeoutMinutes;
@@ -19,13 +19,14 @@ public class MedicalSessionTimeoutCustomizer implements WebServerFactoryCustomiz
     }
 
     @Override
-    public void customize(ConfigurableServletWebServerFactory factory) {
+    public void customize(TomcatServletWebServerFactory factory) {
         if (!this.hipaaPolicy.isStrict(Department.MEDICAL)) {
             return;
         }
         if (this.sessionTimeoutMinutes <= 0) {
             return;
         }
-        factory.setSessionTimeout(Duration.ofMinutes(this.sessionTimeoutMinutes));
+        long minutes = Duration.ofMinutes(this.sessionTimeoutMinutes).toMinutes();
+        factory.addContextCustomizers(context -> context.setSessionTimeout((int) minutes));
     }
 }
