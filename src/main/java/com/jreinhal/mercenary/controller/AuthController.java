@@ -31,7 +31,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing credentials"));
         }
         String username = request.username().trim();
-        User user = this.standardAuthenticationService.authenticateCredentials(username, request.password());
+        User user = this.standardAuthenticationService.authenticateCredentials(username, request.password(), httpRequest);
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
         }

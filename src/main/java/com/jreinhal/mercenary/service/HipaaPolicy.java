@@ -28,6 +28,12 @@ public class HipaaPolicy {
     private boolean suppressSensitiveLogs;
     @Value(value="${sentinel.hipaa.enforce-tls:true}")
     private boolean enforceTls;
+    @Value(value="${sentinel.hipaa.oidc.auto-provision:false}")
+    private boolean oidcAutoProvision;
+    @Value(value="${sentinel.hipaa.oidc.require-approval:true}")
+    private boolean oidcRequireApproval;
+    @Value(value="${sentinel.hipaa.oidc.require-mfa:true}")
+    private boolean oidcRequireMfa;
 
     public HipaaPolicy(LicenseService licenseService) {
         this.licenseService = licenseService;
@@ -88,5 +94,17 @@ public class HipaaPolicy {
 
     public boolean shouldEnforceTls() {
         return this.isStrict(Department.MEDICAL) && this.enforceTls;
+    }
+
+    public boolean shouldAllowOidcAutoProvision() {
+        return !this.isStrict(Department.MEDICAL) || this.oidcAutoProvision;
+    }
+
+    public boolean shouldRequireOidcApproval() {
+        return this.isStrict(Department.MEDICAL) && this.oidcRequireApproval;
+    }
+
+    public boolean shouldRequireOidcMfa() {
+        return this.isStrict(Department.MEDICAL) && this.oidcRequireMfa;
     }
 }

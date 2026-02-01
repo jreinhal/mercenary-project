@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.service;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.repository.UserRepository;
 import com.jreinhal.mercenary.service.AuthenticationService;
+import com.jreinhal.mercenary.security.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.nio.charset.StandardCharsets;
@@ -24,12 +25,16 @@ implements AuthenticationService {
     public static final String SESSION_USER_ID = "mercenary.auth.userId";
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ClientIpResolver clientIpResolver;
+    private final LoginAttemptService loginAttemptService;
     @Value(value="${app.standard.allow-basic:false}")
     private boolean allowBasic;
 
-    public StandardAuthenticationService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public StandardAuthenticationService(UserRepository userRepository, PasswordEncoder passwordEncoder, ClientIpResolver clientIpResolver, LoginAttemptService loginAttemptService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.clientIpResolver = clientIpResolver;
+        this.loginAttemptService = loginAttemptService;
         log.info("==========================================================");
         log.info(">>> STANDARD AUTHENTICATION MODE ACTIVE (Session) <<<");
         log.info(">>> Users authenticate via session or optional Basic <<<");
@@ -49,31 +54,46 @@ implements AuthenticationService {
     }
 
     public User authenticateCredentials(String username, String password) {
+        return this.authenticateCredentials(username, password, null);
+    }
+
+    public User authenticateCredentials(String username, String password, HttpServletRequest request) {
         if (username == null || username.isBlank() || password == null) {
             log.warn("Authentication failed: Missing credentials");
+            return null;
+        }
+        String clientIp = this.clientIpResolver.resolveClientIp(request);
+        String lockoutKey = this.loginAttemptService.buildKey(username, clientIp);
+        if (this.loginAttemptService.isLockedOut(lockoutKey)) {
+            log.warn("Authentication locked out for user '{}' from {}", username, clientIp);
             return null;
         }
         Optional<User> userOpt = this.userRepository.findByUsername(username);
         if (userOpt.isEmpty()) {
             log.warn("Authentication failed: User '{}' not found", username);
+            this.loginAttemptService.recordFailure(lockoutKey);
             return null;
         }
         User user = userOpt.get();
         if (!user.isActive()) {
             log.warn("Authentication failed: User '{}' is deactivated", username);
+            this.loginAttemptService.recordFailure(lockoutKey);
             return null;
         }
         if (user.isPendingApproval()) {
             log.warn("Authentication failed: User '{}' pending approval", username);
+            this.loginAttemptService.recordFailure(lockoutKey);
             return null;
         }
         if (user.getPasswordHash() != null && this.passwordEncoder.matches((CharSequence)password, user.getPasswordHash())) {
             user.setLastLoginAt(Instant.now());
             this.userRepository.save(user);
             log.info("User '{}' authenticated successfully", username);
+            this.loginAttemptService.recordSuccess(lockoutKey);
             return user;
         }
         log.warn("Authentication failed: Invalid password for user '{}'", username);
+        this.loginAttemptService.recordFailure(lockoutKey);
         return null;
     }
 
@@ -116,7 +136,7 @@ implements AuthenticationService {
             }
             String username = values[0];
             String password = values[1];
-            User user = this.authenticateCredentials(username, password);
+            User user = this.authenticateCredentials(username, password, request);
             if (user != null) {
                 log.info("User '{}' authenticated successfully via Basic Auth", username);
             }

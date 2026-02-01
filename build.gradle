@@ -74,6 +74,9 @@ dependencies {
     // JWT validation for OIDC
     implementation 'com.nimbusds:nimbus-jose-jwt:9.37.3'
 
+    // AWS KMS (optional key management for HIPAA deployments)
+    implementation 'software.amazon.awssdk:kms:2.25.62'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
