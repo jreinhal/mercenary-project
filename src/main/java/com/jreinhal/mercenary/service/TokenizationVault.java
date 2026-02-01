@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.service;
 
+import com.jreinhal.mercenary.Department;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
@@ -26,7 +27,9 @@ import org.springframework.stereotype.Service;
 public class TokenizationVault {
     private static final Logger log = LoggerFactory.getLogger(TokenizationVault.class);
     private final MongoTemplate mongoTemplate;
-    private final byte[] secretKey;
+    private final byte[] hmacKey;
+    private final byte[] aesKey;
+    private final HipaaPolicy hipaaPolicy;
     @Value(value="${app.tokenization.enabled:true}")
     private boolean enabled;
     @Value(value="${app.tokenization.store-originals:true}")
@@ -35,21 +38,15 @@ public class TokenizationVault {
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
 
-    public TokenizationVault(MongoTemplate mongoTemplate, @Value(value="${app.tokenization.secret-key:}") String configuredKey) {
+    public TokenizationVault(MongoTemplate mongoTemplate, HipaaPolicy hipaaPolicy,
+                             @Value(value="${app.tokenization.secret-key:}") String configuredKey,
+                             @Value(value="${app.tokenization.hmac-key:}") String configuredHmacKey,
+                             @Value(value="${app.tokenization.aes-key:}") String configuredAesKey) {
         this.mongoTemplate = mongoTemplate;
-        if (configuredKey == null || configuredKey.isBlank()) {
-            byte[] randomKey = new byte[32];
-            new SecureRandom().nextBytes(randomKey);
-            this.secretKey = randomKey;
-            log.warn("=================================================================");
-            log.warn("  TOKENIZATION VAULT: Using randomly generated key (DEV MODE)");
-            log.warn("  Tokens will NOT be consistent across application restarts!");
-            log.warn("  Set app.tokenization.secret-key for production use.");
-            log.warn("=================================================================");
-        } else {
-            this.secretKey = Base64.getDecoder().decode(configuredKey);
-            log.info("Tokenization Vault initialized with configured secret key");
-        }
+        this.hipaaPolicy = hipaaPolicy;
+        KeyMaterial keys = this.resolveKeys(configuredKey, configuredHmacKey, configuredAesKey);
+        this.hmacKey = keys.hmacKey();
+        this.aesKey = keys.aesKey();
     }
 
     public String tokenize(String value, String piiType, String userId) {
@@ -100,7 +97,7 @@ public class TokenizationVault {
 
     private String generateToken(String value, String piiType) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
-        SecretKeySpec keySpec = new SecretKeySpec(this.secretKey, "HmacSHA256");
+        SecretKeySpec keySpec = new SecretKeySpec(this.hmacKey, "HmacSHA256");
         mac.init(keySpec);
         String input = piiType + ":" + value;
         byte[] hmac = mac.doFinal(input.getBytes(StandardCharsets.UTF_8));
@@ -114,7 +111,7 @@ public class TokenizationVault {
             byte[] iv = new byte[12];
             new SecureRandom().nextBytes(iv);
             Cipher cipher = Cipher.getInstance(AES_GCM_ALGORITHM);
-            SecretKeySpec keySpec = new SecretKeySpec(this.secretKey, "AES");
+            SecretKeySpec keySpec = new SecretKeySpec(this.aesKey, "AES");
             GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
             cipher.init(1, (Key)keySpec, gcmSpec);
             byte[] plaintext = value.getBytes(StandardCharsets.UTF_8);
@@ -139,7 +136,7 @@ public class TokenizationVault {
             byte[] ciphertext = new byte[buffer.remaining()];
             buffer.get(ciphertext);
             Cipher cipher = Cipher.getInstance(AES_GCM_ALGORITHM);
-            SecretKeySpec keySpec = new SecretKeySpec(this.secretKey, "AES");
+            SecretKeySpec keySpec = new SecretKeySpec(this.aesKey, "AES");
             GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
             cipher.init(2, (Key)keySpec, gcmSpec);
             byte[] plaintext = cipher.doFinal(ciphertext);
@@ -156,6 +153,57 @@ public class TokenizationVault {
         new SecureRandom().nextBytes(key);
         return Base64.getEncoder().encodeToString(key);
     }
+
+    private KeyMaterial resolveKeys(String baseKey, String hmacKey, String aesKey) {
+        boolean hasBase = baseKey != null && !baseKey.isBlank();
+        boolean hasHmac = hmacKey != null && !hmacKey.isBlank();
+        boolean hasAes = aesKey != null && !aesKey.isBlank();
+
+        if (this.hipaaPolicy.isStrict(Department.MEDICAL) && !(hasBase || (hasHmac && hasAes))) {
+            throw new IllegalStateException("HIPAA medical deployments require configured tokenization keys (set app.tokenization.secret-key or both app.tokenization.hmac-key and app.tokenization.aes-key).");
+        }
+
+        if (hasHmac || hasAes) {
+            if (!(hasHmac && hasAes)) {
+                throw new IllegalStateException("Tokenization vault requires both app.tokenization.hmac-key and app.tokenization.aes-key when using split keys.");
+            }
+            return new KeyMaterial(decodeKey(hmacKey, "HMAC"), decodeKey(aesKey, "AES"));
+        }
+
+        if (hasBase) {
+            byte[] base = decodeKey(baseKey, "base");
+            return new KeyMaterial(deriveKey(base, "HMAC"), deriveKey(base, "AES"));
+        }
+
+        byte[] randomKey = new byte[32];
+        new SecureRandom().nextBytes(randomKey);
+        log.warn("=================================================================");
+        log.warn("  TOKENIZATION VAULT: Using randomly generated key (DEV MODE)");
+        log.warn("  Tokens will NOT be consistent across application restarts!");
+        log.warn("  Set app.tokenization.secret-key for production use.");
+        log.warn("=================================================================");
+        return new KeyMaterial(randomKey, randomKey);
+    }
+
+    private byte[] deriveKey(byte[] baseKey, String label) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(baseKey, "HmacSHA256"));
+            return mac.doFinal(("TOKENIZATION-" + label).getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to derive tokenization " + label + " key", e);
+        }
+    }
+
+    private byte[] decodeKey(String raw, String label) {
+        try {
+            return Base64.getDecoder().decode(raw);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("Invalid base64 for tokenization " + label + " key", e);
+        }
+    }
+
+    private record KeyMaterial(byte[] hmacKey, byte[] aesKey) {}
 
     @Document(collection="tokenization_vault")
     public static class TokenEntry {

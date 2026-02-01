@@ -5,6 +5,7 @@ import com.jreinhal.mercenary.filter.PreAuthRateLimitFilter;
 import com.jreinhal.mercenary.filter.RateLimitFilter;
 import com.jreinhal.mercenary.filter.SecurityFilter;
 import com.jreinhal.mercenary.security.CacUserDetailsService;
+import com.jreinhal.mercenary.Department;
 import jakarta.servlet.Filter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -35,19 +36,19 @@ public class SecurityConfig {
     private final RateLimitFilter rateLimitFilter;
     private final PreAuthRateLimitFilter preAuthRateLimitFilter;
     private final CorrelationIdFilter correlationIdFilter;
+    private final com.jreinhal.mercenary.service.HipaaPolicy hipaaPolicy;
     @Value(value="${app.auth-mode:DEV}")
     private String authMode;
     @Value(value="${app.csrf.bypass-ingest:false}")
     private boolean csrfBypassIngest;
-    @Value(value="${sentinel.hipaa.enforce-tls:false}")
-    private boolean hipaaEnforceTls;
 
-    public SecurityConfig(CacUserDetailsService cacUserDetailsService, SecurityFilter securityFilter, RateLimitFilter rateLimitFilter, PreAuthRateLimitFilter preAuthRateLimitFilter, CorrelationIdFilter correlationIdFilter) {
+    public SecurityConfig(CacUserDetailsService cacUserDetailsService, SecurityFilter securityFilter, RateLimitFilter rateLimitFilter, PreAuthRateLimitFilter preAuthRateLimitFilter, CorrelationIdFilter correlationIdFilter, com.jreinhal.mercenary.service.HipaaPolicy hipaaPolicy) {
         this.cacUserDetailsService = cacUserDetailsService;
         this.securityFilter = securityFilter;
         this.rateLimitFilter = rateLimitFilter;
         this.preAuthRateLimitFilter = preAuthRateLimitFilter;
         this.correlationIdFilter = correlationIdFilter;
+        this.hipaaPolicy = hipaaPolicy;
     }
 
     @Bean
@@ -120,7 +121,7 @@ public class SecurityConfig {
                 .addFilterBefore((Filter)this.securityFilter, AnonymousAuthenticationFilter.class)
                 .addFilterBefore((Filter)this.rateLimitFilter, AuthorizationFilter.class)
                 .requiresChannel(channel -> {
-                    if (this.hipaaEnforceTls) {
+                    if (this.hipaaPolicy.shouldEnforceTls()) {
                         channel.anyRequest().requiresSecure();
                     }
                 })
@@ -132,7 +133,7 @@ public class SecurityConfig {
                     }
                 })
                 .headers(headers -> {
-                    if (this.hipaaEnforceTls) {
+                    if (this.hipaaPolicy.shouldEnforceTls()) {
                         headers.httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31536000L).includeSubDomains(true).preload(true));
                     }
                     headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
@@ -140,7 +141,18 @@ public class SecurityConfig {
                             .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                             .addHeaderWriter(new PermissionsPolicyHeaderWriter("geolocation=(), microphone=(), camera=()"));
                 })
-                .authorizeHttpRequests(auth -> ((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)auth.requestMatchers(new String[]{"/api/health", "/api/status"})).permitAll().requestMatchers(new String[]{"/api/auth/**"})).permitAll().requestMatchers(new String[]{"/", "/index.html", "/manual.html"})).permitAll().requestMatchers(new String[]{"/css/**", "/js/**", "/images/**", "/favicon.ico"})).permitAll().requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"})).permitAll().requestMatchers(new String[]{"/api/admin/**"})).hasAuthority("ADMIN").requestMatchers(new String[]{"/api/**"})).authenticated().anyRequest()).permitAll())
+                .authorizeHttpRequests(auth -> {
+                    auth.requestMatchers(new String[]{"/api/health", "/api/status"}).permitAll();
+                    auth.requestMatchers(new String[]{"/api/auth/**"}).permitAll();
+                    auth.requestMatchers(new String[]{"/", "/index.html", "/manual.html"}).permitAll();
+                    auth.requestMatchers(new String[]{"/css/**", "/js/**", "/images/**", "/favicon.ico"}).permitAll();
+                    if (!this.hipaaPolicy.isStrict(Department.MEDICAL)) {
+                        auth.requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"}).permitAll();
+                    }
+                    auth.requestMatchers(new String[]{"/api/admin/**"}).hasAuthority("ADMIN");
+                    auth.requestMatchers(new String[]{"/api/**"}).authenticated();
+                    auth.anyRequest().permitAll();
+                })
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable);
         return (SecurityFilterChain)http.build();

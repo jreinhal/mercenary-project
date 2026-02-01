@@ -414,7 +414,13 @@ sentinel:
     disable-experience-learning: ${HIPAA_DISABLE_EXPERIENCE:true}
     suppress-sensitive-logs: ${HIPAA_SUPPRESS_LOGS:true}
     # Enforce TLS on non-govcloud profiles when strict mode is required
-    enforce-tls: ${HIPAA_ENFORCE_TLS:false}
+    enforce-tls: ${HIPAA_ENFORCE_TLS:true}
+    # Automatic logoff via server session timeout (minutes)
+    session-timeout-minutes: ${HIPAA_SESSION_TIMEOUT_MINUTES:15}
+
+  integrity:
+    # HMAC signing key for session exports/traces (required for medical deployments)
+    secret-key: ${SENTINEL_INTEGRITY_SECRET:}
 
 # ============================================
 # Swagger/OpenAPI Configuration

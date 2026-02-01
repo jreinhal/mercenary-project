@@ -26,6 +26,8 @@ public class HipaaPolicy {
     private boolean disableExperienceLearning;
     @Value(value="${sentinel.hipaa.suppress-sensitive-logs:true}")
     private boolean suppressSensitiveLogs;
+    @Value(value="${sentinel.hipaa.enforce-tls:true}")
+    private boolean enforceTls;
 
     public HipaaPolicy(LicenseService licenseService) {
         this.licenseService = licenseService;
@@ -82,5 +84,9 @@ public class HipaaPolicy {
 
     public boolean shouldSuppressSensitiveLogs(Department department) {
         return this.isStrict(department) && this.suppressSensitiveLogs;
+    }
+
+    public boolean shouldEnforceTls() {
+        return this.isStrict(Department.MEDICAL) && this.enforceTls;
     }
 }
