@@ -4044,10 +4044,13 @@
         function showSettingToast(settingName, enabled) {
             const toast = document.createElement('div');
             toast.className = 'setting-toast';
-            toast.innerHTML = `
-                <span class="setting-toast-icon ${enabled ? 'setting-toast-icon--on' : 'setting-toast-icon--off'}">${enabled ? 'OK' : 'OFF'}</span>
-                <span>${settingName} ${enabled ? 'enabled' : 'disabled'}</span>
-            `;
+            const icon = document.createElement('span');
+            icon.className = `setting-toast-icon ${enabled ? 'setting-toast-icon--on' : 'setting-toast-icon--off'}`;
+            icon.textContent = enabled ? 'OK' : 'OFF';
+            const label = document.createElement('span');
+            label.textContent = `${settingName} ${enabled ? 'enabled' : 'disabled'}`;
+            toast.appendChild(icon);
+            toast.appendChild(label);
             document.body.appendChild(toast);
 
             requestAnimationFrame(() => {
@@ -4064,10 +4067,13 @@
         function showInfoToast(message, duration = 4000) {
             const toast = document.createElement('div');
             toast.className = 'setting-toast info-toast';
-            toast.innerHTML = `
-                <span class="setting-toast-icon setting-toast-icon--info">ℹ</span>
-                <span>${message}</span>
-            `;
+            const icon = document.createElement('span');
+            icon.className = 'setting-toast-icon setting-toast-icon--info';
+            icon.textContent = 'ℹ';
+            const label = document.createElement('span');
+            label.textContent = message;
+            toast.appendChild(icon);
+            toast.appendChild(label);
             document.body.appendChild(toast);
 
             requestAnimationFrame(() => {
@@ -4135,10 +4141,13 @@
 
             const toast = document.createElement('div');
             toast.className = 'setting-toast';
-            toast.innerHTML = `
-                <span class="setting-toast-icon setting-toast-icon--on">OK</span>
-                <span>Settings saved successfully</span>
-            `;
+            const icon = document.createElement('span');
+            icon.className = 'setting-toast-icon setting-toast-icon--on';
+            icon.textContent = 'OK';
+            const label = document.createElement('span');
+            label.textContent = 'Settings saved successfully';
+            toast.appendChild(icon);
+            toast.appendChild(label);
             document.body.appendChild(toast);
 
             requestAnimationFrame(() => {
