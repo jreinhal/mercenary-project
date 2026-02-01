@@ -28,10 +28,20 @@ Optional:
 - OIDC_ALGORITHMS
 - OIDC_VALIDATE_ISSUER
 - OIDC_VALIDATE_AUDIENCE
+- OIDC_REQUIRE_APPROVAL
+- OIDC_REQUIRE_MFA
+- OIDC_MFA_CLAIMS
+- OIDC_MFA_ACR
 
 ## CAC configuration (govcloud profile)
 - CAC_AUTO_PROVISION=false by default
 - CAC_DEFAULT_ROLE and CAC_DEFAULT_CLEARANCE apply only if auto-provisioning is enabled
+
+## Standard auth lockout
+- AUTH_LOCKOUT_ENABLED (default true)
+- AUTH_LOCKOUT_MAX_ATTEMPTS (default 5)
+- AUTH_LOCKOUT_WINDOW_MINUTES (default 15)
+- AUTH_LOCKOUT_DURATION_MINUTES (default 15)
 
 ## Roles and permissions
 Roles are defined in UserRole:
@@ -62,6 +72,8 @@ Security-relevant events are written to MongoDB (audit_log). Audit access requir
 Endpoints:
 - /api/audit/events
 - /api/audit/stats
+- /api/hipaa/audit/events
+- /api/hipaa/audit/export
 
 ## Additional security controls
 - Guardrails: app.guardrails.enabled

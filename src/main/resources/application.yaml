@@ -112,6 +112,23 @@ app:
   audit:
     # Fail-closed is enforced in govcloud profile at runtime
     fail-closed: ${AUDIT_FAIL_CLOSED:false}
+  auth:
+    lockout:
+      enabled: ${AUTH_LOCKOUT_ENABLED:true}
+      max-attempts: ${AUTH_LOCKOUT_MAX_ATTEMPTS:5}
+      window-minutes: ${AUTH_LOCKOUT_WINDOW_MINUTES:15}
+      duration-minutes: ${AUTH_LOCKOUT_DURATION_MINUTES:15}
+  tokenization:
+    enabled: ${TOKENIZATION_ENABLED:true}
+    store-originals: ${TOKENIZATION_STORE_ORIGINALS:true}
+    secret-key: ${TOKENIZATION_SECRET_KEY:}
+    hmac-key: ${TOKENIZATION_HMAC_KEY:}
+    aes-key: ${TOKENIZATION_AES_KEY:}
+    active-key-id: ${TOKENIZATION_ACTIVE_KEY_ID:}
+    hmac-keys: ${TOKENIZATION_HMAC_KEYS:}
+    aes-keys: ${TOKENIZATION_AES_KEYS:}
+    hmac-keys-kms: ${TOKENIZATION_HMAC_KEYS_KMS:}
+    aes-keys-kms: ${TOKENIZATION_AES_KEYS_KMS:}
 
 # ============================================
 # SENTINEL Configuration
@@ -417,10 +434,25 @@ sentinel:
     enforce-tls: ${HIPAA_ENFORCE_TLS:true}
     # Automatic logoff via server session timeout (minutes)
     session-timeout-minutes: ${HIPAA_SESSION_TIMEOUT_MINUTES:15}
+    oidc:
+      # Override OIDC defaults for medical deployments
+      auto-provision: ${HIPAA_OIDC_AUTO_PROVISION:false}
+      require-approval: ${HIPAA_OIDC_REQUIRE_APPROVAL:true}
+      require-mfa: ${HIPAA_OIDC_REQUIRE_MFA:true}
+
+  kms:
+    enabled: ${KMS_ENABLED:false}
+    region: ${KMS_REGION:}
+    endpoint: ${KMS_ENDPOINT:}
 
   integrity:
     # HMAC signing key for session exports/traces (required for medical deployments)
     secret-key: ${SENTINEL_INTEGRITY_SECRET:}
+    # Rotation-ready keyring: keyId:base64 pairs (comma-separated)
+    active-key-id: ${INTEGRITY_ACTIVE_KEY_ID:}
+    keys: ${INTEGRITY_KEYS:}
+    # KMS-encrypted keyring entries (keyId:ciphertextBase64)
+    keys-kms: ${INTEGRITY_KEYS_KMS:}
 
 # ============================================
 # Swagger/OpenAPI Configuration
@@ -486,6 +518,10 @@ app:
     validate-issuer: ${OIDC_VALIDATE_ISSUER:true}
     validate-audience: ${OIDC_VALIDATE_AUDIENCE:true}
     auto-provision: ${OIDC_AUTO_PROVISION:true}
+    require-approval: ${OIDC_REQUIRE_APPROVAL:false}
+    require-mfa: ${OIDC_REQUIRE_MFA:false}
+    mfa-claim-values: ${OIDC_MFA_CLAIMS:mfa,otp,pwd+otp,hwk}
+    mfa-acr-values: ${OIDC_MFA_ACR:}
     default-role: ${OIDC_DEFAULT_ROLE:VIEWER}
     default-clearance: ${OIDC_DEFAULT_CLEARANCE:UNCLASSIFIED}
 

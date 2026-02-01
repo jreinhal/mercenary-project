@@ -47,6 +47,8 @@ Sectors (dept): GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
 ## Audit
 - GET /api/audit/events?limit=100
 - GET /api/audit/stats
+- GET /api/hipaa/audit/events?limit=200&since=<ISO-8601>&until=<ISO-8601>&type=<PHI_ACCESS|PHI_QUERY|PHI_DISCLOSURE|...>
+- GET /api/hipaa/audit/export?format=json|csv&since=<ISO-8601>&until=<ISO-8601>&type=<eventType>
 
 ## Admin (ADMIN role)
 - GET /api/admin/users

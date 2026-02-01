@@ -5,9 +5,14 @@ import com.jreinhal.mercenary.service.PiiRedactionService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.CriteriaDefinition;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -97,6 +102,34 @@ public class HipaaAuditService {
             return redacted.substring(0, 200) + "...";
         }
         return redacted;
+    }
+
+    public List<HipaaAuditEvent> getRecentEvents(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        Query query = new Query();
+        query.with(Sort.by(Sort.Direction.DESC, "timestamp"));
+        query.limit(limit);
+        return this.mongoTemplate.find(query, HipaaAuditEvent.class, COLLECTION_NAME);
+    }
+
+    public List<HipaaAuditEvent> queryEvents(Optional<Instant> since, Optional<Instant> until, Optional<AuditEventType> type, int limit) {
+        Query query = new Query();
+        if (since.isPresent()) {
+            query.addCriteria((CriteriaDefinition)Criteria.where("timestamp").gte(since.get()));
+        }
+        if (until.isPresent()) {
+            query.addCriteria((CriteriaDefinition)Criteria.where("timestamp").lte(until.get()));
+        }
+        if (type.isPresent()) {
+            query.addCriteria((CriteriaDefinition)Criteria.where("eventType").is(type.get()));
+        }
+        query.with(Sort.by(Sort.Direction.DESC, "timestamp"));
+        if (limit > 0) {
+            query.limit(limit);
+        }
+        return this.mongoTemplate.find(query, HipaaAuditEvent.class, COLLECTION_NAME);
     }
 
     public static enum AuditEventType {

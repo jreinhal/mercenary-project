@@ -24,6 +24,7 @@ implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(OidcAuthenticationService.class);
     private final UserRepository userRepository;
     private final JwtValidator jwtValidator;
+    private final HipaaPolicy hipaaPolicy;
     @Value(value="${app.oidc.issuer:}")
     private String issuer;
     @Value(value="${app.oidc.client-id:}")
@@ -41,9 +42,10 @@ implements AuthenticationService {
     @Value(value="${app.oidc.max-default-role:ANALYST}")
     private String maxDefaultRole;
 
-    public OidcAuthenticationService(UserRepository userRepository, JwtValidator jwtValidator) {
+    public OidcAuthenticationService(UserRepository userRepository, JwtValidator jwtValidator, HipaaPolicy hipaaPolicy) {
         this.userRepository = userRepository;
         this.jwtValidator = jwtValidator;
+        this.hipaaPolicy = hipaaPolicy;
         log.info("==========================================================");
         log.info(">>> OIDC AUTHENTICATION MODE ACTIVE <<<");
         log.info(">>> JWT signature validation: ENABLED                  <<<");
@@ -76,6 +78,21 @@ implements AuthenticationService {
             log.info("  Require approval: {}", this.requireApproval);
         }
         this.validateDefaultPermissions();
+        this.enforceHipaaDefaults();
+    }
+
+    private void enforceHipaaDefaults() {
+        if (!this.hipaaPolicy.isStrict(Department.MEDICAL)) {
+            return;
+        }
+        if (this.autoProvision && !this.hipaaPolicy.shouldAllowOidcAutoProvision()) {
+            log.warn("HIPAA strict: disabling OIDC auto-provisioning.");
+            this.autoProvision = false;
+        }
+        if (!this.requireApproval && this.hipaaPolicy.shouldRequireOidcApproval()) {
+            log.warn("HIPAA strict: enabling OIDC require-approval.");
+            this.requireApproval = true;
+        }
     }
 
     private void validateDefaultPermissions() {

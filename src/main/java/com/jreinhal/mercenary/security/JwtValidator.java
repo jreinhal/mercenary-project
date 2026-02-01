@@ -16,15 +16,18 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import com.jreinhal.mercenary.service.HipaaPolicy;
 
 @Component
 public class JwtValidator {
     private static final Logger log = LoggerFactory.getLogger(JwtValidator.class);
     private final JwksKeyProvider keyProvider;
+    private final HipaaPolicy hipaaPolicy;
     @Value(value="${app.oidc.issuer:}")
     private String expectedIssuer;
     @Value(value="${app.oidc.client-id:}")
@@ -37,9 +40,16 @@ public class JwtValidator {
     private boolean validateIssuer;
     @Value(value="${app.oidc.validate-audience:true}")
     private boolean validateAudience;
+    @Value(value="${app.oidc.require-mfa:false}")
+    private boolean requireMfa;
+    @Value(value="${app.oidc.mfa-claim-values:mfa,otp,pwd+otp,hwk}")
+    private String mfaClaimValues;
+    @Value(value="${app.oidc.mfa-acr-values:}")
+    private String mfaAcrValues;
 
-    public JwtValidator(JwksKeyProvider keyProvider) {
+    public JwtValidator(JwksKeyProvider keyProvider, HipaaPolicy hipaaPolicy) {
         this.keyProvider = keyProvider;
+        this.hipaaPolicy = hipaaPolicy;
     }
 
     public ValidationResult validate(String token) {
@@ -109,6 +119,9 @@ public class JwtValidator {
         if (claims.getSubject() == null || claims.getSubject().isEmpty()) {
             return ValidationResult.failure("Token missing subject claim");
         }
+        if (this.isMfaRequired() && !this.isMfaSatisfied(claims)) {
+            return ValidationResult.failure("MFA required but token lacks required AMR/ACR claims");
+        }
         return ValidationResult.success(claims);
     }
 
@@ -118,6 +131,52 @@ public class JwtValidator {
         }
         HashSet<String> allowed = new HashSet<String>(Arrays.asList(this.allowedAlgorithms.split(",")));
         return allowed.contains(algorithm.getName());
+    }
+
+    private boolean isMfaRequired() {
+        return this.requireMfa || this.hipaaPolicy.shouldRequireOidcMfa();
+    }
+
+    private boolean isMfaSatisfied(JWTClaimsSet claims) {
+        Set<String> requiredAmr = this.parseList(this.mfaClaimValues);
+        Set<String> requiredAcr = this.parseList(this.mfaAcrValues);
+        Object amrClaim = claims.getClaim("amr");
+        if (amrClaim instanceof List<?> amrList) {
+            for (Object value : amrList) {
+                if (value != null && requiredAmr.contains(value.toString().toLowerCase())) {
+                    return true;
+                }
+            }
+        } else if (amrClaim instanceof String amrString) {
+            if (requiredAmr.contains(amrString.toLowerCase())) {
+                return true;
+            }
+        }
+        if (!requiredAcr.isEmpty()) {
+            try {
+                String acr = claims.getStringClaim("acr");
+                if (acr != null && requiredAcr.contains(acr.toLowerCase())) {
+                    return true;
+                }
+            } catch (ParseException e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private Set<String> parseList(String values) {
+        Set<String> items = new HashSet<>();
+        if (values == null || values.isBlank()) {
+            return items;
+        }
+        for (String value : values.split(",")) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            items.add(value.trim().toLowerCase());
+        }
+        return items;
     }
 
     public boolean isValidFormat(String token) {
