@@ -324,6 +324,7 @@
                     case 'regenerateResponse': regenerateResponse(); break;
                     case 'switchRightTab': switchRightTab(el.dataset.tab); break;
                     case 'switchGraphTab': switchGraphTab(el.dataset.graphTab); break;
+                    case 'setEntityGraphMode': setEntityGraphMode(el.dataset.entityGraphMode); break;
                     case 'refreshEntityGraph': refreshEntityGraph(); break;
                     case 'collapseEntityExplorer': collapseEntityExplorer(); break;
                     case 'toggleInfoSection': toggleInfoSection(el); break;
@@ -1085,6 +1086,22 @@
             selectedNode: null,
             searchFilter: ''
         };
+        let entityGraphMode = 'context'; // 'context' (response) or 'sector' (corpus)
+        let contextGraphState = {
+            entities: [],
+            edges: []
+        };
+
+        function getActiveEntityGraphState() {
+            return entityGraphMode === 'context' ? contextGraphState : entityGraphState;
+        }
+
+        function setEntityGraphStats(entityCount, edgeCount) {
+            const nodeCountEl = document.getElementById('entity-node-count');
+            const edgeCountEl = document.getElementById('entity-edge-count');
+            setText(nodeCountEl, String(entityCount ?? 0));
+            setText(edgeCountEl, String(edgeCount ?? 0));
+        }
 
         function switchGraphTab(tabName) {
             const graphContainer = document.getElementById('graph-container');
@@ -1107,20 +1124,28 @@
                 infoSections.forEach(section => setHidden(section, true));
                 // Expand the right panel for better graph visualization
                 workspace?.classList.add('entity-explorer-expanded');
-                // Load entities if not already loaded
-                if (entityGraphState.entities.length === 0) {
-                    loadEntityGraph();
+                if (entityGraphMode === 'sector') {
+                    // Load sector graph if not already loaded
+                    if (entityGraphState.entities.length === 0) {
+                        loadEntityGraph();
+                    } else {
+                        renderEntityGraph();
+                    }
                 } else {
-                    // Resize graph to fit new container size
-                    setTimeout(() => {
-                        if (entityGraphState.graph) {
-                            const container = document.getElementById('entity-graph');
-                            if (container) {
-                                entityGraphState.graph.width(container.clientWidth);
-                                entityGraphState.graph.height(container.clientHeight);
-                            }
-                        }
-                    }, 250);
+                    // Context graph uses latest response entities
+                    if (contextGraphState.entities.length === 0) {
+                        const placeholder = document.getElementById('entity-placeholder');
+                        const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
+                        const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
+                        if (placeholderText) placeholderText.textContent = 'No entities extracted from the latest response';
+                        if (placeholderHint) placeholderHint.textContent = 'Ask a question to populate the context graph.';
+                        setHidden(placeholder, false);
+                        const graphEl = document.getElementById('entity-graph');
+                        if (graphEl) graphEl.innerHTML = '';
+                        setEntityGraphStats(0, 0);
+                    } else {
+                        renderEntityGraph();
+                    }
                 }
             } else {
                 setHidden(graphContainer, false);
@@ -1142,6 +1167,8 @@
             const nodeCountEl = document.getElementById('entity-node-count');
             const edgeCountEl = document.getElementById('entity-edge-count');
             const placeholder = document.getElementById('entity-placeholder');
+            const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
+            const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
             const graphEl = document.getElementById('entity-graph');
 
             try {
@@ -1153,6 +1180,10 @@
                     console.warn('Entity graph stats error:', stats.error);
                     setText(nodeCountEl, '0');
                     setText(edgeCountEl, '0');
+                    if (placeholderText) placeholderText.textContent = 'Entity graph unavailable';
+                    if (placeholderHint) placeholderHint.textContent = stats.error;
+                    setHidden(placeholder, false);
+                    graphEl.innerHTML = '';
                     return;
                 }
 
@@ -1174,8 +1205,12 @@
                 const entitiesData = await entitiesRes.json();
                 const edgesData = await edgesRes.json();
 
-                if (entitiesData.error) {
-                    console.warn('Entity graph entities error:', entitiesData.error);
+                if (entitiesData.error || edgesData.error) {
+                    console.warn('Entity graph entities error:', entitiesData.error || edgesData.error);
+                    if (placeholderText) placeholderText.textContent = 'Entity graph failed to load';
+                    if (placeholderHint) placeholderHint.textContent = entitiesData.error || edgesData.error;
+                    setHidden(placeholder, false);
+                    graphEl.innerHTML = '';
                     return;
                 }
 
@@ -1188,19 +1223,148 @@
                     return;
                 }
 
+                if (placeholderText) placeholderText.textContent = 'Entity network will appear here';
+                if (placeholderHint) placeholderHint.textContent = 'Entities are extracted during document upload. Enable Deep Analysis to query the entity graph.';
                 setHidden(placeholder, true);
                 renderEntityGraph();
 
             } catch (error) {
                 if (error && error.code === 'auth') return;
                 console.error('Failed to load entity graph:', error);
+                if (placeholderText) placeholderText.textContent = 'Entity graph unavailable';
+                if (placeholderHint) placeholderHint.textContent = 'Failed to load graph data. Please retry.';
+                setHidden(placeholder, false);
+                graphEl.innerHTML = '';
             }
         }
 
         function refreshEntityGraph() {
-            entityGraphState.entities = [];
-            entityGraphState.edges = [];
-            loadEntityGraph();
+            if (entityGraphMode === 'sector') {
+                entityGraphState.entities = [];
+                entityGraphState.edges = [];
+                loadEntityGraph();
+                return;
+            }
+
+            const entities = extractEntities(lastResponseText || '', true);
+            updateContextEntityGraph(entities);
+            renderEntityGraph();
+        }
+
+        function setEntityGraphMode(mode) {
+            const normalized = mode === 'sector' ? 'sector' : 'context';
+            entityGraphMode = normalized;
+
+            document.querySelectorAll('.entity-mode-btn').forEach(btn => {
+                const isActive = btn.dataset.entityGraphMode === normalized;
+                btn.classList.toggle('active', isActive);
+            });
+
+            const placeholder = document.getElementById('entity-placeholder');
+            const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
+            const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
+            const graphEl = document.getElementById('entity-graph');
+
+            if (normalized === 'sector') {
+                if (entityGraphState.entities.length === 0) {
+                    loadEntityGraph();
+                } else {
+                    setEntityGraphStats(entityGraphState.entities.length, entityGraphState.edges.length);
+                    if (placeholderText) placeholderText.textContent = 'Entity network will appear here';
+                    if (placeholderHint) placeholderHint.textContent = 'Entities are extracted during document upload. Enable Deep Analysis to query the entity graph.';
+                    setHidden(placeholder, entityGraphState.entities.length > 0);
+                    if (entityGraphState.entities.length === 0 && graphEl) graphEl.innerHTML = '';
+                    renderEntityGraph();
+                }
+                return;
+            }
+
+            // Context mode (latest response)
+            if (contextGraphState.entities.length === 0) {
+                setEntityGraphStats(0, 0);
+                if (placeholderText) placeholderText.textContent = 'No entities extracted from the latest response';
+                if (placeholderHint) placeholderHint.textContent = 'Ask a question to populate the context graph.';
+                setHidden(placeholder, false);
+                if (graphEl) graphEl.innerHTML = '';
+                return;
+            }
+
+            setEntityGraphStats(contextGraphState.entities.length, contextGraphState.edges.length);
+            if (placeholderText) placeholderText.textContent = 'Context entity network';
+            if (placeholderHint) placeholderHint.textContent = 'Entities are extracted from the latest response.';
+            setHidden(placeholder, true);
+            renderEntityGraph();
+        }
+
+        function updateContextEntityGraph(entities) {
+            const normalizedEntities = Array.isArray(entities) ? entities : [];
+            const placeholder = document.getElementById('entity-placeholder');
+            const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
+            const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
+
+            if (normalizedEntities.length === 0) {
+                contextGraphState.entities = [];
+                contextGraphState.edges = [];
+                if (entityGraphMode === 'context') {
+                    setEntityGraphStats(0, 0);
+                    if (placeholderText) placeholderText.textContent = 'No entities extracted from the latest response';
+                    if (placeholderHint) placeholderHint.textContent = 'Ask a question to populate the context graph.';
+                    setHidden(placeholder, false);
+                }
+                return;
+            }
+
+            const typeMap = {
+                person: 'PERSON',
+                organization: 'ORGANIZATION',
+                location: 'LOCATION',
+                date: 'DATE',
+                document: 'REFERENCE',
+                concept: 'TECHNICAL',
+                acronym: 'TECHNICAL'
+            };
+
+            const nodes = [];
+            const nodeIds = [];
+            const seen = new Set();
+
+            const responseNodeId = 'context:response';
+            nodes.push({
+                id: responseNodeId,
+                value: 'Response Context',
+                entityType: 'REFERENCE',
+                referenceCount: normalizedEntities.length
+            });
+            nodeIds.push(responseNodeId);
+
+            normalizedEntities.forEach((entity, idx) => {
+                const name = (entity?.name || '').trim();
+                if (!name) return;
+                const key = name.toLowerCase();
+                if (seen.has(key)) return;
+                seen.add(key);
+                const entityType = typeMap[(entity?.type || '').toLowerCase()] || 'TECHNICAL';
+                const id = `context:${idx}:${key.replace(/[^a-z0-9]+/gi, '-')}`;
+                nodes.push({
+                    id,
+                    value: name,
+                    entityType,
+                    referenceCount: 1
+                });
+                nodeIds.push(id);
+            });
+
+            const edges = nodeIds.length > 1 ? [{ id: 'context:edge', nodeIds }] : [];
+
+            contextGraphState.entities = nodes;
+            contextGraphState.edges = edges;
+
+            if (entityGraphMode === 'context') {
+                setEntityGraphStats(nodes.length, edges.length);
+                if (placeholderText) placeholderText.textContent = 'Context entity network';
+                if (placeholderHint) placeholderHint.textContent = 'Entities are extracted from the latest response.';
+                setHidden(placeholder, true);
+            }
         }
 
         // ============================================================
@@ -1239,11 +1403,13 @@
         }
 
         function prepareEntityGraphData() {
-            let entities = entityGraphState.entities;
+            const activeState = getActiveEntityGraphState();
+            let entities = activeState.entities;
             if (entities.length === 0) return null;
 
             const nodeLimit = getEntityNodeLimit();
             const enabledTypes = getEnabledEntityTypes();
+            const searchFilter = (entityGraphState.searchFilter || '').trim().toLowerCase();
 
             // Type mapping: backend type -> filter type
             // Backend uses TECHNICAL, filter uses TECHNOLOGY (and vice versa)
@@ -1261,6 +1427,13 @@
                        enabledTypes.has(type.replace('_', ''));
             });
 
+            if (searchFilter) {
+                entities = entities.filter(e => {
+                    const label = (e.value || e.name || '').toString().toLowerCase();
+                    return label.includes(searchFilter);
+                });
+            }
+
             // Sort by referenceCount (importance) and limit nodes
             // This prevents overcrowding while showing the most relevant entities
             entities = [...entities]
@@ -1277,7 +1450,7 @@
 
             const nodeIdSet = new Set(nodes.map(n => n.id));
             const links = [];
-            const edges = entityGraphState.edges || [];
+            const edges = activeState.edges || [];
 
             for (const edge of edges) {
                 const nodeIds = (edge.nodeIds || []).filter(id => nodeIdSet.has(id));
@@ -1350,7 +1523,8 @@
         function showEntityTooltip(node, x, y) {
             const tooltip = getEntityTooltip();
             // Count connections for this node
-            const connections = (entityGraphState.edges || []).filter(edge =>
+            const activeState = getActiveEntityGraphState();
+            const connections = (activeState.edges || []).filter(edge =>
                 (edge.nodeIds || []).includes(node.id)
             ).length;
 
@@ -1405,7 +1579,24 @@
             if (!graphEl) return;
 
             const graphData = prepareEntityGraphData();
-            if (!graphData) return;
+            if (!graphData) {
+                const placeholder = document.getElementById('entity-placeholder');
+                const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
+                const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
+                const hasFilter = Boolean((entityGraphState.searchFilter || '').trim());
+                if (placeholderText) {
+                    placeholderText.textContent = hasFilter ? 'No entities match your search' : 'Entity network will appear here';
+                }
+                if (placeholderHint) {
+                    placeholderHint.textContent = hasFilter ? 'Clear the search filter to restore results.' : 'Entities are extracted during document upload. Enable Deep Analysis to query the entity graph.';
+                }
+                setHidden(placeholder, false);
+                graphEl.innerHTML = '';
+                return;
+            }
+
+            const placeholder = document.getElementById('entity-placeholder');
+            setHidden(placeholder, true);
 
             if (typeof ForceGraph === 'undefined') {
                 console.warn('2D force-graph not loaded');
@@ -2018,6 +2209,14 @@
                     renderEntityGraph();
                 });
             });
+
+            window.addEventListener('resize', () => {
+                if (!entity2DGraph) return;
+                const container = document.getElementById('entity-graph');
+                if (!container) return;
+                entity2DGraph.width(container.clientWidth);
+                entity2DGraph.height(container.clientHeight);
+            });
         });
 
         // Update graph data without full re-render
@@ -2098,7 +2297,16 @@
         });
 
         async function searchEntities(query) {
-            if (!query || query.length < 2) {
+            const normalized = (query || '').trim();
+            entityGraphState.searchFilter = normalized;
+
+            if (entityGraphMode === 'context') {
+                renderEntityGraph();
+                return;
+            }
+
+            if (!normalized || normalized.length < 2) {
+                entityGraphState.searchFilter = '';
                 // Reset to full list
                 loadEntityGraph();
                 return;
@@ -2106,7 +2314,7 @@
 
             const dept = sectorSelect?.value || 'ENTERPRISE';
             try {
-                const res = await guardedFetch(`${API_BASE}/graph/search?q=${encodeURIComponent(query)}&dept=${encodeURIComponent(dept)}&limit=50`);
+                const res = await guardedFetch(`${API_BASE}/graph/search?q=${encodeURIComponent(normalized)}&dept=${encodeURIComponent(dept)}&limit=50`);
                 const data = await res.json();
 
                 if (data.error) {
@@ -2239,6 +2447,7 @@
             }
 
             const entities = extractEntities(responseText, true);
+            updateContextEntityGraph(entities);
 
             const entitiesList = document.getElementById('info-entities-list');
             if (entitiesList) {
@@ -2258,6 +2467,11 @@
             }
 
             renderKnowledgeGraph(sources, entities);
+
+            const entityTabActive = document.querySelector('.graph-subtab[data-graph-tab="entity"]')?.classList.contains('active');
+            if (entityGraphMode === 'context' && entityTabActive) {
+                renderEntityGraph();
+            }
         }
 
 
@@ -3236,8 +3450,8 @@
 
             if (!excludeDocuments) {
                 const docPatterns = [
-                    /\[([^\]]+\.(pdf|txt|md|doc|docx))\]/gi,
-                    /`([^`]+\.(pdf|txt|md|doc|docx))`/gi
+                    /\[([^\]]+\.(pdf|txt|md|doc|docx|csv|xlsx|xls|pptx|html|htm|json|ndjson|log))\]/gi,
+                    /`([^`]+\.(pdf|txt|md|doc|docx|csv|xlsx|xls|pptx|html|htm|json|ndjson|log))`/gi
                 ];
                 docPatterns.forEach(pattern => {
                     let match;
@@ -3282,7 +3496,7 @@
             const quotedPattern = /"([^"]{3,40})"/g;
             while ((match = quotedPattern.exec(text)) !== null) {
                 const term = match[1].trim();
-                if (term.match(/\.(pdf|txt|md|doc|docx|csv|json|xml|html|xlsx)$/i)) continue;
+                if (term.match(/\.(pdf|txt|md|doc|docx|csv|json|xml|html|htm|xlsx|xls|pptx|ndjson|log)$/i)) continue;
                 if (term.includes(',')) continue;
                 if (term[0] !== term[0].toUpperCase()) continue;
                 if (term.match(/^(The|This|That|It|A|An|What|How|Why|When|Where|Which)\b/i)) continue;
@@ -3830,10 +4044,13 @@
         function showSettingToast(settingName, enabled) {
             const toast = document.createElement('div');
             toast.className = 'setting-toast';
-            toast.innerHTML = `
-                <span class="setting-toast-icon ${enabled ? 'setting-toast-icon--on' : 'setting-toast-icon--off'}">${enabled ? 'OK' : 'OFF'}</span>
-                <span>${settingName} ${enabled ? 'enabled' : 'disabled'}</span>
-            `;
+            const icon = document.createElement('span');
+            icon.className = `setting-toast-icon ${enabled ? 'setting-toast-icon--on' : 'setting-toast-icon--off'}`;
+            icon.textContent = enabled ? 'OK' : 'OFF';
+            const label = document.createElement('span');
+            label.textContent = `${settingName} ${enabled ? 'enabled' : 'disabled'}`;
+            toast.appendChild(icon);
+            toast.appendChild(label);
             document.body.appendChild(toast);
 
             requestAnimationFrame(() => {
@@ -3850,10 +4067,13 @@
         function showInfoToast(message, duration = 4000) {
             const toast = document.createElement('div');
             toast.className = 'setting-toast info-toast';
-            toast.innerHTML = `
-                <span class="setting-toast-icon setting-toast-icon--info">ℹ</span>
-                <span>${message}</span>
-            `;
+            const icon = document.createElement('span');
+            icon.className = 'setting-toast-icon setting-toast-icon--info';
+            icon.textContent = 'ℹ';
+            const label = document.createElement('span');
+            label.textContent = message;
+            toast.appendChild(icon);
+            toast.appendChild(label);
             document.body.appendChild(toast);
 
             requestAnimationFrame(() => {
@@ -3921,10 +4141,13 @@
 
             const toast = document.createElement('div');
             toast.className = 'setting-toast';
-            toast.innerHTML = `
-                <span class="setting-toast-icon setting-toast-icon--on">OK</span>
-                <span>Settings saved successfully</span>
-            `;
+            const icon = document.createElement('span');
+            icon.className = 'setting-toast-icon setting-toast-icon--on';
+            icon.textContent = 'OK';
+            const label = document.createElement('span');
+            label.textContent = 'Settings saved successfully';
+            toast.appendChild(icon);
+            toast.appendChild(label);
             document.body.appendChild(toast);
 
             requestAnimationFrame(() => {
@@ -4446,26 +4669,26 @@
 
         function extractSourcesFromText(text) {
             const sources = new Set();
-
-            const bracketMatches = text.match(/\[(?:(?:filename|source|citation):\s*)?([^\]]+\.(pdf|txt|md))\]/gi) || [];
+            const extPattern = '(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log)';
+            const bracketMatches = text.match(new RegExp(`\\[(?:(?:filename|source|citation):\\s*)?([^\\]]+\\.${extPattern})\\]`, 'gi')) || [];
             bracketMatches.forEach(m => {
                 const filename = m.replace(/[\[\]]/g, '').replace(/^(filename|source|citation):\s*/i, '').trim();
                 if (filename) sources.add(filename);
             });
 
-            const backtickMatches = text.match(/`([^`]+\.(pdf|txt|md))`/gi) || [];
+            const backtickMatches = text.match(new RegExp('`([^`]+\\.' + extPattern + ')`', 'gi')) || [];
             backtickMatches.forEach(m => {
                 const filename = m.replace(/`/g, '').trim();
                 if (filename) sources.add(filename);
             });
 
-            const boldMatches = text.match(/\*{1,2}([^*]+\.(pdf|txt|md))\*{1,2}/gi) || [];
+            const boldMatches = text.match(new RegExp('\\*{1,2}([^*]+\\.' + extPattern + ')\\*{1,2}', 'gi')) || [];
             boldMatches.forEach(m => {
                 const filename = m.replace(/\*/g, '').trim();
                 if (filename) sources.add(filename);
             });
 
-            const quotedMatches = text.match(/"([^"]+\.(pdf|txt|md))"/gi) || [];
+            const quotedMatches = text.match(new RegExp('\"([^\\\"]+\\.' + extPattern + ')\"', 'gi')) || [];
             quotedMatches.forEach(m => {
                 const filename = m.replace(/"/g, '').trim();
                 if (filename) sources.add(filename);
@@ -4475,18 +4698,19 @@
         }
 
         function processCitations(text) {
+            const extPattern = '(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log)';
 
-            let cleanText = text.replace(/\[(?:(?:filename|source|citation):\s*)?([^\]]+\.(pdf|txt|md|docx|doc))\]/gi, '');
+            let cleanText = text.replace(new RegExp(`\\[(?:(?:filename|source|citation):\\s*)?([^\\]]+\\.${extPattern})\\]`, 'gi'), '');
 
-            cleanText = cleanText.replace(/\[filename\]\s*\(([^)]+\.(pdf|txt|md|docx|doc))\)/gi, '');
+            cleanText = cleanText.replace(new RegExp(`\\[filename\\]\\s*\\(([^)]+\\.${extPattern})\\)`, 'gi'), '');
 
-            cleanText = cleanText.replace(/\(([^)]+\.(pdf|txt|md|docx|doc))\)/gi, '');
+            cleanText = cleanText.replace(new RegExp(`\\(([^)]+\\.${extPattern})\\)`, 'gi'), '');
 
-            cleanText = cleanText.replace(/`([^`]+\.(pdf|txt|md|docx|doc))`/gi, '');
+            cleanText = cleanText.replace(new RegExp('`([^`]+\\.' + extPattern + ')`', 'gi'), '');
 
-            cleanText = cleanText.replace(/\*{1,2}([^*]+\.(pdf|txt|md|docx|doc))\*{1,2}/gi, '');
+            cleanText = cleanText.replace(new RegExp('\\*{1,2}([^*]+\\.' + extPattern + ')\\*{1,2}', 'gi'), '');
 
-            cleanText = cleanText.replace(/"([^"]+\.(pdf|txt|md|docx|doc))"/gi, '');
+            cleanText = cleanText.replace(new RegExp('\"([^\\\"]+\\.' + extPattern + ')\"', 'gi'), '');
 
             cleanText = cleanText.replace(/\[filename\]/gi, '');
 
@@ -4672,6 +4896,9 @@
                 }
             }
             console.log('Deep Analysis:', state.deepAnalysisEnabled ? 'enabled' : 'disabled');
+            if (state.deepAnalysisEnabled) {
+                refreshEntityGraph();
+            }
         }
 
         let lastQuery = '';
@@ -4747,6 +4974,9 @@
                 const responseMetrics = { ...(data.metrics || {}), activeFileCount: activeFiles.length };
                 appendAssistantResponse(data.answer, reasoningSteps, sources, data.traceId, responseMetrics);
                 fetchSystemStatus();
+                if (state.deepAnalysisEnabled) {
+                    refreshEntityGraph();
+                }
 
             } catch (error) {
                 removeElement(loadingId);

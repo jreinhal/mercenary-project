@@ -39,6 +39,9 @@ class SecureIngestionServiceTest {
     @Mock
     private LightOnOcrService lightOnOcrService;
 
+    @Mock
+    private HipaaPolicy hipaaPolicy;
+
     private SecureIngestionService ingestionService;
 
     @BeforeEach
@@ -48,7 +51,9 @@ class SecureIngestionServiceTest {
         when(megaRagService.isEnabled()).thenReturn(false);
         when(hyperGraphMemory.isIndexingEnabled()).thenReturn(false);
         when(lightOnOcrService.isEnabled()).thenReturn(false);
-        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService);
+        when(hipaaPolicy.isStrict(any(Department.class))).thenReturn(false);
+        when(hipaaPolicy.shouldDisableVisual(any(Department.class))).thenReturn(false);
+        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService, hipaaPolicy);
     }
 
     @Test
@@ -61,7 +66,7 @@ class SecureIngestionServiceTest {
             "This is a test document with normal content.".getBytes()
         );
 
-        when(piiRedactionService.redact(anyString()))
+        when(piiRedactionService.redact(anyString(), any()))
             .thenReturn(new PiiRedactionService.RedactionResult(
                 "This is a test document with normal content.",
                 java.util.Collections.emptyMap()
@@ -184,7 +189,7 @@ class SecureIngestionServiceTest {
             "SSN: 123-45-6789".getBytes()
         );
 
-        when(piiRedactionService.redact(anyString()))
+        when(piiRedactionService.redact(anyString(), any()))
             .thenReturn(new PiiRedactionService.RedactionResult(
                 "SSN: [REDACTED-SSN]",
                 java.util.Map.of(PiiRedactionService.PiiType.SSN, 1)
@@ -192,7 +197,7 @@ class SecureIngestionServiceTest {
 
         assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
 
-        verify(piiRedactionService, atLeastOnce()).redact(anyString());
+        verify(piiRedactionService, atLeastOnce()).redact(anyString(), any());
     }
 
     @Test
@@ -205,7 +210,7 @@ class SecureIngestionServiceTest {
             "Classified government document content.".getBytes()
         );
 
-        when(piiRedactionService.redact(anyString()))
+        when(piiRedactionService.redact(anyString(), any()))
             .thenReturn(new PiiRedactionService.RedactionResult(
                 "Classified government document content.",
                 java.util.Collections.emptyMap()

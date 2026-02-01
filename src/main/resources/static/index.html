@@ -10,9 +10,9 @@
     <link rel="stylesheet" href="css/sentinel.css?v=20260128b" id="sentinel-css">
     <script src="js/css-bust.js"></script>
     <!-- D3.js for force simulation and collision detection -->
-    <script src="https://unpkg.com/d3@7"></script>
+    <script src="/vendor/d3.v7.min.js"></script>
     <!-- Force Graph library for Entity Network visualization -->
-    <script src="https://unpkg.com/force-graph"></script>
+    <script src="/vendor/force-graph.min.js"></script>
 </head>
 
 <body>
@@ -310,7 +310,7 @@
     </aside>
 
     <!-- Hidden file input -->
-    <input type="file" id="file-input" accept=".pdf,.txt,.md" class="hidden" multiple>
+    <input type="file" id="file-input" accept=".pdf,.txt,.md,.csv,.xlsx,.xls,.docx,.pptx,.html,.htm,.json,.ndjson,.log" class="hidden" multiple>
 
     <!-- Simple Menu Bar (Kotaemon-style) -->
     <nav class="menu-bar" role="navigation">
@@ -586,6 +586,14 @@
                     <div class="entity-explorer-toolbar">
                         <input type="text" class="entity-search-input" id="entity-search-input"
                                placeholder="Search entities..." autocomplete="off">
+                        <div class="entity-graph-mode" role="group" aria-label="Entity graph mode">
+                            <button class="entity-mode-btn active" data-action="setEntityGraphMode" data-entity-graph-mode="context" title="Show entities from the latest response">
+                                Context
+                            </button>
+                            <button class="entity-mode-btn" data-action="setEntityGraphMode" data-entity-graph-mode="sector" title="Show sector-wide entity graph">
+                                Sector
+                            </button>
+                        </div>
                         <div class="entity-limit-control">
                             <label for="entity-limit-slider" title="Max nodes to display">Nodes:</label>
                             <input type="range" id="entity-limit-slider" min="10" max="100" value="30" step="5">
@@ -621,7 +629,7 @@
                             <span class="filter-dot" style="background: #33bbee;"></span>Date
                         </label>
                         <label class="type-filter" data-type="REFERENCE">
-                            <input type="checkbox" data-entity-type="REFERENCE">
+                            <input type="checkbox" checked data-entity-type="REFERENCE">
                             <span class="filter-dot" style="background: #F0E442;"></span>Reference
                         </label>
                     </div>

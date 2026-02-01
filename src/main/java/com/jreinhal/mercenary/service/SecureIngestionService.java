@@ -10,11 +10,13 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import org.apache.tika.Tika;
+import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
@@ -23,8 +25,6 @@ import org.apache.tika.extractor.EmbeddedDocumentExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.reader.TextReader;
-import org.springframework.ai.document.DocumentReader;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -41,6 +41,7 @@ public class SecureIngestionService {
     private static final Logger log = LoggerFactory.getLogger(SecureIngestionService.class);
     private static final int MAX_EMBEDDED_IMAGES = 10;
     private static final int MIN_TEXT_LENGTH_FOR_VALID_PDF = 100; // Threshold for scanned PDF detection
+    private static final int MAX_TIKA_CHARS = 1_000_000;
     private final VectorStore vectorStore;
     private final PiiRedactionService piiRedactionService;
     private final PartitionAssigner partitionAssigner;
@@ -48,6 +49,7 @@ public class SecureIngestionService {
     private final MegaRagService megaRagService;
     private final HyperGraphMemory hyperGraphMemory;
     private final LightOnOcrService lightOnOcrService;
+    private final HipaaPolicy hipaaPolicy;
     private final Tika tika;
     private static final Set<String> BLOCKED_MIME_TYPES = Set.of("application/x-executable", "application/x-msdos-program", "application/x-msdownload", "application/x-sh", "application/x-shellscript", "application/java-archive", "application/x-httpd-php");
     @Value(value="${sentinel.miarag.min-chunks-for-mindscape:10}")
@@ -57,7 +59,7 @@ public class SecureIngestionService {
     @Value(value="${sentinel.ocr.fallback-for-scanned-pdf:true}")
     private boolean ocrFallbackForScannedPdf;
 
-    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService) {
+    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, HipaaPolicy hipaaPolicy) {
         this.vectorStore = vectorStore;
         this.piiRedactionService = piiRedactionService;
         this.partitionAssigner = partitionAssigner;
@@ -65,6 +67,7 @@ public class SecureIngestionService {
         this.megaRagService = megaRagService;
         this.hyperGraphMemory = hyperGraphMemory;
         this.lightOnOcrService = lightOnOcrService;
+        this.hipaaPolicy = hipaaPolicy;
         this.tika = new Tika();
     }
 
@@ -73,12 +76,17 @@ public class SecureIngestionService {
             List<Document> rawDocuments;
             String filename = file.getOriginalFilename();
             log.info("Initiating RAGPart Defense Protocol for: {} [Sector: {}]", filename, dept);
+            boolean hipaaStrict = this.hipaaPolicy.isStrict(dept);
             byte[] fileBytes = file.getBytes();
             String detectedMimeType = this.detectMimeType(fileBytes, filename);
             log.info(">> Magic byte detection: {} -> {}", filename, detectedMimeType);
             this.validateFileType(filename, detectedMimeType, fileBytes);
             if (detectedMimeType.startsWith("image/")) {
                 log.info(">> DETECTED IMAGE: Engaging MegaRAG Visual Ingestion...");
+                if (hipaaStrict && this.hipaaPolicy.shouldDisableVisual(dept)) {
+                    log.warn("HIPAA strict: visual ingestion disabled for medical sector, rejecting {}", filename);
+                    throw new SecureIngestionException("Visual ingestion disabled for HIPAA medical deployments.", null);
+                }
                 if (this.megaRagService != null && this.megaRagService.isEnabled()) {
                     this.megaRagService.ingestVisualAsset(fileBytes, filename, dept.name(), "");
                 } else {
@@ -97,7 +105,7 @@ public class SecureIngestionService {
                     .mapToInt(doc -> doc.getContent() != null ? doc.getContent().length() : 0)
                     .sum();
 
-                if (totalTextLength < MIN_TEXT_LENGTH_FOR_VALID_PDF && this.ocrFallbackForScannedPdf
+                if (!hipaaStrict && totalTextLength < MIN_TEXT_LENGTH_FOR_VALID_PDF && this.ocrFallbackForScannedPdf
                         && this.lightOnOcrService != null && this.lightOnOcrService.isEnabled()) {
                     log.info(">> SCANNED PDF DETECTED: Text extraction yielded only {} chars. Engaging LightOnOCR...", totalTextLength);
                     String ocrText = this.lightOnOcrService.ocrPdf(fileBytes, filename);
@@ -107,13 +115,12 @@ public class SecureIngestionService {
                     }
                 }
 
-                if (this.extractImagesFromPdf && this.megaRagService != null && this.megaRagService.isEnabled()) {
+                if (!hipaaStrict && this.extractImagesFromPdf && this.megaRagService != null && this.megaRagService.isEnabled()) {
                     this.ingestEmbeddedImages(fileBytes, filename, dept.name(), rawDocuments);
                 }
             } else {
-                log.info(">> DETECTED TEXT: Engaging Standard Text Stream...");
-                TextReader textReader = new TextReader((Resource)resource);
-                rawDocuments = textReader.get();
+                log.info(">> DETECTED DOCUMENT: Engaging Tika text extraction...");
+                rawDocuments = this.extractTextDocuments(fileBytes, filename);
             }
             ArrayList<Document> cleanDocs = new ArrayList<Document>();
             for (Document doc : rawDocuments) {
@@ -128,7 +135,7 @@ public class SecureIngestionService {
             ArrayList<Document> finalDocuments = new ArrayList<Document>();
             int totalRedactions = 0;
             for (Document doc : splitDocuments) {
-                PiiRedactionService.RedactionResult result = this.piiRedactionService.redact(doc.getContent());
+                PiiRedactionService.RedactionResult result = this.piiRedactionService.redact(doc.getContent(), hipaaStrict ? Boolean.TRUE : null);
                 Document redactedDoc = new Document(result.getRedactedContent(), doc.getMetadata());
                 totalRedactions += result.getTotalRedactions();
                 finalDocuments.add(redactedDoc);
@@ -238,5 +245,40 @@ public class SecureIngestionService {
             log.warn("Embedded image extraction failed: {}", e.getMessage());
         }
         return images;
+    }
+
+    private List<Document> extractTextDocuments(byte[] fileBytes, String filename) {
+        String extracted = this.extractTextWithTika(fileBytes, filename);
+        if (extracted == null || extracted.isBlank()) {
+            try {
+                extracted = new String(fileBytes, StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                log.warn("UTF-8 fallback failed for {}: {}", filename, e.getMessage());
+            }
+        }
+        if (extracted == null || extracted.isBlank()) {
+            throw new SecureIngestionException("Unable to extract text content from " + filename, null);
+        }
+        return List.of(new Document(extracted));
+    }
+
+    private String extractTextWithTika(byte[] fileBytes, String filename) {
+        try {
+            AutoDetectParser parser = new AutoDetectParser();
+            ParseContext context = new ParseContext();
+            Metadata metadata = new Metadata();
+            if (filename != null) {
+                metadata.set("resourceName", filename);
+            }
+            BodyContentHandler handler = new BodyContentHandler(MAX_TIKA_CHARS);
+            parser.parse(new ByteArrayInputStream(fileBytes), handler, metadata, context);
+            return handler.toString();
+        } catch (IOException | SAXException | TikaException e) {
+            log.warn("Tika extraction failed for {}: {}", filename, e.getMessage());
+            return "";
+        } catch (Exception e) {
+            log.warn("Unexpected extraction failure for {}: {}", filename, e.getMessage());
+            return "";
+        }
     }
 }

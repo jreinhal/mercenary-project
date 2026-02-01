@@ -20,6 +20,11 @@ Client
 - vector: LocalMongoVectorStore and embedding logic
 - professional/medical/government: edition-specific features
 
+## Edition-based response policy
+- Response formatting and citation strictness are tuned by license edition.
+- Professional/Trial editions favor longer synthesized answers with evidence appended when citations are missing.
+- Medical/Government editions enforce strict citations and include evidence excerpts for auditability.
+
 ## Data stores
 - MongoDB collections:
   - vector_store (embeddings + metadata)

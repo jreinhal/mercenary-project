@@ -3,8 +3,10 @@ package com.jreinhal.mercenary.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.config.SectorConfig;
+import com.jreinhal.mercenary.core.license.LicenseService;
 import com.jreinhal.mercenary.dto.EnhancedAskResponse;
 import com.jreinhal.mercenary.filter.SecurityContext;
+import com.jreinhal.mercenary.medical.hipaa.HipaaAuditService;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
@@ -86,16 +88,39 @@ public class RagOrchestrationService {
     private final PromptGuardrailService guardrailService;
     private final ConversationMemoryService conversationMemoryService;
     private final SessionPersistenceService sessionPersistenceService;
+    private final LicenseService licenseService;
+    private final PiiRedactionService piiRedactionService;
+    private final HipaaPolicy hipaaPolicy;
+    private final HipaaAuditService hipaaAuditService;
     private final AtomicInteger queryCount = new AtomicInteger(0);
     private final AtomicLong totalLatencyMs = new AtomicLong(0L);
     private final Cache<String, String> secureDocCache;
+    private final String llmModel;
+    private final double llmTemperature;
+    private final int llmNumPredict;
     private final OllamaOptions llmOptions;
     private static final String NO_RELEVANT_RECORDS = "No relevant records found.";
-    private static final Pattern STRICT_CITATION_PATTERN = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?[^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp)\\]", 2);
+    private static final Pattern STRICT_CITATION_PATTERN = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?[^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp)\\]", 2);
     private static final Pattern METRIC_HINT_PATTERN = Pattern.compile("\\b(metric|metrics|performance|availability|uptime|latency|sla|kpi|mttd|mttr|throughput|error rate|response time|accuracy|precision|recall|f1|cost|risk|budget|revenue|expense|income|profit|loss|spend|spending|amount|total|price|value|rate|percentage|count|number|quantity|allocation|funding|compliance)\\b", 2);
     private static final Pattern NAME_CONTEXT_PATTERN = Pattern.compile("\\b(sponsor|author|lead|director|manager|officer|chief|head|principal|coordinator|owner|contact|prepared by|reviewed by|approved by|submitted by)\\s*:?\\s*", 2);
+    private static final Pattern SUMMARY_HINT_PATTERN = Pattern.compile("\\b(summarize|summary|overview|brief|synopsis|recap)\\b", 2);
     private static final Pattern NUMERIC_PATTERN = Pattern.compile("\\d");
     private static final Pattern RELATIONSHIP_PATTERN = Pattern.compile("\\b(relationship|relate|comparison|compare|versus|between|difference|differ|impact|effect|align|alignment|correlat|dependency|tradeoff|link)\\b", 2);
+    private static final Pattern FILE_MARKER_PATTERN = Pattern.compile("^=+\\s*FILE\\s*:\\s*.+?=+$", 2);
+    private static final Pattern FILE_MARKER_INLINE_PATTERN = Pattern.compile("^FILE\\s*:\\s*.+$", 2);
+    private static final Pattern DOC_ID_HINT_PATTERN = Pattern.compile("\\b(doc\\s*id|docid|document\\s*id)\\b", 2);
+    private static final Pattern TITLE_HINT_PATTERN = Pattern.compile("\\btitle\\b", 2);
+    private static final Pattern DATE_HINT_PATTERN = Pattern.compile("\\b(date|when|year|month)\\b", 2);
+    private static final Pattern CLASSIFICATION_HINT_PATTERN = Pattern.compile("\\b(classification|classified|unclassified|confidential)\\b", 2);
+    private static final Pattern AUTHOR_HINT_PATTERN = Pattern.compile("\\b(author|prepared by|reviewed by|approved by)\\b", 2);
+    private static final Pattern DOC_ID_VALUE_PATTERN = Pattern.compile("\\b([A-Z]{2,}[A-Z0-9]*-\\d{4}(?:-[A-Z0-9]{2,})*)\\b");
+    private static final List<String> DOC_ID_META_KEYS = List.of("doc_id", "docid", "docId", "document_id", "documentId", "documentid", "id", "record_id", "recordId");
+    private static final List<String> TITLE_META_KEYS = List.of("title", "document_title", "documentTitle", "doc_title", "name");
+    private static final Pattern TITLE_LINE_SKIP_PATTERN = Pattern.compile("^(classification|document date|version|report period|protocol)\\b", 2);
+    private static final Pattern METADATA_LINE_PATTERN = Pattern.compile("^(doc[_\\s]?id|docid|document id|sector|title|date|author|author_role|classification|confidentiality notice|status)\\b", 2);
+    private static final Pattern BOILERPLATE_LINE_PATTERN = Pattern.compile("^(confidentiality notice|this document contains|approved this release|approved on|approved by|release approved|distribution:|prepared for:|document metadata|document id:|doc id:|author:|review date:|classification:|report period:)\\b", 2);
+    private static final Pattern TEST_ARTIFACT_SOURCE_PATTERN = Pattern.compile("(pii_test_|upload_valid|upload_spoofed|sample_)", 2);
+    private static final Pattern PII_QUERY_PATTERN = Pattern.compile("\\b(pii|ssn|phi|redact|redaction|token|tokenize)\\b", 2);
     private static final List<Pattern> NO_INFO_PATTERNS = List.of(Pattern.compile("no relevant records found", 2), Pattern.compile("no relevant (?:information|data|documents)", 2), Pattern.compile("no specific (?:information|data|metrics)", 2), Pattern.compile("no internal records", 2), Pattern.compile("no information (?:available|found)", 2), Pattern.compile("unable to find", 2), Pattern.compile("couldn'?t find", 2), Pattern.compile("do not contain any (?:information|data|metrics)", 2), Pattern.compile("not mentioned in (?:the )?documents", 2));
     @Value("${sentinel.llm.timeout-seconds:60}")
     private int llmTimeoutSeconds;
@@ -108,7 +133,7 @@ public class RagOrchestrationService {
     @Value("${sentinel.rag.max-docs:16}")
     private int maxDocs;
 
-    public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, Cache<String, String> secureDocCache,
+    public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, LicenseService licenseService, PiiRedactionService piiRedactionService, HipaaPolicy hipaaPolicy, HipaaAuditService hipaaAuditService, Cache<String, String> secureDocCache,
                                   @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
                                   @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
                                   @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
@@ -133,7 +158,14 @@ public class RagOrchestrationService {
         this.guardrailService = guardrailService;
         this.conversationMemoryService = conversationMemoryService;
         this.sessionPersistenceService = sessionPersistenceService;
+        this.licenseService = licenseService;
+        this.piiRedactionService = piiRedactionService;
+        this.hipaaPolicy = hipaaPolicy;
+        this.hipaaAuditService = hipaaAuditService;
         this.secureDocCache = secureDocCache;
+        this.llmModel = llmModel;
+        this.llmTemperature = llmTemperature;
+        this.llmNumPredict = llmNumPredict;
         this.llmOptions = OllamaOptions.create()
                 .withModel(llmModel)
                 .withTemperature(llmTemperature)
@@ -182,6 +214,7 @@ public class RagOrchestrationService {
             this.auditService.logAccessDenied(user, "/api/ask", "Not authorized for sector " + department.name(), request);
             return "ACCESS DENIED: You are not authorized to access the " + department.name() + " sector.";
         }
+        boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
         try {
             String rescued;
@@ -189,6 +222,7 @@ public class RagOrchestrationService {
             List<String> subQueries;
             boolean isCompoundQuery;
             long start = System.currentTimeMillis();
+            ResponsePolicy responsePolicy = responsePolicyForEdition(this.licenseService.getEdition());
             if (this.isPromptInjection(query)) {
                 if (user != null) {
                     this.auditService.logPromptInjection(user, query, request);
@@ -240,24 +274,25 @@ public class RagOrchestrationService {
             }
             ArrayList<Document> rawDocs = new ArrayList<Document>(allDocs);
             List<Document> orderedDocs = this.sortDocumentsDeterministically(rawDocs);
-            log.info("Retrieved {} documents for query {}", rawDocs.size(), LogSanitizer.querySummary(query));
-            rawDocs.forEach(doc -> log.info("  - Source: {}, Content preview: {}", doc.getMetadata().get("source"), doc.getContent().substring(0, Math.min(50, doc.getContent().length()))));
+            if (!this.hipaaPolicy.shouldSuppressSensitiveLogs(department)) {
+                log.info("Retrieved {} documents for query {}", rawDocs.size(), LogSanitizer.querySummary(query));
+                rawDocs.forEach(doc -> log.info("  - Source: {}, Content preview: {}", doc.getMetadata().get("source"), doc.getContent().substring(0, Math.min(50, doc.getContent().length()))));
+            } else {
+                log.info("Retrieved {} documents for query (suppressed content preview)", rawDocs.size());
+            }
             List<Document> topDocs = orderedDocs.stream().limit(15L).toList();
+            if (hipaaStrict && this.hipaaAuditService != null) {
+                List<String> docIds = topDocs.stream().map(doc -> String.valueOf(doc.getMetadata().getOrDefault("source", "unknown"))).distinct().toList();
+                this.hipaaAuditService.logPhiQuery(user, query, topDocs.size(), docIds);
+            }
             String globalContext = this.mergeGlobalContexts(globalContexts);
             String information = this.buildInformation(topDocs, globalContext);
-            boolean useVisual = this.megaRagService != null && this.megaRagService.isEnabled() && !visualDocs.isEmpty();
-            String systemText = "";
-            systemText = information.isEmpty() ? "You are a helpful assistant. No documents are available. Respond: 'No internal records found for this query.'" : String.format(
-                "You are a helpful assistant that answers questions based on the provided documents.\n\n" +
-                "INSTRUCTIONS:\n" +
-                "1. Read the documents below carefully\n" +
-                "2. If an OVERVIEW section is present, use it for background only and do NOT cite it\n" +
-                "3. Answer the question using ONLY information from the DOCUMENTS section\n" +
-                "4. Include the exact numbers, names, dates, or facts as written in the documents\n" +
-                "5. Cite sources using [filename] after each fact\n" +
-                "6. If the answer is not in the documents, say \"No relevant records found.\"\n\n" +
-                "DOCUMENTS:\n%s\n\n" +
-                "Answer the user's question based on the documents above.", information);
+            boolean allowVisual = !this.hipaaPolicy.shouldDisableVisual(department);
+            if (!allowVisual) {
+                visualDocs.clear();
+            }
+            boolean useVisual = allowVisual && this.megaRagService != null && this.megaRagService.isEnabled() && !visualDocs.isEmpty();
+            String systemText = buildSystemPrompt(information, responsePolicy, department);
             String systemMessage = systemText.replace("{information}", information);
             List<Document> extractiveDocs = this.expandDocsFromCache(topDocs, dept, query);
             boolean llmSuccess = true;
@@ -268,8 +303,13 @@ public class RagOrchestrationService {
                 } else {
                     String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
                     String userQuery = query.replace("{", "[").replace("}", "]");
-                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
-                    log.info("LLM RAW RESPONSE for /ask: {}", rawResponse != null ? rawResponse.substring(0, Math.min(500, rawResponse.length())) : "null");
+                    ChatOptions options = optionsForPolicy(responsePolicy);
+                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options(options).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                    if (!this.hipaaPolicy.shouldSuppressSensitiveLogs(department)) {
+                        log.info("LLM RAW RESPONSE for /ask: {}", rawResponse != null ? rawResponse.substring(0, Math.min(500, rawResponse.length())) : "null");
+                    } else {
+                        log.info("LLM RAW RESPONSE for /ask (suppressed)");
+                    }
                     response = cleanLlmResponse(rawResponse);
                 }
             }
@@ -299,12 +339,16 @@ public class RagOrchestrationService {
                 }
                 response = sim.toString();
             }
+            if (this.hipaaPolicy.shouldRedactResponses(department)) {
+                response = this.piiRedactionService.redact(response, Boolean.TRUE).getRedactedContent();
+            }
             boolean isTimeoutResponse = response != null && response.toLowerCase(Locale.ROOT).contains("response timeout");
             boolean hasEvidence = RagOrchestrationService.hasRelevantEvidence(extractiveDocs, query) || !visualDocs.isEmpty();
             int citationCount = RagOrchestrationService.countCitations(response);
             boolean rescueApplied = false;
             boolean excerptFallbackApplied = false;
-            if (llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
+            boolean evidenceAppendApplied = false;
+            if (responsePolicy != null && responsePolicy.enforceCitations() && llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
                 response = rescued;
                 rescueApplied = true;
                 citationCount = RagOrchestrationService.countCitations(response);
@@ -325,11 +369,29 @@ public class RagOrchestrationService {
                     }
                 }
                 answerable = false;
-            } else if (llmSuccess && citationCount == 0) {
+            } else if (llmSuccess && citationCount == 0 && responsePolicy != null && responsePolicy.enforceCitations()) {
                 response = NO_RELEVANT_RECORDS;
                 answerable = false;
                 usedAnswerabilityGate = true;
                 citationCount = 0;
+            } else if (llmSuccess && citationCount == 0 && responsePolicy != null && !responsePolicy.enforceCitations()) {
+                String augmented = appendEvidenceIfNeeded(response, extractiveDocs, query, responsePolicy, true);
+                evidenceAppendApplied = !augmented.equals(response);
+                response = augmented;
+                citationCount = RagOrchestrationService.countCitations(response);
+            }
+            if (answerable && responsePolicy != null && responsePolicy.appendEvidenceAlways()) {
+                String augmented = appendEvidenceIfNeeded(response, extractiveDocs, query, responsePolicy, false);
+                evidenceAppendApplied = evidenceAppendApplied || !augmented.equals(response);
+                response = augmented;
+                citationCount = RagOrchestrationService.countCitations(response);
+            }
+            if (query != null && DOC_ID_HINT_PATTERN.matcher(query).find() && (response == null || !response.contains("DOC_ID"))) {
+                String forced = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query);
+                if (!NO_RELEVANT_RECORDS.equals(forced)) {
+                    response = forced;
+                    citationCount = RagOrchestrationService.countCitations(response);
+                }
             }
             if (usedAnswerabilityGate) {
                 log.info("Answerability gate applied (citations={}, answerable=false) for query {}", citationCount, LogSanitizer.querySummary(query));
@@ -337,9 +399,12 @@ public class RagOrchestrationService {
                 log.info("Citation rescue applied (extractive fallback) for query {}", LogSanitizer.querySummary(query));
             } else if (excerptFallbackApplied) {
                 log.info("Excerpt fallback applied (no direct answer) for query {}", LogSanitizer.querySummary(query));
+            } else if (evidenceAppendApplied) {
+                log.info("Evidence appendix applied for query {}", LogSanitizer.querySummary(query));
             }
-            // Skip hallucination check for extractive responses (they come directly from documents)
-            boolean skipHallucinationCheckAsk = rescueApplied || excerptFallbackApplied;
+            // Skip hallucination check for extractive responses or responses already grounded with citations
+            boolean skipHallucinationCheckAsk = rescueApplied || excerptFallbackApplied
+                || (citationCount > 0 && hasEvidence);
             if (!skipHallucinationCheckAsk) {
                 QuCoRagService.HallucinationResult hallucinationResult = this.quCoRagService.detectHallucinationRisk(response, query);
                 if (hallucinationResult.isHighRisk()) {
@@ -347,23 +412,16 @@ public class RagOrchestrationService {
                     RetrievalContext retryContext = this.retrieveContext(query, dept, activeFiles, routing, true, false);
                     if (!retryContext.textDocuments().isEmpty()) {
                         String retryInfo = this.buildInformation(retryContext.textDocuments(), retryContext.globalContext());
-                        String retrySystem = retryInfo.isEmpty() ? "You are a helpful assistant. No documents are available. Respond: 'No internal records found for this query.'" : String.format(
-                            "You are a helpful assistant that answers questions based on the provided documents.\n\n" +
-                            "INSTRUCTIONS:\n" +
-                            "1. Read the documents below carefully\n" +
-                            "2. Answer the question using ONLY information from these documents\n" +
-                            "3. Cite sources using [filename] after each fact\n" +
-                            "4. If the answer is not in the documents, say \"No relevant records found.\"\n\n" +
-                            "DOCUMENTS:\n%s\n\n" +
-                            "Answer the user's question based on the documents above.", retryInfo);
+                        String retrySystem = buildSystemPrompt(retryInfo, responsePolicy, department);
                         String retrySystemMessage = retrySystem.replace("{information}", retryInfo);
                         try {
                             String sysMsg = retrySystemMessage.replace("{", "[").replace("}", "]");
                             String userQuery = query.replace("{", "[").replace("}", "]");
-                            String rawRetry = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                            ChatOptions options = optionsForPolicy(responsePolicy);
+                            String rawRetry = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options(options).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
                             response = cleanLlmResponse(rawRetry);
                             citationCount = RagOrchestrationService.countCitations(response);
-                            if (citationCount == 0) {
+                            if (citationCount == 0 && responsePolicy != null && responsePolicy.enforceCitations()) {
                                 response = NO_RELEVANT_RECORDS;
                             }
                         }
@@ -377,13 +435,16 @@ public class RagOrchestrationService {
             } else {
                 log.debug("QuCo-RAG: Skipping hallucination check for extractive response");
             }
-            if (this.bidirectionalRagService != null && this.bidirectionalRagService.isEnabled() && hasEvidence) {
+            if (this.bidirectionalRagService != null && this.bidirectionalRagService.isEnabled() && hasEvidence && !this.hipaaPolicy.shouldDisableExperienceLearning(department)) {
                 String userId = user != null ? user.getUsername() : "unknown";
                 this.bidirectionalRagService.validateAndLearn(query, response, topDocs, department.name(), userId);
             }
             long timeTaken = System.currentTimeMillis() - start;
             this.totalLatencyMs.addAndGet(timeTaken);
             this.queryCount.incrementAndGet();
+            if (this.hipaaPolicy.shouldRedactResponses(department)) {
+                response = this.piiRedactionService.redact(response, Boolean.TRUE).getRedactedContent();
+            }
             if (user != null) {
                 this.auditService.logQuery(user, query, department, response, request);
             }
@@ -419,17 +480,22 @@ public class RagOrchestrationService {
             this.auditService.logAccessDenied(user, "/api/ask/enhanced", "Not authorized for sector " + department.name(), request);
             return new EnhancedAskResponse("ACCESS DENIED: Not authorized for " + department.name() + " sector.", List.of(), List.of(), Map.of(), null);
         }
+        boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
         String effectiveSessionId = sessionId;
         String effectiveQuery = query;
         if (sessionId != null && !sessionId.isBlank()) {
             try {
-                this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
-                this.conversationMemoryService.saveUserMessage(user.getId(), sessionId, query);
-                if (this.conversationMemoryService.isFollowUp(query)) {
-                    ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
-                    effectiveQuery = this.conversationMemoryService.expandFollowUp(query, context);
-                    log.debug("Expanded follow-up query for session {}", sessionId);
+                if (!this.hipaaPolicy.shouldDisableSessionMemory(department)) {
+                    this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
+                    this.conversationMemoryService.saveUserMessage(user.getId(), sessionId, query);
+                    if (this.conversationMemoryService.isFollowUp(query)) {
+                        ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
+                        effectiveQuery = this.conversationMemoryService.expandFollowUp(query, context);
+                        log.debug("Expanded follow-up query for session {}", sessionId);
+                    }
+                } else {
+                    log.info("HIPAA strict: conversation memory disabled for medical session {}", sessionId);
                 }
             }
             catch (Exception e) {
@@ -437,12 +503,14 @@ public class RagOrchestrationService {
                 effectiveSessionId = null;
             }
         }
-        ReasoningTrace trace = this.reasoningTracer.startTrace(query, dept);
+        String traceQuery = hipaaStrict ? this.piiRedactionService.redact(query, Boolean.TRUE).getRedactedContent() : query;
+        ReasoningTrace trace = this.reasoningTracer.startTrace(traceQuery, dept);
         try {
             Object source;
             String rescued;
             String response;
             long start = System.currentTimeMillis();
+            ResponsePolicy responsePolicy = responsePolicyForEdition(this.licenseService.getEdition());
             long stepStart = System.currentTimeMillis();
             if (this.isPromptInjection(query)) {
                 this.reasoningTracer.addStep(ReasoningStep.StepType.SECURITY_CHECK, "Security Scan", "BLOCKED: Prompt injection detected", System.currentTimeMillis() - stepStart, Map.of("blocked", true, "reason", "injection_detected"));
@@ -470,7 +538,8 @@ public class RagOrchestrationService {
                 log.info("AdaptiveRAG: ZeroHop path - skipping retrieval for conversational query");
                 try {
                     String userQuery = query.replace("{", "[").replace("}", "]");
-                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.").user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                    ChatOptions options = optionsForPolicy(responsePolicy);
+                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system("You are SENTINEL, an intelligence assistant. Respond helpfully and concisely.").user(userQuery).options(options).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
                     directResponse = cleanLlmResponse(rawResponse);
                 }
                 catch (TimeoutException te) {
@@ -479,6 +548,12 @@ public class RagOrchestrationService {
                 }
                 catch (Exception llmError) {
                     directResponse = "I apologize, but I'm unable to process your request at the moment. Please try rephrasing your question.";
+                }
+                if (this.hipaaPolicy.shouldRedactResponses(department)) {
+                    directResponse = this.piiRedactionService.redact(directResponse, Boolean.TRUE).getRedactedContent();
+                }
+                if (hipaaStrict && this.hipaaAuditService != null) {
+                    this.hipaaAuditService.logPhiQuery(user, query, 0, List.of());
                 }
                 long timeTaken = System.currentTimeMillis() - start;
                 this.totalLatencyMs.addAndGet(timeTaken);
@@ -526,6 +601,10 @@ public class RagOrchestrationService {
             stepStart = System.currentTimeMillis();
             List<Document> orderedDocs = this.sortDocumentsDeterministically(rawDocs);
             List<Document> topDocs = orderedDocs.stream().limit(15L).toList();
+            if (hipaaStrict && this.hipaaAuditService != null) {
+                List<String> docIds = topDocs.stream().map(doc -> String.valueOf(doc.getMetadata().getOrDefault("source", "unknown"))).distinct().toList();
+                this.hipaaAuditService.logPhiQuery(user, query, topDocs.size(), docIds);
+            }
             List<String> docSources = topDocs.stream().map(doc -> {
                 Object src = doc.getMetadata().get("source");
                 return src != null ? src.toString() : "unknown";
@@ -550,19 +629,12 @@ public class RagOrchestrationService {
             int contextLength = information.length();
             this.reasoningTracer.addStep(ReasoningStep.StepType.CONTEXT_ASSEMBLY, "Context Assembly", "Assembled " + contextLength + " characters from " + topDocs.size() + " documents", System.currentTimeMillis() - stepStart, Map.of("contextLength", contextLength, "documentCount", topDocs.size()));
             stepStart = System.currentTimeMillis();
-            boolean useVisual = this.megaRagService != null && this.megaRagService.isEnabled() && !visualDocs.isEmpty();
-            String systemText = information.isEmpty() ? "You are SENTINEL. No documents are available. Respond: 'No internal records found for this query.'" : String.format(
-                "You are SENTINEL, an advanced intelligence analyst for %s sector.\n\n" +
-                "INSTRUCTIONS:\n" +
-                "- Analyze the provided source documents carefully\n" +
-                "- If an OVERVIEW section is present, use it for background only and do NOT cite it\n" +
-                "- Base your response ONLY on the provided documents\n" +
-                "- Cite each source immediately after each fact using [filename] format\n\n" +
-                "CONSTRAINTS:\n" +
-                "- Never fabricate or guess filenames\n" +
-                "- Only cite files that appear in the DOCUMENTS section below\n" +
-                "- If information is not in the documents, respond: \"No relevant records found.\"\n\n" +
-                "DOCUMENTS:\n%s\n", dept, information);
+            boolean allowVisual = !this.hipaaPolicy.shouldDisableVisual(department);
+            if (!allowVisual) {
+                visualDocs.clear();
+            }
+            boolean useVisual = allowVisual && this.megaRagService != null && this.megaRagService.isEnabled() && !visualDocs.isEmpty();
+            String systemText = buildSystemPrompt(information, responsePolicy, department);
             String systemMessage = systemText.replace("{information}", information);
             List<Document> extractiveDocs = this.expandDocsFromCache(topDocs, dept, query);
             boolean llmSuccess = true;
@@ -573,7 +645,8 @@ public class RagOrchestrationService {
                 } else {
                     String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
                     String userQuery = query.replace("{", "[").replace("}", "]");
-                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options((ChatOptions)this.llmOptions).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                    ChatOptions options = optionsForPolicy(responsePolicy);
+                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options(options).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
                     response = cleanLlmResponse(rawResponse);
                 }
             }
@@ -603,6 +676,9 @@ public class RagOrchestrationService {
                 }
                 response = sim.toString();
             }
+            if (this.hipaaPolicy.shouldRedactResponses(department)) {
+                response = this.piiRedactionService.redact(response, Boolean.TRUE).getRedactedContent();
+            }
             this.reasoningTracer.addStep(ReasoningStep.StepType.LLM_GENERATION, "Response Synthesis", (String)(llmSuccess ? "Generated response (" + response.length() + " chars)" : "Fallback mode (LLM offline)"), System.currentTimeMillis() - stepStart, Map.of("success", llmSuccess, "responseLength", response.length()));
             stepStart = System.currentTimeMillis();
             boolean isTimeoutResponse = response != null && response.toLowerCase(Locale.ROOT).contains("response timeout");
@@ -610,7 +686,8 @@ public class RagOrchestrationService {
             int citationCount = RagOrchestrationService.countCitations(response);
             boolean rescueApplied = false;
             boolean excerptFallbackApplied = false;
-            if (llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
+            boolean evidenceAppendApplied = false;
+            if (responsePolicy != null && responsePolicy.enforceCitations() && llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
                 response = rescued;
                 rescueApplied = true;
                 citationCount = RagOrchestrationService.countCitations(response);
@@ -631,17 +708,36 @@ public class RagOrchestrationService {
                     }
                 }
                 answerable = false;
-            } else if (llmSuccess && citationCount == 0) {
+            } else if (llmSuccess && citationCount == 0 && responsePolicy != null && responsePolicy.enforceCitations()) {
                 response = NO_RELEVANT_RECORDS;
                 answerable = false;
                 usedAnswerabilityGate = true;
                 citationCount = 0;
+            } else if (llmSuccess && citationCount == 0 && responsePolicy != null && !responsePolicy.enforceCitations()) {
+                String augmented = appendEvidenceIfNeeded(response, extractiveDocs, query, responsePolicy, true);
+                evidenceAppendApplied = !augmented.equals(response);
+                response = augmented;
+                citationCount = RagOrchestrationService.countCitations(response);
+            }
+            if (answerable && responsePolicy != null && responsePolicy.appendEvidenceAlways()) {
+                String augmented = appendEvidenceIfNeeded(response, extractiveDocs, query, responsePolicy, false);
+                evidenceAppendApplied = evidenceAppendApplied || !augmented.equals(response);
+                response = augmented;
+                citationCount = RagOrchestrationService.countCitations(response);
+            }
+            if (query != null && DOC_ID_HINT_PATTERN.matcher(query).find() && (response == null || !response.contains("DOC_ID"))) {
+                String forced = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query);
+                if (!NO_RELEVANT_RECORDS.equals(forced)) {
+                    response = forced;
+                    citationCount = RagOrchestrationService.countCitations(response);
+                }
             }
             String gateDetail = isTimeoutResponse ? "System response (timeout)" : (rescueApplied ? "Citation rescue applied (extractive evidence)" : (excerptFallbackApplied ? "No direct answer; showing excerpts" : (usedAnswerabilityGate ? "No answer returned (missing citations or no evidence)" : "Answerable with citations")));
             this.reasoningTracer.addStep(ReasoningStep.StepType.CITATION_VERIFICATION, "Answerability Gate", gateDetail, System.currentTimeMillis() - stepStart, Map.of("answerable", answerable, "citationCount", citationCount, "gateApplied", usedAnswerabilityGate, "rescueApplied", rescueApplied, "excerptFallbackApplied", excerptFallbackApplied));
             stepStart = System.currentTimeMillis();
-            // Skip hallucination check for extractive responses (they come directly from documents)
-            boolean skipHallucinationCheck = rescueApplied || excerptFallbackApplied;
+            // Skip hallucination check for extractive or fully cited responses
+            boolean skipHallucinationCheck = rescueApplied || excerptFallbackApplied
+                || (citationCount > 0 && hasEvidence);
             QuCoRagService.HallucinationResult hallucinationResult = skipHallucinationCheck
                 ? new QuCoRagService.HallucinationResult(0.0, List.of(), false)
                 : this.quCoRagService.detectHallucinationRisk(response, query);
@@ -658,7 +754,7 @@ public class RagOrchestrationService {
                     ? "High risk detected; response abstained (" + hallucinationResult.flaggedEntities().size() + " novel entities, risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")"
                     : "Passed (risk=" + String.format("%.2f", hallucinationResult.riskScore()) + ")");
             this.reasoningTracer.addStep(ReasoningStep.StepType.UNCERTAINTY_ANALYSIS, "Hallucination Check", hallucinationDetail, System.currentTimeMillis() - stepStart, Map.of("riskScore", hallucinationResult.riskScore(), "flaggedEntities", hallucinationResult.flaggedEntities(), "isHighRisk", hasHallucinationRisk, "skipped", skipHallucinationCheck));
-            if (this.bidirectionalRagService != null && this.bidirectionalRagService.isEnabled() && hasEvidence) {
+            if (this.bidirectionalRagService != null && this.bidirectionalRagService.isEnabled() && hasEvidence && !this.hipaaPolicy.shouldDisableExperienceLearning(department)) {
                 String userId = user != null ? user.getUsername() : "unknown";
                 this.bidirectionalRagService.validateAndLearn(query, response, topDocs, department.name(), userId);
             }
@@ -669,34 +765,37 @@ public class RagOrchestrationService {
             this.reasoningTracer.addMetric("documentsRetrieved", topDocs.size());
             this.reasoningTracer.addMetric("subQueriesProcessed", subQueries.size());
             ReasoningTrace completedTrace = this.reasoningTracer.endTrace();
+            if (this.hipaaPolicy.shouldRedactResponses(department)) {
+                response = this.piiRedactionService.redact(response, Boolean.TRUE).getRedactedContent();
+            }
             this.auditService.logQuery(user, query, department, response, request);
             ArrayList<String> sources = new ArrayList<String>();
-            Matcher matcher1 = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?([^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp))\\]", 2).matcher(response);
+            Matcher matcher1 = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?([^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp))\\]", 2).matcher(response);
             while (matcher1.find()) {
                 String source2 = matcher1.group(1).trim();
                 if (sources.contains(source2)) continue;
                 sources.add(source2);
             }
-            Matcher matcher2 = Pattern.compile("\\(([^)]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp))\\)", 2).matcher(response);
+            Matcher matcher2 = Pattern.compile("\\(([^)]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp))\\)", 2).matcher(response);
             while (matcher2.find()) {
                 String source3 = matcher2.group(1);
                 if (sources.contains(source3)) continue;
                 sources.add(source3);
             }
-            Matcher matcher3 = Pattern.compile("(?:Citation|Source|filename):\\s*([^\\s,]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp))", 2).matcher(response);
-            Matcher matcher4 = Pattern.compile("`([^`]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp))`", 2).matcher(response);
+            Matcher matcher3 = Pattern.compile("(?:Citation|Source|filename):\\s*([^\\s,]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp))", 2).matcher(response);
+            Matcher matcher4 = Pattern.compile("`([^`]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp))`", 2).matcher(response);
             while (matcher4.find()) {
                 String source4 = matcher4.group(1).trim();
                 if (sources.contains(source4)) continue;
                 sources.add(source4);
             }
-            Matcher matcher5 = Pattern.compile("\\*{1,2}([^*]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp))\\*{1,2}", 2).matcher(response);
+            Matcher matcher5 = Pattern.compile("\\*{1,2}([^*]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp))\\*{1,2}", 2).matcher(response);
             while (matcher5.find()) {
                 String source5 = matcher5.group(1).trim();
                 if (sources.contains(source5)) continue;
                 sources.add(source5);
             }
-            Matcher matcher6 = Pattern.compile("\"([^\"]+\\.(pdf|txt|md|csv|xlsx|xls|png|jpg|jpeg|gif|tif|tiff|bmp))\"", 2).matcher(response);
+            Matcher matcher6 = Pattern.compile("\"([^\"]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp))\"", 2).matcher(response);
             while (matcher6.find()) {
                 source = matcher6.group(1).trim();
                 if (sources.contains(source)) continue;
@@ -727,6 +826,13 @@ public class RagOrchestrationService {
             metrics.put("answerabilityGate", usedAnswerabilityGate);
             metrics.put("citationRescue", rescueApplied);
             metrics.put("excerptFallbackApplied", excerptFallbackApplied);
+            if (responsePolicy != null) {
+                metrics.put("editionPolicy", responsePolicy.edition().name());
+                metrics.put("editionMaxTokens", responsePolicy.maxTokens());
+                metrics.put("editionEnforceCitations", responsePolicy.enforceCitations());
+                metrics.put("editionAppendEvidenceAlways", responsePolicy.appendEvidenceAlways());
+                metrics.put("editionAppendEvidenceOnNoCitations", responsePolicy.appendEvidenceWhenNoCitations());
+            }
             metrics.put("retrievalStrategies", retrievalStrategies);
             return new EnhancedAskResponse(response, completedTrace != null ? completedTrace.getStepsAsMaps() : List.of(), sources, metrics, completedTrace != null ? completedTrace.getTraceId() : null);
         }
@@ -735,6 +841,109 @@ public class RagOrchestrationService {
             ReasoningTrace errorTrace = this.reasoningTracer.endTrace();
             return new EnhancedAskResponse("An error occurred processing your query. Please try again or contact support. [ERR-1002]", errorTrace != null ? errorTrace.getStepsAsMaps() : List.of(), List.of(), Map.of("errorCode", "ERR-1002"), errorTrace != null ? errorTrace.getTraceId() : null);
         }
+    }
+
+    private record ResponsePolicy(LicenseService.Edition edition,
+                                  int maxTokens,
+                                  boolean enforceCitations,
+                                  boolean appendEvidenceAlways,
+                                  boolean appendEvidenceWhenNoCitations) {
+    }
+
+    private ResponsePolicy responsePolicyForEdition(LicenseService.Edition edition) {
+        LicenseService.Edition resolved = edition != null ? edition : LicenseService.Edition.TRIAL;
+        int baseTokens = Math.max(128, this.llmNumPredict);
+        return switch (resolved) {
+            case GOVERNMENT -> new ResponsePolicy(resolved, Math.max(baseTokens, 768), true, true, false);
+            case MEDICAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 768), true, true, false);
+            case PROFESSIONAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 640), false, false, true);
+            case TRIAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 512), false, false, true);
+        };
+    }
+
+    private ChatOptions optionsForPolicy(ResponsePolicy policy) {
+        int tokens = policy != null ? policy.maxTokens : this.llmNumPredict;
+        return OllamaOptions.create()
+                .withModel(this.llmModel)
+                .withTemperature(this.llmTemperature)
+                .withNumPredict(Integer.valueOf(tokens));
+    }
+
+    private String buildResponseFormat(ResponsePolicy policy, Department department) {
+        if (policy == null) {
+            return "Return a concise summary with citations after each factual claim.";
+        }
+        String base = switch (policy.edition) {
+            case GOVERNMENT -> """
+                FORMAT:
+                - Intelligence Summary (6-10 sentences, fully cited)
+                - Key Facts (5-8 bullets with citations)
+                - Operational Implications (3-5 bullets with citations)
+                - Evidence Excerpts (3-6 short excerpts with citations)
+                - If evidence is insufficient, state \"No relevant records found.\"
+                """;
+            case MEDICAL -> """
+                FORMAT:
+                - Clinical Summary (6-10 sentences, fully cited)
+                - Key Facts (5-8 bullets with citations)
+                - Compliance Notes (2-4 bullets; redactions already applied; do not reveal PHI)
+                - Evidence Excerpts (3-6 short excerpts with citations)
+                - If evidence is insufficient, state \"No relevant records found.\"
+                """;
+            case PROFESSIONAL, TRIAL -> """
+                FORMAT:
+                - Executive Summary (6-10 sentences, fully cited where possible)
+                - Key Findings (5-8 bullets with citations)
+                - Implications / Next Steps (3-6 bullets, cite if factual)
+                - If evidence is insufficient, state \"No relevant records found.\"
+                """;
+        };
+        if (department == null) {
+            return base;
+        }
+        return base + "\nSector: " + department.name() + "\n";
+    }
+
+    private String buildSystemPrompt(String information, ResponsePolicy policy, Department department) {
+        if (information == null || information.isBlank()) {
+            return "You are a helpful assistant. No documents are available. Respond: 'No internal records found for this query.'";
+        }
+        String format = buildResponseFormat(policy, department);
+        return String.format(
+            "You are a helpful assistant that answers questions based on the provided documents.\n\n" +
+            "INSTRUCTIONS:\n" +
+            "1. Read the documents below carefully\n" +
+            "2. If an OVERVIEW section is present, use it for background only and do NOT cite it\n" +
+            "3. Answer the question using ONLY information from the DOCUMENTS section\n" +
+            "4. Include the exact numbers, names, dates, or facts as written in the documents\n" +
+            "5. Cite sources using [filename] after each fact\n" +
+            "6. If the answer is not in the documents, say \"No relevant records found.\"\n\n" +
+            "%s\n" +
+            "DOCUMENTS:\n%s\n\n" +
+            "Answer the user's question based on the documents above.",
+            format,
+            information
+        );
+    }
+
+    private String appendEvidenceIfNeeded(String response, List<Document> extractiveDocs, String query, ResponsePolicy policy, boolean missingCitations) {
+        if (policy == null) {
+            return response;
+        }
+        if (response == null || response.isBlank()) {
+            return response;
+        }
+        if (policy.appendEvidenceAlways || (policy.appendEvidenceWhenNoCitations && missingCitations)) {
+            if (response.startsWith("Based on the retrieved documents") || response.startsWith("No direct answer found")) {
+                return response;
+            }
+            String evidence = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query);
+            if (NO_RELEVANT_RECORDS.equals(evidence)) {
+                return response;
+            }
+            return response + "\n\nEvidence Excerpts:\n" + evidence;
+        }
+        return response;
     }
 
 
@@ -835,10 +1044,55 @@ public class RagOrchestrationService {
         LinkedHashSet<String> seenSnippets = new LinkedHashSet<String>();
         Set<String> keywords = RagOrchestrationService.buildQueryKeywords(query);
         boolean wantsMetrics = RagOrchestrationService.queryWantsMetrics(query);
+        boolean wantsDocId = query != null && DOC_ID_HINT_PATTERN.matcher(query).find();
+        boolean wantsTitle = query != null && TITLE_HINT_PATTERN.matcher(query).find();
+        boolean relationshipQuery = query != null && RELATIONSHIP_PATTERN.matcher(query).find();
+        boolean wantsSummary = RagOrchestrationService.queryWantsSummary(query);
         int minKeywordHits = RagOrchestrationService.requiredKeywordHits(query, keywords);
-        for (Document doc : docs) {
-            String source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown_Document.txt"));
-            String snippet = RagOrchestrationService.extractSnippet(doc.getContent(), keywords, wantsMetrics, minKeywordHits, query);
+        List<Document> orderedDocs = RagOrchestrationService.sortByKeywordPreference(docs, keywords);
+        for (Document doc : orderedDocs) {
+            String source = RagOrchestrationService.getDocumentSource(doc);
+            boolean sourceHasKeywords = RagOrchestrationService.countKeywordHits(source, keywords) > 0;
+            String snippet = RagOrchestrationService.buildDocIdTitleSnippet(doc, wantsDocId, wantsTitle);
+            if (snippet.isBlank()) {
+                snippet = RagOrchestrationService.extractSnippet(doc.getContent(), keywords, wantsMetrics, minKeywordHits, query);
+            }
+            boolean usedDerivedTitle = false;
+            if (snippet.isBlank() && !wantsDocId && !wantsTitle && sourceHasKeywords) {
+                String derived = RagOrchestrationService.deriveTitleFromSource(source);
+                if (!derived.isBlank()) {
+                    snippet = derived;
+                    usedDerivedTitle = true;
+                }
+            }
+            if (!snippet.isBlank() && sourceHasKeywords && RagOrchestrationService.countKeywordHits(snippet, keywords) == 0) {
+                String derived = RagOrchestrationService.deriveTitleFromSource(source);
+                if (!derived.isBlank()) {
+                    snippet = derived;
+                    usedDerivedTitle = true;
+                }
+            }
+            if (usedDerivedTitle) {
+                String extra = RagOrchestrationService.extractSnippetLenient(doc.getContent(), keywords);
+                if (!extra.isBlank() && !extra.equals(snippet)) {
+                    snippet = snippet + " — " + extra;
+                }
+            }
+            if (relationshipQuery && !snippet.isBlank()) {
+                List<String> missingKeywords = RagOrchestrationService.buildMissingKeywords(snippet, keywords);
+                if (!missingKeywords.isEmpty()) {
+                    String extra = RagOrchestrationService.extractSnippetForKeywords(doc.getContent(), missingKeywords);
+                    if (!extra.isBlank() && !extra.equals(snippet)) {
+                        snippet = snippet + " — " + extra;
+                    }
+                }
+            }
+            if (wantsSummary && snippet.length() < 120) {
+                String extra = RagOrchestrationService.extractSupplementalSnippet(doc.getContent(), keywords, snippet);
+                if (!extra.isBlank() && !extra.equals(snippet)) {
+                    snippet = snippet + " — " + extra;
+                }
+            }
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
             summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]\n");
             if (++added < 5) continue;
@@ -856,17 +1110,62 @@ public class RagOrchestrationService {
         if (docs == null || docs.isEmpty()) {
             return NO_RELEVANT_RECORDS;
         }
-        StringBuilder summary = new StringBuilder("No direct answer found in the documents. Closest excerpts:\n\n");
+        StringBuilder summary = new StringBuilder("Relevant excerpts from the documents:\n\n");
         int added = 0;
         LinkedHashSet<String> seenSnippets = new LinkedHashSet<String>();
         Set<String> keywords = RagOrchestrationService.buildQueryKeywords(query);
         boolean wantsMetrics = RagOrchestrationService.queryWantsMetrics(query);
+        boolean wantsDocId = query != null && DOC_ID_HINT_PATTERN.matcher(query).find();
+        boolean wantsTitle = query != null && TITLE_HINT_PATTERN.matcher(query).find();
+        boolean relationshipQuery = query != null && RELATIONSHIP_PATTERN.matcher(query).find();
+        boolean wantsSummary = RagOrchestrationService.queryWantsSummary(query);
         int minKeywordHits = Math.max(1, RagOrchestrationService.requiredKeywordHits(query, keywords) - 1);
-        for (Document doc : docs) {
-            source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown_Document.txt"));
-            snippet = RagOrchestrationService.extractSnippet(doc.getContent(), keywords, wantsMetrics, minKeywordHits, query);
+        List<Document> orderedDocs = RagOrchestrationService.sortByKeywordPreference(docs, keywords);
+        for (Document doc : orderedDocs) {
+            source = RagOrchestrationService.getDocumentSource(doc);
+            boolean sourceHasKeywords = RagOrchestrationService.countKeywordHits(source, keywords) > 0;
+            boolean usedDerivedTitle = false;
+            snippet = RagOrchestrationService.buildDocIdTitleSnippet(doc, wantsDocId, wantsTitle);
+            if (snippet.isBlank()) {
+                snippet = RagOrchestrationService.extractSnippet(doc.getContent(), keywords, wantsMetrics, minKeywordHits, query);
+            }
             if (snippet.isBlank()) {
                 snippet = RagOrchestrationService.extractSnippetLenient(doc.getContent(), keywords);
+            }
+            if (snippet.isBlank() && !wantsDocId && !wantsTitle && sourceHasKeywords) {
+                String derived = RagOrchestrationService.deriveTitleFromSource(source);
+                if (!derived.isBlank()) {
+                    snippet = derived;
+                    usedDerivedTitle = true;
+                }
+            }
+            if (!snippet.isBlank() && sourceHasKeywords && RagOrchestrationService.countKeywordHits(snippet, keywords) == 0) {
+                String derived = RagOrchestrationService.deriveTitleFromSource(source);
+                if (!derived.isBlank()) {
+                    snippet = derived;
+                    usedDerivedTitle = true;
+                }
+            }
+            if (usedDerivedTitle) {
+                String extra = RagOrchestrationService.extractSnippetLenient(doc.getContent(), keywords);
+                if (!extra.isBlank() && !extra.equals(snippet)) {
+                    snippet = snippet + " — " + extra;
+                }
+            }
+            if (relationshipQuery && !snippet.isBlank()) {
+                List<String> missingKeywords = RagOrchestrationService.buildMissingKeywords(snippet, keywords);
+                if (!missingKeywords.isEmpty()) {
+                    String extra = RagOrchestrationService.extractSnippetForKeywords(doc.getContent(), missingKeywords);
+                    if (!extra.isBlank() && !extra.equals(snippet)) {
+                        snippet = snippet + " — " + extra;
+                    }
+                }
+            }
+            if (wantsSummary && snippet.length() < 120) {
+                String extra = RagOrchestrationService.extractSupplementalSnippet(doc.getContent(), keywords, snippet);
+                if (!extra.isBlank() && !extra.equals(snippet)) {
+                    snippet = snippet + " — " + extra;
+                }
             }
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
             summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]\n");
@@ -891,6 +1190,10 @@ public class RagOrchestrationService {
 
     private static boolean queryWantsMetrics(String query) {
         return query != null && METRIC_HINT_PATTERN.matcher(query).find();
+    }
+
+    private static boolean queryWantsSummary(String query) {
+        return query != null && SUMMARY_HINT_PATTERN.matcher(query).find();
     }
 
     private static int requiredKeywordHits(String query, Set<String> keywords) {
@@ -947,20 +1250,35 @@ public class RagOrchestrationService {
         Set<String> keywords = RagOrchestrationService.buildQueryKeywords(query);
         boolean wantsMetrics = RagOrchestrationService.queryWantsMetrics(query);
         int minKeywordHits = RagOrchestrationService.requiredKeywordHits(query, keywords);
-        if ((keywords.isEmpty() || minKeywordHits == 0) && !wantsMetrics) {
-            return false;
-        }
+        boolean hasAnyContent = false;
         for (Document doc : docs) {
             String[] lines;
             String content = doc.getContent();
             if (content == null || content.isBlank()) continue;
+            hasAnyContent = true;
             for (String rawLine : lines = content.split("\\R")) {
                 String trimmed = rawLine.trim();
-                if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || !RagOrchestrationService.isRelevantLine(trimmed, keywords, wantsMetrics, minKeywordHits)) continue;
+                if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed) || !RagOrchestrationService.isRelevantLine(trimmed, keywords, wantsMetrics, minKeywordHits)) continue;
                 return true;
             }
         }
+        if (hasAnyContent && !wantsMetrics) {
+            return true;
+        }
         return false;
+    }
+
+    private static List<Document> sortByKeywordPreference(List<Document> docs, Set<String> keywords) {
+        if (docs == null || docs.isEmpty()) {
+            return List.of();
+        }
+        return docs.stream().sorted((a, b) -> {
+            String aSource = RagOrchestrationService.getDocumentSource(a);
+            String bSource = RagOrchestrationService.getDocumentSource(b);
+            int aHits = RagOrchestrationService.countKeywordHits(aSource, keywords) + RagOrchestrationService.countKeywordHits(a.getContent(), keywords);
+            int bHits = RagOrchestrationService.countKeywordHits(bSource, keywords) + RagOrchestrationService.countKeywordHits(b.getContent(), keywords);
+            return Integer.compare(bHits, aHits);
+        }).toList();
     }
 
     private static String extractSnippet(String content, Set<String> keywords, boolean wantsMetrics, int minKeywordHits, String query) {
@@ -970,8 +1288,42 @@ public class RagOrchestrationService {
         String[] lines = content.split("\\R");
         String bestCandidate = "";
         int bestScore = -1;
+        String bestMetricCandidate = "";
+        int bestMetricScore = -1;
+        String bestNameCandidate = "";
+        int bestNameScore = -1;
         List<String> idTokens = RagOrchestrationService.extractIdentifierTokens(query);
         List<String> phraseHints = RagOrchestrationService.extractProperNounPhrases(query);
+        boolean wantsDocId = query != null && DOC_ID_HINT_PATTERN.matcher(query).find();
+        boolean wantsTitle = query != null && TITLE_HINT_PATTERN.matcher(query).find();
+        boolean wantsMetadata = wantsDocId || wantsTitle || query != null && (DATE_HINT_PATTERN.matcher(query).find() || CLASSIFICATION_HINT_PATTERN.matcher(query).find() || AUTHOR_HINT_PATTERN.matcher(query).find());
+        String docIdLine = null;
+        String titleLine = null;
+        if (wantsDocId || wantsTitle) {
+            for (String rawLine : lines) {
+                String trimmed = rawLine.trim();
+                if (trimmed.isEmpty()) continue;
+                String upper = trimmed.toUpperCase(Locale.ROOT);
+                if (wantsDocId && docIdLine == null && (upper.startsWith("DOC_ID") || upper.startsWith("DOCID") || upper.startsWith("DOC ID") || upper.startsWith("DOCUMENT ID"))) {
+                    docIdLine = RagOrchestrationService.sanitizeSnippet(trimmed);
+                }
+                if (wantsTitle && titleLine == null && upper.startsWith("TITLE")) {
+                    titleLine = RagOrchestrationService.sanitizeSnippet(trimmed);
+                }
+                if ((!wantsDocId || docIdLine != null) && (!wantsTitle || titleLine != null)) {
+                    break;
+                }
+            }
+            if (wantsDocId && wantsTitle && docIdLine != null && titleLine != null) {
+                return (docIdLine + " | " + titleLine).trim();
+            }
+            if (wantsDocId && docIdLine != null && titleLine == null) {
+                return docIdLine.trim();
+            }
+            if (wantsTitle && titleLine != null && docIdLine == null) {
+                return titleLine.trim();
+            }
+        }
 
         // Check if query is looking for a person/name (contains name-context keywords)
         boolean wantsName = keywords.stream().anyMatch(k ->
@@ -983,12 +1335,21 @@ public class RagOrchestrationService {
         // Search all lines, prioritizing those with the strongest keyword + value match
         for (String rawLine : lines) {
             String trimmed = rawLine.trim();
-            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed)) continue;
+            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed)) continue;
+            if (!wantsMetadata && RagOrchestrationService.isBoilerplateLine(trimmed)) {
+                continue;
+            }
 
             // Count keyword hits in this line
             int keywordHits = RagOrchestrationService.countKeywordHits(trimmed, keywords);
             boolean hasIdToken = RagOrchestrationService.containsAnyToken(trimmed, idTokens);
             boolean hasPhraseHint = RagOrchestrationService.containsAnyPhrase(trimmed, phraseHints);
+            boolean hasDocId = trimmed.toUpperCase(Locale.ROOT).startsWith("DOC_ID")
+                || trimmed.toUpperCase(Locale.ROOT).startsWith("DOCID")
+                || trimmed.toUpperCase(Locale.ROOT).startsWith("DOC ID")
+                || trimmed.toUpperCase(Locale.ROOT).startsWith("DOCUMENT ID");
+            boolean hasTitle = trimmed.toUpperCase(Locale.ROOT).startsWith("TITLE");
+            boolean isMetadataLine = RagOrchestrationService.isMetadataLine(trimmed);
 
             // Check if this line contains a metric value (dollar amounts, numbers, percentages)
             boolean hasMetric = NUMERIC_PATTERN.matcher(trimmed).find() ||
@@ -1002,6 +1363,9 @@ public class RagOrchestrationService {
 
             // Skip lines without keywords (unless they have metrics/names and we want those)
             if (keywordHits < minKeywordHits && !(wantsMetrics && hasMetric) && !(wantsName && hasNameContext) && !hasIdToken && !hasPhraseHint) {
+                continue;
+            }
+            if (!wantsMetadata && isMetadataLine && keywordHits == 0 && !hasIdToken && !hasPhraseHint) {
                 continue;
             }
 
@@ -1025,6 +1389,12 @@ public class RagOrchestrationService {
             if (hasPhraseHint) {
                 score += 20;
             }
+            if (wantsDocId && hasDocId) {
+                score += 40;
+            }
+            if (wantsTitle && hasTitle) {
+                score += 25;
+            }
             if (keywordHits >= minKeywordHits && minKeywordHits > 1) {
                 score += 2;
             }
@@ -1035,17 +1405,227 @@ public class RagOrchestrationService {
                 bestScore = score;
                 bestCandidate = candidate;
             }
+            if (wantsMetrics && hasMetric) {
+                int metricScore = score + 15;
+                String lower = trimmed.toLowerCase(Locale.ROOT);
+                if (trimmed.contains("$") || trimmed.contains("%") || lower.contains("million") || lower.contains("billion")) {
+                    metricScore += 10;
+                }
+                if (metricScore > bestMetricScore) {
+                    bestMetricScore = metricScore;
+                    bestMetricCandidate = candidate;
+                }
+            }
+            if (wantsName && hasNameContext) {
+                int nameScore = score + 15;
+                if (nameScore > bestNameScore) {
+                    bestNameScore = nameScore;
+                    bestNameCandidate = candidate;
+                }
+            }
         }
 
         if (bestCandidate.isEmpty()) {
             return "";
         }
         String result = RagOrchestrationService.sanitizeSnippet(bestCandidate);
+        if (wantsMetrics && !RagOrchestrationService.hasMetricValue(result) && !bestMetricCandidate.isEmpty()) {
+            result = RagOrchestrationService.sanitizeSnippet(bestMetricCandidate);
+        }
+        if (wantsName && !RagOrchestrationService.hasNameContext(result) && !bestNameCandidate.isEmpty()) {
+            result = RagOrchestrationService.sanitizeSnippet(bestNameCandidate);
+        }
         int maxLen = 240;
         if (result.length() > maxLen) {
             result = result.substring(0, maxLen - 3).trim() + "...";
         }
         return result;
+    }
+
+    private static String buildDocIdTitleSnippet(Document doc, boolean wantsDocId, boolean wantsTitle) {
+        if (doc == null || (!wantsDocId && !wantsTitle)) {
+            return "";
+        }
+        Map<String, Object> metadata = doc.getMetadata();
+        String source = RagOrchestrationService.getDocumentSource(doc);
+        String docId = null;
+        String title = null;
+        if (wantsDocId) {
+            docId = RagOrchestrationService.findMetadataValue(metadata, DOC_ID_META_KEYS);
+            if (docId == null || docId.isBlank()) {
+                docId = RagOrchestrationService.extractDocIdFromContent(doc.getContent());
+            }
+            if (docId == null || docId.isBlank()) {
+                docId = RagOrchestrationService.deriveDocIdFromSource(source);
+            }
+        }
+        if (wantsTitle) {
+            title = RagOrchestrationService.findMetadataValue(metadata, TITLE_META_KEYS);
+            if (title == null || title.isBlank()) {
+                title = RagOrchestrationService.extractTitleFromContent(doc.getContent());
+            }
+            if (title == null || title.isBlank()) {
+                title = RagOrchestrationService.deriveTitleFromSource(source);
+            }
+        }
+        String docPart = RagOrchestrationService.formatDocId(docId, wantsDocId);
+        String titlePart = RagOrchestrationService.formatTitle(title, wantsTitle);
+        if (!docPart.isBlank() && !titlePart.isBlank()) {
+            return (docPart + " | " + titlePart).trim();
+        }
+        if (!docPart.isBlank()) {
+            return docPart.trim();
+        }
+        if (!titlePart.isBlank()) {
+            return titlePart.trim();
+        }
+        return "";
+    }
+
+    private static String findMetadataValue(Map<String, Object> metadata, List<String> keys) {
+        if (metadata == null || metadata.isEmpty() || keys == null || keys.isEmpty()) {
+            return null;
+        }
+        for (String key : keys) {
+            Object value = metadata.get(key);
+            if (value instanceof String str && !str.isBlank()) {
+                return str.trim();
+            }
+        }
+        for (Map.Entry<String, Object> entry : metadata.entrySet()) {
+            String metaKey = entry.getKey();
+            if (metaKey == null) {
+                continue;
+            }
+            for (String key : keys) {
+                if (!metaKey.equalsIgnoreCase(key)) continue;
+                Object value = entry.getValue();
+                if (value instanceof String str && !str.isBlank()) {
+                    return str.trim();
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String deriveDocIdFromSource(String source) {
+        if (source == null) {
+            return "";
+        }
+        String base = source.trim();
+        if (base.isBlank()) {
+            return "";
+        }
+        base = base.replace('\\', '/');
+        int slash = base.lastIndexOf('/');
+        if (slash >= 0 && slash < base.length() - 1) {
+            base = base.substring(slash + 1);
+        }
+        int dot = base.lastIndexOf('.');
+        if (dot > 0) {
+            base = base.substring(0, dot);
+        }
+        return base.trim();
+    }
+
+    private static String deriveTitleFromSource(String source) {
+        String base = RagOrchestrationService.deriveDocIdFromSource(source);
+        if (base.isBlank()) {
+            return "";
+        }
+        String cleaned = base.replaceAll("[_\\-]+", " ");
+        cleaned = cleaned.replaceAll("\\s+", " ").trim();
+        return RagOrchestrationService.toTitleCase(cleaned);
+    }
+
+    private static String extractDocIdFromContent(String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        for (String rawLine : content.split("\\R")) {
+            String trimmed = rawLine.trim();
+            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed)) {
+                continue;
+            }
+            Matcher matcher = DOC_ID_VALUE_PATTERN.matcher(trimmed);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+        return "";
+    }
+
+    private static String extractTitleFromContent(String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        for (String rawLine : content.split("\\R")) {
+            String trimmed = rawLine.trim();
+            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed)) {
+                continue;
+            }
+            if (TITLE_LINE_SKIP_PATTERN.matcher(trimmed).find()) {
+                continue;
+            }
+            if (trimmed.length() < 3) {
+                continue;
+            }
+            return RagOrchestrationService.sanitizeSnippet(trimmed);
+        }
+        return "";
+    }
+
+    private static String formatDocId(String docId, boolean wantsDocId) {
+        if (!wantsDocId || docId == null) {
+            return "";
+        }
+        String trimmed = docId.trim();
+        if (trimmed.isBlank()) {
+            return "";
+        }
+        String upper = trimmed.toUpperCase(Locale.ROOT);
+        if (upper.startsWith("DOC_ID") || upper.startsWith("DOCID") || upper.startsWith("DOCUMENT ID")) {
+            return trimmed;
+        }
+        return "DOC_ID: " + trimmed;
+    }
+
+    private static String formatTitle(String title, boolean wantsTitle) {
+        if (!wantsTitle || title == null) {
+            return "";
+        }
+        String trimmed = title.trim();
+        if (trimmed.isBlank()) {
+            return "";
+        }
+        String upper = trimmed.toUpperCase(Locale.ROOT);
+        if (upper.startsWith("TITLE")) {
+            return trimmed;
+        }
+        return "TITLE: " + trimmed;
+    }
+
+    private static String toTitleCase(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String[] parts = value.trim().split("\\s+");
+        ArrayList<String> output = new ArrayList<>();
+        for (String part : parts) {
+            if (part.isBlank()) {
+                continue;
+            }
+            String token = part.trim();
+            String upper = token.toUpperCase(Locale.ROOT);
+            boolean hasDigit = token.chars().anyMatch(Character::isDigit);
+            if (token.length() <= 2 || token.equals(upper) || hasDigit) {
+                output.add(upper);
+                continue;
+            }
+            String lower = token.toLowerCase(Locale.ROOT);
+            output.add(Character.toUpperCase(lower.charAt(0)) + lower.substring(1));
+        }
+        return String.join(" ", output).trim();
     }
 
     private static String extractSnippetLenient(String content, Set<String> keywords) {
@@ -1057,14 +1637,14 @@ public class RagOrchestrationService {
         String candidate = "";
         for (String rawLine : lines) {
             trimmed = rawLine.trim();
-            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || !keywords.isEmpty() && !RagOrchestrationService.containsKeyword(trimmed, keywords)) continue;
+            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed) || RagOrchestrationService.isMetadataLine(trimmed) || RagOrchestrationService.isBoilerplateLine(trimmed) || !keywords.isEmpty() && !RagOrchestrationService.containsKeyword(trimmed, keywords)) continue;
             candidate = trimmed;
             break;
         }
         if (candidate.isEmpty()) {
             for (String rawLine : lines) {
                 trimmed = rawLine.trim();
-                if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed)) continue;
+                if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed) || RagOrchestrationService.isMetadataLine(trimmed) || RagOrchestrationService.isBoilerplateLine(trimmed)) continue;
                 candidate = trimmed;
                 break;
             }
@@ -1080,6 +1660,101 @@ public class RagOrchestrationService {
         return candidate;
     }
 
+    private static boolean hasMetricValue(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String lower = text.toLowerCase(Locale.ROOT);
+        return NUMERIC_PATTERN.matcher(text).find() || text.contains("$") || text.contains("%") || lower.contains("million") || lower.contains("billion");
+    }
+
+    private static boolean hasNameContext(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        return NAME_CONTEXT_PATTERN.matcher(text.toLowerCase(Locale.ROOT)).find();
+    }
+
+    private static List<String> buildMissingKeywords(String snippet, Set<String> keywords) {
+        if (snippet == null || snippet.isBlank() || keywords == null || keywords.isEmpty()) {
+            return List.of();
+        }
+        String lower = snippet.toLowerCase(Locale.ROOT);
+        return keywords.stream()
+            .filter(k -> !lower.contains(k))
+            .sorted((a, b) -> Integer.compare(b.length(), a.length()))
+            .limit(5)
+            .toList();
+    }
+
+    private static String extractSnippetForKeywords(String content, List<String> keywords) {
+        if (content == null || keywords == null || keywords.isEmpty()) {
+            return "";
+        }
+        String[] lines = content.split("\\R");
+        String bestCandidate = "";
+        int bestScore = -1;
+        for (String rawLine : lines) {
+            String trimmed = rawLine.trim();
+            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed) || RagOrchestrationService.isMetadataLine(trimmed) || RagOrchestrationService.isBoilerplateLine(trimmed)) {
+                continue;
+            }
+            String lower = trimmed.toLowerCase(Locale.ROOT);
+            int score = 0;
+            for (String keyword : keywords) {
+                if (!lower.contains(keyword)) continue;
+                score += Math.max(1, keyword.length());
+            }
+            if (score <= 0) {
+                continue;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestCandidate = trimmed;
+            }
+        }
+        if (bestCandidate.isEmpty()) {
+            return "";
+        }
+        String result = RagOrchestrationService.sanitizeSnippet(bestCandidate);
+        int maxLen = 240;
+        if (result.length() > maxLen) {
+            result = result.substring(0, maxLen - 3).trim() + "...";
+        }
+        return result;
+    }
+
+    private static String extractSupplementalSnippet(String content, Set<String> keywords, String primarySnippet) {
+        if (content == null) {
+            return "";
+        }
+        String primaryLower = primarySnippet == null ? "" : primarySnippet.toLowerCase(Locale.ROOT);
+        String[] lines = content.split("\\R");
+        for (String rawLine : lines) {
+            String trimmed = rawLine.trim();
+            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed) || RagOrchestrationService.isMetadataLine(trimmed) || RagOrchestrationService.isBoilerplateLine(trimmed)) {
+                continue;
+            }
+            String lower = trimmed.toLowerCase(Locale.ROOT);
+            if (!keywords.isEmpty() && !RagOrchestrationService.containsKeyword(trimmed, keywords)) {
+                continue;
+            }
+            if (!primaryLower.isBlank() && lower.contains(primaryLower)) {
+                continue;
+            }
+            String candidate = RagOrchestrationService.sanitizeSnippet(trimmed);
+            if (candidate.isBlank()) {
+                continue;
+            }
+            int maxLen = 240;
+            if (candidate.length() > maxLen) {
+                candidate = candidate.substring(0, maxLen - 3).trim() + "...";
+            }
+            return candidate;
+        }
+        return "";
+    }
+
     private static String extractAnySnippet(String content) {
         String[] lines;
         if (content == null) {
@@ -1088,7 +1763,7 @@ public class RagOrchestrationService {
         for (String rawLine : lines = content.split("\\R")) {
             String candidate;
             String trimmed = rawLine.trim();
-            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || (candidate = RagOrchestrationService.sanitizeSnippet(trimmed)).isBlank()) continue;
+            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed) || RagOrchestrationService.isMetadataLine(trimmed) || RagOrchestrationService.isBoilerplateLine(trimmed) || (candidate = RagOrchestrationService.sanitizeSnippet(trimmed)).isBlank()) continue;
             return RagOrchestrationService.truncateSnippet(candidate);
         }
         String fallback = RagOrchestrationService.sanitizeSnippet(content.replaceAll("\\s+", " ").trim());
@@ -1120,6 +1795,36 @@ public class RagOrchestrationService {
 
     private static boolean isTableSeparator(String line) {
         return line.matches("\\s*\\|?\\s*:?-{3,}:?\\s*(\\|\\s*:?-{3,}:?\\s*)+\\|?\\s*");
+    }
+
+    private static boolean isFileMarkerLine(String line) {
+        if (line == null) {
+            return false;
+        }
+        String trimmed = line.trim();
+        return FILE_MARKER_PATTERN.matcher(trimmed).matches() || FILE_MARKER_INLINE_PATTERN.matcher(trimmed).matches();
+    }
+
+    private static boolean isMetadataLine(String line) {
+        if (line == null) {
+            return false;
+        }
+        String trimmed = line.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        return METADATA_LINE_PATTERN.matcher(trimmed).find();
+    }
+
+    private static boolean isBoilerplateLine(String line) {
+        if (line == null) {
+            return false;
+        }
+        String trimmed = line.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        return BOILERPLATE_LINE_PATTERN.matcher(trimmed).find();
     }
 
     private static String summarizeTableRow(String row, Set<String> keywords, boolean wantsMetrics, int minKeywordHits) {
@@ -1162,10 +1867,15 @@ public class RagOrchestrationService {
             return "";
         }
         String cleaned = text.trim();
+        if (isFileMarkerLine(cleaned)) {
+            return "";
+        }
         cleaned = cleaned.replaceAll("^\\s*[#>*-]+\\s*", "");
         cleaned = cleaned.replaceAll("\\*{1,2}", "");
         cleaned = cleaned.replaceAll("_{1,2}", "");
         cleaned = cleaned.replaceAll("`", "");
+        cleaned = cleaned.replaceAll("(?i)^=+\\s*file\\s*:\\s*.+?=+$", "");
+        cleaned = cleaned.replaceAll("(?i)^file\\s*:\\s*.+$", "");
         cleaned = cleaned.replaceAll("\\s*\\|\\s*", " - ");
         cleaned = cleaned.replaceAll("\\s*[\\u00B7\\u2022]\\s*", " - ");
         cleaned = cleaned.replaceAll("\\s*-\\s*-\\s*", " - ");
@@ -1214,6 +1924,7 @@ public class RagOrchestrationService {
             log.warn("SECURITY: Invalid department value in filter: {}", dept);
             return List.of();
         }
+        Set<String> queryKeywords = RagOrchestrationService.buildQueryKeywords(query);
         if (this.hybridRagService != null && this.hybridRagService.isEnabled()) {
             try {
                 HybridRagService.HybridRetrievalResult result = this.hybridRagService.retrieve(query, dept);
@@ -1258,6 +1969,13 @@ public class RagOrchestrationService {
             if (!cachedMatches.isEmpty()) {
                 scoped = new ArrayList<>(new LinkedHashSet<>(scoped));
                 scoped.addAll(cachedMatches);
+            }
+        }
+        if (scoped.isEmpty() && activeFiles != null && !activeFiles.isEmpty()) {
+            List<Document> cacheScoped = this.loadActiveFilesFromCache(dept, activeFiles, queryKeywords);
+            if (!cacheScoped.isEmpty()) {
+                boostKeywordMatches(cacheScoped, query);
+                return this.sortDocumentsDeterministically(cacheScoped);
             }
         }
         if (scoped.isEmpty()) {
@@ -1362,6 +2080,7 @@ public class RagOrchestrationService {
             }
         }
         List<Document> scoped = this.filterDocumentsByFiles(sweepResults, activeFiles);
+        scoped = this.filterTestArtifacts(scoped, query);
         if (scoped.isEmpty()) {
             return List.of();
         }
@@ -1391,11 +2110,28 @@ public class RagOrchestrationService {
         boolean longQuery = query.split("\\s+").length > 15;
         boolean advancedNeeded = complexQuery || relationshipQuery || longQuery || highUncertainty;
         Set<ModalityRouter.ModalityTarget> modalities = this.modalityRouter != null ? this.modalityRouter.route(query) : Set.of(ModalityRouter.ModalityTarget.TEXT);
+        boolean allowVisual = true;
+        try {
+            Department department = Department.valueOf(dept.toUpperCase());
+            allowVisual = !this.hipaaPolicy.shouldDisableVisual(department);
+        } catch (IllegalArgumentException ignored) {
+        }
+        if (!allowVisual) {
+            modalities = Set.of(ModalityRouter.ModalityTarget.TEXT);
+        }
 
         ArrayList<String> strategies = new ArrayList<>();
         List<Document> textDocs = new ArrayList<>();
         String globalContext = "";
         RagPartService.RagPartResult ragPartResult = null;
+
+        if (activeFiles != null && !activeFiles.isEmpty()) {
+            List<Document> cacheScoped = this.loadActiveFilesFromCache(dept, activeFiles, RagOrchestrationService.buildQueryKeywords(query));
+            if (!cacheScoped.isEmpty()) {
+                textDocs.addAll(cacheScoped);
+                strategies.add("ActiveFileCache");
+            }
+        }
 
         if (this.ragPartService != null && this.ragPartService.isEnabled()) {
             ragPartResult = this.ragPartService.retrieve(query, dept);
@@ -1455,7 +2191,7 @@ public class RagOrchestrationService {
 
         ArrayList<Document> visualDocs = new ArrayList<>();
         ArrayList<MegaRagService.CrossModalEdge> edges = new ArrayList<>();
-        if (this.megaRagService != null && this.megaRagService.isEnabled() && (modalities.contains(ModalityRouter.ModalityTarget.VISUAL) || modalities.contains(ModalityRouter.ModalityTarget.CROSS_MODAL))) {
+        if (allowVisual && this.megaRagService != null && this.megaRagService.isEnabled() && (modalities.contains(ModalityRouter.ModalityTarget.VISUAL) || modalities.contains(ModalityRouter.ModalityTarget.CROSS_MODAL))) {
             MegaRagService.CrossModalRetrievalResult crossModal = this.megaRagService.retrieve(query, dept);
             edges.addAll(crossModal.crossModalEdges());
             visualDocs.addAll(crossModal.visualDocs());
@@ -1484,8 +2220,26 @@ public class RagOrchestrationService {
                 strategies.add("KeywordSweep");
             }
         }
+        if (!textDocs.isEmpty()) {
+            Set<String> keywords = RagOrchestrationService.buildQueryKeywords(query);
+            int minKeywordHits = RagOrchestrationService.requiredKeywordHits(query, keywords);
+            boolean hasKeywordMatch = textDocs.stream().anyMatch(doc -> {
+                String source = RagOrchestrationService.getDocumentSource(doc);
+                int sourceHits = RagOrchestrationService.countKeywordHits(source, keywords);
+                int contentHits = RagOrchestrationService.countKeywordHits(doc.getContent(), keywords);
+                return sourceHits >= Math.max(1, minKeywordHits) || contentHits >= Math.max(1, minKeywordHits);
+            });
+            if (!hasKeywordMatch && !keywords.isEmpty()) {
+                List<Document> keywordSweep = this.attemptKeywordSweep(query, dept, activeFiles);
+                if (!keywordSweep.isEmpty()) {
+                    textDocs.addAll(keywordSweep);
+                    strategies.add("KeywordSweep");
+                }
+            }
+        }
 
         textDocs = new ArrayList<>(this.filterDocumentsByFiles(textDocs, activeFiles));
+        textDocs = new ArrayList<>(this.filterTestArtifacts(textDocs, query));
         visualDocs = new ArrayList<>(this.filterDocumentsByFiles(visualDocs, activeFiles));
 
         textDocs = this.sortDocumentsDeterministically(new ArrayList<>(new LinkedHashSet<>(textDocs)));
@@ -1649,6 +2403,30 @@ public class RagOrchestrationService {
         return results;
     }
 
+    private List<Document> loadActiveFilesFromCache(String dept, List<String> activeFiles, Set<String> keywords) {
+        if (activeFiles == null || activeFiles.isEmpty()) {
+            return List.of();
+        }
+        String sectorPrefix = dept.toUpperCase() + ":";
+        ArrayList<Document> results = new ArrayList<>();
+        for (Map.Entry<String, String> entry : this.secureDocCache.asMap().entrySet()) {
+            String cacheKey = entry.getKey();
+            if (!cacheKey.startsWith(sectorPrefix)) continue;
+            String filename = cacheKey.substring(sectorPrefix.length());
+            if (!this.isFilenameInScope(filename, activeFiles)) continue;
+            String content = entry.getValue();
+            Document doc = new Document(content);
+            doc.getMetadata().put("source", filename);
+            doc.getMetadata().put("filename", filename);
+            doc.getMetadata().put("dept", dept.toUpperCase());
+            int hits = RagOrchestrationService.countKeywordHits(content, keywords)
+                + RagOrchestrationService.countKeywordHits(filename, keywords);
+            doc.getMetadata().put("score", (double)Math.max(hits, 1));
+            results.add(doc);
+        }
+        return results;
+    }
+
     private List<String> parseActiveFiles(List<String> fileParams, String filesParam) {
         LinkedHashSet<String> files = new LinkedHashSet<String>();
         if (fileParams != null) {
@@ -1686,6 +2464,20 @@ public class RagOrchestrationService {
         }).collect(Collectors.toList());
     }
 
+    private List<Document> filterTestArtifacts(List<Document> docs, String query) {
+        if (docs == null || docs.isEmpty()) {
+            return docs;
+        }
+        if (query != null && PII_QUERY_PATTERN.matcher(query).find()) {
+            return docs;
+        }
+        List<Document> filtered = docs.stream().filter(doc -> {
+            String source = RagOrchestrationService.getDocumentSource(doc).toLowerCase(Locale.ROOT);
+            return !TEST_ARTIFACT_SOURCE_PATTERN.matcher(source).find();
+        }).collect(Collectors.toList());
+        return filtered.isEmpty() ? docs : filtered;
+    }
+
     private List<Document> sortDocumentsDeterministically(List<Document> docs) {
         docs.sort(Comparator.comparingDouble(RagOrchestrationService::getDocumentScore).reversed().thenComparing(RagOrchestrationService::getDocumentSource, String.CASE_INSENSITIVE_ORDER));
         return docs;
@@ -1721,6 +2513,16 @@ public class RagOrchestrationService {
 
         for (Document doc : docs) {
             String content = doc.getContent().toLowerCase(Locale.ROOT);
+            String source = RagOrchestrationService.getDocumentSource(doc).toLowerCase(Locale.ROOT);
+            String titleMeta = "";
+            Object rawTitle = doc.getMetadata().get("title");
+            if (rawTitle == null) {
+                rawTitle = doc.getMetadata().get("document_title");
+            }
+            if (rawTitle != null) {
+                titleMeta = rawTitle.toString().toLowerCase(Locale.ROOT);
+            }
+            String metaText = (source + " " + titleMeta).trim();
             double boost = 0.0;
 
             // Big boost for exact phrase matches
@@ -1729,18 +2531,28 @@ public class RagOrchestrationService {
                     boost += 0.5;  // Significant boost for phrase match
                     log.debug("Keyword boost +0.5 for phrase '{}' in doc", phrase);
                 }
+                if (!metaText.isEmpty() && metaText.contains(phrase)) {
+                    boost += 0.8;
+                    log.debug("Metadata boost +0.8 for phrase '{}' in doc source/title", phrase);
+                }
             }
 
             // Smaller boost for individual keyword matches
             int wordMatches = 0;
+            int metaMatches = 0;
             for (String word : importantWords) {
                 if (content.contains(word)) {
                     wordMatches++;
+                }
+                if (!metaText.isEmpty() && metaText.contains(word)) {
+                    metaMatches++;
                 }
             }
             if (importantWords.size() > 0) {
                 double wordBoost = 0.2 * ((double) wordMatches / importantWords.size());
                 boost += wordBoost;
+                double metaBoost = 0.3 * ((double) metaMatches / importantWords.size());
+                boost += metaBoost;
             }
 
             // Apply boost to score

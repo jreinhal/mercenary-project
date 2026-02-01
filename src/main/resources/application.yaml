@@ -365,10 +365,19 @@ sentinel:
       phone: ${PII_PHONE:true}
       credit-card: ${PII_CREDIT_CARD:true}
       dob: ${PII_DOB:true}
+      date: ${PII_DATE:true}
+      age: ${PII_AGE:true}
       ip-address: ${PII_IP:true}
       passport: ${PII_PASSPORT:true}
       drivers-license: ${PII_DL:true}
-      names: ${PII_NAMES:true}
+      account-number: ${PII_ACCOUNT:true}
+      health-plan-id: ${PII_HEALTH_PLAN:true}
+      certificate-number: ${PII_CERTIFICATE:true}
+      vehicle-id: ${PII_VEHICLE:true}
+      device-id: ${PII_DEVICE:true}
+      url: ${PII_URL:true}
+      biometric: ${PII_BIOMETRIC:true}
+      names: ${PII_NAMES:false}
       address: ${PII_ADDRESS:true}
       medical-id: ${PII_MEDICAL:true}
 
@@ -390,6 +399,22 @@ sentinel:
     show-classification: ${SENTINEL_SHOW_CLASSIFICATION:true}
     # Allow users to switch sectors
     allow-sector-switching: ${SENTINEL_ALLOW_SECTOR_SWITCH:true}
+
+  # HIPAA strict mode (Medical edition)
+  hipaa:
+    # Enable strict mode via env, or default-on for Medical edition
+    strict: ${HIPAA_STRICT:false}
+    enable-for-medical-edition: ${HIPAA_ENFORCE_MEDICAL:true}
+    # Disable persistence/exports and sensitive subsystems in strict mode
+    redact-responses: ${HIPAA_REDACT_RESPONSES:true}
+    disable-feedback: ${HIPAA_DISABLE_FEEDBACK:true}
+    disable-session-memory: ${HIPAA_DISABLE_SESSION_MEMORY:true}
+    disable-session-export: ${HIPAA_DISABLE_SESSION_EXPORT:true}
+    disable-visual: ${HIPAA_DISABLE_VISUAL:true}
+    disable-experience-learning: ${HIPAA_DISABLE_EXPERIENCE:true}
+    suppress-sensitive-logs: ${HIPAA_SUPPRESS_LOGS:true}
+    # Enforce TLS on non-govcloud profiles when strict mode is required
+    enforce-tls: ${HIPAA_ENFORCE_TLS:false}
 
 # ============================================
 # Swagger/OpenAPI Configuration

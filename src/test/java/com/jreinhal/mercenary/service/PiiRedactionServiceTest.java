@@ -31,6 +31,15 @@ class PiiRedactionServiceTest {
         ReflectionTestUtils.setField(redactionService, "redactNames", true);
         ReflectionTestUtils.setField(redactionService, "redactAddress", true);
         ReflectionTestUtils.setField(redactionService, "redactMedicalId", true);
+        ReflectionTestUtils.setField(redactionService, "redactAccountNumber", true);
+        ReflectionTestUtils.setField(redactionService, "redactHealthPlanId", true);
+        ReflectionTestUtils.setField(redactionService, "redactCertificateNumber", true);
+        ReflectionTestUtils.setField(redactionService, "redactVehicleId", true);
+        ReflectionTestUtils.setField(redactionService, "redactDeviceId", true);
+        ReflectionTestUtils.setField(redactionService, "redactUrl", true);
+        ReflectionTestUtils.setField(redactionService, "redactBiometric", true);
+        ReflectionTestUtils.setField(redactionService, "redactDate", true);
+        ReflectionTestUtils.setField(redactionService, "redactAge", true);
     }
 
     @Test
@@ -135,6 +144,76 @@ class PiiRedactionServiceTest {
 
         assertFalse(result.getRedactedContent().contains("MRN-778899"));
         assertTrue(result.hasRedactions());
+    }
+
+    @Test
+    @DisplayName("Should redact account numbers in context")
+    void shouldRedactAccountNumbers() {
+        String input = "Account number: ACCT-778899";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertFalse(result.getRedactedContent().contains("ACCT-778899"));
+        assertTrue(result.getRedactedContent().contains("[REDACTED-ACCOUNT_NUMBER]"));
+    }
+
+    @Test
+    @DisplayName("Should redact health plan IDs in context")
+    void shouldRedactHealthPlanId() {
+        String input = "Health Plan ID: HPLAN-554433";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertFalse(result.getRedactedContent().contains("HPLAN-554433"));
+        assertTrue(result.getRedactedContent().contains("[REDACTED-HEALTH_PLAN_ID]"));
+    }
+
+    @Test
+    @DisplayName("Should redact URLs")
+    void shouldRedactUrls() {
+        String input = "Report is at https://example.com/private/report";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertFalse(result.getRedactedContent().contains("https://example.com/private/report"));
+        assertTrue(result.getRedactedContent().contains("[REDACTED-URL]"));
+    }
+
+    @Test
+    @DisplayName("Should redact device identifiers")
+    void shouldRedactDeviceIdentifiers() {
+        String input = "MAC: AA:BB:CC:DD:EE:FF, IMEI: 356938035643809";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertFalse(result.getRedactedContent().contains("AA:BB:CC:DD:EE:FF"));
+        assertFalse(result.getRedactedContent().contains("356938035643809"));
+        assertTrue(result.getRedactedContent().contains("[REDACTED-DEVICE_ID]"));
+    }
+
+    @Test
+    @DisplayName("Should redact vehicle identifiers")
+    void shouldRedactVehicleIdentifiers() {
+        String input = "VIN: 1HGCM82633A004352, License Plate: ABC-1234";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertFalse(result.getRedactedContent().contains("1HGCM82633A004352"));
+        assertFalse(result.getRedactedContent().contains("ABC-1234"));
+        assertTrue(result.getRedactedContent().contains("[REDACTED-VEHICLE_ID]"));
+    }
+
+    @Test
+    @DisplayName("Should redact admission dates and age over 89")
+    void shouldRedactDateAndAge() {
+        String input = "Admission Date: 01/15/2020, age 92";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(input);
+
+        assertFalse(result.getRedactedContent().contains("01/15/2020"));
+        assertFalse(result.getRedactedContent().contains("92"));
+        assertTrue(result.getRedactedContent().contains("[REDACTED-DATE]"));
+        assertTrue(result.getRedactedContent().contains("[REDACTED-AGE]"));
     }
 
     @Test

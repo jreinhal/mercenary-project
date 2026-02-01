@@ -39,6 +39,8 @@ public class SecurityConfig {
     private String authMode;
     @Value(value="${app.csrf.bypass-ingest:false}")
     private boolean csrfBypassIngest;
+    @Value(value="${sentinel.hipaa.enforce-tls:false}")
+    private boolean hipaaEnforceTls;
 
     public SecurityConfig(CacUserDetailsService cacUserDetailsService, SecurityFilter securityFilter, RateLimitFilter rateLimitFilter, PreAuthRateLimitFilter preAuthRateLimitFilter, CorrelationIdFilter correlationIdFilter) {
         this.cacUserDetailsService = cacUserDetailsService;
@@ -117,6 +119,11 @@ public class SecurityConfig {
                 .addFilterBefore((Filter)this.preAuthRateLimitFilter, SecurityContextHolderFilter.class)
                 .addFilterBefore((Filter)this.securityFilter, AnonymousAuthenticationFilter.class)
                 .addFilterBefore((Filter)this.rateLimitFilter, AuthorizationFilter.class)
+                .requiresChannel(channel -> {
+                    if (this.hipaaEnforceTls) {
+                        channel.anyRequest().requiresSecure();
+                    }
+                })
                 .csrf(csrf -> {
                     csrf.csrfTokenRepository((CsrfTokenRepository)CookieCsrfTokenRepository.withHttpOnlyFalse())
                             .ignoringRequestMatchers(new String[]{"/api/health", "/api/status"});
@@ -124,7 +131,15 @@ public class SecurityConfig {
                         csrf.ignoringRequestMatchers(new String[]{"/api/ingest/**"});
                     }
                 })
-                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny).contentTypeOptions(contentType -> {}).referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)).addHeaderWriter(new PermissionsPolicyHeaderWriter("geolocation=(), microphone=(), camera=()")))
+                .headers(headers -> {
+                    if (this.hipaaEnforceTls) {
+                        headers.httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31536000L).includeSubDomains(true).preload(true));
+                    }
+                    headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                            .contentTypeOptions(contentType -> {})
+                            .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                            .addHeaderWriter(new PermissionsPolicyHeaderWriter("geolocation=(), microphone=(), camera=()"));
+                })
                 .authorizeHttpRequests(auth -> ((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)auth.requestMatchers(new String[]{"/api/health", "/api/status"})).permitAll().requestMatchers(new String[]{"/api/auth/**"})).permitAll().requestMatchers(new String[]{"/", "/index.html", "/manual.html"})).permitAll().requestMatchers(new String[]{"/css/**", "/js/**", "/images/**", "/favicon.ico"})).permitAll().requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"})).permitAll().requestMatchers(new String[]{"/api/admin/**"})).hasAuthority("ADMIN").requestMatchers(new String[]{"/api/**"})).authenticated().anyRequest()).permitAll())
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable);

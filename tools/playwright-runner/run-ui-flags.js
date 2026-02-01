@@ -8,6 +8,40 @@ const adminPass = process.env.ADMIN_PASS || process.env.SENTINEL_ADMIN_PASSWORD 
 const scenario = (process.env.SCENARIO || 'HYDE').toUpperCase();
 const outputJson = process.env.OUTPUT_JSON || path.join(__dirname, `results_flags_${scenario.toLowerCase()}.json`);
 const screenshotDir = process.env.SCREENSHOT_DIR || path.join(__dirname, 'screens');
+const testDocsDir = path.resolve(__dirname, '..', '..', 'src', 'test', 'resources', 'test_docs');
+const skipSeed = String(process.env.SKIP_SEED_DOCS || '').toLowerCase() === 'true';
+const MIN_ACTION_DELAY_MS = 2500;
+
+const sectorUploads = {
+  ENTERPRISE: [
+    'enterprise_compliance_audit.txt',
+    'enterprise_transformation.txt',
+    'enterprise_vendor_mgmt.txt',
+    'legal_contract_review.txt',
+    'legal_ip_brief.txt'
+  ],
+  GOVERNMENT: [
+    'defense_diamond_shield.txt',
+    'defense_cybersecurity.txt',
+    'operational_test.txt',
+    'operations_report_alpha.txt',
+    'operations_report_beta.txt'
+  ],
+  MEDICAL: [
+    'medical_clinical_trial.txt',
+    'medical_patient_outcomes.txt'
+  ],
+  FINANCE: [
+    'finance_earnings_q4.txt',
+    'finance_portfolio_analysis.txt'
+  ],
+  ACADEMIC: [
+    'academic_research_program.txt',
+    'academic_publications_review.txt',
+    'academic_funding_partnerships.txt',
+    'academic_compliance_irb.txt'
+  ]
+};
 
 const scenarios = {
   HYDE: {
@@ -162,6 +196,29 @@ async function runQuery(page, query) {
   return { responseText, sources, placeholderVisible };
 }
 
+async function uploadFile(page, filePath) {
+  await page.setInputFiles('#file-input', filePath);
+  await page.waitForFunction(() => {
+    const el = document.getElementById('upload-status');
+    if (!el) return false;
+    const text = el.innerText || '';
+    return /ingested|Upload failed|files ingested|failed/i.test(text);
+  }, { timeout: 60000 });
+  const statusText = (await page.locator('#upload-status').innerText()).trim();
+  await page.waitForTimeout(MIN_ACTION_DELAY_MS);
+  return statusText;
+}
+
+async function seedSectorDocumentsForSector(page, sector) {
+  const files = sectorUploads[sector];
+  if (!files || files.length === 0) return;
+  for (const fileName of files) {
+    const fullPath = path.join(testDocsDir, fileName);
+    await uploadFile(page, fullPath);
+  }
+  await page.waitForTimeout(5000);
+}
+
 function textIncludes(haystack, needle) {
   if (!needle) return true;
   return haystack.toLowerCase().includes(needle.toLowerCase());
@@ -203,6 +260,11 @@ async function run() {
 
   for (const test of scenarioConfig.tests) {
     await selectSector(page, test.sector);
+    if (!skipSeed) {
+      await seedSectorDocumentsForSector(page, test.sector);
+    } else {
+      console.log('Skipping seedSectorDocumentsForSector (SKIP_SEED_DOCS=true)');
+    }
     const result = await runQuery(page, test.query);
 
     let pass = true;
