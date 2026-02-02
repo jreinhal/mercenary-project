@@ -116,11 +116,15 @@ public class HipaaAuditService {
 
     public List<HipaaAuditEvent> queryEvents(Optional<Instant> since, Optional<Instant> until, Optional<AuditEventType> type, int limit) {
         Query query = new Query();
-        if (since.isPresent()) {
-            query.addCriteria((CriteriaDefinition)Criteria.where("timestamp").gte(since.get()));
-        }
-        if (until.isPresent()) {
-            query.addCriteria((CriteriaDefinition)Criteria.where("timestamp").lte(until.get()));
+        if (since.isPresent() || until.isPresent()) {
+            Criteria tsCriteria = Criteria.where("timestamp");
+            if (since.isPresent()) {
+                tsCriteria = tsCriteria.gte(since.get());
+            }
+            if (until.isPresent()) {
+                tsCriteria = tsCriteria.lte(until.get());
+            }
+            query.addCriteria((CriteriaDefinition)tsCriteria);
         }
         if (type.isPresent()) {
             query.addCriteria((CriteriaDefinition)Criteria.where("eventType").is(type.get()));
