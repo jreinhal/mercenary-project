@@ -1,0 +1,13 @@
+Enterprise Incident Brief
+
+Summary:
+A synthetic incident brief capturing detection, triage, and containment milestones for a simulated ransomware event.
+
+Timeline:
+- T+0: Suspicious lateral movement detected.
+- T+30m: Affected endpoints isolated.
+- T+2h: Backups validated and recovery initiated.
+
+Recommendations:
+- Expand EDR coverage.
+- Enforce privileged access workstation policies.

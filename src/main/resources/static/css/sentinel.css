@@ -5610,3 +5610,228 @@
 
 /* Additional spacing */
 .mb-1 { margin-bottom: 4px; }
+
+/* Onboarding Panel */
+.onboarding-panel {
+    margin: 16px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.onboarding-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.onboarding-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.onboarding-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.onboarding-steps {
+    display: grid;
+    gap: 14px;
+}
+
+.onboarding-step {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.onboarding-step-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.onboarding-step-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.onboarding-step-note {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.onboarding-scenarios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.scenario-chip {
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 11px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.scenario-chip:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Case Workspace */
+.case-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.case-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.case-title-input {
+    flex: 1;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    color: var(--text-primary);
+    font-size: 12px;
+}
+
+.case-status {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(79, 209, 197, 0.15);
+    color: #4fd1c5;
+}
+
+.case-meta {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.case-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.case-compliance-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.case-timeline {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 120px;
+}
+
+.case-empty-state {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    text-align: center;
+    padding: 12px 0;
+}
+
+.case-timeline-item {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.case-timeline-meta {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    display: flex;
+    justify-content: space-between;
+}
+
+.case-timeline-title {
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.case-timeline-detail {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.case-timeline-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.case-note-input {
+    width: 100%;
+    min-height: 90px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    color: var(--text-primary);
+    font-size: 12px;
+    resize: vertical;
+}
+
+.case-notes {
+    padding: 12px 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.case-note-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.case-note-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+@media (max-width: 1200px) {
+    .onboarding-panel {
+        margin: 12px;
+    }
+}
+
+.message.highlight {
+    box-shadow: 0 0 0 2px var(--accent, #4fd1c5);
+    border-radius: var(--radius-md);
+}

@@ -118,6 +118,11 @@ Users can enable **Deep Analysis** on a per-query basis using the toggle button 
 
 The **Entity Network** tab in the right panel only appears when Deep Analysis is enabled.
 
+## Demo dataset loader (admin-only)
+- SENTINEL_DEMO_ENABLED (default: true; disabled in govcloud profile)
+- SENTINEL_DEMO_PATH (default: classpath:demo_docs/*.*)
+- SENTINEL_DEMO_MAX_FILES (default: 50)
+
 **Performance Note:** Entity extraction during document upload is fast and always enabled by default. The slow operation is the graph traversal at query time, which is now opt-in per query.
 
 ### Entity Explorer UI

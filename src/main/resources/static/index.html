@@ -506,6 +506,48 @@
                 </div>
             </div>
 
+            <!-- Onboarding / Quickstart -->
+            <div class="onboarding-panel hidden" id="onboarding-panel" role="region" aria-label="Onboarding">
+                <div class="onboarding-header">
+                    <div>
+                        <div class="onboarding-title">Get started</div>
+                        <div class="onboarding-subtitle">Load documents, run a scenario, validate sources, and capture findings.</div>
+                    </div>
+                    <button class="icon-btn" data-action="dismissOnboarding" aria-label="Dismiss onboarding">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="onboarding-steps">
+                    <div class="onboarding-step">
+                        <div class="onboarding-step-title">1) Load documents</div>
+                        <div class="onboarding-step-actions">
+                            <button class="btn btn-primary" data-action="triggerFileInput">Upload files</button>
+                            <button class="btn btn-secondary" data-action="loadDemoDataset" id="demo-load-btn">Load demo dataset</button>
+                        </div>
+                        <div class="onboarding-step-note">Demo data is synthetic and safe for evaluation.</div>
+                    </div>
+                    <div class="onboarding-step">
+                        <div class="onboarding-step-title">2) Run a scenario</div>
+                        <div class="onboarding-scenarios">
+                            <button class="scenario-chip" data-action="setQueryInput" data-text="Summarize the enterprise transformation roadmap.">Enterprise roadmap</button>
+                            <button class="scenario-chip" data-action="setQueryInput" data-text="Extract key security controls and compliance obligations.">Compliance controls</button>
+                            <button class="scenario-chip" data-action="setQueryInput" data-text="Identify dependencies and risks across the migration plan.">Dependency risks</button>
+                        </div>
+                    </div>
+                    <div class="onboarding-step">
+                        <div class="onboarding-step-title">3) Validate evidence + graph</div>
+                        <div class="onboarding-step-actions">
+                            <button class="btn btn-secondary" data-action="switchRightTab" data-tab="source">Open Sources</button>
+                            <button class="btn btn-secondary" data-action="openEntityGraph">Open Entity Graph</button>
+                            <button class="btn btn-secondary" data-action="openCaseTab">Open Case</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Chat Input -->
             <div class="chat-input-container">
                 <div class="chat-input-wrapper">
@@ -551,6 +593,7 @@
                 <div class="right-panel-tabs">
                     <button class="right-panel-tab active" data-action="switchRightTab" data-tab="plot" data-tab="plot">Plot</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="source" data-tab="source">Source</button>
+                    <button class="right-panel-tab" data-action="switchRightTab" data-tab="case">Case</button>
                 </div>
             </div>
 
@@ -742,6 +785,34 @@
                     </div>
                     <div class="source-viewer" id="source-viewer" class="source-viewer-constrained">
                         Loading document content...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Case Tab (Investigation Workspace) -->
+            <div class="right-panel-content hidden" id="right-tab-case">
+                <div class="case-header">
+                    <div class="case-title-row">
+                        <input id="case-title-input" class="case-title-input" type="text" placeholder="Case title">
+                        <span class="case-status" id="case-status">Active</span>
+                    </div>
+                    <div class="case-meta" id="case-meta">No activity yet.</div>
+                    <div class="case-actions">
+                        <button class="btn btn-secondary" data-action="exportCase" id="case-export-btn">Export Case</button>
+                        <button class="btn btn-secondary" data-action="clearCase" id="case-clear-btn">Clear</button>
+                    </div>
+                    <div class="case-compliance-hint" id="case-compliance-hint"></div>
+                </div>
+
+                <div class="case-timeline" id="case-timeline">
+                    <div class="case-empty-state">No case activity yet. Add a response to start the timeline.</div>
+                </div>
+
+                <div class="case-notes">
+                    <label for="case-note-input" class="case-note-label">Analyst notes</label>
+                    <textarea id="case-note-input" class="case-note-input" placeholder="Add observation, decision, or next step..."></textarea>
+                    <div class="case-note-actions">
+                        <button class="btn btn-primary" data-action="addCaseNote" id="case-note-add">Add Note</button>
                     </div>
                 </div>
             </div>
