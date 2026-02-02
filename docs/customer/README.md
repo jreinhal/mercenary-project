@@ -12,9 +12,12 @@ Start here if you are deploying or operating SENTINEL.
 7. BACKUP_RESTORE.md
 8. SECURITY.md
 9. COMPLIANCE_APPENDICES.md
-10. OPERATIONS.md
-11. API.md
-12. TROUBLESHOOTING.md
+10. HIPAA_COMPLIANCE_RECOMMENDATIONS.md (medical)
+11. MEDICAL_DEPLOYMENT_CHECKLIST.md (medical)
+12. MEDICAL_GO_LIVE_RUNBOOK.md (medical)
+13. OPERATIONS.md
+14. API.md
+15. TROUBLESHOOTING.md
 
 ## Scope
 These documents describe installation, security posture, and operations for customer deployments.
