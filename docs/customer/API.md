@@ -61,6 +61,7 @@ Sectors (dept): GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
 - GET /api/admin/stats/documents
 - GET /api/admin/health
 - GET /api/admin/dashboard
+- POST /api/admin/demo/load (loads synthetic demo dataset; disabled in regulated editions by default)
 
 Swagger UI
 - /swagger-ui.html is enabled only in dev profile by default

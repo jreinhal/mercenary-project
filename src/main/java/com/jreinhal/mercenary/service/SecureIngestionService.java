@@ -164,6 +164,64 @@ public class SecureIngestionService {
         }
     }
 
+    public void ingestBytes(byte[] fileBytes, String filename, Department dept) {
+        if (fileBytes == null || fileBytes.length == 0) {
+            throw new SecureIngestionException("Empty file payload provided for ingestion.", null);
+        }
+        String safeName = (filename == null || filename.isBlank()) ? "uploaded.bin" : filename;
+        ingest(new InMemoryMultipartFile(safeName, fileBytes), dept);
+    }
+
+    private static final class InMemoryMultipartFile implements MultipartFile {
+        private final String filename;
+        private final byte[] bytes;
+
+        private InMemoryMultipartFile(String filename, byte[] bytes) {
+            this.filename = filename;
+            this.bytes = bytes;
+        }
+
+        @Override
+        public String getName() {
+            return this.filename;
+        }
+
+        @Override
+        public String getOriginalFilename() {
+            return this.filename;
+        }
+
+        @Override
+        public String getContentType() {
+            return null;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return this.bytes.length == 0;
+        }
+
+        @Override
+        public long getSize() {
+            return this.bytes.length;
+        }
+
+        @Override
+        public byte[] getBytes() throws IOException {
+            return this.bytes;
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            return new ByteArrayInputStream(this.bytes);
+        }
+
+        @Override
+        public void transferTo(java.io.File dest) throws IOException, IllegalStateException {
+            throw new UnsupportedOperationException("In-memory file cannot be transferred.");
+        }
+    }
+
     private void validateFileType(String filename, String detectedMimeType, byte[] bytes) {
         if (BLOCKED_MIME_TYPES.contains(detectedMimeType)) {
             log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", filename, detectedMimeType);

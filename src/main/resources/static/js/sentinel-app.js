@@ -6,6 +6,15 @@
             messageIndex: new Map(),
             deepAnalysisEnabled: false
         };
+        let currentEdition = 'PROFESSIONAL';
+        let currentClearance = 'UNCLASSIFIED';
+        let currentIsAdmin = false;
+        const regulatedEditions = new Set(['MEDICAL', 'GOVERNMENT']);
+        const casePolicy = {
+            allowPersistence: true,
+            allowExport: true,
+            allowDemo: true
+        };
 
         const API_BASE = window.location.origin + '/api';
         const authState = { authenticated: true, pending: false };
@@ -60,7 +69,10 @@
                 'stats-status-dot', 'stats-user', 'theme-dark', 'theme-light',
                 'top-k-slider', 'top-k-value', 'upload-filename', 'upload-percent',
                 'upload-progress-bar', 'upload-progress-container', 'upload-stage',
-                'upload-status', 'upload-zone', 'welcome-state'
+                'upload-status', 'upload-zone', 'welcome-state', 'onboarding-panel',
+                'right-tab-case', 'case-title-input', 'case-meta', 'case-timeline',
+                'case-note-input', 'case-note-add', 'case-export-btn', 'case-clear-btn',
+                'case-compliance-hint', 'demo-load-btn'
             ];
 
             const missing = requiredIds.filter(id => !document.getElementById(id));
@@ -313,6 +325,18 @@
                     case 'openDocsIndex': openDocsIndex(); break;
                     case 'openReadme': openReadme(); break;
                     case 'startNewChat': startNewChat(); break;
+                    case 'dismissOnboarding': dismissOnboarding(); break;
+                    case 'setQueryInput': setQueryInput(el.dataset.text); break;
+                    case 'openCaseTab': openCaseTab(); break;
+                    case 'openEntityGraph': openEntityGraph(); break;
+                    case 'addCaseNote': addCaseNote(); break;
+                    case 'exportCase': exportCase(); break;
+                    case 'clearCase': clearCase(); break;
+                    case 'addMessageToCase': addMessageToCase(el.dataset.msgId); break;
+                    case 'jumpToMessage': jumpToMessage(el.dataset.msgId); break;
+                    case 'loadDemoDataset': loadDemoDataset(); break;
+                    case 'openMessageSources': openMessageSources(el.dataset.msgId); break;
+                    case 'openMessageGraph': openMessageGraph(el.dataset.msgId); break;
                     case 'toggleConversationList': toggleConversationList(); break;
                     case 'clearUnpinnedConversations': clearUnpinnedConversations(); break;
                     case 'toggleSavedQueriesList': toggleSavedQueriesList(); break;
@@ -584,6 +608,15 @@
                         setText(document.getElementById('stats-user'), userContext.displayName);
                         localStorage.setItem('sentinel_operator', userContext.displayName);
                     }
+                    currentIsAdmin = Boolean(userContext.isAdmin);
+                    if (userContext.clearance) {
+                        currentClearance = String(userContext.clearance).toUpperCase();
+                    }
+                    if (userContext.edition) {
+                        applyEditionPolicy(userContext.edition);
+                    } else {
+                        applyEditionPolicy(currentEdition);
+                    }
 
                     if (!userContext.isAdmin && userContext.allowedSectors && userContext.allowedSectors.length > 0) {
                         filterSectorDropdown(userContext.allowedSectors);
@@ -597,6 +630,8 @@
                 const statsUser = document.getElementById('stats-user');
                 if (statsUser) statsUser.textContent = 'DEMO_USER';
                 localStorage.setItem('sentinel_operator', 'DEMO_USER');
+                currentIsAdmin = false;
+                applyEditionPolicy(currentEdition);
             }
 
             const savedSector = localStorage.getItem('sentinel-sector');
@@ -741,6 +776,7 @@
                 if (statsDocs) {
                     statsDocs.textContent = data.documentCount?.toLocaleString() || '0';
                 }
+                updateOnboardingVisibility(data.documentCount);
 
                 const statsUser = document.getElementById('stats-user');
                 if (statsUser) {
@@ -773,6 +809,7 @@
         let conversationHistory = [];
         let currentSessionId = null;
         let currentMessages = [];
+        let currentCase = null;
 
         function generateSessionId() {
             return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -784,8 +821,301 @@
             return `${baseKey}_${userId}_${sector}`;
         }
 
+        function createCaseForSession(sessionId, seedTitle) {
+            const now = Date.now();
+            return {
+                id: `case_${sessionId}`,
+                sessionId,
+                title: seedTitle || 'New Case',
+                status: 'Active',
+                createdAt: now,
+                updatedAt: now,
+                timeline: [],
+                notes: []
+            };
+        }
+
+        function ensureCaseLoaded() {
+            if (currentCase && currentCase.sessionId === currentSessionId) {
+                return;
+            }
+            const session = conversationHistory.find(s => s.id === currentSessionId);
+            if (session && session.caseData) {
+                currentCase = session.caseData;
+            } else {
+                currentCase = createCaseForSession(currentSessionId);
+            }
+            renderCasePanel();
+        }
+
+        function saveCaseState() {
+            if (!currentCase) return;
+            currentCase.updatedAt = Date.now();
+            if (canPersistCaseData()) {
+                saveCurrentSession();
+            }
+            renderCasePanel();
+        }
+
+        function addCaseTimelineEntry(entry) {
+            if (!currentCase) return;
+            currentCase.timeline.unshift(entry);
+            saveCaseState();
+        }
+
+        function addMessageToCase(msgId) {
+            const record = state.messageIndex.get(msgId);
+            if (!record) {
+                showInfoToast('No message data found for this response.');
+                return;
+            }
+            ensureCaseLoaded();
+            const title = record.query ? record.query.slice(0, 140) : 'Response captured';
+            const detail = record.response ? record.response.slice(0, 220) : '';
+            const entry = {
+                id: `entry_${Date.now()}`,
+                type: 'response',
+                timestamp: Date.now(),
+                title,
+                detail,
+                msgId,
+                sources: record.sources || []
+            };
+            addCaseTimelineEntry(entry);
+            showInfoToast('Added response to case timeline.');
+        }
+
+        function addCaseNote() {
+            const input = document.getElementById('case-note-input');
+            if (!input) return;
+            const noteText = input.value.trim();
+            if (!noteText) {
+                showInfoToast('Add a note before saving.');
+                return;
+            }
+            ensureCaseLoaded();
+            const entry = {
+                id: `note_${Date.now()}`,
+                type: 'note',
+                timestamp: Date.now(),
+                title: 'Analyst Note',
+                detail: noteText,
+                msgId: null,
+                sources: []
+            };
+            input.value = '';
+            addCaseTimelineEntry(entry);
+        }
+
+        function clearCase() {
+            if (!currentCase) return;
+            const confirmed = confirm('Clear case timeline and notes? This cannot be undone.');
+            if (!confirmed) return;
+            currentCase.timeline = [];
+            currentCase.notes = [];
+            saveCaseState();
+        }
+
+        function formatCaseTimestamp(ts) {
+            const date = new Date(ts);
+            return date.toLocaleString();
+        }
+
+        function renderCasePanel() {
+            const titleInput = document.getElementById('case-title-input');
+            const metaEl = document.getElementById('case-meta');
+            const timelineEl = document.getElementById('case-timeline');
+            if (!timelineEl) return;
+
+            if (!currentCase) {
+                timelineEl.innerHTML = '<div class="case-empty-state">No case loaded.</div>';
+                if (titleInput) titleInput.value = '';
+                if (metaEl) metaEl.textContent = 'No activity yet.';
+                return;
+            }
+
+            if (titleInput) {
+                titleInput.value = currentCase.title || 'New Case';
+                titleInput.onchange = () => {
+                    currentCase.title = titleInput.value.trim() || 'New Case';
+                    saveCaseState();
+                };
+            }
+
+            if (metaEl) {
+                const total = currentCase.timeline.length;
+                const lastUpdate = currentCase.updatedAt ? formatCaseTimestamp(currentCase.updatedAt) : 'N/A';
+                metaEl.textContent = `${total} timeline item${total === 1 ? '' : 's'} · Updated ${lastUpdate}`;
+            }
+
+            if (!currentCase.timeline.length) {
+                timelineEl.innerHTML = '<div class="case-empty-state">No case activity yet. Add a response to start the timeline.</div>';
+                return;
+            }
+
+            timelineEl.innerHTML = currentCase.timeline.map(entry => {
+                const label = entry.type === 'note' ? 'Note' : 'Response';
+                const sourceCount = entry.sources ? entry.sources.length : 0;
+                const sourceText = sourceCount ? `${sourceCount} source${sourceCount === 1 ? '' : 's'}` : 'No sources';
+                const jumpBtn = entry.msgId
+                    ? `<button class="message-action-btn" data-action="jumpToMessage" data-msg-id="${entry.msgId}">View</button>`
+                    : '';
+                return `
+                    <div class="case-timeline-item">
+                        <div class="case-timeline-meta">
+                            <span>${label}</span>
+                            <span>${formatCaseTimestamp(entry.timestamp)}</span>
+                        </div>
+                        <div class="case-timeline-title">${escapeHtml(entry.title || label)}</div>
+                        <div class="case-timeline-detail">${escapeHtml(entry.detail || '')}</div>
+                        <div class="case-timeline-actions">
+                            ${jumpBtn}
+                            <span class="case-timeline-detail">${sourceText}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openCaseTab() {
+            ensureCaseLoaded();
+            switchRightTab('case');
+        }
+
+        function openEntityGraph() {
+            switchRightTab('plot');
+            switchGraphTab('entity');
+            entityGraphMode = 'context';
+            renderEntityGraph();
+        }
+
+        function openMessageSources(msgId) {
+            const record = state.messageIndex.get(msgId);
+            if (!record || !record.sources || record.sources.length === 0) {
+                showInfoToast('No sources were attached to this response.');
+                return;
+            }
+            switchRightTab('source');
+            openSource(record.sources[0], true);
+        }
+
+        function openMessageGraph(msgId) {
+            const record = state.messageIndex.get(msgId);
+            const responseText = record ? record.response : '';
+            const entities = extractEntities(responseText || '', true);
+            updateContextEntityGraph(entities);
+            switchRightTab('plot');
+            switchGraphTab('entity');
+            entityGraphMode = 'context';
+            renderEntityGraph();
+        }
+
+        function jumpToMessage(msgId) {
+            const el = document.getElementById(msgId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('highlight');
+                setTimeout(() => el.classList.remove('highlight'), 1200);
+            }
+        }
+
+        function exportCase() {
+            if (!currentCase) return;
+            if (!canExportCaseData()) {
+                showInfoToast('Case export is disabled for regulated editions.');
+                return;
+            }
+            const lines = [];
+            lines.push(`# ${currentCase.title || 'Case Summary'}`);
+            lines.push(`Status: ${currentCase.status || 'Active'}`);
+            lines.push(`Last updated: ${formatCaseTimestamp(currentCase.updatedAt)}`);
+            lines.push('');
+            lines.push('## Timeline');
+            if (!currentCase.timeline.length) {
+                lines.push('No timeline entries recorded.');
+            } else {
+                currentCase.timeline.forEach(entry => {
+                    const label = entry.type === 'note' ? 'Note' : 'Response';
+                    lines.push(`- ${formatCaseTimestamp(entry.timestamp)} · ${label}: ${entry.title || ''}`);
+                    if (entry.detail) {
+                        lines.push(`  ${entry.detail}`);
+                    }
+                    if (entry.sources && entry.sources.length) {
+                        lines.push(`  Sources: ${entry.sources.join(', ')}`);
+                    }
+                });
+            }
+            const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+            const filename = `${(currentCase.title || 'case').replace(/[^a-z0-9_-]/gi, '_').toLowerCase()}_case.md`;
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function setQueryInput(text) {
+            if (!queryInput) return;
+            queryInput.value = text || '';
+            queryInput.focus();
+        }
+
+        function updateOnboardingVisibility(docCount) {
+            const panel = document.getElementById('onboarding-panel');
+            if (!panel) return;
+            const dismissed = localStorage.getItem('sentinel-onboarding-dismissed') === 'true';
+            const shouldShow = !dismissed && Number(docCount || 0) === 0;
+            setHidden(panel, !shouldShow);
+        }
+
+        function dismissOnboarding() {
+            localStorage.setItem('sentinel-onboarding-dismissed', 'true');
+            updateOnboardingVisibility(1);
+        }
+
+        async function loadDemoDataset() {
+            if (!currentIsAdmin) {
+                showInfoToast('Admin access required to load demo data.');
+                return;
+            }
+            if (!canLoadDemoData()) {
+                showInfoToast('Demo loader disabled for regulated editions.');
+                return;
+            }
+            const confirmed = confirm('Load the demo dataset into the current deployment?');
+            if (!confirmed) return;
+            const headers = { 'Content-Type': 'application/json' };
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/demo/load`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ scenario: 'default' })
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.message || err.error || 'Demo load failed');
+                }
+                const data = await response.json();
+                showInfoToast(`Demo dataset loaded (${data.loaded || 0} files).`);
+                fetchSystemStatus();
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Demo load failed: ${error.message}`);
+            }
+        }
+
         function loadConversationHistory() {
             try {
+                if (!canPersistCaseData()) {
+                    conversationHistory = [];
+                    renderHistoryList();
+                    return;
+                }
                 const storageKey = getScopedStorageKey('sentinel_conversations');
                 const saved = localStorage.getItem(storageKey);
                 conversationHistory = saved ? JSON.parse(saved) : [];
@@ -798,6 +1128,9 @@
 
         function saveConversationHistory() {
             try {
+                if (!canPersistCaseData()) {
+                    return;
+                }
                 if (conversationHistory.length > 50) {
                     conversationHistory = conversationHistory.slice(-50);
                 }
@@ -833,9 +1166,11 @@
             }
             currentSessionId = generateSessionId();
             currentMessages = [];
+            currentCase = createCaseForSession(currentSessionId);
             clearChat();
             clearInfoPanel();
             renderHistoryList();
+            renderCasePanel();
         }
 
         function saveCurrentSession() {
@@ -844,13 +1179,18 @@
             const firstUserMsg = currentMessages.find(m => m.role === 'user');
             const title = firstUserMsg ? firstUserMsg.content.substring(0, 150) : 'Untitled conversation';
 
+            if (!currentCase || currentCase.sessionId !== currentSessionId) {
+                currentCase = createCaseForSession(currentSessionId, title);
+            }
+
             const existingIdx = conversationHistory.findIndex(s => s.id === currentSessionId);
             const sessionData = {
                 id: currentSessionId,
                 title: title + (title.length >= 150 ? '...' : ''),
                 timestamp: Date.now(),
                 messageCount: currentMessages.length,
-                messages: currentMessages
+                messages: currentMessages,
+                caseData: canPersistCaseData() ? currentCase : null
             };
 
             if (existingIdx >= 0) {
@@ -873,6 +1213,7 @@
 
             currentSessionId = sessionId;
             currentMessages = session.messages || [];
+            currentCase = session.caseData || createCaseForSession(currentSessionId, session.title);
 
             const chatMessages = document.getElementById('chat-messages');
             const welcome = document.getElementById('welcome-state');
@@ -890,6 +1231,7 @@
 
             restoreInfoPanelFromSession(currentMessages);
 
+            renderCasePanel();
             renderHistoryList();
         }
 
@@ -967,12 +1309,27 @@
             const chatMessages = document.getElementById('chat-messages');
             const div = document.createElement('div');
             div.className = 'message assistant';
+            const msgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+            div.id = msgId;
             const processedText = processCitations(text);
             div.innerHTML = `
             <div class="message-bubble">${processedText}</div>
+            <div class="message-actions">
+                <button class="message-action-btn" data-action="openMessageSources" data-msg-id="${msgId}" title="Open sources">Sources</button>
+                <button class="message-action-btn" data-action="openMessageGraph" data-msg-id="${msgId}" title="Open entity graph">Graph</button>
+                <button class="message-action-btn" data-action="addMessageToCase" data-msg-id="${msgId}" title="Add to case timeline">Add to Case</button>
+            </div>
             <div class="message-meta">Restored</div>
         `;
             chatMessages.appendChild(div);
+            state.messageIndex.set(msgId, {
+                query: '',
+                response: text || '',
+                sources: sources || [],
+                meta: {},
+                reasoningSteps: 0,
+                metrics: {}
+            });
         }
 
         function deleteSession(sessionId) {
@@ -994,7 +1351,7 @@
                 meta: meta || null,
                 timestamp: Date.now()
             });
-            if (appSettings.saveHistory) {
+            if (canPersistCaseData()) {
                 saveCurrentSession();
             }
         }
@@ -1002,7 +1359,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadConversationHistory();
             currentSessionId = generateSessionId();
+            currentCase = createCaseForSession(currentSessionId);
             renderConversationList();
+            renderCasePanel();
         });
 
         function switchMainTab(tabName) {
@@ -1059,9 +1418,11 @@
         function switchRightTab(tabName) {
             const plotTab = document.getElementById('right-tab-plot');
             const sourceTab = document.getElementById('right-tab-source');
+            const caseTab = document.getElementById('right-tab-case');
 
             setHidden(plotTab, true);
             setHidden(sourceTab, true);
+            setHidden(caseTab, true);
 
             document.querySelectorAll('.right-panel-tab').forEach(btn => {
                 btn.classList.remove('active');
@@ -3892,6 +4253,93 @@
             saveHistory: true
         };
 
+        function isRegulatedEdition() {
+            return regulatedEditions.has(currentEdition);
+        }
+
+        function canPersistCaseData() {
+            return appSettings.saveHistory && casePolicy.allowPersistence;
+        }
+
+        function canExportCaseData() {
+            return casePolicy.allowExport;
+        }
+
+        function canLoadDemoData() {
+            return casePolicy.allowDemo;
+        }
+
+        function clearPersistedHistory() {
+            try {
+                const storageKey = getScopedStorageKey('sentinel_conversations');
+                localStorage.removeItem(storageKey);
+            } catch (e) {
+                console.warn('Failed to clear persisted history:', e);
+            }
+            conversationHistory = [];
+            renderHistoryList();
+            renderConversationList();
+        }
+
+        function updateComplianceControls() {
+            const saveHistoryToggle = document.getElementById('save-history');
+            if (saveHistoryToggle) {
+                if (isRegulatedEdition()) {
+                    saveHistoryToggle.checked = false;
+                    saveHistoryToggle.disabled = true;
+                    saveHistoryToggle.title = 'Disabled for regulated editions';
+                } else {
+                    saveHistoryToggle.disabled = false;
+                    saveHistoryToggle.title = '';
+                }
+            }
+
+            const caseExportBtn = document.getElementById('case-export-btn');
+            if (caseExportBtn) {
+                caseExportBtn.disabled = !canExportCaseData();
+                caseExportBtn.title = canExportCaseData()
+                    ? 'Export case summary'
+                    : 'Export disabled for regulated editions';
+            }
+
+            const demoBtn = document.getElementById('demo-load-btn');
+            if (demoBtn) {
+                const demoAllowed = canLoadDemoData() && currentIsAdmin;
+                demoBtn.disabled = !demoAllowed;
+                if (!currentIsAdmin) {
+                    demoBtn.title = 'Admin only';
+                } else {
+                    demoBtn.title = demoAllowed
+                        ? 'Load demo dataset'
+                        : 'Demo loader disabled for regulated editions';
+                }
+            }
+
+            const complianceHint = document.getElementById('case-compliance-hint');
+            if (complianceHint) {
+                const hint = isRegulatedEdition()
+                    ? 'Regulated mode: case export and persistence are disabled.'
+                    : 'Case workspace can be exported or persisted when Save History is enabled.';
+                complianceHint.textContent = hint;
+            }
+        }
+
+        function applyEditionPolicy(edition) {
+            if (edition) {
+                currentEdition = String(edition).toUpperCase();
+            }
+            const regulated = isRegulatedEdition();
+            casePolicy.allowPersistence = !regulated;
+            casePolicy.allowExport = !regulated;
+            casePolicy.allowDemo = !regulated;
+
+            if (regulated) {
+                appSettings.saveHistory = false;
+                clearPersistedHistory();
+            }
+            updateComplianceControls();
+        }
+
         function initSettingsToggles() {
             const hydeToggle = document.getElementById('hyde-toggle');
             const graphragToggle = document.getElementById('graphrag-toggle');
@@ -3926,6 +4374,8 @@
             const simSlider = document.getElementById('similarity-slider');
             if (topKSlider) topKSlider.addEventListener('input', markSettingsUnsaved);
             if (simSlider) simSlider.addEventListener('input', markSettingsUnsaved);
+
+            updateComplianceControls();
         }
 
         function initInfoTooltips() {
@@ -4112,12 +4562,13 @@
             }
             if (autoScrollToggle) appSettings.autoScroll = autoScrollToggle.checked;
             if (saveHistoryToggle) {
+                if (isRegulatedEdition() && saveHistoryToggle.checked) {
+                    saveHistoryToggle.checked = false;
+                    showInfoToast('Save History is disabled for regulated editions.');
+                }
                 appSettings.saveHistory = saveHistoryToggle.checked;
-                if (!saveHistoryToggle.checked) {
-                    localStorage.removeItem('sentinel-conversation-history');
-                    conversationHistory = [];
-                    renderHistoryList();
-                    renderConversationList();
+                if (!appSettings.saveHistory) {
+                    clearPersistedHistory();
                 }
             }
             if (topKSlider) appSettings.topK = parseInt(topKSlider.value);
@@ -4442,9 +4893,11 @@
 
             currentSessionId = generateSessionId();
             currentMessages = [];
+            currentCase = createCaseForSession(currentSessionId);
 
             const chatTitle = document.getElementById('chat-title-text');
             if (chatTitle) chatTitle.textContent = 'New Conversation';
+            renderCasePanel();
         }
 
         function hideWelcome() {
@@ -4454,6 +4907,8 @@
 
         function appendUserMessage(text) {
             hideWelcome();
+            const onboarding = document.getElementById('onboarding-panel');
+            setHidden(onboarding, true);
             const div = document.createElement('div');
             div.className = 'message user';
             div.innerHTML = `
@@ -4616,6 +5071,9 @@
                 ${processedText}
             </div>
             <div class="message-actions">
+                <button class="message-action-btn" data-action="openMessageSources" data-msg-id="${msgId}" title="Open sources">Sources</button>
+                <button class="message-action-btn" data-action="openMessageGraph" data-msg-id="${msgId}" title="Open entity graph">Graph</button>
+                <button class="message-action-btn" data-action="addMessageToCase" data-msg-id="${msgId}" title="Add to case timeline">Add to Case</button>
                 <button class="feedback-btn positive" data-action="handleFeedback" data-msg-id="${msgId}" data-type="positive" title="Helpful">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>

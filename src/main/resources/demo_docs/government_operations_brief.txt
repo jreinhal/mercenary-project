@@ -1,0 +1,12 @@
+Government Operations Brief (Synthetic)
+
+Mission:
+- Increase readiness by improving supply chain visibility.
+
+Key Actions:
+- Implement secure logistics telemetry.
+- Harden access control for critical depots.
+
+Risks:
+- Vendor lead-time variability.
+- Data integrity in disconnected sites.

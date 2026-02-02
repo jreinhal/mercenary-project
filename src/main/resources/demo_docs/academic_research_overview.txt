@@ -1,0 +1,11 @@
+Academic Research Overview
+
+Topic:
+- Multi-agent reasoning frameworks for knowledge synthesis.
+
+Highlights:
+- Structured prompting reduces hallucination rates.
+- Graph-based retrieval improves multi-hop answers.
+
+Future Work:
+- Benchmark cross-domain retrieval performance.

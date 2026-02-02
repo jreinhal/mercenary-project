@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.controller;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.config.SectorConfig;
+import com.jreinhal.mercenary.core.license.LicenseService;
 import com.jreinhal.mercenary.dto.EnhancedAskResponse;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
@@ -111,6 +112,7 @@ public class MercenaryController {
     private final SessionPersistenceService sessionPersistenceService;
     private final RagOrchestrationService ragOrchestrationService;
     private final Cache<String, String> secureDocCache;
+    private final LicenseService licenseService;
     private final AtomicInteger docCount = new AtomicInteger(0);
     private final OllamaOptions llmOptions;
     private static final String NO_RELEVANT_RECORDS = "No relevant records found.";
@@ -131,7 +133,7 @@ public class MercenaryController {
     @Value("${sentinel.rag.max-visual-docs:8}")
     private int maxVisualDocs;
 
-    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache,
+    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache, LicenseService licenseService,
                                @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
                                @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
                                @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
@@ -161,6 +163,7 @@ public class MercenaryController {
         this.sessionPersistenceService = sessionPersistenceService;
         this.ragOrchestrationService = ragOrchestrationService;
         this.secureDocCache = secureDocCache;
+        this.licenseService = licenseService;
         this.llmOptions = OllamaOptions.create()
                 .withModel(llmModel)
                 .withTemperature(llmTemperature)
@@ -220,11 +223,12 @@ public class MercenaryController {
     @GetMapping(value={"/user/context"})
     public UserContextResponse getUserContext() {
         User user = SecurityContext.getCurrentUser();
+        String edition = this.licenseService.getEdition().name();
         if (user == null) {
-            return new UserContextResponse("Anonymous", "UNCLASSIFIED", List.of(), false);
+            return new UserContextResponse("Anonymous", "UNCLASSIFIED", List.of(), false, edition);
         }
         List<String> sectors = user.getAllowedSectors().stream().map(Enum::name).sorted().collect(Collectors.toList());
-        return new UserContextResponse(user.getDisplayName(), user.getClearance().name(), sectors, user.hasRole(UserRole.ADMIN));
+        return new UserContextResponse(user.getDisplayName(), user.getClearance().name(), sectors, user.hasRole(UserRole.ADMIN), edition);
     }
 
     @GetMapping(value={"/inspect"})
@@ -1233,7 +1237,7 @@ public class MercenaryController {
     public record TelemetryResponse(int documentCount, int queryCount, long avgLatencyMs, boolean dbOnline, boolean llmOnline) {
     }
 
-    public record UserContextResponse(String displayName, String clearance, List<String> allowedSectors, boolean isAdmin) {
+    public record UserContextResponse(String displayName, String clearance, List<String> allowedSectors, boolean isAdmin, String edition) {
     }
 
     public record InspectResponse(String content, List<String> highlights, boolean redacted, int redactionCount) {

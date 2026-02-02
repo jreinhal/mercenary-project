@@ -194,6 +194,11 @@ sentinel:
     load: ${SAMPLE_DATA_LOAD:false}
     path: classpath:test_docs/*.txt
 
+  demo:
+    enabled: ${SENTINEL_DEMO_ENABLED:true}
+    path: ${SENTINEL_DEMO_PATH:classpath:demo_docs/*.*}
+    max-files: ${SENTINEL_DEMO_MAX_FILES:50}
+
   # HiFi-RAG Pipeline (arXiv:2512.22442v1)
   # Hierarchical filtering + two-pass generation
   # NOTE: Disabled by default - LLM reranking adds significant latency
@@ -543,6 +548,10 @@ app:
     # Least-privilege defaults if auto-provision is enabled
     default-role: ${CAC_DEFAULT_ROLE:VIEWER}
     default-clearance: ${CAC_DEFAULT_CLEARANCE:UNCLASSIFIED}
+
+sentinel:
+  demo:
+    enabled: false
 
 # Disable Swagger UI in government deployments
 springdoc:
