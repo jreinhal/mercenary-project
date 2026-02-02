@@ -13,6 +13,9 @@ This directory is the source of record for customer and engineering documentatio
 - docs/customer/BACKUP_RESTORE.md
 - docs/customer/SECURITY.md
 - docs/customer/COMPLIANCE_APPENDICES.md
+- docs/customer/HIPAA_COMPLIANCE_RECOMMENDATIONS.md
+- docs/customer/MEDICAL_DEPLOYMENT_CHECKLIST.md
+- docs/customer/MEDICAL_GO_LIVE_RUNBOOK.md
 - docs/customer/OPERATIONS.md
 - docs/customer/API.md
 - docs/customer/TROUBLESHOOTING.md

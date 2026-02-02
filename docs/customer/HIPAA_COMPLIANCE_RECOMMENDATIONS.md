@@ -196,3 +196,4 @@ These configuration keys are available to enforce medical-only behavior:
 - Convert this into a formal remediation plan with priorities and staged milestones.
 - Implement the code changes listed in the remediation backlog.
 - Run a formal HIPAA risk analysis with compliance/legal stakeholders.
+- Follow MEDICAL_DEPLOYMENT_CHECKLIST.md and MEDICAL_GO_LIVE_RUNBOOK.md for production readiness.

@@ -83,3 +83,5 @@ Endpoints:
 ## Related guidance
 - Compliance mapping by sector: COMPLIANCE_APPENDICES.md
 - Host hardening for Linux deployments: HARDENING_LINUX.md
+- Medical deployment checklist: MEDICAL_DEPLOYMENT_CHECKLIST.md
+- Medical go-live runbook: MEDICAL_GO_LIVE_RUNBOOK.md
