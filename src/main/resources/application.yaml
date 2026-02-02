@@ -199,6 +199,10 @@ sentinel:
     path: ${SENTINEL_DEMO_PATH:classpath:demo_docs/*.*}
     max-files: ${SENTINEL_DEMO_MAX_FILES:50}
 
+  casework:
+    enabled: ${SENTINEL_CASEWORK_ENABLED:true}
+    allow-regulated: ${SENTINEL_CASEWORK_ALLOW_REGULATED:false}
+
   connectors:
     enabled: ${SENTINEL_CONNECTORS_ENABLED:true}
     allow-regulated: ${SENTINEL_CONNECTORS_ALLOW_REGULATED:false}

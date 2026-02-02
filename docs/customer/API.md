@@ -65,5 +65,13 @@ Sectors (dept): GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
 - GET /api/admin/connectors/status
 - POST /api/admin/connectors/sync
 
+## Case Collaboration (non-regulated editions)
+- GET /api/cases
+- POST /api/cases
+- GET /api/cases/{caseId}
+- POST /api/cases/{caseId}/share
+- POST /api/cases/{caseId}/review
+- POST /api/cases/{caseId}/review/decision
+
 Swagger UI
 - /swagger-ui.html is enabled only in dev profile by default

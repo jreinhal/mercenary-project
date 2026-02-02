@@ -6131,6 +6131,70 @@
     justify-content: flex-end;
 }
 
+.case-collab {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.case-collab-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.case-collab-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.case-collab-hint {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-bottom: 10px;
+}
+
+.case-library {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-tertiary);
+    padding: 10px;
+}
+
+.case-library-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.case-library-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+}
+
+.case-library-title {
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.case-library-meta {
+    font-size: 10px;
+    color: var(--text-tertiary);
+}
+
 @media (max-width: 1200px) {
     .onboarding-panel {
         margin: 12px;

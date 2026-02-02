@@ -862,13 +862,32 @@
                         <input id="case-title-input" class="case-title-input" type="text" placeholder="Case title">
                         <span class="case-status" id="case-status">Active</span>
                     </div>
-                    <div class="case-meta" id="case-meta">No activity yet.</div>
-                    <div class="case-actions">
-                        <button class="btn btn-secondary" data-action="exportCase" id="case-export-btn">Export Case</button>
-                        <button class="btn btn-secondary" data-action="clearCase" id="case-clear-btn">Clear</button>
-                    </div>
-                    <div class="case-compliance-hint" id="case-compliance-hint"></div>
+                <div class="case-meta" id="case-meta">No activity yet.</div>
+                <div class="case-actions">
+                    <button class="btn btn-secondary" data-action="exportCase" id="case-export-btn">Export Case</button>
+                    <button class="btn btn-secondary" data-action="clearCase" id="case-clear-btn">Clear</button>
                 </div>
+                <div class="case-compliance-hint" id="case-compliance-hint"></div>
+                <div class="case-collab">
+                    <div class="case-collab-header">
+                        <span>Collaboration</span>
+                        <button class="btn btn-secondary" data-action="refreshCaseLibrary" id="case-library-refresh-btn">Refresh</button>
+                    </div>
+                    <div class="case-collab-actions">
+                        <button class="btn btn-secondary" data-action="saveCaseLibrary" id="case-save-btn">Save to Library</button>
+                        <button class="btn btn-secondary" data-action="shareCase" id="case-share-btn">Share</button>
+                        <button class="btn btn-secondary" data-action="submitCaseReview" id="case-review-btn">Submit for Review</button>
+                        <button class="btn btn-secondary" data-action="approveCase" id="case-approve-btn">Approve</button>
+                        <button class="btn btn-secondary" data-action="requestRedaction" id="case-redaction-btn">Request Redaction</button>
+                    </div>
+                    <div class="case-collab-hint" id="case-collab-hint"></div>
+                    <div class="case-library" id="case-library">
+                        <div class="case-library-list" id="case-library-list">
+                            <div class="case-empty-state">No shared cases yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
                 <div class="case-timeline" id="case-timeline">
                     <div class="case-empty-state">No case activity yet. Add a response to start the timeline.</div>

@@ -123,6 +123,10 @@ The **Entity Network** tab in the right panel only appears when Deep Analysis is
 - SENTINEL_DEMO_PATH (default: classpath:demo_docs/*.*)
 - SENTINEL_DEMO_MAX_FILES (default: 50)
 
+## Case collaboration (non-regulated by default)
+- SENTINEL_CASEWORK_ENABLED (default: true)
+- SENTINEL_CASEWORK_ALLOW_REGULATED (default: false)
+
 ## Connectors (admin-only)
 - SENTINEL_CONNECTORS_ENABLED (default: true; disabled in govcloud profile)
 - SENTINEL_CONNECTORS_ALLOW_REGULATED (default: false)
