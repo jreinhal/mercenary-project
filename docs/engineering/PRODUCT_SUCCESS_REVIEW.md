@@ -63,6 +63,17 @@ Recommended inspirations:
 - Marketplace for connectors and sector-specific pipelines.
 - Expanded reporting for compliance and executive summaries.
 
+## Implementation Status (2026-02-02)
+### Completed (Fast Wins)
+- Guided onboarding with demo scenarios and admin-only synthetic data loader.
+- Case/timeline workspace with export and compliance gating.
+- Graph + source + case quick actions in the onboarding panel.
+
+### In Progress (Mid-Term)
+- Enterprise connectors: SharePoint, Confluence, S3 (admin-only, disabled for regulated editions by default).
+- Eval harness UI (admin-only) for baseline query suites and quality signals.
+- Collaboration workflows (shared cases, review/approval, redaction review) not yet implemented.
+
 ## References (UI/UX Inspiration)
 - https://www.splunk.com/en-us/blog/security/use-investigation-workbench-to-reduce-time-to-contain-and-time-to-remediate.html
 - https://www.elastic.co/docs/solutions/security/get-started/elastic-security-ui

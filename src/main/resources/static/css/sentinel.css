@@ -4814,6 +4814,66 @@
             border-top: 1px solid var(--border-subtle);
         }
 
+        .settings-hint {
+            margin-top: 10px;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            line-height: 1.4;
+        }
+
+        .connector-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .connector-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-radius: var(--radius-md);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .connector-name {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .connector-status {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: var(--bg-secondary);
+            color: var(--text-tertiary);
+            border: 1px solid transparent;
+        }
+
+        .connector-status.enabled {
+            color: var(--success);
+            background: var(--success-muted);
+            border-color: rgba(5, 150, 105, 0.3);
+        }
+
+        .connector-status.syncing,
+        .connector-status.blocked {
+            color: var(--warning);
+            background: var(--warning-muted);
+            border-color: rgba(217, 119, 6, 0.35);
+        }
+
+        .connector-status.error {
+            color: var(--error);
+            background: var(--error-muted);
+            border-color: rgba(220, 38, 38, 0.35);
+        }
+
         .save-settings-btn {
             display: flex;
             align-items: center;
@@ -4847,6 +4907,252 @@
         .save-settings-btn.unsaved {
             background: var(--warning);
             animation: pulse-warning 1.5s ease-in-out infinite;
+        }
+
+        .eval-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .eval-header {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 14px 16px;
+        }
+
+        .eval-title-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .eval-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .eval-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .eval-badge {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: var(--bg-secondary);
+            color: var(--text-tertiary);
+            border: 1px solid var(--border-subtle);
+            white-space: nowrap;
+        }
+
+        .eval-badge.regulated {
+            background: var(--warning-muted);
+            color: var(--warning);
+            border-color: rgba(217, 119, 6, 0.35);
+        }
+
+        .eval-badge.blocked {
+            background: var(--error-muted);
+            color: var(--error);
+            border-color: rgba(220, 38, 38, 0.35);
+        }
+
+        .eval-hint {
+            margin-top: 10px;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            line-height: 1.4;
+        }
+
+        .eval-controls {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .eval-control {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1 1 220px;
+        }
+
+        .eval-control label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .eval-select {
+            width: 100%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 8px 10px;
+            color: var(--text-primary);
+            font-size: 12px;
+        }
+
+        .eval-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .eval-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .eval-progress-bar {
+            width: 100%;
+            height: 6px;
+            border-radius: 999px;
+            background: var(--bg-tertiary);
+            overflow: hidden;
+        }
+
+        .eval-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-primary);
+            transition: width 0.2s ease;
+        }
+
+        .eval-progress-text {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        .eval-results {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .eval-empty-state {
+            padding: 16px;
+            border-radius: var(--radius-lg);
+            border: 1px dashed var(--border-subtle);
+            color: var(--text-tertiary);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .eval-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 16px;
+            padding: 12px 14px;
+            border-radius: var(--radius-lg);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .eval-summary-item strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .eval-result-card {
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-secondary);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .eval-result-card.good {
+            border-color: rgba(5, 150, 105, 0.35);
+        }
+
+        .eval-result-card.ok {
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+
+        .eval-result-card.short,
+        .eval-result-card.warn {
+            border-color: rgba(217, 119, 6, 0.35);
+        }
+
+        .eval-result-card.error {
+            border-color: rgba(220, 38, 38, 0.35);
+        }
+
+        .eval-result-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .eval-result-index {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        .eval-result-query {
+            font-size: 12px;
+            color: var(--text-primary);
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .eval-trace {
+            font-size: 10px;
+            color: var(--text-tertiary);
+        }
+
+        .eval-result-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .eval-metric {
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: var(--bg-tertiary);
+        }
+
+        .eval-metric.warn {
+            color: var(--warning);
+            background: var(--warning-muted);
+        }
+
+        .eval-metric.error {
+            color: var(--error);
+            background: var(--error-muted);
+        }
+
+        .eval-snippet {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .eval-error {
+            font-size: 12px;
+            color: var(--error);
+            background: var(--error-muted);
+            border-radius: var(--radius-md);
+            padding: 6px 8px;
         }
 
         @keyframes pulse-warning {

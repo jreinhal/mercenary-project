@@ -123,6 +123,40 @@ The **Entity Network** tab in the right panel only appears when Deep Analysis is
 - SENTINEL_DEMO_PATH (default: classpath:demo_docs/*.*)
 - SENTINEL_DEMO_MAX_FILES (default: 50)
 
+## Connectors (admin-only)
+- SENTINEL_CONNECTORS_ENABLED (default: true; disabled in govcloud profile)
+- SENTINEL_CONNECTORS_ALLOW_REGULATED (default: false)
+
+### SharePoint (Microsoft Graph)
+- SENTINEL_SHAREPOINT_ENABLED
+- SENTINEL_SHAREPOINT_GRAPH
+- SENTINEL_SHAREPOINT_DRIVE_ID
+- SENTINEL_SHAREPOINT_FOLDER
+- SENTINEL_SHAREPOINT_TOKEN
+- SENTINEL_SHAREPOINT_MAX_FILES
+- SENTINEL_SHAREPOINT_DEPT
+
+### Confluence
+- SENTINEL_CONFLUENCE_ENABLED
+- SENTINEL_CONFLUENCE_URL
+- SENTINEL_CONFLUENCE_EMAIL
+- SENTINEL_CONFLUENCE_TOKEN
+- SENTINEL_CONFLUENCE_SPACE
+- SENTINEL_CONFLUENCE_LIMIT
+- SENTINEL_CONFLUENCE_PAGES
+- SENTINEL_CONFLUENCE_DEPT
+
+### S3
+- SENTINEL_S3_ENABLED
+- SENTINEL_S3_BUCKET
+- SENTINEL_S3_PREFIX
+- SENTINEL_S3_REGION
+- SENTINEL_S3_ENDPOINT
+- SENTINEL_S3_ACCESS_KEY
+- SENTINEL_S3_SECRET_KEY
+- SENTINEL_S3_MAX_FILES
+- SENTINEL_S3_DEPT
+
 **Performance Note:** Entity extraction during document upload is fast and always enabled by default. The slow operation is the graph traversal at query time, which is now opt-in per query.
 
 ### Entity Explorer UI

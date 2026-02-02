@@ -76,6 +76,8 @@ dependencies {
 
     // AWS KMS (optional key management for HIPAA deployments)
     implementation 'software.amazon.awssdk:kms:2.25.62'
+    // AWS S3 connector (optional ingestion)
+    implementation 'software.amazon.awssdk:s3:2.25.62'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
