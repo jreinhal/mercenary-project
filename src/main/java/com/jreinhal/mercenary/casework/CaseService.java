@@ -73,6 +73,7 @@ public class CaseService {
 
         String finalId = existing != null ? existing.caseId() : (caseId != null ? caseId : generateCaseId());
         String ownerId = existing != null ? existing.ownerId() : user.getId();
+        boolean ownerOrAdmin = existing == null || isOwnerOrAdmin(user, existing);
         String sector = normalize(payload.sector());
         if (sector == null && existing != null) {
             sector = existing.sector();
@@ -81,7 +82,7 @@ public class CaseService {
             sector = "ENTERPRISE";
         }
 
-        CaseRecord.CaseStatus status = parseStatus(payload.status());
+        CaseRecord.CaseStatus status = ownerOrAdmin ? parseStatus(payload.status()) : null;
         if (status == null && existing != null) {
             status = existing.status();
         }
@@ -99,8 +100,12 @@ public class CaseService {
             notes = existing.notes();
         }
 
-        String title = clamp(payload.title(), MAX_TITLE_LENGTH, existing != null ? existing.title() : "New Case");
-        String summary = clamp(payload.summary(), MAX_SUMMARY_LENGTH, existing != null ? existing.summary() : "");
+        String title = ownerOrAdmin
+            ? clamp(payload.title(), MAX_TITLE_LENGTH, existing != null ? existing.title() : "New Case")
+            : (existing != null ? existing.title() : "New Case");
+        String summary = ownerOrAdmin
+            ? clamp(payload.summary(), MAX_SUMMARY_LENGTH, existing != null ? existing.summary() : "")
+            : (existing != null ? existing.summary() : "");
 
         List<String> sharedWith = existing != null ? existing.sharedWith() : Collections.emptyList();
         List<CaseRecord.CaseReview> reviews = existing != null ? existing.reviews() : Collections.emptyList();
@@ -109,7 +114,7 @@ public class CaseService {
         Instant updatedAt = Instant.now();
 
         boolean redactionRequired = status == CaseRecord.CaseStatus.REDACTION_REQUIRED;
-        String redactionNotes = payload.redactionNotes();
+        String redactionNotes = ownerOrAdmin ? payload.redactionNotes() : null;
         if ((redactionNotes == null || redactionNotes.isBlank()) && existing != null) {
             redactionNotes = existing.redactionNotes();
         }
