@@ -227,6 +227,31 @@
                 </div>
             </div>
 
+            <!-- Integrations -->
+            <div class="sidebar-section" id="connectors-section">
+                <div class="sidebar-section-title">Integrations</div>
+                <p class="settings-description">Sync from external knowledge sources (admin-only).</p>
+                <div class="connector-list">
+                    <div class="connector-item">
+                        <div class="connector-name">SharePoint</div>
+                        <div class="connector-status" id="connector-status-sharepoint">Unknown</div>
+                    </div>
+                    <div class="connector-item">
+                        <div class="connector-name">Confluence</div>
+                        <div class="connector-status" id="connector-status-confluence">Unknown</div>
+                    </div>
+                    <div class="connector-item">
+                        <div class="connector-name">S3</div>
+                        <div class="connector-status" id="connector-status-s3">Unknown</div>
+                    </div>
+                </div>
+                <div class="settings-actions">
+                    <button class="btn btn-secondary" data-action="refreshConnectors" id="connector-refresh-btn">Refresh</button>
+                    <button class="btn btn-primary" data-action="syncConnectors" id="connector-sync-btn">Sync Now</button>
+                </div>
+                <div class="settings-hint" id="connector-compliance-hint"></div>
+            </div>
+
             <!-- Advanced -->
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Advanced</div>
@@ -593,6 +618,7 @@
                 <div class="right-panel-tabs">
                     <button class="right-panel-tab active" data-action="switchRightTab" data-tab="plot" data-tab="plot">Plot</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="source" data-tab="source">Source</button>
+                    <button class="right-panel-tab" data-action="switchRightTab" data-tab="eval">Eval</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="case">Case</button>
                 </div>
             </div>
@@ -785,6 +811,46 @@
                     </div>
                     <div class="source-viewer" id="source-viewer" class="source-viewer-constrained">
                         Loading document content...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Eval Tab (Quality Harness) -->
+            <div class="right-panel-content hidden" id="right-tab-eval">
+                <div class="eval-panel">
+                    <div class="eval-header">
+                        <div class="eval-title-row">
+                            <div>
+                                <div class="eval-title">Evaluation Harness</div>
+                                <div class="eval-subtitle">Run baseline query suites and capture quality signals.</div>
+                            </div>
+                            <span class="eval-badge" id="eval-compliance-badge">Read-only</span>
+                        </div>
+                        <div class="eval-hint" id="eval-compliance-hint">
+                            Results stay in-browser and are not persisted.
+                        </div>
+                    </div>
+
+                    <div class="eval-controls">
+                        <div class="eval-control">
+                            <label for="eval-suite-select">Suite</label>
+                            <select id="eval-suite-select" class="eval-select" aria-label="Evaluation suite"></select>
+                        </div>
+                        <div class="eval-actions">
+                            <button class="btn btn-primary" data-action="runEvalSuite" id="eval-run-btn">Run Suite</button>
+                            <button class="btn btn-secondary" data-action="clearEvalResults" id="eval-clear-btn">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="eval-progress" id="eval-progress">
+                        <div class="eval-progress-bar">
+                            <div class="eval-progress-fill" id="eval-progress-bar"></div>
+                        </div>
+                        <div class="eval-progress-text" id="eval-progress-text">Idle</div>
+                    </div>
+
+                    <div class="eval-results" id="eval-results">
+                        <div class="eval-empty-state">No evaluation runs yet.</div>
                     </div>
                 </div>
             </div>

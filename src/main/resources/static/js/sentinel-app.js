@@ -15,6 +15,131 @@
             allowExport: true,
             allowDemo: true
         };
+        const evalState = {
+            running: false,
+            results: [],
+            lastSuiteId: null
+        };
+        let connectorPolicyAllowsSync = false;
+        const evalSuites = [
+            {
+                id: 'baseline',
+                label: 'Baseline (4)',
+                description: 'Summary, risks, stakeholders, timeline.',
+                queries: {
+                    GOVERNMENT: [
+                        'Summarize the mission brief and primary objectives.',
+                        'List key compliance or policy obligations referenced.',
+                        'Identify major stakeholders and sponsoring agencies.',
+                        'Provide the timeline of major milestones and deliverables.'
+                    ],
+                    MEDICAL: [
+                        'Summarize the clinical protocol and primary endpoints.',
+                        'List inclusion/exclusion criteria and safety monitoring steps.',
+                        'Identify PHI handling or privacy requirements.',
+                        'Provide the study timeline and key milestones.'
+                    ],
+                    FINANCE: [
+                        'Summarize the earnings report highlights and guidance.',
+                        'List key risk factors and mitigation strategies.',
+                        'Identify major initiatives or investments.',
+                        'Provide the liquidity and capital position summary.'
+                    ],
+                    ACADEMIC: [
+                        'Summarize the research objectives and key findings.',
+                        'List datasets or methods used.',
+                        'Identify funding sources and collaborators.',
+                        'Provide limitations and future work.'
+                    ],
+                    ENTERPRISE: [
+                        'Summarize the transformation roadmap and objectives.',
+                        'List top dependencies and risks.',
+                        'Identify key owners or stakeholders.',
+                        'Provide the milestone timeline and deadlines.'
+                    ],
+                    DEFAULT: [
+                        'Summarize the primary objectives and outcomes.',
+                        'List key risks and mitigations.',
+                        'Identify major stakeholders.',
+                        'Provide the timeline of major milestones.'
+                    ]
+                }
+            },
+            {
+                id: 'compliance',
+                label: 'Compliance + Risk (3)',
+                description: 'Controls, obligations, audit readiness.',
+                queries: {
+                    GOVERNMENT: [
+                        'Extract compliance obligations and reporting timelines.',
+                        'List required security controls or accreditation steps.',
+                        'Summarize audit or governance requirements.'
+                    ],
+                    MEDICAL: [
+                        'Extract HIPAA/privacy obligations and reporting timelines.',
+                        'List required safety monitoring or audit controls.',
+                        'Summarize governance and disclosure requirements.'
+                    ],
+                    FINANCE: [
+                        'Extract regulatory obligations and reporting timelines.',
+                        'List required controls for risk and compliance.',
+                        'Summarize audit, governance, or oversight requirements.'
+                    ],
+                    ACADEMIC: [
+                        'Extract compliance obligations and reporting timelines.',
+                        'List required data handling or ethics controls.',
+                        'Summarize governance or audit requirements.'
+                    ],
+                    ENTERPRISE: [
+                        'Extract compliance obligations and reporting timelines.',
+                        'List required controls or policy requirements.',
+                        'Summarize audit or governance requirements.'
+                    ],
+                    DEFAULT: [
+                        'Extract compliance obligations and reporting timelines.',
+                        'List required controls or policy requirements.',
+                        'Summarize audit or governance requirements.'
+                    ]
+                }
+            },
+            {
+                id: 'decision',
+                label: 'Decision Support (3)',
+                description: 'Options, tradeoffs, next steps.',
+                queries: {
+                    GOVERNMENT: [
+                        'Recommend next steps based on the mission objectives.',
+                        'Identify decision tradeoffs and operational impacts.',
+                        'Summarize near-term risks requiring leadership action.'
+                    ],
+                    MEDICAL: [
+                        'Recommend next steps based on protocol and outcomes.',
+                        'Identify clinical or operational tradeoffs.',
+                        'Summarize near-term risks requiring leadership action.'
+                    ],
+                    FINANCE: [
+                        'Recommend next steps based on performance and guidance.',
+                        'Identify decision tradeoffs and financial impacts.',
+                        'Summarize near-term risks requiring leadership action.'
+                    ],
+                    ACADEMIC: [
+                        'Recommend next steps based on findings.',
+                        'Identify research tradeoffs or open questions.',
+                        'Summarize near-term risks requiring leadership action.'
+                    ],
+                    ENTERPRISE: [
+                        'Recommend next steps based on the roadmap.',
+                        'Identify decision tradeoffs and execution impacts.',
+                        'Summarize near-term risks requiring leadership action.'
+                    ],
+                    DEFAULT: [
+                        'Recommend next steps based on the findings.',
+                        'Identify decision tradeoffs and impacts.',
+                        'Summarize near-term risks requiring leadership action.'
+                    ]
+                }
+            }
+        ];
 
         const API_BASE = window.location.origin + '/api';
         const authState = { authenticated: true, pending: false };
@@ -72,7 +197,12 @@
                 'upload-status', 'upload-zone', 'welcome-state', 'onboarding-panel',
                 'right-tab-case', 'case-title-input', 'case-meta', 'case-timeline',
                 'case-note-input', 'case-note-add', 'case-export-btn', 'case-clear-btn',
-                'case-compliance-hint', 'demo-load-btn'
+                'case-compliance-hint', 'demo-load-btn', 'right-tab-eval',
+                'connector-status-sharepoint', 'connector-status-confluence', 'connector-status-s3',
+                'connector-refresh-btn', 'connector-sync-btn', 'connector-compliance-hint',
+                'eval-suite-select', 'eval-run-btn', 'eval-clear-btn', 'eval-results',
+                'eval-progress-bar', 'eval-progress-text', 'eval-compliance-hint',
+                'eval-compliance-badge'
             ];
 
             const missing = requiredIds.filter(id => !document.getElementById(id));
@@ -335,6 +465,8 @@
                     case 'addMessageToCase': addMessageToCase(el.dataset.msgId); break;
                     case 'jumpToMessage': jumpToMessage(el.dataset.msgId); break;
                     case 'loadDemoDataset': loadDemoDataset(); break;
+                    case 'refreshConnectors': refreshConnectorStatus(); break;
+                    case 'syncConnectors': syncConnectors(); break;
                     case 'openMessageSources': openMessageSources(el.dataset.msgId); break;
                     case 'openMessageGraph': openMessageGraph(el.dataset.msgId); break;
                     case 'toggleConversationList': toggleConversationList(); break;
@@ -346,6 +478,8 @@
                     case 'executeQuery': executeQuery(); break;
                     case 'toggleDeepAnalysis': toggleDeepAnalysis(); break;
                     case 'regenerateResponse': regenerateResponse(); break;
+                    case 'runEvalSuite': runEvalSuite(); break;
+                    case 'clearEvalResults': clearEvalResults(); break;
                     case 'switchRightTab': switchRightTab(el.dataset.tab); break;
                     case 'switchGraphTab': switchGraphTab(el.dataset.graphTab); break;
                     case 'setEntityGraphMode': setEntityGraphMode(el.dataset.entityGraphMode); break;
@@ -660,6 +794,9 @@
                 loadConversationHistory();
                 renderSavedQueriesList();
             });
+
+            initEvalHarness();
+            refreshConnectorStatus();
         }
 
         function filterSectorDropdown(allowedSectors) {
@@ -1109,6 +1246,393 @@
             }
         }
 
+        function resolveConnectorId(name) {
+            if (!name) return '';
+            const normalized = String(name).toLowerCase().trim();
+            if (normalized.includes('sharepoint')) return 'sharepoint';
+            if (normalized.includes('confluence')) return 'confluence';
+            if (normalized === 's3') return 's3';
+            return normalized.replace(/[^a-z0-9_-]/g, '');
+        }
+
+        function setConnectorStatus(id, text, stateClass = '') {
+            const el = document.getElementById(`connector-status-${id}`);
+            if (!el) return;
+            el.textContent = text;
+            el.classList.remove('enabled', 'disabled', 'blocked', 'error', 'syncing');
+            if (stateClass) el.classList.add(stateClass);
+        }
+
+        function setConnectorTitle(id, title) {
+            const el = document.getElementById(`connector-status-${id}`);
+            if (!el) return;
+            el.title = title || '';
+        }
+
+        function setConnectorStatusesDefault(label, stateClass = 'disabled') {
+            ['sharepoint', 'confluence', 's3'].forEach(id => {
+                setConnectorStatus(id, label, stateClass);
+                setConnectorTitle(id, '');
+            });
+        }
+
+        function formatConnectorStatus(status) {
+            if (!status) {
+                return { label: 'Unknown', stateClass: 'disabled', title: '' };
+            }
+            let label = status.enabled ? 'Enabled' : 'Disabled';
+            let stateClass = status.enabled ? 'enabled' : 'disabled';
+            let title = '';
+
+            if (status.lastResult) {
+                const message = status.lastResult.message || '';
+                if (status.lastResult.success === false) {
+                    label = 'Error';
+                    stateClass = 'error';
+                    title = message || 'Sync failed';
+                } else if (status.lastResult.success === true) {
+                    label = status.lastResult.loaded > 0 ? 'Synced' : 'Ready';
+                    stateClass = status.enabled ? 'enabled' : 'disabled';
+                    title = message || 'Sync complete';
+                }
+            }
+            if (status.lastSync) {
+                const lastSync = new Date(status.lastSync).toLocaleString();
+                title = title ? `${title} (Last sync ${lastSync})` : `Last sync ${lastSync}`;
+            }
+            return { label, stateClass, title };
+        }
+
+        async function refreshConnectorStatus() {
+            if (!currentIsAdmin) {
+                setConnectorStatusesDefault('Admin only', 'blocked');
+                updateComplianceControls();
+                return;
+            }
+
+            ['sharepoint', 'confluence', 's3'].forEach(id => setConnectorStatus(id, 'Loading...', 'syncing'));
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/connectors/status`);
+                if (!response.ok) {
+                    throw new Error(`Connector status failed (${response.status})`);
+                }
+                const data = await response.json();
+                connectorPolicyAllowsSync = isRegulatedEdition()
+                    ? data.some(item => item && item.enabled)
+                    : true;
+                const byId = new Map();
+                data.forEach(status => {
+                    const id = resolveConnectorId(status.name);
+                    byId.set(id, status);
+                });
+                ['sharepoint', 'confluence', 's3'].forEach(id => {
+                    const status = byId.get(id);
+                    const formatted = formatConnectorStatus(status);
+                    setConnectorStatus(id, formatted.label, formatted.stateClass);
+                    setConnectorTitle(id, formatted.title);
+                });
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                setConnectorStatusesDefault('Unavailable', 'error');
+            } finally {
+                updateComplianceControls();
+            }
+        }
+
+        async function syncConnectors() {
+            if (!currentIsAdmin) {
+                showInfoToast('Admin access required to sync connectors.');
+                return;
+            }
+            if (isRegulatedEdition() && !connectorPolicyAllowsSync) {
+                showInfoToast('Connector sync disabled for regulated editions.');
+                return;
+            }
+            const confirmed = confirm('Run connector sync now? This will ingest external content.');
+            if (!confirmed) return;
+            ['sharepoint', 'confluence', 's3'].forEach(id => setConnectorStatus(id, 'Syncing...', 'syncing'));
+
+            const headers = { 'Content-Type': 'application/json' };
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/connectors/sync`, {
+                    method: 'POST',
+                    headers
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.message || err.error || 'Connector sync failed');
+                }
+                const results = await response.json();
+                connectorPolicyAllowsSync = isRegulatedEdition()
+                    ? results.some(item => item && item.success)
+                    : true;
+                results.forEach(result => {
+                    const id = resolveConnectorId(result.name);
+                    const status = {
+                        name: result.name,
+                        enabled: result.success,
+                        lastSync: new Date().toISOString(),
+                        lastResult: result
+                    };
+                    const formatted = formatConnectorStatus(status);
+                    setConnectorStatus(id, formatted.label, formatted.stateClass);
+                    setConnectorTitle(id, formatted.title);
+                });
+                showInfoToast('Connector sync complete.');
+                fetchSystemStatus();
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Connector sync failed: ${error.message}`);
+                setConnectorStatusesDefault('Error', 'error');
+            } finally {
+                updateComplianceControls();
+            }
+        }
+
+        function initEvalHarness() {
+            const select = document.getElementById('eval-suite-select');
+            if (!select) return;
+            select.innerHTML = '';
+            evalSuites.forEach(suite => {
+                const option = document.createElement('option');
+                option.value = suite.id;
+                option.textContent = `${suite.label} - ${suite.description}`;
+                select.appendChild(option);
+            });
+            if (evalState.lastSuiteId) {
+                select.value = evalState.lastSuiteId;
+            }
+            renderEvalResults();
+            updateEvalComplianceHint();
+        }
+
+        function updateEvalComplianceHint() {
+            const badge = document.getElementById('eval-compliance-badge');
+            const hint = document.getElementById('eval-compliance-hint');
+            if (!badge || !hint) return;
+
+            badge.classList.remove('blocked', 'regulated');
+
+            if (!currentIsAdmin) {
+                badge.textContent = 'Admin only';
+                badge.classList.add('blocked');
+                hint.textContent = 'Admin access required to run evaluation suites.';
+                return;
+            }
+
+            if (isRegulatedEdition()) {
+                badge.textContent = 'Regulated (read-only)';
+                badge.classList.add('regulated');
+                hint.textContent = 'Results stay in-browser with no persistence or export.';
+                return;
+            }
+
+            badge.textContent = 'Read-only';
+            hint.textContent = 'Results stay in-browser and are not persisted.';
+        }
+
+        function setEvalProgress(current, total, label) {
+            const progressBar = document.getElementById('eval-progress-bar');
+            const progressText = document.getElementById('eval-progress-text');
+            if (progressBar) {
+                const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+                progressBar.style.width = `${percent}%`;
+            }
+            if (progressText) {
+                progressText.textContent = label || 'Idle';
+            }
+        }
+
+        function getEvalSuiteById(id) {
+            return evalSuites.find(suite => suite.id === id) || evalSuites[0];
+        }
+
+        function getEvalQueriesForSuite(suite, sector) {
+            if (!suite) return [];
+            const key = String(sector || '').toUpperCase();
+            return suite.queries[key] || suite.queries.DEFAULT || [];
+        }
+
+        function truncateText(text, maxLength) {
+            if (!text) return '';
+            if (text.length <= maxLength) return text;
+            return text.slice(0, maxLength).trim() + '...';
+        }
+
+        function renderEvalResults() {
+            const container = document.getElementById('eval-results');
+            if (!container) return;
+            if (!evalState.results.length) {
+                container.innerHTML = '<div class="eval-empty-state">No evaluation runs yet.</div>';
+                return;
+            }
+
+            const summary = summarizeEvalResults(evalState.results);
+            const summaryHtml = `
+                <div class="eval-summary">
+                    <div class="eval-summary-item"><strong>${summary.count}</strong> queries</div>
+                    <div class="eval-summary-item"><strong>${summary.avgWords}</strong> avg words</div>
+                    <div class="eval-summary-item"><strong>${summary.avgSources}</strong> avg sources</div>
+                    <div class="eval-summary-item"><strong>${summary.avgLatency}</strong> avg latency</div>
+                    <div class="eval-summary-item">${summary.noDirectCount} no-direct</div>
+                </div>
+            `;
+
+            const resultHtml = evalState.results.map((result, index) => {
+                const statusClass = result.error
+                    ? 'error'
+                    : result.noDirect
+                        ? 'warn'
+                        : result.wordCount >= 120
+                            ? 'good'
+                            : result.wordCount >= 70
+                                ? 'ok'
+                                : 'short';
+                const snippet = result.answer ? truncateText(result.answer, 200) : '';
+                const metrics = result.error
+                    ? `<span class="eval-metric error">Error</span>`
+                    : `
+                        <span class="eval-metric">Words: ${result.wordCount}</span>
+                        <span class="eval-metric">Sources: ${result.sourceCount}</span>
+                        <span class="eval-metric">Latency: ${result.latencyMs}ms</span>
+                        ${result.noDirect ? '<span class="eval-metric warn">No direct answer</span>' : ''}
+                    `;
+                const traceHtml = result.traceId ? `<span class="eval-trace">Trace ${escapeHtml(result.traceId)}</span>` : '';
+                const errorHtml = result.error ? `<div class="eval-error">${escapeHtml(result.error)}</div>` : '';
+                const snippetHtml = snippet ? `<div class="eval-snippet">${escapeHtml(snippet)}</div>` : '';
+
+                return `
+                    <div class="eval-result-card ${statusClass}">
+                        <div class="eval-result-header">
+                            <span class="eval-result-index">#${index + 1}</span>
+                            <span class="eval-result-query">${escapeHtml(result.query)}</span>
+                            ${traceHtml}
+                        </div>
+                        <div class="eval-result-metrics">${metrics}</div>
+                        ${snippetHtml}
+                        ${errorHtml}
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = summaryHtml + resultHtml;
+        }
+
+        function summarizeEvalResults(results) {
+            const count = results.length;
+            if (!count) {
+                return { count: 0, avgWords: 0, avgSources: 0, avgLatency: '0ms', noDirectCount: 0 };
+            }
+            const totals = results.reduce((acc, result) => {
+                acc.words += result.wordCount || 0;
+                acc.sources += result.sourceCount || 0;
+                acc.latency += result.latencyMs || 0;
+                acc.noDirect += result.noDirect ? 1 : 0;
+                return acc;
+            }, { words: 0, sources: 0, latency: 0, noDirect: 0 });
+            return {
+                count,
+                avgWords: Math.round(totals.words / count),
+                avgSources: (totals.sources / count).toFixed(1),
+                avgLatency: `${Math.round(totals.latency / count)}ms`,
+                noDirectCount: totals.noDirect
+            };
+        }
+
+        async function runEvalSuite() {
+            if (evalState.running) return;
+            if (!currentIsAdmin) {
+                showInfoToast('Admin access required to run evaluation suites.');
+                return;
+            }
+
+            const suiteSelect = document.getElementById('eval-suite-select');
+            const suiteId = suiteSelect ? suiteSelect.value : evalSuites[0].id;
+            const suite = getEvalSuiteById(suiteId);
+            const sector = sectorSelect ? sectorSelect.value : DEFAULT_SECTOR;
+            const queries = getEvalQueriesForSuite(suite, sector);
+            if (!queries.length) {
+                showInfoToast('No evaluation queries defined for this sector.');
+                return;
+            }
+
+            evalState.running = true;
+            evalState.results = [];
+            evalState.lastSuiteId = suite.id;
+            renderEvalResults();
+            updateComplianceControls();
+
+            setEvalProgress(0, queries.length, `Running 0 of ${queries.length}`);
+
+            for (let i = 0; i < queries.length; i++) {
+                const query = queries[i];
+                setEvalProgress(i, queries.length, `Running ${i + 1} of ${queries.length}`);
+                try {
+                    const result = await runEvalQuery(query, sector);
+                    evalState.results.push(result);
+                } catch (error) {
+                    evalState.results.push({
+                        query,
+                        error: error.message || 'Evaluation failed',
+                        wordCount: 0,
+                        sourceCount: 0,
+                        latencyMs: 0,
+                        noDirect: false,
+                        traceId: ''
+                    });
+                }
+                renderEvalResults();
+            }
+
+            evalState.running = false;
+            setEvalProgress(queries.length, queries.length, `Completed ${queries.length} queries`);
+            updateComplianceControls();
+        }
+
+        async function runEvalQuery(query, sector) {
+            const params = new URLSearchParams({ q: query, dept: sector });
+            const activeFiles = getActiveContextFiles();
+            activeFiles.forEach((file) => params.append('file', file));
+            if (state.deepAnalysisEnabled) {
+                params.append('deepAnalysis', 'true');
+            }
+
+            const startTime = Date.now();
+            const response = await guardedFetch(`${API_BASE}/ask/enhanced?${params.toString()}`);
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.message || err.error || `Eval failed (${response.status})`);
+            }
+            const data = await response.json();
+            const latencyMs = Date.now() - startTime;
+            const answer = data.answer || '';
+            const wordCount = answer.trim() ? answer.trim().split(/\s+/).filter(Boolean).length : 0;
+            const sources = (data.sources || []).map(s => {
+                if (typeof s === 'string') return { filename: s };
+                if (s && typeof s === 'object') return s;
+                return { filename: String(s || '') };
+            }).filter(s => s.filename || s.source || s.name);
+
+            return {
+                query,
+                answer,
+                wordCount,
+                sourceCount: sources.length,
+                latencyMs,
+                noDirect: /no direct answer/i.test(answer),
+                traceId: data.traceId || ''
+            };
+        }
+
+        function clearEvalResults() {
+            if (evalState.running) return;
+            evalState.results = [];
+            setEvalProgress(0, 0, 'Idle');
+            renderEvalResults();
+        }
+
         function loadConversationHistory() {
             try {
                 if (!canPersistCaseData()) {
@@ -1418,10 +1942,12 @@
         function switchRightTab(tabName) {
             const plotTab = document.getElementById('right-tab-plot');
             const sourceTab = document.getElementById('right-tab-source');
+            const evalTab = document.getElementById('right-tab-eval');
             const caseTab = document.getElementById('right-tab-case');
 
             setHidden(plotTab, true);
             setHidden(sourceTab, true);
+            setHidden(evalTab, true);
             setHidden(caseTab, true);
 
             document.querySelectorAll('.right-panel-tab').forEach(btn => {
@@ -4322,6 +4848,39 @@
                     : 'Case workspace can be exported or persisted when Save History is enabled.';
                 complianceHint.textContent = hint;
             }
+
+            const refreshBtn = document.getElementById('connector-refresh-btn');
+            const syncBtn = document.getElementById('connector-sync-btn');
+            const connectorHint = document.getElementById('connector-compliance-hint');
+            if (refreshBtn && syncBtn) {
+                if (!currentIsAdmin) {
+                    refreshBtn.disabled = true;
+                    syncBtn.disabled = true;
+                    if (connectorHint) connectorHint.textContent = 'Admin access required.';
+                    setConnectorStatusesDefault('Admin only', 'blocked');
+                } else if (isRegulatedEdition() && !connectorPolicyAllowsSync) {
+                    refreshBtn.disabled = false;
+                    syncBtn.disabled = true;
+                    if (connectorHint) {
+                        connectorHint.textContent = 'Regulated mode: connector sync disabled (set SENTINEL_CONNECTORS_ALLOW_REGULATED=true to override).';
+                    }
+                } else {
+                    refreshBtn.disabled = false;
+                    syncBtn.disabled = false;
+                    if (connectorHint) connectorHint.textContent = 'Sync pulls from configured connectors.';
+                }
+            }
+
+            const evalRunBtn = document.getElementById('eval-run-btn');
+            const evalClearBtn = document.getElementById('eval-clear-btn');
+            if (evalRunBtn) {
+                evalRunBtn.disabled = !currentIsAdmin || evalState.running;
+                evalRunBtn.title = currentIsAdmin ? 'Run evaluation suite' : 'Admin only';
+            }
+            if (evalClearBtn) {
+                evalClearBtn.disabled = evalState.running;
+            }
+            updateEvalComplianceHint();
         }
 
         function applyEditionPolicy(edition) {
