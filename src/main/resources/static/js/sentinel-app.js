@@ -202,7 +202,9 @@
                 'connector-refresh-btn', 'connector-sync-btn', 'connector-compliance-hint',
                 'eval-suite-select', 'eval-run-btn', 'eval-clear-btn', 'eval-results',
                 'eval-progress-bar', 'eval-progress-text', 'eval-compliance-hint',
-                'eval-compliance-badge'
+                'eval-compliance-badge', 'case-save-btn', 'case-share-btn', 'case-review-btn',
+                'case-approve-btn', 'case-redaction-btn', 'case-library-list',
+                'case-library-refresh-btn', 'case-collab-hint'
             ];
 
             const missing = requiredIds.filter(id => !document.getElementById(id));
@@ -462,6 +464,13 @@
                     case 'addCaseNote': addCaseNote(); break;
                     case 'exportCase': exportCase(); break;
                     case 'clearCase': clearCase(); break;
+                    case 'saveCaseLibrary': saveCaseLibrary(); break;
+                    case 'shareCase': shareCase(); break;
+                    case 'submitCaseReview': submitCaseReview(); break;
+                    case 'approveCase': approveCase(); break;
+                    case 'requestRedaction': requestRedaction(); break;
+                    case 'refreshCaseLibrary': refreshCaseLibrary(); break;
+                    case 'loadCaseLibrary': loadCaseFromLibrary(el.dataset.caseId); break;
                     case 'addMessageToCase': addMessageToCase(el.dataset.msgId); break;
                     case 'jumpToMessage': jumpToMessage(el.dataset.msgId); break;
                     case 'loadDemoDataset': loadDemoDataset(); break;
@@ -797,6 +806,7 @@
 
             initEvalHarness();
             refreshConnectorStatus();
+            refreshCaseLibrary();
         }
 
         function filterSectorDropdown(allowedSectors) {
@@ -962,13 +972,19 @@
             const now = Date.now();
             return {
                 id: `case_${sessionId}`,
+                serverId: null,
                 sessionId,
                 title: seedTitle || 'New Case',
-                status: 'Active',
+                status: 'DRAFT',
+                reviewStatus: 'DRAFT',
                 createdAt: now,
                 updatedAt: now,
                 timeline: [],
-                notes: []
+                notes: [],
+                sharedWith: [],
+                reviews: [],
+                summary: '',
+                redactionNotes: ''
             };
         }
 
@@ -1044,6 +1060,238 @@
             addCaseTimelineEntry(entry);
         }
 
+        function buildCasePayload() {
+            if (!currentCase) return null;
+            const sector = sectorSelect ? sectorSelect.value : DEFAULT_SECTOR;
+            return {
+                caseId: currentCase.serverId || null,
+                title: currentCase.title || 'New Case',
+                sector,
+                status: currentCase.reviewStatus || currentCase.status || 'DRAFT',
+                summary: currentCase.summary || '',
+                timeline: currentCase.timeline || [],
+                notes: currentCase.notes || [],
+                redactionNotes: currentCase.redactionNotes || ''
+            };
+        }
+
+        async function saveCaseLibrary() {
+            if (!currentCase) return;
+            if (isRegulatedEdition()) {
+                showInfoToast('Case collaboration disabled for regulated editions.');
+                return;
+            }
+            const headers = { 'Content-Type': 'application/json' };
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+            try {
+                const payload = buildCasePayload();
+                const response = await guardedFetch(`${API_BASE}/cases`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    throw new Error(`Case save failed (${response.status})`);
+                }
+                const data = await response.json();
+                currentCase.serverId = data.caseId;
+                currentCase.reviewStatus = data.status || currentCase.reviewStatus;
+                currentCase.sharedWith = data.sharedWith || currentCase.sharedWith || [];
+                currentCase.summary = data.summary || currentCase.summary;
+                currentCase.updatedAt = Date.now();
+                showInfoToast('Case saved to library.');
+                renderCasePanel();
+                refreshCaseLibrary();
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Case save failed: ${error.message}`);
+            }
+        }
+
+        async function refreshCaseLibrary() {
+            if (isRegulatedEdition()) {
+                const listEl = document.getElementById('case-library-list');
+                if (listEl) {
+                    listEl.innerHTML = '<div class="case-empty-state">Case library disabled for regulated editions.</div>';
+                }
+                return;
+            }
+            try {
+                const response = await guardedFetch(`${API_BASE}/cases`);
+                if (!response.ok) {
+                    throw new Error(`Case list failed (${response.status})`);
+                }
+                const data = await response.json();
+                renderCaseLibrary(data || []);
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                const listEl = document.getElementById('case-library-list');
+                if (listEl) {
+                    listEl.innerHTML = '<div class="case-empty-state">Case library unavailable.</div>';
+                }
+            }
+        }
+
+        function renderCaseLibrary(cases) {
+            const listEl = document.getElementById('case-library-list');
+            if (!listEl) return;
+            if (!cases || cases.length === 0) {
+                listEl.innerHTML = '<div class="case-empty-state">No shared cases yet.</div>';
+                return;
+            }
+            listEl.innerHTML = cases.map(record => {
+                const title = record.title || 'Untitled Case';
+                const status = record.status || 'DRAFT';
+                const updated = record.updatedAt ? formatCaseTimestamp(new Date(record.updatedAt).getTime()) : 'N/A';
+                return `
+                    <div class="case-library-item">
+                        <div>
+                            <div class="case-library-title">${escapeHtml(title)}</div>
+                            <div class="case-library-meta">${escapeHtml(status)} · Updated ${updated}</div>
+                        </div>
+                        <button class="btn btn-secondary" data-action="loadCaseLibrary" data-case-id="${escapeHtml(record.caseId)}">Load</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadCaseFromLibrary(caseId) {
+            if (!caseId) return;
+            try {
+                const response = await guardedFetch(`${API_BASE}/cases/${encodeURIComponent(caseId)}`);
+                if (!response.ok) {
+                    throw new Error(`Case load failed (${response.status})`);
+                }
+                const data = await response.json();
+                currentCase = {
+                    id: data.caseId || `case_${currentSessionId}`,
+                    serverId: data.caseId,
+                    sessionId: currentSessionId,
+                    title: data.title || 'New Case',
+                    status: data.status || 'DRAFT',
+                    reviewStatus: data.status || 'DRAFT',
+                    createdAt: data.createdAt ? new Date(data.createdAt).getTime() : Date.now(),
+                    updatedAt: data.updatedAt ? new Date(data.updatedAt).getTime() : Date.now(),
+                    timeline: data.timeline || [],
+                    notes: data.notes || [],
+                    sharedWith: data.sharedWith || [],
+                    reviews: data.reviews || [],
+                    summary: data.summary || '',
+                    redactionNotes: data.redactionNotes || ''
+                };
+                renderCasePanel();
+                showInfoToast('Loaded case from library.');
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Case load failed: ${error.message}`);
+            }
+        }
+
+        async function shareCase() {
+            if (!currentCase || !currentCase.serverId) {
+                showInfoToast('Save the case before sharing.');
+                return;
+            }
+            if (isRegulatedEdition()) {
+                showInfoToast('Case collaboration disabled for regulated editions.');
+                return;
+            }
+            const raw = prompt('Share with usernames (comma-separated):', '');
+            if (!raw) return;
+            const usernames = raw.split(',').map(item => item.trim()).filter(Boolean);
+            if (usernames.length === 0) return;
+
+            const headers = { 'Content-Type': 'application/json' };
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+            try {
+                const response = await guardedFetch(`${API_BASE}/cases/${encodeURIComponent(currentCase.serverId)}/share`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ usernames })
+                });
+                if (!response.ok) {
+                    throw new Error(`Share failed (${response.status})`);
+                }
+                const data = await response.json();
+                currentCase.sharedWith = data.sharedWith || currentCase.sharedWith;
+                renderCasePanel();
+                showInfoToast('Case shared.');
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Share failed: ${error.message}`);
+            }
+        }
+
+        async function submitCaseReview() {
+            if (!currentCase || !currentCase.serverId) {
+                showInfoToast('Save the case before submitting for review.');
+                return;
+            }
+            if (isRegulatedEdition()) {
+                showInfoToast('Case collaboration disabled for regulated editions.');
+                return;
+            }
+            const comment = prompt('Add a review note (optional):', '') || '';
+            await updateCaseReviewStatus('review', { comment });
+        }
+
+        async function approveCase() {
+            if (!currentCase || !currentCase.serverId) {
+                showInfoToast('Save the case before approving.');
+                return;
+            }
+            if (!currentIsAdmin) {
+                showInfoToast('Admin access required to approve cases.');
+                return;
+            }
+            const comment = prompt('Approval note (optional):', '') || '';
+            await updateCaseReviewStatus('decision', { decision: 'APPROVED', comment });
+        }
+
+        async function requestRedaction() {
+            if (!currentCase || !currentCase.serverId) {
+                showInfoToast('Save the case before requesting redaction.');
+                return;
+            }
+            if (!currentIsAdmin) {
+                showInfoToast('Admin access required to request redaction.');
+                return;
+            }
+            const comment = prompt('Describe redaction requirements:', '') || '';
+            await updateCaseReviewStatus('decision', { decision: 'REDACTION_REQUIRED', comment });
+        }
+
+        async function updateCaseReviewStatus(endpoint, payload) {
+            if (!currentCase || !currentCase.serverId) return;
+            const headers = { 'Content-Type': 'application/json' };
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+            const url = endpoint === 'review'
+                ? `${API_BASE}/cases/${encodeURIComponent(currentCase.serverId)}/review`
+                : `${API_BASE}/cases/${encodeURIComponent(currentCase.serverId)}/review/decision`;
+            try {
+                const response = await guardedFetch(url, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    throw new Error(`Review update failed (${response.status})`);
+                }
+                const data = await response.json();
+                currentCase.reviewStatus = data.status || currentCase.reviewStatus;
+                currentCase.status = data.status || currentCase.status;
+                currentCase.redactionNotes = data.redactionNotes || currentCase.redactionNotes;
+                renderCasePanel();
+                showInfoToast('Case review updated.');
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Review update failed: ${error.message}`);
+            }
+        }
+
         function clearCase() {
             if (!currentCase) return;
             const confirmed = confirm('Clear case timeline and notes? This cannot be undone.');
@@ -1062,12 +1310,14 @@
             const titleInput = document.getElementById('case-title-input');
             const metaEl = document.getElementById('case-meta');
             const timelineEl = document.getElementById('case-timeline');
+            const statusEl = document.getElementById('case-status');
             if (!timelineEl) return;
 
             if (!currentCase) {
                 timelineEl.innerHTML = '<div class="case-empty-state">No case loaded.</div>';
                 if (titleInput) titleInput.value = '';
                 if (metaEl) metaEl.textContent = 'No activity yet.';
+                if (statusEl) statusEl.textContent = 'Draft';
                 return;
             }
 
@@ -1082,7 +1332,22 @@
             if (metaEl) {
                 const total = currentCase.timeline.length;
                 const lastUpdate = currentCase.updatedAt ? formatCaseTimestamp(currentCase.updatedAt) : 'N/A';
-                metaEl.textContent = `${total} timeline item${total === 1 ? '' : 's'} · Updated ${lastUpdate}`;
+                const sharedCount = currentCase.sharedWith ? currentCase.sharedWith.length : 0;
+                const sharedLabel = sharedCount > 0 ? ` · Shared with ${sharedCount}` : '';
+                metaEl.textContent = `${total} timeline item${total === 1 ? '' : 's'} · Updated ${lastUpdate}${sharedLabel}`;
+            }
+
+            if (statusEl) {
+                const status = currentCase.reviewStatus || currentCase.status || 'DRAFT';
+                statusEl.textContent = status.replace('_', ' ');
+            }
+
+            const collabHint = document.getElementById('case-collab-hint');
+            if (collabHint && !isRegulatedEdition()) {
+                const sharedCount = currentCase.sharedWith ? currentCase.sharedWith.length : 0;
+                if (sharedCount > 0) {
+                    collabHint.textContent = `Shared with ${sharedCount} teammate${sharedCount === 1 ? '' : 's'}.`;
+                }
             }
 
             if (!currentCase.timeline.length) {
@@ -1164,7 +1429,7 @@
             }
             const lines = [];
             lines.push(`# ${currentCase.title || 'Case Summary'}`);
-            lines.push(`Status: ${currentCase.status || 'Active'}`);
+            lines.push(`Status: ${currentCase.reviewStatus || currentCase.status || 'DRAFT'}`);
             lines.push(`Last updated: ${formatCaseTimestamp(currentCase.updatedAt)}`);
             lines.push('');
             lines.push('## Timeline');
@@ -4847,6 +5112,36 @@
                     ? 'Regulated mode: case export and persistence are disabled.'
                     : 'Case workspace can be exported or persisted when Save History is enabled.';
                 complianceHint.textContent = hint;
+            }
+
+            const caseSaveBtn = document.getElementById('case-save-btn');
+            const caseShareBtn = document.getElementById('case-share-btn');
+            const caseReviewBtn = document.getElementById('case-review-btn');
+            const caseApproveBtn = document.getElementById('case-approve-btn');
+            const caseRedactBtn = document.getElementById('case-redaction-btn');
+            const caseLibraryRefresh = document.getElementById('case-library-refresh-btn');
+            const caseCollabHint = document.getElementById('case-collab-hint');
+
+            if (isRegulatedEdition()) {
+                [caseSaveBtn, caseShareBtn, caseReviewBtn, caseApproveBtn, caseRedactBtn].forEach(btn => {
+                    if (btn) btn.disabled = true;
+                });
+                if (caseLibraryRefresh) caseLibraryRefresh.disabled = true;
+                if (caseCollabHint) {
+                    caseCollabHint.textContent = 'Collaboration disabled for regulated editions.';
+                }
+            } else {
+                if (caseSaveBtn) caseSaveBtn.disabled = false;
+                if (caseShareBtn) caseShareBtn.disabled = false;
+                if (caseReviewBtn) caseReviewBtn.disabled = false;
+                if (caseLibraryRefresh) caseLibraryRefresh.disabled = false;
+                if (caseApproveBtn) caseApproveBtn.disabled = !currentIsAdmin;
+                if (caseRedactBtn) caseRedactBtn.disabled = !currentIsAdmin;
+                if (caseCollabHint) {
+                    caseCollabHint.textContent = currentIsAdmin
+                        ? 'Share cases and manage review decisions.'
+                        : 'Submit cases for review or share with teammates.';
+                }
             }
 
             const refreshBtn = document.getElementById('connector-refresh-btn');

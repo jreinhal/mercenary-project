@@ -72,7 +72,7 @@ Recommended inspirations:
 ### In Progress (Mid-Term)
 - Enterprise connectors: SharePoint, Confluence, S3 (admin-only, disabled for regulated editions by default).
 - Eval harness UI (admin-only) for baseline query suites and quality signals.
-- Collaboration workflows (shared cases, review/approval, redaction review) not yet implemented.
+- Collaboration workflows (shared cases, review/approval, redaction review) implemented for non-regulated editions.
 
 ## References (UI/UX Inspiration)
 - https://www.splunk.com/en-us/blog/security/use-investigation-workbench-to-reduce-time-to-contain-and-time-to-remediate.html
