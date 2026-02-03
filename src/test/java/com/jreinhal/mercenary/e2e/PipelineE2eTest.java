@@ -18,6 +18,9 @@ import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.repository.ChatLogRepository;
 import com.jreinhal.mercenary.repository.FeedbackRepository;
 import com.jreinhal.mercenary.repository.UserRepository;
+import com.jreinhal.mercenary.repository.WorkspaceRepository;
+import com.jreinhal.mercenary.workspace.Workspace;
+import com.jreinhal.mercenary.workspace.Workspace.WorkspaceQuota;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
@@ -65,13 +68,25 @@ class PipelineE2eTest {
     @MockitoBean
     private FeedbackRepository feedbackRepository;
 
+    @MockitoBean
+    private WorkspaceRepository workspaceRepository;
+
     @BeforeEach
     void setup() {
+        Workspace defaultWorkspace = new Workspace("workspace_default", "Default Workspace", "Default workspace",
+                "system", java.time.Instant.now(), java.time.Instant.now(), WorkspaceQuota.unlimited(), true);
         when(mongoTemplate.getCollection(anyString()).countDocuments()).thenReturn(0L);
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
         when(userRepository.findByExternalId(anyString())).thenReturn(Optional.empty());
         when(userRepository.findById(anyString())).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.countByWorkspaceIdsContaining(anyString())).thenReturn(0L);
+        when(userRepository.findByWorkspaceIdsContaining(anyString())).thenReturn(List.of());
+        when(workspaceRepository.existsById(anyString())).thenReturn(true);
+        when(workspaceRepository.findById(anyString())).thenReturn(Optional.of(defaultWorkspace));
+        when(workspaceRepository.findAll()).thenReturn(List.of(defaultWorkspace));
+        when(workspaceRepository.findByIdIn(any())).thenReturn(List.of(defaultWorkspace));
+        when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         if (vectorStore instanceof InMemoryVectorStore store) {
             store.clear();
