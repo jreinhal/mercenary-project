@@ -28,6 +28,8 @@
             schedulesAllowed: null
         };
         let connectorPolicyAllowsSync = false;
+        let connectorCatalog = [];
+        let connectorCatalogById = new Map();
         const evalSuites = [
             {
                 id: 'baseline',
@@ -494,6 +496,10 @@
                     case 'loadDemoDataset': loadDemoDataset(); break;
                     case 'refreshConnectors': refreshConnectorStatus(); break;
                     case 'syncConnectors': syncConnectors(); break;
+                    case 'refreshConnectorCatalog': refreshConnectorCatalog(); break;
+                    case 'toggleConnectorDetails': toggleConnectorDetails(el.dataset.connectorId); break;
+                    case 'copyConnectorConfig': copyConnectorConfig(el.dataset.connectorId); break;
+                    case 'applyPipelinePreset': applyPipelinePreset(el.dataset.preset); break;
                     case 'openMessageSources': openMessageSources(el.dataset.msgId); break;
                     case 'openMessageGraph': openMessageGraph(el.dataset.msgId); break;
                     case 'toggleConversationList': toggleConversationList(); break;
@@ -841,6 +847,7 @@
             initReportingPanel();
             refreshReportingData();
             refreshConnectorStatus();
+            refreshConnectorCatalog();
             refreshCaseLibrary();
         }
 
@@ -848,12 +855,17 @@
             const workspaceSection = document.getElementById('workspace-section');
             const workspaceSelect = document.getElementById('workspace-select');
             const workspaceHint = document.getElementById('workspace-hint');
+            const quickSwitcher = document.getElementById('workspace-quick-switcher');
+            const quickSelect = document.getElementById('workspace-quick-select');
 
-            if (!workspaceSection || !workspaceSelect) return;
+            const hideWorkspaceUi = () => {
+                if (workspaceSection) workspaceSection.classList.add('hidden');
+                if (quickSwitcher) quickSwitcher.classList.add('hidden');
+            };
 
             if (isRegulatedEdition()) {
                 setWorkspaceId('workspace_default');
-                workspaceSection.classList.add('hidden');
+                hideWorkspaceUi();
                 return;
             }
 
@@ -871,16 +883,23 @@
             }
 
             if (!Array.isArray(workspaces) || workspaces.length === 0) {
-                workspaceSection.classList.add('hidden');
+                hideWorkspaceUi();
                 return;
             }
 
             workspaceSelect.innerHTML = '';
+            if (quickSelect) quickSelect.innerHTML = '';
             workspaces.forEach(workspace => {
                 const option = document.createElement('option');
                 option.value = workspace.id;
                 option.textContent = workspace.name || workspace.id;
                 workspaceSelect.appendChild(option);
+                if (quickSelect) {
+                    const quickOption = document.createElement('option');
+                    quickOption.value = workspace.id;
+                    quickOption.textContent = workspace.name || workspace.id;
+                    quickSelect.appendChild(quickOption);
+                }
             });
 
             let selectedWorkspace = getWorkspaceId();
@@ -889,6 +908,7 @@
                 setWorkspaceId(selectedWorkspace);
             }
             workspaceSelect.value = selectedWorkspace;
+            if (quickSelect) quickSelect.value = selectedWorkspace;
 
             if (workspaceHint) {
                 workspaceHint.textContent = workspaces.length > 1
@@ -897,20 +917,38 @@
             }
 
             workspaceSection.classList.remove('hidden');
+            if (quickSwitcher) {
+                if (workspaces.length > 1) {
+                    quickSwitcher.classList.remove('hidden');
+                } else {
+                    quickSwitcher.classList.add('hidden');
+                }
+            }
 
-            workspaceSelect.addEventListener('change', () => {
-                const nextWorkspace = workspaceSelect.value;
+            const applyWorkspaceChange = (nextWorkspace) => {
                 if (!nextWorkspace || nextWorkspace === getWorkspaceId()) {
                     return;
                 }
                 setWorkspaceId(nextWorkspace);
+                if (workspaceSelect) workspaceSelect.value = nextWorkspace;
+                if (quickSelect) quickSelect.value = nextWorkspace;
                 resetDashboardState();
                 loadConversationHistory();
                 renderSavedQueriesList();
                 refreshCaseLibrary();
                 refreshConnectorStatus();
+                refreshConnectorCatalog();
                 refreshReportingData();
+            };
+
+            workspaceSelect.addEventListener('change', () => {
+                applyWorkspaceChange(workspaceSelect.value);
             });
+            if (quickSelect) {
+                quickSelect.addEventListener('change', () => {
+                    applyWorkspaceChange(quickSelect.value);
+                });
+            }
         }
 
         function filterSectorDropdown(allowedSectors) {
@@ -1759,6 +1797,141 @@
             } finally {
                 updateComplianceControls();
             }
+        }
+
+        async function refreshConnectorCatalog() {
+            const listEl = document.getElementById('connector-catalog-list');
+            const hintEl = document.getElementById('connector-catalog-hint');
+            if (!listEl) return;
+
+            if (!currentIsAdmin) {
+                listEl.innerHTML = '<div class="connector-empty">Admin access required to view the catalog.</div>';
+                if (hintEl) hintEl.textContent = '';
+                return;
+            }
+
+            listEl.innerHTML = '<div class="connector-empty">Loading connector catalog...</div>';
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/connectors/catalog`);
+                if (!response.ok) {
+                    throw new Error(`Connector catalog failed (${response.status})`);
+                }
+                const data = await response.json();
+                connectorCatalog = Array.isArray(data) ? data : [];
+                connectorCatalogById = new Map();
+                connectorCatalog.forEach(entry => {
+                    if (entry && entry.id) {
+                        const rawKey = String(entry.id).toLowerCase();
+                        connectorCatalogById.set(rawKey, entry);
+                        const resolvedKey = resolveConnectorId(entry.id);
+                        if (resolvedKey && resolvedKey !== rawKey) {
+                            connectorCatalogById.set(resolvedKey, entry);
+                        }
+                    }
+                });
+                renderConnectorCatalog(connectorCatalog);
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                listEl.innerHTML = '<div class="connector-empty">Connector catalog unavailable.</div>';
+            } finally {
+                if (hintEl) {
+                    hintEl.textContent = isRegulatedEdition()
+                        ? 'Connectors are disabled for regulated editions by policy.'
+                        : 'Use the catalog to plan integrations before enabling connectors.';
+                }
+            }
+        }
+
+        function renderConnectorCatalog(entries) {
+            const listEl = document.getElementById('connector-catalog-list');
+            if (!listEl) return;
+            if (!entries || entries.length === 0) {
+                listEl.innerHTML = '<div class="connector-empty">No connectors available.</div>';
+                return;
+            }
+            listEl.innerHTML = entries.map(entry => {
+                const formatted = formatConnectorStatus({
+                    enabled: entry.enabled,
+                    lastSync: entry.lastSync,
+                    lastResult: entry.lastResult
+                });
+                const statusClass = formatted.stateClass === 'error'
+                    ? 'error'
+                    : (formatted.stateClass === 'enabled' ? 'enabled' : 'disabled');
+                const regulatedTag = entry.supportsRegulated ? '<span class="connector-tag">Regulated</span>' : '';
+                const connectorKey = resolveConnectorId(entry.id);
+                const detailsId = `connector-details-${connectorKey}`;
+                const configKeys = Array.isArray(entry.configKeys) ? entry.configKeys.join('\n') : 'No config keys';
+                const lastSync = entry.lastSync ? new Date(entry.lastSync).toLocaleString() : 'Never';
+                const lastResult = entry.lastResult?.message ? entry.lastResult.message : 'No sync activity';
+                return `
+                    <div class="connector-marketplace-item">
+                        <div class="connector-marketplace-header">
+                            <div class="connector-marketplace-title">${escapeHtml(entry.name || entry.id)}</div>
+                            <div class="connector-marketplace-tags">
+                                <span class="connector-tag">${escapeHtml(entry.category || 'Connector')}</span>
+                                <span class="connector-tag ${statusClass}">${escapeHtml(formatted.label)}</span>
+                                ${regulatedTag}
+                            </div>
+                        </div>
+                        <div class="connector-marketplace-description">${escapeHtml(entry.description || '')}</div>
+                        <div class="connector-marketplace-actions">
+                            <button class="btn btn-secondary btn-sm" data-action="toggleConnectorDetails" data-connector-id="${connectorKey}">Details</button>
+                            <button class="btn btn-secondary btn-sm" data-action="copyConnectorConfig" data-connector-id="${connectorKey}">Copy Config Keys</button>
+                        </div>
+                        <div class="connector-marketplace-details hidden" id="${detailsId}">
+                            <div>Last sync: ${escapeHtml(lastSync)}</div>
+                            <div>Status: ${escapeHtml(lastResult)}</div>
+                            <div class="connector-marketplace-keys">${escapeHtml(configKeys)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleConnectorDetails(connectorId) {
+            if (!connectorId) return;
+            const details = document.getElementById(`connector-details-${connectorId}`);
+            if (!details) return;
+            details.classList.toggle('hidden');
+        }
+
+        function copyConnectorConfig(connectorId) {
+            if (!connectorId) return;
+            const entry = connectorCatalogById.get(String(connectorId).toLowerCase());
+            if (!entry || !Array.isArray(entry.configKeys)) {
+                showInfoToast('No config keys available for this connector.');
+                return;
+            }
+            const text = entry.configKeys.join('\n');
+            copyTextToClipboard(text);
+            showInfoToast('Connector config keys copied.');
+        }
+
+        function copyTextToClipboard(text) {
+            if (navigator?.clipboard?.writeText) {
+                navigator.clipboard.writeText(text).catch(() => {
+                    fallbackCopyText(text);
+                });
+                return;
+            }
+            fallbackCopyText(text);
+        }
+
+        function fallbackCopyText(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+            } catch (e) {
+                console.warn('Clipboard copy failed:', e);
+            }
+            textarea.remove();
         }
 
         function initEvalHarness() {
@@ -5733,6 +5906,88 @@
             saveHistory: true
         };
 
+        const pipelinePresets = {
+            ENTERPRISE: {
+                label: 'Enterprise',
+                topK: 6,
+                similarity: 0.72,
+                hyde: false,
+                graphrag: true,
+                rerank: true
+            },
+            GOVERNMENT: {
+                label: 'Government',
+                topK: 5,
+                similarity: 0.78,
+                hyde: false,
+                graphrag: true,
+                rerank: true
+            },
+            MEDICAL: {
+                label: 'Medical',
+                topK: 5,
+                similarity: 0.8,
+                hyde: false,
+                graphrag: true,
+                rerank: true
+            },
+            FINANCE: {
+                label: 'Finance',
+                topK: 6,
+                similarity: 0.74,
+                hyde: false,
+                graphrag: false,
+                rerank: true
+            },
+            ACADEMIC: {
+                label: 'Academic',
+                topK: 8,
+                similarity: 0.68,
+                hyde: true,
+                graphrag: true,
+                rerank: true
+            }
+        };
+
+        function applyPipelinePreset(presetId) {
+            if (!presetId) return;
+            const preset = pipelinePresets[presetId.toUpperCase()];
+            if (!preset) {
+                showInfoToast('Unknown pipeline preset.');
+                return;
+            }
+
+            const hydeToggle = document.getElementById('hyde-toggle');
+            const graphragToggle = document.getElementById('graphrag-toggle');
+            const rerankToggle = document.getElementById('rerank-toggle');
+            const topKSlider = document.getElementById('top-k-slider');
+            const topKValue = document.getElementById('top-k-value');
+            const simSlider = document.getElementById('similarity-slider');
+            const simValue = document.getElementById('similarity-value');
+
+            if (hydeToggle) hydeToggle.checked = preset.hyde;
+            if (graphragToggle) graphragToggle.checked = preset.graphrag;
+            if (rerankToggle) rerankToggle.checked = preset.rerank;
+            if (topKSlider && topKValue) {
+                topKSlider.value = preset.topK;
+                topKValue.textContent = preset.topK;
+            }
+            if (simSlider && simValue) {
+                const simPercent = Math.round(preset.similarity * 100);
+                simSlider.value = simPercent;
+                simValue.textContent = preset.similarity.toFixed(2);
+            }
+
+            appSettings.topK = preset.topK;
+            appSettings.similarityThreshold = preset.similarity;
+            appSettings.hyde = preset.hyde;
+            appSettings.graphrag = preset.graphrag;
+            appSettings.reranking = preset.rerank;
+
+            markSettingsUnsaved();
+            showInfoToast(`Applied ${preset.label} pipeline preset.`);
+        }
+
         function isRegulatedEdition() {
             return regulatedEditions.has(currentEdition);
         }
@@ -5836,6 +6091,7 @@
             const refreshBtn = document.getElementById('connector-refresh-btn');
             const syncBtn = document.getElementById('connector-sync-btn');
             const connectorHint = document.getElementById('connector-compliance-hint');
+            const catalogRefreshBtn = document.getElementById('connector-catalog-refresh');
             if (refreshBtn && syncBtn) {
                 if (!currentIsAdmin) {
                     refreshBtn.disabled = true;
@@ -5853,6 +6109,9 @@
                     syncBtn.disabled = false;
                     if (connectorHint) connectorHint.textContent = 'Sync pulls from configured connectors.';
                 }
+            }
+            if (catalogRefreshBtn) {
+                catalogRefreshBtn.disabled = !currentIsAdmin;
             }
 
             const evalRunBtn = document.getElementById('eval-run-btn');

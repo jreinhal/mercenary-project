@@ -57,6 +57,74 @@ public final class ConnectorCatalog {
                 "SENTINEL_CONFLUENCE_DEPT"
             ),
             false
+        ),
+        new ConnectorDefinition(
+            "Jira",
+            "Atlassian Jira",
+            "Work Management",
+            "Sync Jira issues, tickets, and project knowledge for incident response.",
+            List.of(
+                "SENTINEL_CONNECTORS_ENABLED",
+                "SENTINEL_JIRA_ENABLED",
+                "SENTINEL_JIRA_URL",
+                "SENTINEL_JIRA_EMAIL",
+                "SENTINEL_JIRA_TOKEN",
+                "SENTINEL_JIRA_PROJECTS",
+                "SENTINEL_JIRA_LIMIT",
+                "SENTINEL_JIRA_DEPT"
+            ),
+            false
+        ),
+        new ConnectorDefinition(
+            "ServiceNow",
+            "ServiceNow ITSM",
+            "Service Management",
+            "Sync incident, change, and knowledge base records from ServiceNow.",
+            List.of(
+                "SENTINEL_CONNECTORS_ENABLED",
+                "SENTINEL_SNOW_ENABLED",
+                "SENTINEL_SNOW_INSTANCE",
+                "SENTINEL_SNOW_USERNAME",
+                "SENTINEL_SNOW_PASSWORD",
+                "SENTINEL_SNOW_TABLES",
+                "SENTINEL_SNOW_LIMIT",
+                "SENTINEL_SNOW_DEPT"
+            ),
+            false
+        ),
+        new ConnectorDefinition(
+            "Box",
+            "Box",
+            "Enterprise Content",
+            "Sync documents from Box folders for compliance and audit review.",
+            List.of(
+                "SENTINEL_CONNECTORS_ENABLED",
+                "SENTINEL_BOX_ENABLED",
+                "SENTINEL_BOX_CLIENT_ID",
+                "SENTINEL_BOX_CLIENT_SECRET",
+                "SENTINEL_BOX_ENTERPRISE_ID",
+                "SENTINEL_BOX_FOLDER",
+                "SENTINEL_BOX_LIMIT",
+                "SENTINEL_BOX_DEPT"
+            ),
+            false
+        ),
+        new ConnectorDefinition(
+            "GoogleDrive",
+            "Google Drive",
+            "Enterprise Content",
+            "Sync documents from Google Drive shared folders.",
+            List.of(
+                "SENTINEL_CONNECTORS_ENABLED",
+                "SENTINEL_GDRIVE_ENABLED",
+                "SENTINEL_GDRIVE_CLIENT_ID",
+                "SENTINEL_GDRIVE_CLIENT_SECRET",
+                "SENTINEL_GDRIVE_REFRESH_TOKEN",
+                "SENTINEL_GDRIVE_FOLDER",
+                "SENTINEL_GDRIVE_LIMIT",
+                "SENTINEL_GDRIVE_DEPT"
+            ),
+            false
         )
     );
 

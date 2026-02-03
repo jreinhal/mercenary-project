@@ -146,6 +146,20 @@
                 </select>
             </div>
 
+            <!-- Sector Pipeline Presets -->
+            <div class="sidebar-section" id="pipeline-presets-section">
+                <div class="sidebar-section-title">Sector Pipeline Presets</div>
+                <p class="settings-description">Apply recommended retrieval settings for each sector.</p>
+                <div class="pipeline-preset-list">
+                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="ENTERPRISE">Enterprise</button>
+                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="GOVERNMENT">Government</button>
+                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="MEDICAL">Medical</button>
+                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="FINANCE">Finance</button>
+                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="ACADEMIC">Academic</button>
+                </div>
+                <div class="settings-hint" id="pipeline-presets-hint">Applies locally; use “Save Settings” to persist.</div>
+            </div>
+
             <!-- Appearance -->
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Appearance</div>
@@ -282,6 +296,19 @@
                 <div class="settings-hint" id="connector-compliance-hint"></div>
             </div>
 
+            <!-- Connector Marketplace -->
+            <div class="sidebar-section" id="connector-marketplace-section">
+                <div class="sidebar-section-title">Connector Marketplace</div>
+                <p class="settings-description">Browse available connectors and required configuration keys (admin-only).</p>
+                <div class="connector-marketplace-list" id="connector-catalog-list">
+                    <div class="connector-empty">Loading connector catalog...</div>
+                </div>
+                <div class="settings-actions">
+                    <button class="btn btn-secondary" data-action="refreshConnectorCatalog" id="connector-catalog-refresh">Refresh Catalog</button>
+                </div>
+                <div class="settings-hint" id="connector-catalog-hint"></div>
+            </div>
+
             <!-- Advanced -->
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Advanced</div>
@@ -379,6 +406,15 @@
             </div>
         </div>
         <a href="#" class="menu-item" data-action="toggleSidebar">Settings</a>
+        <span class="menu-bar-spacer"></span>
+        <div class="menu-bar-right">
+            <div class="workspace-quick-switcher hidden" id="workspace-quick-switcher">
+                <span class="workspace-quick-label">Workspace</span>
+                <select class="workspace-quick-select" id="workspace-quick-select" aria-label="Quick switch workspace">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+        </div>
     </nav>
 
     <!-- Main Workspace (3-Column Kotaemon Layout) -->
