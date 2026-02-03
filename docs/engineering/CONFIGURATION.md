@@ -140,6 +140,11 @@ Workspace management APIs (admin-only; non-regulated editions):
 - POST /api/workspaces/{id}/members
 - DELETE /api/workspaces/{id}/members/{userId}
 
+Workspace quotas (per workspace):
+- Set on workspace creation via quota fields (maxDocuments, maxQueriesPerDay, maxStorageMb).
+- Enforcement applies to ingestion and query endpoints.
+- Storage tracking uses per-file `fileSizeBytes` metadata on vector store documents.
+
 ## Connectors (admin-only)
 - SENTINEL_CONNECTORS_ENABLED (default: true; disabled in govcloud profile)
 - SENTINEL_CONNECTORS_ALLOW_REGULATED (default: false)

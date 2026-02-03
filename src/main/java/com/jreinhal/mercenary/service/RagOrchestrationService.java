@@ -93,6 +93,7 @@ public class RagOrchestrationService {
     private final PiiRedactionService piiRedactionService;
     private final HipaaPolicy hipaaPolicy;
     private final HipaaAuditService hipaaAuditService;
+    private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final AtomicInteger queryCount = new AtomicInteger(0);
     private final AtomicLong totalLatencyMs = new AtomicLong(0L);
     private final Cache<String, String> secureDocCache;
@@ -134,7 +135,7 @@ public class RagOrchestrationService {
     @Value("${sentinel.rag.max-docs:16}")
     private int maxDocs;
 
-    public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, LicenseService licenseService, PiiRedactionService piiRedactionService, HipaaPolicy hipaaPolicy, HipaaAuditService hipaaAuditService, Cache<String, String> secureDocCache,
+    public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, LicenseService licenseService, PiiRedactionService piiRedactionService, HipaaPolicy hipaaPolicy, HipaaAuditService hipaaAuditService, Cache<String, String> secureDocCache, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService,
                                   @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
                                   @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
                                   @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
@@ -164,6 +165,7 @@ public class RagOrchestrationService {
         this.hipaaPolicy = hipaaPolicy;
         this.hipaaAuditService = hipaaAuditService;
         this.secureDocCache = secureDocCache;
+        this.workspaceQuotaService = workspaceQuotaService;
         this.llmModel = llmModel;
         this.llmTemperature = llmTemperature;
         this.llmNumPredict = llmNumPredict;
@@ -214,6 +216,12 @@ public class RagOrchestrationService {
         if (!user.canAccessSector(department)) {
             this.auditService.logAccessDenied(user, "/api/ask", "Not authorized for sector " + department.name(), request);
             return "ACCESS DENIED: You are not authorized to access the " + department.name() + " sector.";
+        }
+        try {
+            this.workspaceQuotaService.enforceQueryQuota(com.jreinhal.mercenary.workspace.WorkspaceContext.getCurrentWorkspaceId());
+        } catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
+            this.auditService.logAccessDenied(user, "/api/ask", "Workspace quota exceeded: " + e.getQuotaType(), request);
+            return "ACCESS DENIED: " + e.getMessage();
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
@@ -480,6 +488,13 @@ public class RagOrchestrationService {
         if (!user.canAccessSector(department)) {
             this.auditService.logAccessDenied(user, "/api/ask/enhanced", "Not authorized for sector " + department.name(), request);
             return new EnhancedAskResponse("ACCESS DENIED: Not authorized for " + department.name() + " sector.", List.of(), List.of(), Map.of(), null);
+        }
+        try {
+            this.workspaceQuotaService.enforceQueryQuota(com.jreinhal.mercenary.workspace.WorkspaceContext.getCurrentWorkspaceId());
+        } catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
+            this.auditService.logAccessDenied(user, "/api/ask/enhanced", "Workspace quota exceeded: " + e.getQuotaType(), request);
+            return new EnhancedAskResponse("ACCESS DENIED: " + e.getMessage(), List.of(), List.of(),
+                    Map.of("error", "WORKSPACE_QUOTA", "quota", e.getQuotaType()), null);
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);

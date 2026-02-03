@@ -364,6 +364,11 @@ public class MercenaryController {
             try {
                 this.ingestionService.ingest(file, department);
             }
+            catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
+                log.warn("Workspace quota exceeded for {}: {}", filename, e.getMessage());
+                this.auditService.logAccessDenied(user, "/api/ingest/file", "Workspace quota exceeded: " + e.getQuotaType(), request);
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("QUOTA EXCEEDED: " + e.getMessage());
+            }
             catch (SecurityException e) {
                 log.warn("SECURITY: Ingestion blocked for {}: {}", filename, e.getMessage());
                 this.auditService.logAccessDenied(user, "/api/ingest/file", "Blocked file type: " + e.getMessage(), request);

@@ -51,6 +51,7 @@ public class SecureIngestionService {
     private final HyperGraphMemory hyperGraphMemory;
     private final LightOnOcrService lightOnOcrService;
     private final HipaaPolicy hipaaPolicy;
+    private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final Tika tika;
     private static final Set<String> BLOCKED_MIME_TYPES = Set.of("application/x-executable", "application/x-msdos-program", "application/x-msdownload", "application/x-sh", "application/x-shellscript", "application/java-archive", "application/x-httpd-php");
     @Value(value="${sentinel.miarag.min-chunks-for-mindscape:10}")
@@ -60,7 +61,7 @@ public class SecureIngestionService {
     @Value(value="${sentinel.ocr.fallback-for-scanned-pdf:true}")
     private boolean ocrFallbackForScannedPdf;
 
-    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, HipaaPolicy hipaaPolicy) {
+    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
         this.vectorStore = vectorStore;
         this.piiRedactionService = piiRedactionService;
         this.partitionAssigner = partitionAssigner;
@@ -69,6 +70,7 @@ public class SecureIngestionService {
         this.hyperGraphMemory = hyperGraphMemory;
         this.lightOnOcrService = lightOnOcrService;
         this.hipaaPolicy = hipaaPolicy;
+        this.workspaceQuotaService = workspaceQuotaService;
         this.tika = new Tika();
     }
 
@@ -80,6 +82,7 @@ public class SecureIngestionService {
             String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
             boolean hipaaStrict = this.hipaaPolicy.isStrict(dept);
             byte[] fileBytes = file.getBytes();
+            this.workspaceQuotaService.enforceIngestionQuota(workspaceId, fileBytes.length);
             String detectedMimeType = this.detectMimeType(fileBytes, filename);
             log.info(">> Magic byte detection: {} -> {}", filename, detectedMimeType);
             this.validateFileType(filename, detectedMimeType, fileBytes);
@@ -131,6 +134,7 @@ public class SecureIngestionService {
                 cleanMeta.put("dept", dept.name());
                 cleanMeta.put("workspaceId", workspaceId);
                 cleanMeta.put("mimeType", detectedMimeType);
+                cleanMeta.put("fileSizeBytes", fileBytes.length);
                 cleanDocs.add(new Document(doc.getContent(), cleanMeta));
             }
             TokenTextSplitter splitter = new TokenTextSplitter();
