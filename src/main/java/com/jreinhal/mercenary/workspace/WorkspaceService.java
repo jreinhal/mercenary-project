@@ -13,7 +13,6 @@ import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -34,11 +33,6 @@ public class WorkspaceService {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
         this.workspacePolicy = workspacePolicy;
-    }
-
-    @PostConstruct
-    public void init() {
-        ensureDefaultWorkspace();
     }
 
     public void ensureDefaultWorkspace() {
