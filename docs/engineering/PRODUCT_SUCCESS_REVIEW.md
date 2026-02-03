@@ -75,12 +75,17 @@ Recommended inspirations:
 - Collaboration workflows (shared cases, review/approval, redaction review) implemented for non-regulated editions.
 
 ### Planned (Strategic)
-- Multi-tenant/workspace isolation for MSP or multi-org deployments.
-- Marketplace for connectors and sector-specific pipelines.
-- Expanded reporting for compliance and executive summaries.
+- Workspace admin UI + tenant quotas + migration tooling (Phase 2).
+- Marketplace UI + additional sector pipelines/connectors.
+- Reporting UI, scheduled exports, and SLA dashboards.
 
 ### Now in Motion
 - Workspace isolation design + staged rollout plan drafted in `docs/engineering/plans/WORKSPACE_ISOLATION.md`.
+
+### In Progress (Strategic)
+- Workspace isolation Phase 1 implemented (workspaceId tagging + query filters + header-based selection; UI switcher pending).
+- Connector marketplace API added (admin-only catalog endpoint).
+- Compliance/executive reporting pack added (admin-only executive report endpoint).
 
 ## References (UI/UX Inspiration)
 - https://www.splunk.com/en-us/blog/security/use-investigation-workbench-to-reduce-time-to-contain-and-time-to-remediate.html

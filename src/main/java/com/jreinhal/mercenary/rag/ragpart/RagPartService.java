@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,13 +61,14 @@ public class RagPartService {
             return new RagPartResult(docs, List.of(), Map.of());
         }
         long startTime = System.currentTimeMillis();
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         log.info("RAGPart: Starting defended retrieval for query {}", LogSanitizer.querySummary(query));
         List<Set<Integer>> combinations = this.generateCombinations(this.numPartitions, this.combinationSize);
         log.debug("RAGPart: Generated {} partition combinations", combinations.size());
         HashMap<String, DocumentAppearance> documentAppearances = new HashMap<String, DocumentAppearance>();
         for (int i = 0; i < combinations.size(); ++i) {
             Set<Integer> partitionSet = combinations.get(i);
-            String partitionFilter = this.buildPartitionFilter(partitionSet, department);
+            String partitionFilter = this.buildPartitionFilter(partitionSet, department, workspaceId);
             List<Document> combinationResults = this.retrieveWithFilter(query, partitionFilter);
             log.debug("RAGPart: Combination {} ({}) returned {} documents", new Object[]{i + 1, partitionSet, combinationResults.size()});
             Iterator iterator = combinationResults.iterator();
@@ -113,9 +115,9 @@ public class RagPartService {
         }
     }
 
-    private String buildPartitionFilter(Set<Integer> partitions, String department) {
+    private String buildPartitionFilter(Set<Integer> partitions, String department, String workspaceId) {
         String partitionIn = partitions.stream().map(String::valueOf).collect(Collectors.joining(","));
-        return FilterExpressionBuilder.forDepartment(department) + " && partition_id in [" + partitionIn + "]";
+        return FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId) + " && partition_id in [" + partitionIn + "]";
     }
 
     private List<Document> retrieveWithFilter(String query, String filter) {
@@ -130,7 +132,8 @@ public class RagPartService {
 
     private List<Document> standardRetrieval(String query, String department) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.retrievalK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.retrievalK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
         }
         catch (Exception e) {
             log.error("Standard retrieval failed", (Throwable)e);

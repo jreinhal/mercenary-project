@@ -21,6 +21,8 @@ public class AuditEvent {
     private String userId;
     private String username;
     private ClearanceLevel userClearance;
+    @Indexed
+    private String workspaceId;
     private String sourceIp;
     private String userAgent;
     private String sessionId;
@@ -52,6 +54,11 @@ public class AuditEvent {
             this.username = user.getUsername();
             this.userClearance = user.getClearance();
         }
+        return this;
+    }
+
+    public AuditEvent withWorkspace(String workspaceId) {
+        this.workspaceId = workspaceId;
         return this;
     }
 
@@ -98,6 +105,10 @@ public class AuditEvent {
 
     public String getUserId() {
         return this.userId;
+    }
+
+    public String getWorkspaceId() {
+        return this.workspaceId;
     }
 
     public String getUsername() {

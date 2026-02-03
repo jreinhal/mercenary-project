@@ -22,6 +22,7 @@ public class User {
     private AuthProvider authProvider = AuthProvider.LOCAL;
     private String externalId;
     private String passwordHash;
+    private Set<String> workspaceIds = new HashSet<String>();
     private Instant createdAt;
     private Instant lastLoginAt;
     private boolean active = true;
@@ -35,6 +36,7 @@ public class User {
         user.roles = Set.of(UserRole.ADMIN);
         user.clearance = ClearanceLevel.TOP_SECRET;
         user.allowedSectors = Set.of(Department.values());
+        user.workspaceIds = Set.of("workspace_default");
         user.authProvider = AuthProvider.LOCAL;
         user.createdAt = Instant.now();
         user.active = true;
@@ -153,6 +155,14 @@ public class User {
         this.pendingApproval = pendingApproval;
     }
 
+    public Set<String> getWorkspaceIds() {
+        return this.workspaceIds;
+    }
+
+    public void setWorkspaceIds(Set<String> workspaceIds) {
+        this.workspaceIds = workspaceIds;
+    }
+
     public boolean hasRole(UserRole role) {
         return this.roles.contains(role);
     }
@@ -167,6 +177,19 @@ public class User {
 
     public boolean canAccessClassification(ClearanceLevel required) {
         return this.clearance.canAccess(required);
+    }
+
+    public boolean canAccessWorkspace(String workspaceId) {
+        if (workspaceId == null || workspaceId.isBlank()) {
+            return false;
+        }
+        if (this.hasRole(UserRole.ADMIN)) {
+            return true;
+        }
+        if (this.workspaceIds == null || this.workspaceIds.isEmpty()) {
+            return "workspace_default".equalsIgnoreCase(workspaceId);
+        }
+        return this.workspaceIds.stream().anyMatch(id -> id.equalsIgnoreCase(workspaceId));
     }
 
     public static enum AuthProvider {

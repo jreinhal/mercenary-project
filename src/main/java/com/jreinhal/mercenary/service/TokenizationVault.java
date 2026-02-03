@@ -26,6 +26,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.CriteriaDefinition;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 
 @Service
 public class TokenizationVault {
@@ -77,9 +78,10 @@ public class TokenizationVault {
             Query query;
             TokenizationKey activeKey = this.keyRing.activeKey();
             String token = this.generateToken(value, piiType, activeKey.hmacKey());
-            if (this.storeOriginals && this.mongoTemplate.findOne(query = new Query((CriteriaDefinition)Criteria.where((String)"token").is(token)), TokenEntry.class) == null) {
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            if (this.storeOriginals && this.mongoTemplate.findOne(query = new Query((CriteriaDefinition)Criteria.where((String)"token").is(token).and("workspaceId").is(workspaceId)), TokenEntry.class) == null) {
                 String encryptedValue = this.encryptValue(value, activeKey.aesKey());
-                TokenEntry entry = new TokenEntry(token, encryptedValue, piiType, userId, this.keyRing.activeKeyId());
+                TokenEntry entry = new TokenEntry(token, encryptedValue, piiType, userId, workspaceId, this.keyRing.activeKeyId());
                 this.mongoTemplate.save(entry);
                 log.debug("Tokenized {} value, stored in vault", piiType);
             }
@@ -96,7 +98,8 @@ public class TokenizationVault {
             return Optional.empty();
         }
         try {
-            Query query = new Query((CriteriaDefinition)Criteria.where((String)"token").is(token));
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            Query query = new Query((CriteriaDefinition)Criteria.where((String)"token").is(token).and("workspaceId").is(workspaceId));
             TokenEntry entry = (TokenEntry)this.mongoTemplate.findOne(query, TokenEntry.class);
             if (entry == null) {
                 log.warn("Detokenization requested for unknown token by user {}", userId);
@@ -321,17 +324,19 @@ public class TokenizationVault {
         private String keyId;
         private Instant createdAt;
         private String createdBy;
+        private String workspaceId;
 
         public TokenEntry() {
         }
 
-        public TokenEntry(String token, String encryptedValue, String piiType, String createdBy, String keyId) {
+        public TokenEntry(String token, String encryptedValue, String piiType, String createdBy, String workspaceId, String keyId) {
             this.token = token;
             this.encryptedValue = encryptedValue;
             this.piiType = piiType;
             this.keyId = keyId;
             this.createdAt = Instant.now();
             this.createdBy = createdBy;
+            this.workspaceId = workspaceId;
         }
 
         public String getId() {
@@ -360,6 +365,10 @@ public class TokenizationVault {
 
         public String getCreatedBy() {
             return this.createdBy;
+        }
+
+        public String getWorkspaceId() {
+            return this.workspaceId;
         }
     }
 }

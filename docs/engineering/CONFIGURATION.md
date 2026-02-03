@@ -127,6 +127,12 @@ The **Entity Network** tab in the right panel only appears when Deep Analysis is
 - SENTINEL_CASEWORK_ENABLED (default: true)
 - SENTINEL_CASEWORK_ALLOW_REGULATED (default: false)
 
+## Workspace isolation (non-regulated by default)
+- SENTINEL_WORKSPACE_ENABLED (default: true)
+- SENTINEL_WORKSPACE_ALLOW_REGULATED (default: false)
+- SENTINEL_WORKSPACE_DEFAULT_ID (default: workspace_default)
+- Request header: X-Workspace-Id (ignored in Medical/Government unless allow-regulated=true)
+
 ## Connectors (admin-only)
 - SENTINEL_CONNECTORS_ENABLED (default: true; disabled in govcloud profile)
 - SENTINEL_CONNECTORS_ALLOW_REGULATED (default: false)
@@ -160,6 +166,10 @@ The **Entity Network** tab in the right panel only appears when Deep Analysis is
 - SENTINEL_S3_SECRET_KEY
 - SENTINEL_S3_MAX_FILES
 - SENTINEL_S3_DEPT
+
+## Admin APIs (Reporting & Catalog)
+- GET /api/admin/connectors/catalog
+- GET /api/admin/reports/executive?days=30
 
 **Performance Note:** Entity extraction during document upload is fast and always enabled by default. The slow operation is the graph traversal at query time, which is now opt-in per query.
 

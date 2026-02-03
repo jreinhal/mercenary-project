@@ -4,6 +4,7 @@ import com.jreinhal.mercenary.model.Feedback;
 import com.jreinhal.mercenary.repository.FeedbackRepository;
 import com.jreinhal.mercenary.service.AuditService;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
@@ -37,7 +38,8 @@ public class FeedbackService {
         if (this.hipaaPolicy.shouldDisableFeedback(sector)) {
             return FeedbackResult.disabled("Feedback storage is disabled for HIPAA medical deployments.");
         }
-        Feedback existing = this.feedbackRepository.findByUserIdAndMessageId(userId, messageId);
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Feedback existing = this.feedbackRepository.findByUserIdAndMessageIdAndWorkspaceId(userId, messageId, workspaceId);
         if (existing != null) {
             if (existing.getFeedbackType() == Feedback.FeedbackType.POSITIVE) {
                 this.feedbackRepository.delete(existing);
@@ -47,7 +49,8 @@ public class FeedbackService {
             this.feedbackRepository.delete(existing);
             log.info("User {} switched from negative to positive feedback for message {}", userId, messageId);
         }
-        Feedback feedback = Feedback.positive(userId, messageId, query, response).withUserContext(username, sector, null);
+        Feedback feedback = Feedback.positive(userId, messageId, query, response)
+            .withUserContext(username, sector, null, workspaceId);
         if (ragMetadata != null) {
             feedback.withRagMetadata((String)ragMetadata.get("routingDecision"), this.castToStringList(ragMetadata.get("sourceDocuments")), this.getDoubleOrDefault(ragMetadata, "similarityThreshold", 0.0), this.getIntOrDefault(ragMetadata, "topK", 5), this.getMapOrEmpty(ragMetadata, "signals"));
             feedback.withMetrics(this.getLongOrDefault(ragMetadata, "responseTimeMs", 0L), this.getIntOrDefault(ragMetadata, "reasoningSteps", 0), this.getDoubleOrNull(ragMetadata, "hallucinationScore"));
@@ -61,7 +64,8 @@ public class FeedbackService {
         if (this.hipaaPolicy.shouldDisableFeedback(sector)) {
             return FeedbackResult.disabled("Feedback storage is disabled for HIPAA medical deployments.");
         }
-        Feedback existing = this.feedbackRepository.findByUserIdAndMessageId(userId, messageId);
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Feedback existing = this.feedbackRepository.findByUserIdAndMessageIdAndWorkspaceId(userId, messageId, workspaceId);
         if (existing != null) {
             if (existing.getFeedbackType() == Feedback.FeedbackType.NEGATIVE && existing.getCategory() == category) {
                 this.feedbackRepository.delete(existing);
@@ -71,7 +75,9 @@ public class FeedbackService {
             this.feedbackRepository.delete(existing);
             log.info("User {} replacing previous feedback for message {}", userId, messageId);
         }
-        Feedback feedback = Feedback.negative(userId, messageId, query, response, category).withUserContext(username, sector, null).withComments(comments);
+        Feedback feedback = Feedback.negative(userId, messageId, query, response, category)
+            .withUserContext(username, sector, null, workspaceId)
+            .withComments(comments);
         if (ragMetadata != null) {
             feedback.withRagMetadata((String)ragMetadata.get("routingDecision"), this.castToStringList(ragMetadata.get("sourceDocuments")), this.getDoubleOrDefault(ragMetadata, "similarityThreshold", 0.0), this.getIntOrDefault(ragMetadata, "topK", 5), this.getMapOrEmpty(ragMetadata, "signals"));
             feedback.withMetrics(this.getLongOrDefault(ragMetadata, "responseTimeMs", 0L), this.getIntOrDefault(ragMetadata, "reasoningSteps", 0), this.getDoubleOrNull(ragMetadata, "hallucinationScore"));
@@ -89,7 +95,10 @@ public class FeedbackService {
             return new FeedbackAnalytics(0L, 0L, 0L, 0.0, Map.of(), 0L, 0.0, 0.0, List.of(), days, sector);
         }
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
-        List<Feedback> recentFeedback = sector != null ? this.feedbackRepository.findBySectorAndTimestampBetween(sector, since, Instant.now()) : this.feedbackRepository.findByTimestampBetween(since, Instant.now());
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        List<Feedback> recentFeedback = sector != null
+                ? this.feedbackRepository.findBySectorAndTimestampBetweenAndWorkspaceId(sector, since, Instant.now(), workspaceId)
+                : this.feedbackRepository.findByTimestampBetweenAndWorkspaceId(since, Instant.now(), workspaceId);
         long positive = recentFeedback.stream().filter(f -> f.getFeedbackType() == Feedback.FeedbackType.POSITIVE).count();
         long negative = recentFeedback.stream().filter(f -> f.getFeedbackType() == Feedback.FeedbackType.NEGATIVE).count();
         long total = positive + negative;
@@ -103,15 +112,30 @@ public class FeedbackService {
     }
 
     public Page<Feedback> getOpenIssues(int page, int size) {
-        return this.feedbackRepository.findByFeedbackTypeAndResolutionStatus(Feedback.FeedbackType.NEGATIVE, Feedback.ResolutionStatus.OPEN, (Pageable)PageRequest.of((int)page, (int)size, (Sort)Sort.by((Sort.Direction)Sort.Direction.DESC, (String[])new String[]{"timestamp"})));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        return this.feedbackRepository.findByFeedbackTypeAndResolutionStatusAndWorkspaceId(
+            Feedback.FeedbackType.NEGATIVE,
+            Feedback.ResolutionStatus.OPEN,
+            workspaceId,
+            (Pageable)PageRequest.of((int)page, (int)size, (Sort)Sort.by((Sort.Direction)Sort.Direction.DESC, (String[])new String[]{"timestamp"}))
+        );
     }
 
     public List<Feedback> getHallucinationReports() {
-        return this.feedbackRepository.findByCategoryAndResolutionStatusOrderByTimestampDesc(Feedback.FeedbackCategory.HALLUCINATION, Feedback.ResolutionStatus.OPEN);
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        return this.feedbackRepository.findByCategoryAndResolutionStatusAndWorkspaceIdOrderByTimestampDesc(
+            Feedback.FeedbackCategory.HALLUCINATION,
+            Feedback.ResolutionStatus.OPEN,
+            workspaceId
+        );
     }
 
     public Feedback resolveIssue(String feedbackId, String resolvedBy, String notes) {
         Feedback feedback = (Feedback)this.feedbackRepository.findById(feedbackId).orElseThrow(() -> new IllegalArgumentException("Feedback not found: " + feedbackId));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        if (feedback.getWorkspaceId() != null && !feedback.getWorkspaceId().equalsIgnoreCase(workspaceId)) {
+            throw new SecurityException("Feedback belongs to another workspace");
+        }
         feedback.resolve(resolvedBy, notes);
         return (Feedback)this.feedbackRepository.save(feedback);
     }
@@ -120,7 +144,10 @@ public class FeedbackService {
         if (this.hipaaPolicy.shouldDisableFeedback(sector) || (sector == null && this.hipaaPolicy.isStrict("MEDICAL"))) {
             return List.of();
         }
-        List<Feedback> feedback = sector != null ? this.feedbackRepository.findByFeedbackTypeAndSector(type, sector) : this.feedbackRepository.findByFeedbackTypeOrderByTimestampDesc(type);
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        List<Feedback> feedback = sector != null
+                ? this.feedbackRepository.findByFeedbackTypeAndSectorAndWorkspaceId(type, sector, workspaceId)
+                : this.feedbackRepository.findByFeedbackTypeAndWorkspaceIdOrderByTimestampDesc(type, workspaceId);
         return feedback.stream().filter(f -> f.getQuery() != null && f.getResponse() != null).map(f -> new TrainingExample(f.getQuery(), f.getResponse(), f.getSector(), f.getSourceDocuments(), f.getFeedbackType() == Feedback.FeedbackType.POSITIVE ? 1.0 : 0.0)).collect(Collectors.toList());
     }
 

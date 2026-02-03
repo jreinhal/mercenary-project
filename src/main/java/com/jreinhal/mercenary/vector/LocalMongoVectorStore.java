@@ -25,7 +25,7 @@ public class LocalMongoVectorStore
 implements VectorStore {
     private static final Logger log = LoggerFactory.getLogger(LocalMongoVectorStore.class);
     private static final String COLLECTION_NAME = "vector_store";
-    private static final Set<String> PREFILTER_KEYS = Set.of("dept", "type", "partition_id", "source", "filename", "mimeType");
+    private static final Set<String> PREFILTER_KEYS = Set.of("dept", "workspaceId", "type", "partition_id", "source", "filename", "mimeType");
     private final MongoTemplate mongoTemplate;
     private final EmbeddingModel embeddingModel;
 

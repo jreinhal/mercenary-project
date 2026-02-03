@@ -9,6 +9,7 @@ import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -132,7 +133,8 @@ public class AgenticRagOrchestrator {
     }
 
     private AgenticResult simpleRetrieval(String query, String department, long startTime) {
-        List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(5).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(5).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
         String response = this.generateStandardResponse(query, docs);
         long elapsed = System.currentTimeMillis() - startTime;
         return new AgenticResult(response, docs, 0.7, List.of("SIMPLE_RETRIEVAL"), 1, Map.of("totalMs", elapsed, "mode", "disabled"));
@@ -155,7 +157,8 @@ public class AgenticRagOrchestrator {
     private List<Document> standardRetrieval(String query, String department, AdaptiveRagService.RoutingResult routing) {
         int topK = this.adaptiveRag.getTopK(routing.decision());
         double threshold = this.adaptiveRag.getSimilarityThreshold(routing.decision());
-        return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(topK).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(topK).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
     }
 
     private String generateStandardResponse(String query, List<Document> documents) {

@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.medical.hipaa;
 
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.service.PiiRedactionService;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,7 @@ public class HipaaAuditService {
 
     public void logAuthentication(String username, boolean success, String ipAddress, String reason) {
         AuditEventType type = success ? AuditEventType.AUTH_SUCCESS : AuditEventType.AUTH_FAILURE;
-        HipaaAuditEvent event = new HipaaAuditEvent(type, username, null, ipAddress, Map.of("success", success, "reason", reason != null ? reason : ""));
+        HipaaAuditEvent event = new HipaaAuditEvent(type, username, null, ipAddress, WorkspaceContext.getCurrentWorkspaceId(), Map.of("success", success, "reason", reason != null ? reason : ""));
         this.saveEvent(event);
     }
 
@@ -52,7 +53,7 @@ public class HipaaAuditService {
 
     public void logPhiAccess(String userId, String action, String resourceId, String reason, boolean breakTheGlass) {
         String sanitizedReason = this.sanitizeText(reason);
-        HipaaAuditEvent event = new HipaaAuditEvent(AuditEventType.PHI_ACCESS, userId, null, null, Map.of("action", action, "resourceId", resourceId, "reason", sanitizedReason, "breakTheGlass", breakTheGlass));
+        HipaaAuditEvent event = new HipaaAuditEvent(AuditEventType.PHI_ACCESS, userId, null, null, WorkspaceContext.getCurrentWorkspaceId(), Map.of("action", action, "resourceId", resourceId, "reason", sanitizedReason, "breakTheGlass", breakTheGlass));
         this.saveEvent(event);
         if (breakTheGlass) {
             log.warn("BREAK-THE-GLASS: PHI access by {} for resource {} - Reason: {}", new Object[]{userId, resourceId, sanitizedReason});
@@ -62,14 +63,14 @@ public class HipaaAuditService {
     public void logBreakTheGlass(String userId, String resourceId, String patientId, String emergencyReason) {
         String sanitizedPatient = this.sanitizeText(patientId);
         String sanitizedReason = this.sanitizeText(emergencyReason);
-        HipaaAuditEvent event = new HipaaAuditEvent(AuditEventType.PHI_ACCESS, userId, null, null, Map.of("action", "BREAK_THE_GLASS", "resourceId", resourceId, "patientId", sanitizedPatient, "emergencyReason", sanitizedReason, "requiresReview", true));
+        HipaaAuditEvent event = new HipaaAuditEvent(AuditEventType.PHI_ACCESS, userId, null, null, WorkspaceContext.getCurrentWorkspaceId(), Map.of("action", "BREAK_THE_GLASS", "resourceId", resourceId, "patientId", sanitizedPatient, "emergencyReason", sanitizedReason, "requiresReview", true));
         this.saveEvent(event);
         log.error("!!! BREAK-THE-GLASS EMERGENCY ACCESS !!!");
         log.error("User: {}, Patient: {}, Reason: {}", new Object[]{userId, sanitizedPatient, sanitizedReason});
     }
 
     private void logEvent(AuditEventType type, User user, Map<String, Object> details) {
-        HipaaAuditEvent event = new HipaaAuditEvent(type, user.getUsername(), user.getId(), null, details);
+        HipaaAuditEvent event = new HipaaAuditEvent(type, user.getUsername(), user.getId(), null, WorkspaceContext.getCurrentWorkspaceId(), details);
         this.saveEvent(event);
     }
 
@@ -109,6 +110,7 @@ public class HipaaAuditService {
             return List.of();
         }
         Query query = new Query();
+        query.addCriteria((CriteriaDefinition)Criteria.where("workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         query.with(Sort.by(Sort.Direction.DESC, "timestamp"));
         query.limit(limit);
         return this.mongoTemplate.find(query, HipaaAuditEvent.class, COLLECTION_NAME);
@@ -116,6 +118,7 @@ public class HipaaAuditService {
 
     public List<HipaaAuditEvent> queryEvents(Optional<Instant> since, Optional<Instant> until, Optional<AuditEventType> type, int limit) {
         Query query = new Query();
+        query.addCriteria((CriteriaDefinition)Criteria.where("workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         if (since.isPresent() || until.isPresent()) {
             Criteria tsCriteria = Criteria.where("timestamp");
             if (since.isPresent()) {
@@ -151,9 +154,9 @@ public class HipaaAuditService {
 
     }
 
-    public record HipaaAuditEvent(AuditEventType eventType, String username, String userId, String ipAddress, Map<String, Object> details, Instant timestamp, String id) {
-        public HipaaAuditEvent(AuditEventType eventType, String username, String userId, String ipAddress, Map<String, Object> details) {
-            this(eventType, username, userId, ipAddress, details, Instant.now(), null);
+    public record HipaaAuditEvent(AuditEventType eventType, String username, String userId, String ipAddress, String workspaceId, Map<String, Object> details, Instant timestamp, String id) {
+        public HipaaAuditEvent(AuditEventType eventType, String username, String userId, String ipAddress, String workspaceId, Map<String, Object> details) {
+            this(eventType, username, userId, ipAddress, workspaceId, details, Instant.now(), null);
         }
     }
 }

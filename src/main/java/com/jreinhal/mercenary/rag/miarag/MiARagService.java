@@ -4,6 +4,7 @@ import com.jreinhal.mercenary.rag.miarag.MindscapeBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,6 +63,7 @@ public class MiARagService {
         long startTime = System.currentTimeMillis();
         log.info("MiA-RAG: Building mindscape for '{}' with {} chunks", filename, chunks.size());
         try {
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
             ArrayList<List<String>> hierarchy = new ArrayList<List<String>>();
             hierarchy.add(chunks);
             List<String> currentLevel = chunks;
@@ -74,11 +76,12 @@ public class MiARagService {
             }
             String documentMindscape = currentLevel.isEmpty() ? "" : currentLevel.get(0);
             List<String> keyConcepts = this.mindscapeBuilder.extractKeyConcepts(documentMindscape);
-            Mindscape mindscape = new Mindscape(UUID.randomUUID().toString(), filename, department, documentMindscape, hierarchy, keyConcepts, chunks.size(), System.currentTimeMillis());
+            Mindscape mindscape = new Mindscape(UUID.randomUUID().toString(), filename, department, workspaceId, documentMindscape, hierarchy, keyConcepts, chunks.size(), System.currentTimeMillis());
             this.mongoTemplate.save(mindscape, MINDSCAPE_COLLECTION);
             Document mindscapeDoc = new Document(documentMindscape);
             mindscapeDoc.getMetadata().put("source", filename);
             mindscapeDoc.getMetadata().put("dept", department);
+            mindscapeDoc.getMetadata().put("workspaceId", workspaceId);
             mindscapeDoc.getMetadata().put("type", "mindscape");
             mindscapeDoc.getMetadata().put("mindscapeId", mindscape.id());
             mindscapeDoc.getMetadata().put("keyConcepts", String.join((CharSequence)", ", keyConcepts));
@@ -95,22 +98,24 @@ public class MiARagService {
 
     public MindscapeRetrievalResult retrieve(String query, String department) {
         if (!this.enabled) {
-            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
             return new MindscapeRetrievalResult(docs, null, List.of());
         }
         long startTime = System.currentTimeMillis();
-        List<Document> mindscapeDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(3).withSimilarityThreshold(0.4).withFilterExpression(FilterExpressionBuilder.forDepartmentAndType(department, "mindscape")));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        List<Document> mindscapeDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(3).withSimilarityThreshold(0.4).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceAndType(department, workspaceId, "mindscape")));
         ArrayList<Mindscape> relevantMindscapes = new ArrayList<Mindscape>();
         for (Document doc : mindscapeDocs) {
             Query q;
             Mindscape ms;
             String mindscapeId = (String)doc.getMetadata().get("mindscapeId");
-            if (mindscapeId == null || (ms = (Mindscape)this.mongoTemplate.findOne(q = new Query((CriteriaDefinition)Criteria.where((String)"id").is(mindscapeId)), Mindscape.class, MINDSCAPE_COLLECTION)) == null) continue;
+            if (mindscapeId == null || (ms = (Mindscape)this.mongoTemplate.findOne(q = new Query((CriteriaDefinition)Criteria.where((String)"id").is(mindscapeId).and("workspaceId").is(workspaceId)), Mindscape.class, MINDSCAPE_COLLECTION)) == null) continue;
             relevantMindscapes.add(ms);
         }
         String globalContext = this.buildGlobalContext(relevantMindscapes);
         Set<String> relevantSources = relevantMindscapes.stream().map(Mindscape::filename).collect(Collectors.toSet());
-        List<Document> localDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.25).withFilterExpression(FilterExpressionBuilder.forDepartmentExcludingType(department, "mindscape")));
+        List<Document> localDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.25).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceExcludingType(department, workspaceId, "mindscape")));
         ArrayList<ScoredChunk> scoredChunks = new ArrayList<ScoredChunk>();
         for (int i = 0; i < localDocs.size(); ++i) {
             Document doc = localDocs.get(i);
@@ -173,7 +178,7 @@ public class MiARagService {
     }
 
     public Mindscape getMindscape(String filename, String department) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"filename").is(filename).and("department").is(department));
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"filename").is(filename).and("department").is(department).and("workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         return (Mindscape)this.mongoTemplate.findOne(query, Mindscape.class, MINDSCAPE_COLLECTION);
     }
 
@@ -181,7 +186,7 @@ public class MiARagService {
         return this.enabled;
     }
 
-    public record Mindscape(String id, String filename, String department, String documentSummary, List<List<String>> hierarchy, List<String> keyConcepts, int chunkCount, long timestamp) {
+    public record Mindscape(String id, String filename, String department, String workspaceId, String documentSummary, List<List<String>> hierarchy, List<String> keyConcepts, int chunkCount, long timestamp) {
     }
 
     public record MindscapeRetrievalResult(List<Document> localDocs, String globalContext, List<Mindscape> mindscapes) {

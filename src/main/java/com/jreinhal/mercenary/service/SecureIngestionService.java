@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
 import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -76,6 +77,7 @@ public class SecureIngestionService {
             List<Document> rawDocuments;
             String filename = file.getOriginalFilename();
             log.info("Initiating RAGPart Defense Protocol for: {} [Sector: {}]", filename, dept);
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
             boolean hipaaStrict = this.hipaaPolicy.isStrict(dept);
             byte[] fileBytes = file.getBytes();
             String detectedMimeType = this.detectMimeType(fileBytes, filename);
@@ -127,6 +129,7 @@ public class SecureIngestionService {
                 java.util.Map<String, Object> cleanMeta = new java.util.HashMap<>();
                 cleanMeta.put("source", filename);
                 cleanMeta.put("dept", dept.name());
+                cleanMeta.put("workspaceId", workspaceId);
                 cleanMeta.put("mimeType", detectedMimeType);
                 cleanDocs.add(new Document(doc.getContent(), cleanMeta));
             }

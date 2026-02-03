@@ -7,4 +7,6 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 public interface ChatLogRepository
 extends MongoRepository<ChatLog, String> {
     public List<ChatLog> findByDepartmentOrderByTimestampAsc(String var1);
+
+    public List<ChatLog> findByDepartmentAndWorkspaceIdOrderByTimestampAsc(String department, String workspaceId);
 }

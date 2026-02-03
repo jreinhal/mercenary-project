@@ -20,6 +20,8 @@ public class Feedback {
     private String userId;
     private String username;
     @Indexed
+    private String workspaceId;
+    @Indexed
     private String sector;
     private String sessionId;
     @Indexed
@@ -70,10 +72,11 @@ public class Feedback {
         return fb;
     }
 
-    public Feedback withUserContext(String username, String sector, String sessionId) {
+    public Feedback withUserContext(String username, String sector, String sessionId, String workspaceId) {
         this.username = username;
         this.sector = sector;
         this.sessionId = sessionId;
+        this.workspaceId = workspaceId;
         return this;
     }
 
@@ -131,6 +134,10 @@ public class Feedback {
 
     public String getUsername() {
         return this.username;
+    }
+
+    public String getWorkspaceId() {
+        return this.workspaceId;
     }
 
     public String getSector() {
@@ -223,6 +230,10 @@ public class Feedback {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public void setWorkspaceId(String workspaceId) {
+        this.workspaceId = workspaceId;
     }
 
     public void setSector(String sector) {

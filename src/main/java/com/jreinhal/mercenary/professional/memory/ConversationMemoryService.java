@@ -16,6 +16,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.CriteriaDefinition;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 
 @Service
 public class ConversationMemoryService {
@@ -42,7 +43,7 @@ public class ConversationMemoryService {
     }
 
     private void saveMessage(String userId, String sessionId, MessageRole role, String content, Map<String, Object> metadata) {
-        ConversationMessage message = new ConversationMessage(UUID.randomUUID().toString(), userId, sessionId, role, content, Instant.now(), metadata);
+        ConversationMessage message = new ConversationMessage(UUID.randomUUID().toString(), userId, sessionId, WorkspaceContext.getCurrentWorkspaceId(), role, content, Instant.now(), metadata);
         try {
             this.mongoTemplate.save(message, COLLECTION_NAME);
             log.debug("Saved {} message for user {} in session {}", new Object[]{role, userId, sessionId});
@@ -65,6 +66,7 @@ public class ConversationMemoryService {
         Query query = new Query();
         query.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is(userId));
         query.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         query.addCriteria((CriteriaDefinition)Criteria.where((String)"timestamp").gte(cutoff));
         query.limit(10);
         query.with(Sort.by((Sort.Direction)Sort.Direction.DESC, (String[])new String[]{"timestamp"}));
@@ -102,6 +104,7 @@ public class ConversationMemoryService {
         Query countQuery = new Query();
         countQuery.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is(userId));
         countQuery.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
+        countQuery.addCriteria((CriteriaDefinition)Criteria.where((String)"workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         try {
             long count = this.mongoTemplate.count(countQuery, COLLECTION_NAME);
             metadata.put("messageCount", count);
@@ -158,6 +161,7 @@ public class ConversationMemoryService {
         Query query = new Query();
         query.addCriteria((CriteriaDefinition)Criteria.where((String)"userId").is(userId));
         query.addCriteria((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         try {
             this.mongoTemplate.remove(query, COLLECTION_NAME);
             log.info("Cleared conversation history for user {} session {}", userId, sessionId);
@@ -197,7 +201,7 @@ public class ConversationMemoryService {
 
     }
 
-    public record ConversationMessage(String id, String userId, String sessionId, MessageRole role, String content, Instant timestamp, Map<String, Object> metadata) {
+    public record ConversationMessage(String id, String userId, String sessionId, String workspaceId, MessageRole role, String content, Instant timestamp, Map<String, Object> metadata) {
     }
 
     public record ConversationContext(List<ConversationMessage> recentMessages, List<String> activeTopics, Map<String, Object> sessionMetadata, String formattedContext) {

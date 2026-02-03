@@ -9,6 +9,7 @@ import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
 import com.jreinhal.mercenary.reasoning.ReasoningTrace;
 import com.jreinhal.mercenary.service.HipaaPolicy;
 import com.jreinhal.mercenary.service.IntegritySigner;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import com.mongodb.client.result.DeleteResult;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
@@ -92,13 +93,14 @@ public class SessionPersistenceService {
 
     public ActiveSession touchSession(String userId, String sessionId, String department) {
         ActiveSession session;
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId).and("workspaceId").is(workspaceId));
         ActiveSession existing = (ActiveSession)this.mongoTemplate.findOne(query, ActiveSession.class, SESSIONS_COLLECTION);
         if (existing == null) {
-            session = new ActiveSession(sessionId, userId, department, Instant.now(), Instant.now(), 0, 0, new ArrayList<String>(), new HashMap<String, Object>());
+            session = new ActiveSession(sessionId, userId, workspaceId, department, Instant.now(), Instant.now(), 0, 0, new ArrayList<String>(), new HashMap<String, Object>());
             log.info("Created new session: {} for user: {}", sessionId, userId);
         } else {
-            session = new ActiveSession(existing.sessionId(), existing.userId(), existing.department(), existing.createdAt(), Instant.now(), existing.messageCount(), existing.traceCount(), existing.traceIds(), existing.metadata());
+            session = new ActiveSession(existing.sessionId(), existing.userId(), existing.workspaceId(), existing.department(), existing.createdAt(), Instant.now(), existing.messageCount(), existing.traceCount(), existing.traceIds(), existing.metadata());
         }
         this.mongoTemplate.save(session, SESSIONS_COLLECTION);
         return session;
@@ -109,19 +111,21 @@ public class SessionPersistenceService {
     }
 
     public Optional<ActiveSession> getSession(String sessionId) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId).and("workspaceId").is(workspaceId));
         ActiveSession session = (ActiveSession)this.mongoTemplate.findOne(query, ActiveSession.class, SESSIONS_COLLECTION);
         return Optional.ofNullable(session);
     }
 
     public List<ActiveSession> getUserSessions(String userId) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"userId").is(userId));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"userId").is(userId).and("workspaceId").is(workspaceId));
         return this.mongoTemplate.find(query, ActiveSession.class, SESSIONS_COLLECTION);
     }
 
     public void incrementMessageCount(String sessionId) {
         this.getSession(sessionId).ifPresent(session -> {
-            ActiveSession updated = new ActiveSession(session.sessionId(), session.userId(), session.department(), session.createdAt(), Instant.now(), session.messageCount() + 1, session.traceCount(), session.traceIds(), session.metadata());
+            ActiveSession updated = new ActiveSession(session.sessionId(), session.userId(), session.workspaceId(), session.department(), session.createdAt(), Instant.now(), session.messageCount() + 1, session.traceCount(), session.traceIds(), session.metadata());
             this.mongoTemplate.save(updated, SESSIONS_COLLECTION);
         });
     }
@@ -134,7 +138,7 @@ public class SessionPersistenceService {
             log.info("HIPAA strict: skipping trace persistence for {}", trace.getTraceId());
             return;
         }
-        PersistedTrace unsigned = new PersistedTrace(trace.getTraceId(), sessionId, trace.getUserId(), trace.getDepartment(), trace.getQuery(), trace.getTimestamp(), trace.getTotalDurationMs(), trace.getSteps().size(), trace.getSteps().stream().map(step -> Map.of("type", step.type().name(), "label", step.label(), "detail", step.detail() != null ? step.detail() : "", "durationMs", step.durationMs(), "data", step.data() != null ? step.data() : Map.of())).toList(), trace.getMetrics(), trace.isCompleted(), null, null);
+        PersistedTrace unsigned = new PersistedTrace(trace.getTraceId(), sessionId, trace.getUserId(), trace.getWorkspaceId(), trace.getDepartment(), trace.getQuery(), trace.getTimestamp(), trace.getTotalDurationMs(), trace.getSteps().size(), trace.getSteps().stream().map(step -> Map.of("type", step.type().name(), "label", step.label(), "detail", step.detail() != null ? step.detail() : "", "durationMs", step.durationMs(), "data", step.data() != null ? step.data() : Map.of())).toList(), trace.getMetrics(), trace.isCompleted(), null, null);
         PersistedTrace persisted = this.attachIntegrity(unsigned);
         try {
             this.mongoTemplate.save(persisted, TRACES_COLLECTION);
@@ -156,7 +160,7 @@ public class SessionPersistenceService {
             if (traceIds.size() > this.maxTracesPerSession) {
                 traceIds = traceIds.subList(traceIds.size() - this.maxTracesPerSession, traceIds.size());
             }
-            ActiveSession updated = new ActiveSession(session.sessionId(), session.userId(), session.department(), session.createdAt(), Instant.now(), session.messageCount(), traceIds.size(), traceIds, session.metadata());
+            ActiveSession updated = new ActiveSession(session.sessionId(), session.userId(), session.workspaceId(), session.department(), session.createdAt(), Instant.now(), session.messageCount(), traceIds.size(), traceIds, session.metadata());
             this.mongoTemplate.save(updated, SESSIONS_COLLECTION);
         });
     }
@@ -176,13 +180,15 @@ public class SessionPersistenceService {
     }
 
     public Optional<PersistedTrace> getPersistedTrace(String traceId) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"traceId").is(traceId));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"traceId").is(traceId).and("workspaceId").is(workspaceId));
         PersistedTrace trace = (PersistedTrace)this.mongoTemplate.findOne(query, PersistedTrace.class, TRACES_COLLECTION);
         return Optional.ofNullable(trace);
     }
 
     public List<PersistedTrace> getSessionTraces(String sessionId) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(sessionId).and("workspaceId").is(workspaceId));
         query.with(Sort.by((Sort.Direction)Sort.Direction.ASC, (String[])new String[]{"timestamp"}));
         return this.mongoTemplate.find(query, PersistedTrace.class, TRACES_COLLECTION);
     }
@@ -205,7 +211,7 @@ public class SessionPersistenceService {
         summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
         summary.put("averageResponseTime", traces.isEmpty() ? 0.0 : traces.stream().mapToLong(PersistedTrace::durationMs).average().orElse(0.0));
         summary.put("topicsDiscussed", context.activeTopics());
-        SessionExport unsigned = new SessionExport(sessionId, userId, session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary, null, null);
+        SessionExport unsigned = new SessionExport(sessionId, userId, session.workspaceId(), session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary, null, null);
         SessionExport export = this.attachIntegrity(unsigned);
         String filename = String.format("session_%s_%s.json", sessionId, FILE_DATE_FORMAT.format(Instant.now()));
         Path exportPath = Paths.get(this.sessionDataDir, "exports", filename);
@@ -232,7 +238,7 @@ public class SessionPersistenceService {
         HashMap<String, Object> summary = new HashMap<String, Object>();
         summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
         summary.put("topicsDiscussed", context.activeTopics());
-        SessionExport unsigned = new SessionExport(sessionId, userId, session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary, null, null);
+        SessionExport unsigned = new SessionExport(sessionId, userId, session.workspaceId(), session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary, null, null);
         SessionExport export = this.attachIntegrity(unsigned);
         return this.objectMapper.writeValueAsString(export);
     }
@@ -240,14 +246,16 @@ public class SessionPersistenceService {
     @Scheduled(fixedRate=3600000L)
     public void archiveInactiveSessions() {
         Instant cutoff = Instant.now().minusSeconds((long)this.sessionTimeoutMinutes * 60L);
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"lastActivityAt").lt(cutoff));
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"lastActivityAt").lt(cutoff)
+                .and("workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         List<ActiveSession> inactiveSessions = this.mongoTemplate.find(query, ActiveSession.class, SESSIONS_COLLECTION);
         for (ActiveSession session : inactiveSessions) {
             try {
                 if (this.fileBackupEnabled && !this.hipaaPolicy.shouldDisableSessionExport(this.safeDepartment(session.department()))) {
                     this.exportSession(session.sessionId(), session.userId());
                 }
-                this.mongoTemplate.remove(new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(session.sessionId())), SESSIONS_COLLECTION);
+                this.mongoTemplate.remove(new Query((CriteriaDefinition)Criteria.where((String)"sessionId").is(session.sessionId())
+                        .and("workspaceId").is(session.workspaceId())), SESSIONS_COLLECTION);
                 log.info("Archived inactive session: {}", session.sessionId());
             }
             catch (Exception e) {
@@ -262,7 +270,8 @@ public class SessionPersistenceService {
     @Scheduled(cron="0 0 2 * * *")
     public void purgeOldTraces() {
         Instant cutoff = Instant.now().minusSeconds((long)this.traceRetentionHours * 3600L);
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"timestamp").lt(cutoff));
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"timestamp").lt(cutoff)
+                .and("workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         try {
             DeleteResult result = this.mongoTemplate.remove(query, TRACES_COLLECTION);
             long deleted = result.getDeletedCount();
@@ -307,8 +316,9 @@ public class SessionPersistenceService {
     public Map<String, Object> getStatistics() {
         HashMap<String, Object> stats = new HashMap<String, Object>();
         try {
-            long activeSessions = this.mongoTemplate.count(new Query(), SESSIONS_COLLECTION);
-            long totalTraces = this.mongoTemplate.count(new Query(), TRACES_COLLECTION);
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            long activeSessions = this.mongoTemplate.count(new Query(Criteria.where("workspaceId").is(workspaceId)), SESSIONS_COLLECTION);
+            long totalTraces = this.mongoTemplate.count(new Query(Criteria.where("workspaceId").is(workspaceId)), TRACES_COLLECTION);
             stats.put("activeSessions", activeSessions);
             stats.put("totalPersistedTraces", totalTraces);
             stats.put("traceRetentionHours", this.traceRetentionHours);
@@ -322,13 +332,13 @@ public class SessionPersistenceService {
         return stats;
     }
 
-    public record ActiveSession(String sessionId, String userId, String department, Instant createdAt, Instant lastActivityAt, int messageCount, int traceCount, List<String> traceIds, Map<String, Object> metadata) {
+    public record ActiveSession(String sessionId, String userId, String workspaceId, String department, Instant createdAt, Instant lastActivityAt, int messageCount, int traceCount, List<String> traceIds, Map<String, Object> metadata) {
     }
 
-    public record PersistedTrace(String traceId, String sessionId, String userId, String department, String query, Instant timestamp, long durationMs, int stepCount, List<Map<String, Object>> steps, Map<String, Object> metrics, boolean completed, String integrityHash, String integrityKeyId) {
+    public record PersistedTrace(String traceId, String sessionId, String userId, String workspaceId, String department, String query, Instant timestamp, long durationMs, int stepCount, List<Map<String, Object>> steps, Map<String, Object> metrics, boolean completed, String integrityHash, String integrityKeyId) {
     }
 
-    public record SessionExport(String sessionId, String userId, String department, Instant startTime, Instant endTime, int totalMessages, int totalTraces, List<ConversationMemoryService.ConversationMessage> messages, List<PersistedTrace> traces, Map<String, Object> summary, String integrityHash, String integrityKeyId) {
+    public record SessionExport(String sessionId, String userId, String workspaceId, String department, Instant startTime, Instant endTime, int totalMessages, int totalTraces, List<ConversationMemoryService.ConversationMessage> messages, List<PersistedTrace> traces, Map<String, Object> summary, String integrityHash, String integrityKeyId) {
     }
 
     private PersistedTrace attachIntegrity(PersistedTrace unsigned) {
@@ -338,7 +348,7 @@ public class SessionPersistenceService {
         try {
             String payload = this.objectMapper.writeValueAsString(unsigned);
             IntegritySigner.Signature signature = this.integritySigner.signWithKeyId(payload);
-            return new PersistedTrace(unsigned.traceId(), unsigned.sessionId(), unsigned.userId(), unsigned.department(), unsigned.query(), unsigned.timestamp(), unsigned.durationMs(), unsigned.stepCount(), unsigned.steps(), unsigned.metrics(), unsigned.completed(), signature.signature(), signature.keyId());
+            return new PersistedTrace(unsigned.traceId(), unsigned.sessionId(), unsigned.userId(), unsigned.workspaceId(), unsigned.department(), unsigned.query(), unsigned.timestamp(), unsigned.durationMs(), unsigned.stepCount(), unsigned.steps(), unsigned.metrics(), unsigned.completed(), signature.signature(), signature.keyId());
         } catch (IOException e) {
             throw new IllegalStateException("Failed to sign trace integrity payload", e);
         }
@@ -351,7 +361,7 @@ public class SessionPersistenceService {
         try {
             String payload = this.objectMapper.writeValueAsString(unsigned);
             IntegritySigner.Signature signature = this.integritySigner.signWithKeyId(payload);
-            return new SessionExport(unsigned.sessionId(), unsigned.userId(), unsigned.department(), unsigned.startTime(), unsigned.endTime(), unsigned.totalMessages(), unsigned.totalTraces(), unsigned.messages(), unsigned.traces(), unsigned.summary(), signature.signature(), signature.keyId());
+            return new SessionExport(unsigned.sessionId(), unsigned.userId(), unsigned.workspaceId(), unsigned.department(), unsigned.startTime(), unsigned.endTime(), unsigned.totalMessages(), unsigned.totalTraces(), unsigned.messages(), unsigned.traces(), unsigned.summary(), signature.signature(), signature.keyId());
         } catch (IOException e) {
             throw new IllegalStateException("Failed to sign session export integrity payload", e);
         }
