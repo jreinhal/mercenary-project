@@ -41,6 +41,8 @@ class SecureIngestionServiceTest {
 
     @Mock
     private HipaaPolicy hipaaPolicy;
+    @Mock
+    private com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
 
     private SecureIngestionService ingestionService;
 
@@ -53,7 +55,7 @@ class SecureIngestionServiceTest {
         when(lightOnOcrService.isEnabled()).thenReturn(false);
         when(hipaaPolicy.isStrict(any(Department.class))).thenReturn(false);
         when(hipaaPolicy.shouldDisableVisual(any(Department.class))).thenReturn(false);
-        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService, hipaaPolicy);
+        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService, hipaaPolicy, workspaceQuotaService);
     }
 
     @Test

@@ -81,6 +81,10 @@ Goal: Add tenant-level quotas and export/reporting controls.
 - Per-workspace audit export.
 - Workspace-scoped connector sync.
 
+Implementation status (2026-02-03):
+- Per-workspace quota enforcement (documents/queries/storage) added.
+- Storage is tracked via per-source fileSizeBytes metadata in vector store.
+
 ## Migration Plan
 - Backfill all existing records with `workspace_default`.
 - Force all users to `workspace_default`.
