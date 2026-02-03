@@ -300,6 +300,11 @@
             return localStorage.getItem('workspaceId') || 'workspace_default';
         }
 
+        function setWorkspaceId(workspaceId) {
+            if (!workspaceId) return;
+            localStorage.setItem('workspaceId', workspaceId);
+        }
+
         async function guardedFetch(url, options = {}) {
             const workspaceId = getWorkspaceId();
             const mergedHeaders = { ...(options.headers || {}), 'X-Workspace-Id': workspaceId };
@@ -770,6 +775,8 @@
                     if (!userContext.isAdmin && userContext.allowedSectors && userContext.allowedSectors.length > 0) {
                         filterSectorDropdown(userContext.allowedSectors);
                     }
+
+                    await initWorkspaceSelector();
                 }
             } catch (error) {
                 if (error && error.code === 'auth') {
@@ -813,6 +820,74 @@
             initEvalHarness();
             refreshConnectorStatus();
             refreshCaseLibrary();
+        }
+
+        async function initWorkspaceSelector() {
+            const workspaceSection = document.getElementById('workspace-section');
+            const workspaceSelect = document.getElementById('workspace-select');
+            const workspaceHint = document.getElementById('workspace-hint');
+
+            if (!workspaceSection || !workspaceSelect) return;
+
+            if (isRegulatedEdition()) {
+                setWorkspaceId('workspace_default');
+                workspaceSection.classList.add('hidden');
+                return;
+            }
+
+            let workspaces = [];
+            try {
+                const response = await guardedFetch(`${API_BASE}/workspaces`);
+                if (response.ok) {
+                    workspaces = await response.json();
+                }
+            } catch (error) {
+                if (error && error.code === 'auth') {
+                    return;
+                }
+                console.warn('Could not fetch workspace list:', error);
+            }
+
+            if (!Array.isArray(workspaces) || workspaces.length === 0) {
+                workspaceSection.classList.add('hidden');
+                return;
+            }
+
+            workspaceSelect.innerHTML = '';
+            workspaces.forEach(workspace => {
+                const option = document.createElement('option');
+                option.value = workspace.id;
+                option.textContent = workspace.name || workspace.id;
+                workspaceSelect.appendChild(option);
+            });
+
+            let selectedWorkspace = getWorkspaceId();
+            if (!workspaces.some(ws => ws.id === selectedWorkspace)) {
+                selectedWorkspace = workspaces[0].id;
+                setWorkspaceId(selectedWorkspace);
+            }
+            workspaceSelect.value = selectedWorkspace;
+
+            if (workspaceHint) {
+                workspaceHint.textContent = workspaces.length > 1
+                    ? `${workspaces.length} workspaces available`
+                    : 'Single workspace';
+            }
+
+            workspaceSection.classList.remove('hidden');
+
+            workspaceSelect.addEventListener('change', () => {
+                const nextWorkspace = workspaceSelect.value;
+                if (!nextWorkspace || nextWorkspace === getWorkspaceId()) {
+                    return;
+                }
+                setWorkspaceId(nextWorkspace);
+                resetDashboardState();
+                loadConversationHistory();
+                renderSavedQueriesList();
+                refreshCaseLibrary();
+                refreshConnectorStatus();
+            });
         }
 
         function filterSectorDropdown(allowedSectors) {
@@ -971,7 +1046,8 @@
         function getScopedStorageKey(baseKey) {
             const userId = localStorage.getItem('sentinel_operator') || 'DEMO_USER';
             const sector = sectorSelect?.value || localStorage.getItem('sentinel-sector') || 'ENTERPRISE';
-            return `${baseKey}_${userId}_${sector}`;
+            const workspace = getWorkspaceId();
+            return `${baseKey}_${userId}_${sector}_${workspace}`;
         }
 
         function createCaseForSession(sessionId, seedTitle) {

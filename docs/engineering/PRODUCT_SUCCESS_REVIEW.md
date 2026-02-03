@@ -85,6 +85,7 @@ Recommended inspirations:
 ### In Progress (Strategic)
 - Workspace isolation Phase 1 implemented (workspaceId tagging + query filters + header-based selection; UI switcher pending).
 - Workspace management APIs (Phase 2) implemented (create/list/membership; non-regulated only).
+- Workspace selector added to Settings sidebar (Phase 3 partial; regulated editions hidden).
 - Connector marketplace API added (admin-only catalog endpoint).
 - Compliance/executive reporting pack added (admin-only executive report endpoint).
 
