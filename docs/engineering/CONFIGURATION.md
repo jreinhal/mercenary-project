@@ -133,6 +133,13 @@ The **Entity Network** tab in the right panel only appears when Deep Analysis is
 - SENTINEL_WORKSPACE_DEFAULT_ID (default: workspace_default)
 - Request header: X-Workspace-Id (ignored in Medical/Government unless allow-regulated=true)
 
+Workspace management APIs (admin-only; non-regulated editions):
+- GET /api/workspaces
+- POST /api/workspaces
+- GET /api/workspaces/{id}/members
+- POST /api/workspaces/{id}/members
+- DELETE /api/workspaces/{id}/members/{userId}
+
 ## Connectors (admin-only)
 - SENTINEL_CONNECTORS_ENABLED (default: true; disabled in govcloud profile)
 - SENTINEL_CONNECTORS_ALLOW_REGULATED (default: false)

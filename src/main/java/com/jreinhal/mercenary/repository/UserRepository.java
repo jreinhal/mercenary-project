@@ -16,4 +16,8 @@ extends MongoRepository<User, String> {
     public Optional<User> findByEmail(String var1);
 
     public List<User> findByActiveTrue();
+
+    public List<User> findByWorkspaceIdsContaining(String var1);
+
+    public long countByWorkspaceIdsContaining(String var1);
 }

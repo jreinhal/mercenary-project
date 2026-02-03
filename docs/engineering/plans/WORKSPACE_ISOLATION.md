@@ -57,6 +57,12 @@ Security rules:
 - Only ADMIN can create/delete workspaces.
 - Users must be explicit members to access workspace data.
 
+Implementation status (2026-02-03):
+- API endpoints implemented with edition gating (disabled for Medical/Gov by default).
+- Workspace metadata persisted in `workspaces` collection.
+- Member add/remove updates user workspaceIds.
+- UI switcher remains Phase 3.
+
 ## Phase 3 (UI Workspace Switcher)
 Goal: Provide workspace switcher and scoped UI contexts.
 
