@@ -108,6 +108,15 @@
         </div>
         <div class="sidebar-content">
             <!-- Active Sector -->
+            <div class="sidebar-section hidden" id="workspace-section">
+                <div class="sidebar-section-title">Active Workspace</div>
+                <p class="settings-description">Select the tenant workspace to use.</p>
+                <select class="sector-select workspace-select" id="workspace-select" aria-label="Select Workspace">
+                    <!-- Populated dynamically -->
+                </select>
+                <div class="settings-hint" id="workspace-hint"></div>
+            </div>
+
             <div class="sidebar-section" id="sector-section">
                 <div class="sidebar-section-title">Active Sector</div>
                 <p class="settings-description">Select the document collection to search within.</p>

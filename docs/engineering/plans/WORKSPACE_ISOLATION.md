@@ -70,6 +70,10 @@ Goal: Provide workspace switcher and scoped UI contexts.
 - Persist last workspace selection in local storage per user.
 - Disable cross-workspace case sharing.
 
+Implementation status (2026-02-03):
+- Workspace selector added to Settings sidebar for non-regulated editions.
+- Local storage keys for conversations/saved queries now include workspace id.
+
 ## Phase 4 (Operational Controls)
 Goal: Add tenant-level quotas and export/reporting controls.
 
