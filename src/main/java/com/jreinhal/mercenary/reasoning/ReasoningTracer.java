@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 
 @Component
 public class ReasoningTracer {
@@ -28,7 +29,7 @@ public class ReasoningTracer {
         if (!this.enabled) {
             return null;
         }
-        ReasoningTrace trace = new ReasoningTrace(query, department, userId);
+        ReasoningTrace trace = new ReasoningTrace(query, department, userId, WorkspaceContext.getCurrentWorkspaceId());
         this.currentTrace.set(trace);
         log.debug("Started reasoning trace: {} for user: {}", trace.getTraceId(), userId);
         return trace;

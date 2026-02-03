@@ -5,6 +5,7 @@ import com.jreinhal.mercenary.rag.megarag.VisualEntityLinker;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,12 +77,13 @@ public class MegaRagService {
         }
         long startTime = System.currentTimeMillis();
         try {
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
             ImageAnalysis analysis = this.imageAnalyzer.analyze(imageBytes, filename);
             List<VisualEntity> visualEntities = analysis.entities();
-            VisualNode node = new VisualNode(UUID.randomUUID().toString(), filename, analysis.imageType(), analysis.description(), analysis.extractedText(), visualEntities.stream().map(VisualEntity::name).toList(), department, System.currentTimeMillis());
+            VisualNode node = new VisualNode(UUID.randomUUID().toString(), filename, analysis.imageType(), analysis.description(), analysis.extractedText(), visualEntities.stream().map(VisualEntity::name).toList(), department, workspaceId, System.currentTimeMillis());
             this.mongoTemplate.save(node, VISUAL_NODES_COLLECTION);
             if (contextText != null && !contextText.isBlank()) {
-                List<CrossModalEdge> edges = this.visualEntityLinker.linkEntities(visualEntities, contextText, node.id());
+                List<CrossModalEdge> edges = this.visualEntityLinker.linkEntities(visualEntities, contextText, node.id(), workspaceId);
                 for (CrossModalEdge edge : edges) {
                     this.mongoTemplate.save(edge, CROSS_MODAL_EDGES_COLLECTION);
                 }
@@ -89,6 +91,7 @@ public class MegaRagService {
             Document visualDoc = new Document(analysis.description());
             visualDoc.getMetadata().put("source", filename);
             visualDoc.getMetadata().put("dept", department);
+            visualDoc.getMetadata().put("workspaceId", workspaceId);
             visualDoc.getMetadata().put("type", "visual");
             visualDoc.getMetadata().put("imageType", analysis.imageType().name());
             visualDoc.getMetadata().put("visualNodeId", node.id());
@@ -115,9 +118,10 @@ public class MegaRagService {
             log.warn("MegaRAG: Invalid department '{}'", department);
             return new CrossModalRetrievalResult(List.of(), List.of(), List.of());
         }
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         long startTime = System.currentTimeMillis();
-        CompletableFuture<List<Document>> textFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentExcludingType(normalizedDept, "visual"))), this.ragExecutor);
-        CompletableFuture<List<Document>> visualFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndType(normalizedDept, "visual"))), this.ragExecutor);
+        CompletableFuture<List<Document>> textFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceExcludingType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
+        CompletableFuture<List<Document>> visualFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceAndType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
         List<Document> textDocs;
         List<Document> visualDocs;
         try {
@@ -157,7 +161,7 @@ public class MegaRagService {
         Set<String> visualNodeIds = visualDocs.stream().map(d -> (String)d.getMetadata().get("visualNodeId")).filter(Objects::nonNull).collect(Collectors.toSet());
         List<CrossModalEdge> relevantEdges = new ArrayList<>();
         if (!visualNodeIds.isEmpty()) {
-            Query edgeQuery = new Query((CriteriaDefinition)Criteria.where((String)"visualNodeId").in(visualNodeIds));
+            Query edgeQuery = new Query((CriteriaDefinition)Criteria.where((String)"visualNodeId").in(visualNodeIds).and("workspaceId").is(workspaceId));
             relevantEdges = this.mongoTemplate.find(edgeQuery, CrossModalEdge.class, CROSS_MODAL_EDGES_COLLECTION);
         }
         Set<String> linkedNodeIds = relevantEdges.stream().map(CrossModalEdge::visualNodeId).collect(Collectors.toSet());
@@ -245,7 +249,7 @@ public class MegaRagService {
     public record ImageAnalysis(ImageType imageType, String description, String extractedText, List<VisualEntity> entities, Map<String, Object> chartData) {
     }
 
-    public record VisualNode(String id, String filename, ImageType imageType, String description, String extractedText, List<String> entities, String department, long timestamp) {
+    public record VisualNode(String id, String filename, ImageType imageType, String description, String extractedText, List<String> entities, String department, String workspaceId, long timestamp) {
     }
 
     public static enum ImageType {
@@ -263,7 +267,7 @@ public class MegaRagService {
 
     }
 
-    public record CrossModalEdge(String id, String visualNodeId, String textEntityName, String visualEntityName, double similarity, String relationshipType) {
+    public record CrossModalEdge(String id, String visualNodeId, String textEntityName, String visualEntityName, double similarity, String relationshipType, String workspaceId) {
     }
 
     public record CrossModalRetrievalResult(List<Document> mergedResults, List<Document> visualDocs, List<CrossModalEdge> crossModalEdges) {

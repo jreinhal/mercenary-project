@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.casework;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.repository.UserRepository;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,9 +46,13 @@ public class CaseService {
     }
 
     public List<CaseRecord> listCases(User user) {
-        Query query = new Query(new Criteria().orOperator(
-            Criteria.where("ownerId").is(user.getId()),
-            Criteria.where("sharedWith").in(user.getId())
+        String workspaceId = currentWorkspaceId();
+        Query query = new Query(new Criteria().andOperator(
+            Criteria.where("workspaceId").is(workspaceId),
+            new Criteria().orOperator(
+                Criteria.where("ownerId").is(user.getId()),
+                Criteria.where("sharedWith").in(user.getId())
+            )
         ));
         query.with(Sort.by(Sort.Direction.DESC, "updatedAt"));
         return mongoTemplate.find(query, CaseRecord.class, COLLECTION);
@@ -55,7 +60,9 @@ public class CaseService {
 
     public Optional<CaseRecord> getCase(String caseId) {
         if (caseId == null || caseId.isBlank()) return Optional.empty();
-        CaseRecord record = mongoTemplate.findById(caseId, CaseRecord.class, COLLECTION);
+        String workspaceId = currentWorkspaceId();
+        Query query = new Query(Criteria.where("caseId").is(caseId).and("workspaceId").is(workspaceId));
+        CaseRecord record = mongoTemplate.findOne(query, CaseRecord.class, COLLECTION);
         return Optional.ofNullable(record);
     }
 
@@ -67,10 +74,18 @@ public class CaseService {
 
         String caseId = normalize(payload.caseId());
         CaseRecord existing = caseId != null ? mongoTemplate.findById(caseId, CaseRecord.class, COLLECTION) : null;
+        if (existing == null && caseId != null) {
+            Query collisionCheck = new Query(Criteria.where("caseId").is(caseId));
+            CaseRecord otherWorkspace = mongoTemplate.findOne(collisionCheck, CaseRecord.class, COLLECTION);
+            if (otherWorkspace != null) {
+                throw new SecurityException("Case belongs to another workspace");
+            }
+        }
         if (existing != null && !canAccess(user, existing)) {
             throw new SecurityException("Access denied");
         }
 
+        String workspaceId = currentWorkspaceId();
         String finalId = existing != null ? existing.caseId() : (caseId != null ? caseId : generateCaseId());
         String ownerId = existing != null ? existing.ownerId() : user.getId();
         boolean ownerOrAdmin = existing == null || isOwnerOrAdmin(user, existing);
@@ -122,6 +137,7 @@ public class CaseService {
         CaseRecord record = new CaseRecord(
             finalId,
             ownerId,
+            workspaceId,
             title,
             sector,
             status,
@@ -160,6 +176,7 @@ public class CaseService {
         CaseRecord updated = new CaseRecord(
             record.caseId(),
             record.ownerId(),
+            record.workspaceId(),
             record.title(),
             record.sector(),
             record.status(),
@@ -189,6 +206,7 @@ public class CaseService {
         CaseRecord updated = new CaseRecord(
             record.caseId(),
             record.ownerId(),
+            record.workspaceId(),
             record.title(),
             record.sector(),
             CaseRecord.CaseStatus.IN_REVIEW,
@@ -223,6 +241,7 @@ public class CaseService {
         CaseRecord updated = new CaseRecord(
             record.caseId(),
             record.ownerId(),
+            record.workspaceId(),
             record.title(),
             record.sector(),
             status,
@@ -330,6 +349,10 @@ public class CaseService {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String currentWorkspaceId() {
+        return WorkspaceContext.getCurrentWorkspaceId();
     }
 
     public record CasePayload(

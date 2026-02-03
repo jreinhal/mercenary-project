@@ -296,8 +296,14 @@
             return error;
         }
 
+        function getWorkspaceId() {
+            return localStorage.getItem('workspaceId') || 'workspace_default';
+        }
+
         async function guardedFetch(url, options = {}) {
-            const mergedOptions = { credentials: 'same-origin', ...options };
+            const workspaceId = getWorkspaceId();
+            const mergedHeaders = { ...(options.headers || {}), 'X-Workspace-Id': workspaceId };
+            const mergedOptions = { credentials: 'same-origin', ...options, headers: mergedHeaders };
             const response = await fetch(url, mergedOptions);
             if (response.status === 401) {
                 showAuthModal('Sign in to continue.');

@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class ChatLog {
     @Id
     private String id;
+    private String workspaceId;
     private String department;
     private String role;
     private String content;
@@ -16,7 +17,8 @@ public class ChatLog {
     public ChatLog() {
     }
 
-    public ChatLog(String department, String role, String content) {
+    public ChatLog(String workspaceId, String department, String role, String content) {
+        this.workspaceId = workspaceId;
         this.department = department;
         this.role = role;
         this.content = content;
@@ -29,6 +31,10 @@ public class ChatLog {
 
     public String getDepartment() {
         return this.department;
+    }
+
+    public String getWorkspaceId() {
+        return this.workspaceId;
     }
 
     public String getRole() {

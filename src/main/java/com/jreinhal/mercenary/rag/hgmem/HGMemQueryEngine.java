@@ -5,6 +5,7 @@ import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -62,13 +63,14 @@ public class HGMemQueryEngine {
         String docId;
         if (!deepAnalysis) {
             log.debug("HGMem deep analysis disabled, using vector search only");
-            List<Document> vectorResults = this.vectorSearch(query, department);
+            List<Document> vectorResults = this.vectorSearch(query, department, WorkspaceContext.getCurrentWorkspaceId());
             return new HGMemResult(vectorResults, List.of(), List.of(), 0);
         }
         long startTime = System.currentTimeMillis();
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         log.info("HGMem: Starting hybrid query for {}", LogSanitizer.querySummary(query));
         long vectorStart = System.currentTimeMillis();
-        List<Document> vectorResults = this.vectorSearch(query, department);
+        List<Document> vectorResults = this.vectorSearch(query, department, workspaceId);
         long vectorTime = System.currentTimeMillis() - vectorStart;
         log.debug("HGMem: Vector search returned {} results in {}ms", vectorResults.size(), vectorTime);
         long graphStart = System.currentTimeMillis();
@@ -101,9 +103,9 @@ public class HGMemQueryEngine {
         return new HGMemResult(finalResults, graphResult.matchedEntities(), new ArrayList<String>(graphResult.entityScores().keySet()), graphResult.nodesTraversed());
     }
 
-    private List<Document> vectorSearch(String query, String department) {
+    private List<Document> vectorSearch(String query, String department, String workspaceId) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.topK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.topK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
         }
         catch (Exception e) {
             log.error("Vector search failed", (Throwable)e);
@@ -116,6 +118,9 @@ public class HGMemQueryEngine {
         doc.getMetadata().put("source", chunk.getSourceDoc());
         doc.getMetadata().put("hgmem_node_id", chunk.getId());
         doc.getMetadata().put("dept", chunk.getDepartment());
+        if (chunk.getWorkspaceId() != null) {
+            doc.getMetadata().put("workspaceId", chunk.getWorkspaceId());
+        }
         return doc;
     }
 

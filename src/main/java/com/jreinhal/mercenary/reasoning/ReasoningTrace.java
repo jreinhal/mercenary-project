@@ -15,19 +15,21 @@ public class ReasoningTrace {
     private final String query;
     private final String department;
     private final String userId;
+    private final String workspaceId;
     private final List<ReasoningStep> steps;
     private final Map<String, Object> metrics;
     private long totalDurationMs;
     private boolean completed;
 
     public ReasoningTrace(String query, String department) {
-        this(query, department, null);
+        this(query, department, null, null);
     }
 
-    public ReasoningTrace(String query, String department, String userId) {
+    public ReasoningTrace(String query, String department, String userId, String workspaceId) {
         this.query = query;
         this.department = department;
         this.userId = userId;
+        this.workspaceId = workspaceId;
         this.steps = new ArrayList<ReasoningStep>();
         this.metrics = new LinkedHashMap<String, Object>();
         this.totalDurationMs = 0L;
@@ -36,6 +38,10 @@ public class ReasoningTrace {
 
     public String getUserId() {
         return this.userId;
+    }
+
+    public String getWorkspaceId() {
+        return this.workspaceId;
     }
 
     public void addStep(ReasoningStep step) {
@@ -89,6 +95,7 @@ public class ReasoningTrace {
         map.put("timestamp", this.timestamp.toString());
         map.put("query", this.query);
         map.put("department", this.department);
+        map.put("workspaceId", this.workspaceId);
         map.put("totalDurationMs", this.totalDurationMs);
         map.put("completed", this.completed);
         List<Map<String, Object>> stepMaps = new ArrayList<>();

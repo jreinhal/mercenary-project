@@ -5,6 +5,7 @@ import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -103,24 +104,28 @@ public class BidirectionalRagService {
         if (!this.enabled) {
             return List.of();
         }
-        Query mongoQuery = new Query((CriteriaDefinition)Criteria.where((String)"department").is(department).and("status").is("APPROVED"));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query mongoQuery = new Query((CriteriaDefinition)Criteria.where((String)"department").is(department)
+                .and("workspaceId").is(workspaceId)
+                .and("status").is("APPROVED"));
         mongoQuery.limit(limit * 3);
         List<Experience> candidates = this.mongoTemplate.find(mongoQuery, Experience.class, EXPERIENCE_STORE);
         if (candidates.isEmpty()) {
             return List.of();
         }
-        List<Document> experienceDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(limit).withSimilarityThreshold(0.5).withFilterExpression(FilterExpressionBuilder.forDepartmentAndType(department, "experience")));
+        List<Document> experienceDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(limit).withSimilarityThreshold(0.5).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceAndType(department, workspaceId, "experience")));
         Set<String> relevantIds = experienceDocs.stream().map(d -> (String)d.getMetadata().get("experienceId")).filter(Objects::nonNull).collect(Collectors.toSet());
         return candidates.stream().filter(e -> relevantIds.contains(e.id())).limit(limit).toList();
     }
 
     public boolean approveExperience(String experienceId, String approvedBy) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"id").is(experienceId));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"id").is(experienceId).and("workspaceId").is(workspaceId));
         Experience pending = (Experience)this.mongoTemplate.findOne(query, Experience.class, PENDING_EXPERIENCES);
         if (pending == null) {
             return false;
         }
-        Experience approved = new Experience(pending.id(), pending.query(), pending.response(), pending.sourceDocuments(), pending.department(), pending.userId(), pending.confidence(), "APPROVED", pending.createdAt(), System.currentTimeMillis(), approvedBy);
+        Experience approved = new Experience(pending.id(), pending.query(), pending.response(), pending.sourceDocuments(), pending.department(), pending.userId(), pending.workspaceId(), pending.confidence(), "APPROVED", pending.createdAt(), System.currentTimeMillis(), approvedBy);
         this.storeExperience(approved);
         this.mongoTemplate.remove(query, PENDING_EXPERIENCES);
         log.info("BiRAG: Experience {} approved by {}", experienceId, approvedBy);
@@ -128,7 +133,8 @@ public class BidirectionalRagService {
     }
 
     public boolean rejectExperience(String experienceId, String rejectedBy, String reason) {
-        Query query = new Query((CriteriaDefinition)Criteria.where((String)"id").is(experienceId));
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query query = new Query((CriteriaDefinition)Criteria.where((String)"id").is(experienceId).and("workspaceId").is(workspaceId));
         Update update = new Update().set("status", "REJECTED").set("reviewedAt", System.currentTimeMillis()).set("reviewedBy", rejectedBy).set("rejectionReason", reason);
         this.mongoTemplate.updateFirst(query, (UpdateDefinition)update, PENDING_EXPERIENCES);
         log.info("BiRAG: Experience {} rejected by {}: {}", new Object[]{experienceId, rejectedBy, reason});
@@ -136,8 +142,9 @@ public class BidirectionalRagService {
     }
 
     public List<Experience> getPendingExperiences(int limit) {
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         Query query = new Query().limit(limit);
-        query.addCriteria((CriteriaDefinition)Criteria.where((String)"status").is("PENDING"));
+        query.addCriteria((CriteriaDefinition)Criteria.where((String)"status").is("PENDING").and("workspaceId").is(workspaceId));
         return this.mongoTemplate.find(query, Experience.class, PENDING_EXPERIENCES);
     }
 
@@ -212,7 +219,8 @@ public class BidirectionalRagService {
 
     private Experience createExperience(String query, String response, List<Document> docs, String department, String userId, double confidence) {
         List<String> sources = docs.stream().map(d -> String.valueOf(d.getMetadata().getOrDefault("source", "unknown"))).distinct().toList();
-        return new Experience(UUID.randomUUID().toString(), query, response, sources, department, userId, confidence, "PENDING", System.currentTimeMillis(), null, null);
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        return new Experience(UUID.randomUUID().toString(), query, response, sources, department, userId, workspaceId, confidence, "PENDING", System.currentTimeMillis(), null, null);
     }
 
     private void storeExperience(Experience experience) {
@@ -220,6 +228,7 @@ public class BidirectionalRagService {
         Document expDoc = new Document(experience.query() + "\n\n" + experience.response());
         expDoc.getMetadata().put("experienceId", experience.id());
         expDoc.getMetadata().put("dept", experience.department());
+        expDoc.getMetadata().put("workspaceId", experience.workspaceId());
         expDoc.getMetadata().put("type", "experience");
         expDoc.getMetadata().put("confidence", experience.confidence());
         this.vectorStore.add(List.of(expDoc));
@@ -245,6 +254,6 @@ public class BidirectionalRagService {
     public record NoveltyResult(List<String> novelTerms, boolean hasHighRiskNovelty) {
     }
 
-    public record Experience(String id, String query, String response, List<String> sourceDocuments, String department, String userId, double confidence, String status, Long createdAt, Long reviewedAt, String reviewedBy) {
+    public record Experience(String id, String query, String response, List<String> sourceDocuments, String department, String userId, String workspaceId, double confidence, String status, Long createdAt, Long reviewedAt, String reviewedBy) {
     }
 }

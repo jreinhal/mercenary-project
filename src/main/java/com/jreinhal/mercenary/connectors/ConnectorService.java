@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.connectors;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,5 +40,30 @@ public class ConnectorService {
             statusMap.put(connector.getName(), status);
         }
         return results;
+    }
+
+    public List<ConnectorCatalogEntry> getCatalog() {
+        List<ConnectorStatus> statuses = getStatuses();
+        Map<String, ConnectorStatus> byName = new HashMap<>();
+        for (ConnectorStatus status : statuses) {
+            byName.put(status.name(), status);
+        }
+        List<ConnectorCatalogEntry> entries = new ArrayList<>();
+        for (ConnectorCatalog.ConnectorDefinition def : ConnectorCatalog.definitions()) {
+            ConnectorStatus status = byName.get(def.id());
+            boolean enabled = status != null && status.enabled();
+            entries.add(new ConnectorCatalogEntry(
+                def.id(),
+                def.name(),
+                def.category(),
+                def.description(),
+                enabled,
+                def.supportsRegulated(),
+                def.configKeys(),
+                status != null ? status.lastSync() : null,
+                status != null ? status.lastResult() : null
+            ));
+        }
+        return entries;
     }
 }

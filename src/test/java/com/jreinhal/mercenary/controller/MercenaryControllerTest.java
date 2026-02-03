@@ -28,6 +28,7 @@ import com.jreinhal.mercenary.service.SecureIngestionService;
 import com.jreinhal.mercenary.service.AuthenticationService;
 import com.jreinhal.mercenary.core.license.LicenseService;
 import com.jreinhal.mercenary.security.ClientIpResolver;
+import com.jreinhal.mercenary.workspace.WorkspacePolicy;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -118,6 +119,8 @@ class MercenaryControllerTest {
     private ClientIpResolver clientIpResolver;
     @MockitoBean
     private AuthenticationService authenticationService;
+    @MockitoBean
+    private WorkspacePolicy workspacePolicy;
 
     @TestConfiguration
     static class ChatClientTestConfig {

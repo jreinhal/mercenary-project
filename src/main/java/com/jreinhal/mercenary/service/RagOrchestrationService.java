@@ -30,6 +30,7 @@ import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
 import com.jreinhal.mercenary.util.DocumentMetadataUtils;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -1924,6 +1925,7 @@ public class RagOrchestrationService {
             log.warn("SECURITY: Invalid department value in filter: {}", dept);
             return List.of();
         }
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         Set<String> queryKeywords = RagOrchestrationService.buildQueryKeywords(query);
         if (this.hybridRagService != null && this.hybridRagService.isEnabled()) {
             try {
@@ -1940,10 +1942,10 @@ public class RagOrchestrationService {
         List<Document> semanticResults = new ArrayList<>();
         List<Document> keywordResults = new ArrayList<>();
         try {
-            semanticResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+            semanticResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
             log.info("Semantic search found {} results for query {}", semanticResults.size(), LogSanitizer.querySummary(query));
             String lowerQuery = query.toLowerCase();
-            keywordResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.01).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+            keywordResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.01).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
             log.info("Keyword fallback found {} documents for query {}", keywordResults.size(), LogSanitizer.querySummary(query));
             Set<String> stopWords = Set.of("the", "and", "for", "was", "are", "is", "of", "to", "in", "what", "where", "when", "who", "how", "why", "tell", "me", "about", "describe", "find", "show", "give", "also");
             String[] queryTerms = lowerQuery.split("\\s+");
@@ -2056,6 +2058,7 @@ public class RagOrchestrationService {
         if (query == null || query.isBlank()) {
             return List.of();
         }
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         Set<String> keywords = RagOrchestrationService.buildQueryKeywords(query);
         if (keywords.isEmpty()) {
             return List.of();
@@ -2066,14 +2069,14 @@ public class RagOrchestrationService {
             sweepResults = this.vectorStore.similaritySearch(SearchRequest.query(query)
                     .withTopK(100)
                     .withSimilarityThreshold(-1.0)
-                    .withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+                    .withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
         } catch (Exception e) {
             log.warn("Keyword sweep with negative threshold failed: {}", e.getMessage());
             try {
                 sweepResults = this.vectorStore.similaritySearch(SearchRequest.query(query)
                         .withTopK(100)
                         .withSimilarityThreshold(0.0)
-                        .withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+                        .withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
             } catch (Exception retry) {
                 log.warn("Keyword sweep fallback failed: {}", retry.getMessage());
                 return List.of();
@@ -2289,7 +2292,8 @@ public class RagOrchestrationService {
         if (!this.shouldAugmentWithCache(query) || dept == null || dept.isBlank()) {
             return docs;
         }
-        String prefix = dept.toUpperCase() + ":";
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        String prefix = dept.toUpperCase() + ":" + workspaceId + ":";
         ArrayList<Document> expanded = new ArrayList<>();
         for (Document doc : docs) {
             if (doc == null) {
@@ -2382,7 +2386,8 @@ public class RagOrchestrationService {
     private List<Document> searchInMemoryCache(String query, String dept, List<String> activeFiles) {
         ArrayList<Document> results = new ArrayList<Document>();
         String[] terms = query.toLowerCase().split("\\s+");
-        String sectorPrefix = dept.toUpperCase() + ":";
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        String sectorPrefix = dept.toUpperCase() + ":" + workspaceId + ":";
         String[] meaningfulTerms = (String[])Arrays.stream(terms).filter(t -> t.length() > 3).toArray(String[]::new);
         int minMatchesRequired = Math.max(2, (int)Math.ceil((double)meaningfulTerms.length * 0.3));
         for (Map.Entry<String, String> entry : this.secureDocCache.asMap().entrySet()) {
@@ -2398,6 +2403,7 @@ public class RagOrchestrationService {
             doc.getMetadata().put("source", filename);
             doc.getMetadata().put("filename", filename);
             doc.getMetadata().put("dept", dept.toUpperCase());
+            doc.getMetadata().put("workspaceId", workspaceId);
             results.add(doc);
         }
         return results;
@@ -2407,7 +2413,8 @@ public class RagOrchestrationService {
         if (activeFiles == null || activeFiles.isEmpty()) {
             return List.of();
         }
-        String sectorPrefix = dept.toUpperCase() + ":";
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        String sectorPrefix = dept.toUpperCase() + ":" + workspaceId + ":";
         ArrayList<Document> results = new ArrayList<>();
         for (Map.Entry<String, String> entry : this.secureDocCache.asMap().entrySet()) {
             String cacheKey = entry.getKey();
@@ -2419,6 +2426,7 @@ public class RagOrchestrationService {
             doc.getMetadata().put("source", filename);
             doc.getMetadata().put("filename", filename);
             doc.getMetadata().put("dept", dept.toUpperCase());
+            doc.getMetadata().put("workspaceId", workspaceId);
             int hits = RagOrchestrationService.countKeywordHits(content, keywords)
                 + RagOrchestrationService.countKeywordHits(filename, keywords);
             doc.getMetadata().put("score", (double)Math.max(hits, 1));

@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.Department;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -71,8 +72,9 @@ public class HybridRagService {
             log.warn("HybridRAG: Invalid department '{}'", department);
             return new HybridRetrievalResult(List.of(), Map.of("mode", "invalid-dept"));
         }
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         if (!this.enabled) {
-            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartment(normalizedDept)));
+            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(normalizedDept, workspaceId)));
             return new HybridRetrievalResult(docs, Map.of("mode", "fallback"));
         }
         long startTime = System.currentTimeMillis();
@@ -80,7 +82,7 @@ public class HybridRagService {
         LinkedHashMap<String, List<RankedDoc>> semanticResults = new LinkedHashMap<String, List<RankedDoc>>();
         LinkedHashMap<String, CompletableFuture<List<RankedDoc>>> futures = new LinkedHashMap<>();
         for (String variant : queryVariants) {
-            futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept), this.ragExecutor));
+            futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept, workspaceId), this.ragExecutor));
         }
         long semanticDeadlineMs = startTime + TimeUnit.SECONDS.toMillis(this.futureTimeoutSeconds);
         for (Map.Entry<String, CompletableFuture<List<RankedDoc>>> entry : futures.entrySet()) {
@@ -109,7 +111,7 @@ public class HybridRagService {
                 semanticResults.put(entry.getKey(), List.of());
             }
         }
-        List<RankedDoc> keywordResults = this.performKeywordRetrieval(query, normalizedDept);
+        List<RankedDoc> keywordResults = this.performKeywordRetrieval(query, normalizedDept, workspaceId);
         if (this.ocrTolerance) {
             keywordResults = this.applyOcrTolerance(keywordResults, query);
         }
@@ -129,12 +131,12 @@ public class HybridRagService {
         return variants;
     }
 
-    private List<RankedDoc> performKeywordRetrieval(String query, String department) {
+    private List<RankedDoc> performKeywordRetrieval(String query, String department, String workspaceId) {
         Set<String> keywords = this.extractKeywords(query);
         if (keywords.isEmpty()) {
             return List.of();
         }
-        List<Document> candidates = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.1).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+        List<Document> candidates = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.1).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
         ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
         for (Document doc : candidates) {
             int keywordScore = this.countKeywordMatches(doc.getContent(), keywords);
@@ -255,8 +257,8 @@ public class HybridRagService {
         }
     }
 
-    private List<RankedDoc> retrieveSemantic(String variant, String department) {
-        List<Document> results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+    private List<RankedDoc> retrieveSemantic(String variant, String department, String workspaceId) {
+        List<Document> results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
         ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
         for (int i = 0; i < results.size(); ++i) {
             ranked.add(new RankedDoc(results.get(i), i + 1, "semantic"));

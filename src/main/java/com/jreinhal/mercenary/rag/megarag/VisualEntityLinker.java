@@ -20,7 +20,7 @@ public class VisualEntityLinker {
     private static final double FUZZY_THRESHOLD = 0.85;
     private static final Pattern ENTITY_PATTERN = Pattern.compile("\\b([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*|[A-Z]{2,}(?:-?\\d+)?|\\d+(?:\\.\\d+)?\\s*(?:%|percent|million|billion|thousand))\\b");
 
-    public List<MegaRagService.CrossModalEdge> linkEntities(List<MegaRagService.VisualEntity> visualEntities, String textContext, String visualNodeId) {
+    public List<MegaRagService.CrossModalEdge> linkEntities(List<MegaRagService.VisualEntity> visualEntities, String textContext, String visualNodeId, String workspaceId) {
         if (visualEntities.isEmpty() || textContext == null || textContext.isBlank()) {
             return List.of();
         }
@@ -32,7 +32,7 @@ public class VisualEntityLinker {
                 double similarity = this.calculateSimilarity(visualName, textEntity);
                 if (!(similarity >= 0.85)) continue;
                 String relationshipType = this.determineRelationshipType(visualEntity, textEntity, similarity);
-                MegaRagService.CrossModalEdge edge = new MegaRagService.CrossModalEdge(UUID.randomUUID().toString(), visualNodeId, textEntity, visualName, similarity, relationshipType);
+                MegaRagService.CrossModalEdge edge = new MegaRagService.CrossModalEdge(UUID.randomUUID().toString(), visualNodeId, textEntity, visualName, similarity, relationshipType, workspaceId);
                 edges.add(edge);
                 log.debug("Created cross-modal edge: '{}' <-> '{}' (sim={:.2f}, rel={})", new Object[]{visualName, textEntity, similarity, relationshipType});
             }

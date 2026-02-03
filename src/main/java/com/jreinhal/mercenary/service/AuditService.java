@@ -4,6 +4,7 @@ import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.model.AuditEvent;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.security.ClientIpResolver;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;
@@ -13,6 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -51,6 +54,9 @@ public class AuditService {
     public void log(AuditEvent event) {
         block2: {
             try {
+                if (event.getWorkspaceId() == null || event.getWorkspaceId().isBlank()) {
+                    event.withWorkspace(WorkspaceContext.getCurrentWorkspaceId());
+                }
                 this.mongoTemplate.save(event, "audit_log");
                 log.debug("Audit event logged: {} - {} - {}", new Object[]{event.getEventType(), event.getUserId(), event.getAction()});
             }
@@ -105,7 +111,11 @@ public class AuditService {
     }
 
     public List<AuditEvent> getRecentEvents(int limit) {
-        return this.mongoTemplate.findAll(AuditEvent.class, "audit_log").stream().sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp())).limit(limit).toList();
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        Query query = new Query(Criteria.where("workspaceId").is(workspaceId));
+        query.limit(limit);
+        query.with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "timestamp"));
+        return this.mongoTemplate.find(query, AuditEvent.class, "audit_log");
     }
 
     private String redactAuditText(String text) {

@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.professional.admin;
 import com.jreinhal.mercenary.connectors.ConnectorService;
 import com.jreinhal.mercenary.connectors.ConnectorStatus;
 import com.jreinhal.mercenary.connectors.ConnectorSyncResult;
+import com.jreinhal.mercenary.connectors.ConnectorCatalogEntry;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,6 +25,11 @@ public class ConnectorAdminController {
     @GetMapping(value={"/status"})
     public ResponseEntity<List<ConnectorStatus>> getStatuses() {
         return ResponseEntity.ok(connectorService.getStatuses());
+    }
+
+    @GetMapping(value={"/catalog"})
+    public ResponseEntity<List<ConnectorCatalogEntry>> getCatalog() {
+        return ResponseEntity.ok(connectorService.getCatalog());
     }
 
     @PostMapping(value={"/sync"})

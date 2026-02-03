@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public record CaseRecord(
     @Id String caseId,
     String ownerId,
+    String workspaceId,
     String title,
     String sector,
     CaseStatus status,

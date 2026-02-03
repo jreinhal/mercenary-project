@@ -35,6 +35,7 @@ import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
 import com.jreinhal.mercenary.util.DocumentMetadataUtils;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -266,14 +267,17 @@ public class MercenaryController {
             log.warn("SECURITY: Path traversal attempt detected in filename: {}", fileName);
             return new InspectResponse("ERROR: Invalid filename. Path traversal not allowed.", List.of(), false, 0);
         }
-        String cacheKey = dept + ":" + normalizedFileName;
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        String cacheKey = workspaceId + ":" + dept + ":" + normalizedFileName;
         String cachedContent = (String)this.secureDocCache.getIfPresent(cacheKey);
         if (cachedContent != null) {
             header = "--- SECURE DOCUMENT VIEWER (CACHE) ---\nFILE: " + fileName + "\nSTATUS: DECRYPTED [RAM]\n----------------------------------\n\n";
             body = cachedContent;
         } else {
             try {
-                List<Document> potentialDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)normalizedFileName).withTopK(20).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+                List<Document> potentialDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)normalizedFileName)
+                        .withTopK(20)
+                        .withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
                 log.info("INSPECT DEBUG: Searching for '{}'. Found {} potential candidates.", normalizedFileName, potentialDocs.size());
                 potentialDocs.forEach(d -> log.info("  >> Candidate Meta: {}", d.getMetadata()));
                 Optional<Document> match = potentialDocs.stream().filter(doc -> normalizedFileName.equals(doc.getMetadata().get("source")) || this.apiKeyMatch(normalizedFileName, doc.getMetadata())).findFirst();
@@ -372,7 +376,8 @@ public class MercenaryController {
             String rawContent = new String(file.getBytes(), StandardCharsets.UTF_8);
             PiiRedactionService.RedactionResult redactionResult = this.piiRedactionService.redact(rawContent);
             String redactedContent = redactionResult.getRedactedContent();
-            String cacheKey = dept.toUpperCase() + ":" + filename;
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            String cacheKey = workspaceId + ":" + dept.toUpperCase() + ":" + filename;
             this.secureDocCache.put(cacheKey, redactedContent);
             this.docCount.incrementAndGet();
             long duration = System.currentTimeMillis() - startTime;
@@ -407,6 +412,11 @@ public class MercenaryController {
         ReasoningTrace trace = this.reasoningTracer.getTrace(traceId);
         if (trace == null) {
             return Map.of("error", "Trace not found", "traceId", traceId);
+        }
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        if (trace.getWorkspaceId() != null && !trace.getWorkspaceId().equalsIgnoreCase(workspaceId)) {
+            this.auditService.logAccessDenied(user, "/api/reasoning/" + traceId, "Cross-workspace trace access", null);
+            return Map.of("error", "Access denied - wrong workspace", "traceId", traceId);
         }
         String traceOwnerId = trace.getUserId();
         boolean isOwner = traceOwnerId != null && traceOwnerId.equals(user.getId());
@@ -744,6 +754,7 @@ public class MercenaryController {
             log.warn("SECURITY: Invalid department value in filter: {}", dept);
             return List.of();
         }
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         if (this.hybridRagService != null && this.hybridRagService.isEnabled()) {
             try {
                 HybridRagService.HybridRetrievalResult result = this.hybridRagService.retrieve(query, dept);
@@ -759,10 +770,10 @@ public class MercenaryController {
         List<Document> semanticResults = new ArrayList<>();
         List<Document> keywordResults = new ArrayList<>();
         try {
-            semanticResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+            semanticResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
             log.info("Semantic search found {} results for query {}", semanticResults.size(), LogSanitizer.querySummary(query));
             String lowerQuery = query.toLowerCase();
-            keywordResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.01).withFilterExpression(FilterExpressionBuilder.forDepartment(dept)));
+            keywordResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.01).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
             log.info("Keyword fallback found {} documents for query {}", keywordResults.size(), LogSanitizer.querySummary(query));
             Set<String> stopWords = Set.of("the", "and", "for", "was", "are", "is", "of", "to", "in", "what", "where", "when", "who", "how", "why", "tell", "me", "about", "describe", "find", "show", "give", "also");
             String[] queryTerms = lowerQuery.split("\\s+");
@@ -1031,7 +1042,8 @@ public class MercenaryController {
     private List<Document> searchInMemoryCache(String query, String dept, List<String> activeFiles) {
         ArrayList<Document> results = new ArrayList<Document>();
         String[] terms = query.toLowerCase().split("\\s+");
-        String sectorPrefix = dept.toUpperCase() + ":";
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        String sectorPrefix = dept.toUpperCase() + ":" + workspaceId + ":";
         String[] meaningfulTerms = (String[])Arrays.stream(terms).filter(t -> t.length() > 3).toArray(String[]::new);
         int minMatchesRequired = Math.max(2, (int)Math.ceil((double)meaningfulTerms.length * 0.3));
         for (Map.Entry<String, String> entry : this.secureDocCache.asMap().entrySet()) {
@@ -1047,6 +1059,7 @@ public class MercenaryController {
             doc.getMetadata().put("source", filename);
             doc.getMetadata().put("filename", filename);
             doc.getMetadata().put("dept", dept.toUpperCase());
+            doc.getMetadata().put("workspaceId", workspaceId);
             results.add(doc);
         }
         return results;

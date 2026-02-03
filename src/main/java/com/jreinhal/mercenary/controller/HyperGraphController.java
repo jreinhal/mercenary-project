@@ -12,6 +12,7 @@ import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory.HGStats;
 import com.jreinhal.mercenary.rag.hgmem.EntityExtractor;
 import com.jreinhal.mercenary.service.AuditService;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -115,8 +116,10 @@ public class HyperGraphController {
         }
 
         try {
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
             // Build query with sector filter
             Criteria criteria = Criteria.where("department").is(dept)
+                    .and("workspaceId").is(workspaceId)
                     .and("type").is(HGNode.NodeType.ENTITY.name());
 
             if (nodeType != null && !nodeType.isBlank()) {
@@ -193,6 +196,7 @@ public class HyperGraphController {
         }
 
         try {
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
             // First verify the source node belongs to the requested department
             HGNode sourceNode = mongoTemplate.findById(nodeId, HGNode.class, NODES_COLLECTION);
             if (sourceNode == null) {
@@ -207,10 +211,18 @@ public class HyperGraphController {
                         "Cross-sector access blocked: " + sourceNode.getDepartment(), null);
                 return new NeighborResponse(List.of(), List.of(), "ACCESS DENIED: Node belongs to different sector.");
             }
+            if (sourceNode.getWorkspaceId() != null && !sourceNode.getWorkspaceId().equalsIgnoreCase(workspaceId)) {
+                log.warn("SECURITY: Cross-workspace node access attempt: user={}, requested={}, node_workspace={}",
+                        user.getDisplayName(), workspaceId, sourceNode.getWorkspaceId());
+                auditService.logAccessDenied(user, "/api/graph/neighbors",
+                        "Cross-workspace access blocked: " + sourceNode.getWorkspaceId(), null);
+                return new NeighborResponse(List.of(), List.of(), "ACCESS DENIED: Node belongs to different workspace.");
+            }
 
             // SECURITY: Find edges containing this node, filtered by department
             Query edgeQuery = new Query(Criteria.where("nodeIds").is(nodeId)
-                    .and("department").is(dept));
+                    .and("department").is(dept)
+                    .and("workspaceId").is(workspaceId));
             List<HGEdge> edges = mongoTemplate.find(edgeQuery, HGEdge.class, EDGES_COLLECTION);
 
             // Collect neighbor node IDs
@@ -235,7 +247,7 @@ public class HyperGraphController {
                 HGNode neighbor = mongoTemplate.findById(neighborId, HGNode.class, NODES_COLLECTION);
                 if (neighbor != null) {
                     // SECURITY: Double-check department on each neighbor
-                    if (dept.equals(neighbor.getDepartment())) {
+                    if (dept.equals(neighbor.getDepartment()) && (neighbor.getWorkspaceId() == null || neighbor.getWorkspaceId().equalsIgnoreCase(workspaceId))) {
                         neighborDtos.add(toEntityDto(neighbor));
                         count++;
                     } else {
@@ -309,6 +321,7 @@ public class HyperGraphController {
 
         try {
             Query mongoQuery = new Query(Criteria.where("department").is(dept)
+                    .and("workspaceId").is(WorkspaceContext.getCurrentWorkspaceId())
                     .and("type").is(HGNode.NodeType.ENTITY.name())
                     .and("value").regex(sanitized, "i"))
                     .limit(Math.min(limit, MAX_NODES));
@@ -377,19 +390,22 @@ public class HyperGraphController {
         }
 
         try {
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
             // Count nodes by department
             long entityCount = mongoTemplate.count(
                     new Query(Criteria.where("department").is(dept)
+                            .and("workspaceId").is(workspaceId)
                             .and("type").is(HGNode.NodeType.ENTITY.name())),
                     NODES_COLLECTION);
 
             long chunkCount = mongoTemplate.count(
                     new Query(Criteria.where("department").is(dept)
+                            .and("workspaceId").is(workspaceId)
                             .and("type").is(HGNode.NodeType.CHUNK.name())),
                     NODES_COLLECTION);
 
             long edgeCount = mongoTemplate.count(
-                    new Query(Criteria.where("department").is(dept)),
+                    new Query(Criteria.where("department").is(dept).and("workspaceId").is(workspaceId)),
                     EDGES_COLLECTION);
 
             long totalNodes = entityCount + chunkCount;
@@ -453,7 +469,8 @@ public class HyperGraphController {
 
         try {
             // Fetch edges for department
-            Query query = new Query(Criteria.where("department").is(dept))
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            Query query = new Query(Criteria.where("department").is(dept).and("workspaceId").is(workspaceId))
                     .limit(Math.min(limit, 500));
 
             List<HGEdge> edges = mongoTemplate.find(query, HGEdge.class, EDGES_COLLECTION);

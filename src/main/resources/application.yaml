@@ -203,6 +203,11 @@ sentinel:
     enabled: ${SENTINEL_CASEWORK_ENABLED:true}
     allow-regulated: ${SENTINEL_CASEWORK_ALLOW_REGULATED:false}
 
+  workspace:
+    enabled: ${SENTINEL_WORKSPACE_ENABLED:true}
+    allow-regulated: ${SENTINEL_WORKSPACE_ALLOW_REGULATED:false}
+    default-id: ${SENTINEL_WORKSPACE_DEFAULT_ID:workspace_default}
+
   connectors:
     enabled: ${SENTINEL_CONNECTORS_ENABLED:true}
     allow-regulated: ${SENTINEL_CONNECTORS_ALLOW_REGULATED:false}

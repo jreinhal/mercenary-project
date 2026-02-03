@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -107,7 +108,8 @@ public class HiFiRagService {
 
     private List<Document> broadRetrieval(String query, String department, int topK) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(topK).withSimilarityThreshold(0.1).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(topK).withSimilarityThreshold(0.1).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
         }
         catch (Exception e) {
             log.error("HiFi-RAG: Broad retrieval failed", (Throwable)e);
@@ -117,7 +119,8 @@ public class HiFiRagService {
 
     private List<Document> standardRetrieval(String query, String department) {
         try {
-            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.filteredK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartment(department)));
+            String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+            return this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(this.filteredK).withSimilarityThreshold(0.15).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
         }
         catch (Exception e) {
             log.error("Standard retrieval failed", (Throwable)e);
