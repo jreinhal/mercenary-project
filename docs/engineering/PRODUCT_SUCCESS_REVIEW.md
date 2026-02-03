@@ -75,21 +75,25 @@ Recommended inspirations:
 - Collaboration workflows (shared cases, review/approval, redaction review) implemented for non-regulated editions.
 
 ### Planned (Strategic)
-- Workspace admin UI + tenant quotas + migration tooling (Phase 2).
-- Marketplace UI + additional sector pipelines/connectors.
-- Reporting UI, scheduled exports, and SLA dashboards.
+- Full multi-tenant/workspace isolation for MSP or multi-org deployments (beyond current phases).
+- Connector marketplace implementations for additional sources (Jira/ServiceNow/Box/Drive).
+- Workspace migration tooling for multi-org cutover.
 
 ### Now in Motion
 - Workspace isolation design + staged rollout plan drafted in `docs/engineering/plans/WORKSPACE_ISOLATION.md`.
 
 ### In Progress (Strategic)
-- Workspace isolation Phase 1 implemented (workspaceId tagging + query filters + header-based selection; UI switcher pending).
+- Workspace isolation Phase 1 implemented (workspaceId tagging + query filters + header-based selection).
 - Workspace management APIs (Phase 2) implemented (create/list/membership; non-regulated only).
-- Workspace selector added to Settings sidebar (Phase 3 partial; regulated editions hidden).
 - Workspace quotas enforced + admin quota editor + usage view (Phase 4).
 - Reporting UI + audit exports + SLA dashboard + scheduled exports (config gated) (Phase 4).
 - Connector marketplace API added (admin-only catalog endpoint).
 - Compliance/executive reporting pack added (admin-only executive report endpoint).
+
+### Completed (Strategic)
+- Workspace selector completed (settings + quick switcher in menu bar; regulated editions hidden).
+- Connector marketplace UI added (catalog + config keys + status badges).
+- Sector pipeline presets added to Settings for quick tuning.
 
 ## Test Ops Note
 - Pre-auth rate limiting should remain ON in normal runs. Disable it only for automated E2E test runs that perform bulk uploads (set `APP_RATE_LIMIT_ENABLED=false`), then re-enable for day-to-day usage.
