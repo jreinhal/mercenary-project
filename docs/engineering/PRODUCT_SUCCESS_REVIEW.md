@@ -69,10 +69,15 @@ Recommended inspirations:
 - Case/timeline workspace with export and compliance gating.
 - Graph + source + case quick actions in the onboarding panel.
 
-### In Progress (Mid-Term)
-- Enterprise connectors: SharePoint, Confluence, S3 (admin-only, disabled for regulated editions by default).
+### Completed (Mid-Term)
+- Enterprise connectors: SharePoint, Confluence, S3 (admin-only; disabled for regulated editions by default).
 - Eval harness UI (admin-only) for baseline query suites and quality signals.
 - Collaboration workflows (shared cases, review/approval, redaction review) implemented for non-regulated editions.
+
+### Planned (Strategic)
+- Multi-tenant/workspace isolation for MSP or multi-org deployments.
+- Marketplace for connectors and sector-specific pipelines.
+- Expanded reporting for compliance and executive summaries.
 
 ## References (UI/UX Inspiration)
 - https://www.splunk.com/en-us/blog/security/use-investigation-workbench-to-reduce-time-to-contain-and-time-to-remediate.html
