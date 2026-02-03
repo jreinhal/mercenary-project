@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.workspace;
 
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
+import com.jreinhal.mercenary.workspace.Workspace.WorkspaceQuota;
 import com.jreinhal.mercenary.workspace.WorkspaceService.WorkspaceCreateRequest;
 import com.jreinhal.mercenary.workspace.WorkspaceService.WorkspaceMember;
 import com.jreinhal.mercenary.workspace.WorkspaceService.WorkspaceMemberRequest;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,10 +25,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkspaceController {
     private final WorkspaceService workspaceService;
     private final WorkspacePolicy workspacePolicy;
+    private final WorkspaceUsageService workspaceUsageService;
 
-    public WorkspaceController(WorkspaceService workspaceService, WorkspacePolicy workspacePolicy) {
+    public WorkspaceController(WorkspaceService workspaceService, WorkspacePolicy workspacePolicy, WorkspaceUsageService workspaceUsageService) {
         this.workspaceService = workspaceService;
         this.workspacePolicy = workspacePolicy;
+        this.workspaceUsageService = workspaceUsageService;
     }
 
     @GetMapping
@@ -75,9 +79,36 @@ public class WorkspaceController {
         return ResponseEntity.ok(new RemovalResponse(removed));
     }
 
+    @PutMapping("/{workspaceId}/quota")
+    @PreAuthorize(value="hasRole('ADMIN')")
+    public ResponseEntity<?> updateQuota(@PathVariable String workspaceId, @RequestBody WorkspaceQuotaRequest request) {
+        if (!workspacePolicy.allowWorkspaceSwitching()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("Workspace quotas disabled for this edition"));
+        }
+        User actor = SecurityContext.getCurrentUser();
+        WorkspaceQuota quota = new WorkspaceQuota(
+                request.maxDocuments(),
+                request.maxQueriesPerDay(),
+                request.maxStorageMb());
+        return ResponseEntity.ok(this.workspaceService.updateQuota(workspaceId, quota, actor));
+    }
+
+    @GetMapping("/{workspaceId}/usage")
+    @PreAuthorize(value="hasRole('ADMIN')")
+    public ResponseEntity<?> getUsage(@PathVariable String workspaceId) {
+        if (!workspacePolicy.allowWorkspaceSwitching()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("Workspace usage disabled for this edition"));
+        }
+        this.workspaceService.getWorkspace(workspaceId);
+        return ResponseEntity.ok(this.workspaceUsageService.getUsage(workspaceId));
+    }
+
     public record ErrorResponse(String error) {
     }
 
     public record RemovalResponse(boolean removed) {
+    }
+
+    public record WorkspaceQuotaRequest(int maxDocuments, int maxQueriesPerDay, int maxStorageMb) {
     }
 }

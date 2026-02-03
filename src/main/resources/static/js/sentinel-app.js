@@ -20,6 +20,13 @@
             results: [],
             lastSuiteId: null
         };
+        const reportingState = {
+            executive: null,
+            sla: null,
+            schedules: [],
+            exports: [],
+            schedulesAllowed: null
+        };
         let connectorPolicyAllowsSync = false;
         const evalSuites = [
             {
@@ -500,6 +507,19 @@
                     case 'regenerateResponse': regenerateResponse(); break;
                     case 'runEvalSuite': runEvalSuite(); break;
                     case 'clearEvalResults': clearEvalResults(); break;
+                    case 'runExecutiveReport': runExecutiveReport(); break;
+                    case 'runSlaReport': runSlaReport(); break;
+                    case 'runAuditExport': runAuditExport(); break;
+                    case 'refreshReportSchedules': refreshReportSchedules(); break;
+                    case 'createReportSchedule': createReportSchedule(); break;
+                    case 'toggleReportSchedule': toggleReportSchedule(el.dataset.scheduleId, el.dataset.enabled); break;
+                    case 'runReportSchedule': runReportSchedule(el.dataset.scheduleId); break;
+                    case 'refreshReportExports': refreshReportExports(); break;
+                    case 'viewReportExport': viewReportExport(el.dataset.exportId); break;
+                    case 'downloadReportExport': downloadReportExport(el.dataset.exportId); break;
+                    case 'refreshWorkspaceQuota': refreshWorkspaceQuota(); break;
+                    case 'saveWorkspaceQuota': saveWorkspaceQuota(); break;
+                    case 'closeReportModal': closeReportModal(); break;
                     case 'switchRightTab': switchRightTab(el.dataset.tab); break;
                     case 'switchGraphTab': switchGraphTab(el.dataset.graphTab); break;
                     case 'setEntityGraphMode': setEntityGraphMode(el.dataset.entityGraphMode); break;
@@ -818,6 +838,8 @@
             });
 
             initEvalHarness();
+            initReportingPanel();
+            refreshReportingData();
             refreshConnectorStatus();
             refreshCaseLibrary();
         }
@@ -887,6 +909,7 @@
                 renderSavedQueriesList();
                 refreshCaseLibrary();
                 refreshConnectorStatus();
+                refreshReportingData();
             });
         }
 
@@ -1980,6 +2003,596 @@
             renderEvalResults();
         }
 
+        // ==================== Reporting ====================
+        function initReportingPanel() {
+            renderExecutiveReport(reportingState.executive);
+            renderSlaReport(reportingState.sla);
+            updateReportingControls();
+        }
+
+        function refreshReportingData() {
+            if (!currentIsAdmin) {
+                updateReportingControls();
+                return;
+            }
+            refreshReportSchedules();
+            refreshReportExports();
+            refreshWorkspaceQuota();
+        }
+
+        function updateReportingControls() {
+            const badge = document.getElementById('reporting-compliance-badge');
+            const hint = document.getElementById('reporting-compliance-hint');
+            const auditTypeSelect = document.getElementById('report-audit-type');
+            const auditHint = document.getElementById('report-audit-hint');
+            const scheduleHint = document.getElementById('report-schedule-hint');
+            const quotaHint = document.getElementById('quota-hint');
+
+            if (!badge || !hint) return;
+
+            badge.classList.remove('blocked', 'regulated');
+
+            const controls = document.querySelectorAll('#right-tab-reports [data-report-control]');
+            controls.forEach(control => {
+                control.disabled = !currentIsAdmin;
+            });
+
+            if (!currentIsAdmin) {
+                badge.textContent = 'Admin only';
+                badge.classList.add('blocked');
+                hint.textContent = 'Admin access required to run reports.';
+                if (auditHint) auditHint.textContent = '';
+                if (scheduleHint) scheduleHint.textContent = '';
+                if (quotaHint) quotaHint.textContent = '';
+                return;
+            }
+
+            const regulated = isRegulatedEdition();
+            if (regulated) {
+                badge.textContent = 'Regulated';
+                badge.classList.add('regulated');
+                hint.textContent = 'Regulated mode: reports are limited to on-demand admin actions.';
+            } else {
+                badge.textContent = 'Admin';
+                hint.textContent = 'Reports are scoped to the active workspace.';
+            }
+
+            if (auditTypeSelect) {
+                const hipaaOption = auditTypeSelect.querySelector('option[value="hipaa"]');
+                if (hipaaOption) {
+                    const isMedical = String(currentEdition).toUpperCase() === 'MEDICAL';
+                    hipaaOption.disabled = !isMedical;
+                    hipaaOption.hidden = !isMedical;
+                    if (!isMedical && auditTypeSelect.value === 'hipaa') {
+                        auditTypeSelect.value = 'standard';
+                    }
+                }
+            }
+
+            if (auditHint) {
+                auditHint.textContent = String(currentEdition).toUpperCase() === 'MEDICAL'
+                    ? 'HIPAA audit log export is available in Medical strict mode.'
+                    : 'Audit exports include redacted response summaries in regulated editions.';
+            }
+
+            const scheduleControls = document.querySelectorAll('#right-tab-reports [data-report-schedule-control]');
+            const schedulesEnabled = reportingState.schedulesAllowed === true;
+            scheduleControls.forEach(control => {
+                control.disabled = !schedulesEnabled;
+            });
+            if (scheduleHint) {
+                if (reportingState.schedulesAllowed === false) {
+                    scheduleHint.textContent = 'Scheduled exports are disabled. Enable SENTINEL_REPORTING_SCHEDULES_ENABLED to use.';
+                } else if (reportingState.schedulesAllowed === true) {
+                    scheduleHint.textContent = 'Schedules run on the server cadence interval.';
+                } else {
+                    scheduleHint.textContent = 'Schedules require server enablement.';
+                }
+            }
+
+            const quotaControls = document.querySelectorAll('#report-quotas-card [data-report-control]');
+            if (regulated) {
+                quotaControls.forEach(control => {
+                    control.disabled = true;
+                });
+                if (quotaHint) {
+                    quotaHint.textContent = 'Workspace quota edits are disabled for regulated editions.';
+                }
+            } else {
+                if (quotaHint) {
+                    quotaHint.textContent = 'Set zero to remove a limit.';
+                }
+            }
+        }
+
+        async function runExecutiveReport() {
+            if (!currentIsAdmin) {
+                showInfoToast('Admin access required to run reports.');
+                return;
+            }
+            const daysInput = document.getElementById('report-executive-days');
+            const btn = document.getElementById('report-executive-btn');
+            const days = parseInt(daysInput?.value, 10) || 30;
+            if (btn) btn.disabled = true;
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/reports/executive?days=${days}`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Report failed');
+                }
+                const report = await response.json();
+                reportingState.executive = report;
+                renderExecutiveReport(report);
+                openReportModal('Executive Report', JSON.stringify(report, null, 2), `Window: ${days} days`);
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Executive report failed: ${error.message}`);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function renderExecutiveReport(report) {
+            const container = document.getElementById('report-executive-metrics');
+            if (!container) return;
+            if (!report) {
+                container.innerHTML = '<div class="report-empty">No report yet.</div>';
+                return;
+            }
+            const metrics = [
+                { label: 'Documents', value: report.usage?.documents ?? 0 },
+                { label: 'Queries', value: report.usage?.queries ?? 0 },
+                { label: 'Ingestions', value: report.usage?.ingestions ?? 0 },
+                { label: 'Access Denied', value: report.security?.accessDenied ?? 0 },
+                { label: 'Auth Failures', value: report.security?.authFailures ?? 0 },
+                { label: 'HIPAA Events', value: report.security?.hipaaEvents ?? 0 }
+            ];
+            container.innerHTML = metrics.map(metric => `
+                <div class="report-metric">
+                    <div class="report-metric-label">${escapeHtml(metric.label)}</div>
+                    <div class="report-metric-value">${metric.value}</div>
+                </div>
+            `).join('');
+        }
+
+        async function runSlaReport() {
+            if (!currentIsAdmin) {
+                showInfoToast('Admin access required to run reports.');
+                return;
+            }
+            const daysInput = document.getElementById('report-sla-days');
+            const btn = document.getElementById('report-sla-btn');
+            const days = parseInt(daysInput?.value, 10) || 7;
+            if (btn) btn.disabled = true;
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/reports/sla?days=${days}`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Report failed');
+                }
+                const report = await response.json();
+                reportingState.sla = report;
+                renderSlaReport(report);
+                openReportModal('SLA Report', JSON.stringify(report, null, 2), `Window: ${days} days`);
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`SLA report failed: ${error.message}`);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function renderSlaReport(report) {
+            const container = document.getElementById('report-sla-metrics');
+            if (!container) return;
+            if (!report) {
+                container.innerHTML = '<div class="report-empty">No SLA data yet.</div>';
+                return;
+            }
+            const metrics = [
+                { label: 'Avg Latency', value: `${Math.round(report.avgLatencyMs || 0)} ms` },
+                { label: 'P50', value: `${report.p50LatencyMs || 0} ms` },
+                { label: 'P95', value: `${report.p95LatencyMs || 0} ms` },
+                { label: 'P99', value: `${report.p99LatencyMs || 0} ms` },
+                { label: 'Max', value: `${report.maxLatencyMs || 0} ms` },
+                { label: 'Queries', value: report.totalQueries || 0 }
+            ];
+            container.innerHTML = metrics.map(metric => `
+                <div class="report-metric">
+                    <div class="report-metric-label">${escapeHtml(metric.label)}</div>
+                    <div class="report-metric-value">${escapeHtml(String(metric.value))}</div>
+                </div>
+            `).join('');
+        }
+
+        async function runAuditExport() {
+            if (!currentIsAdmin) {
+                showInfoToast('Admin access required to export audits.');
+                return;
+            }
+            const days = parseInt(document.getElementById('report-audit-days')?.value, 10) || 7;
+            const limit = parseInt(document.getElementById('report-audit-limit')?.value, 10) || 1000;
+            const format = document.getElementById('report-audit-format')?.value || 'json';
+            const type = document.getElementById('report-audit-type')?.value || 'standard';
+            const endpoint = type === 'hipaa' ? `${API_BASE}/admin/reports/hipaa/export` : `${API_BASE}/admin/reports/audit/export`;
+
+            const params = new URLSearchParams();
+            if (days > 0) params.set('days', String(days));
+            if (limit > 0) params.set('limit', String(limit));
+            params.set('format', format);
+
+            try {
+                const response = await guardedFetch(`${endpoint}?${params.toString()}`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Export failed');
+                }
+                const content = await response.text();
+                const disposition = response.headers.get('content-disposition') || '';
+                const filename = parseContentDispositionFilename(disposition) || `${type}_audit_export.${format}`;
+                const mimeType = format === 'csv' ? 'text/csv' : 'application/json';
+                openReportModal('Audit Export', content, `Window: ${days} days • Limit: ${limit}`);
+                downloadReportContent(content, filename, mimeType);
+                showInfoToast('Audit export ready.');
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Audit export failed: ${error.message}`);
+            }
+        }
+
+        async function refreshReportSchedules() {
+            if (!currentIsAdmin) return;
+            const listEl = document.getElementById('report-schedule-list');
+            if (listEl) {
+                listEl.innerHTML = '<div class="report-empty">Loading schedules...</div>';
+            }
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/reports/schedules`);
+                if (response.status === 403) {
+                    reportingState.schedulesAllowed = false;
+                    if (listEl) {
+                        listEl.innerHTML = '<div class="report-empty">Schedules disabled.</div>';
+                    }
+                    updateReportingControls();
+                    return;
+                }
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Failed to load schedules');
+                }
+                reportingState.schedulesAllowed = true;
+                reportingState.schedules = await response.json();
+                renderReportSchedules(reportingState.schedules);
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                if (listEl) {
+                    listEl.innerHTML = '<div class="report-empty">Unable to load schedules.</div>';
+                }
+                showInfoToast(`Schedule load failed: ${error.message}`);
+            } finally {
+                updateReportingControls();
+            }
+        }
+
+        function renderReportSchedules(schedules) {
+            const listEl = document.getElementById('report-schedule-list');
+            if (!listEl) return;
+            if (!Array.isArray(schedules) || schedules.length === 0) {
+                listEl.innerHTML = '<div class="report-empty">No schedules configured.</div>';
+                return;
+            }
+            listEl.innerHTML = schedules.map(schedule => {
+                const enabled = schedule.enabled;
+                return `
+                    <div class="report-list-item">
+                        <div class="report-list-meta">
+                            <div class="report-list-title">${escapeHtml(schedule.type)} • ${escapeHtml(schedule.cadence)}</div>
+                            <div>Format: ${escapeHtml(schedule.format)} • Window: ${escapeHtml(String(schedule.windowDays || 0))}d</div>
+                            <div>Next: ${escapeHtml(formatTimestamp(schedule.nextRunAt))} • Last: ${escapeHtml(formatTimestamp(schedule.lastRunAt))}</div>
+                        </div>
+                        <div class="report-list-actions">
+                            <button class="btn btn-secondary btn-sm" data-action="toggleReportSchedule" data-schedule-id="${escapeHtml(schedule.id)}" data-enabled="${enabled}">${enabled ? 'Disable' : 'Enable'}</button>
+                            <button class="btn btn-secondary btn-sm" data-action="runReportSchedule" data-schedule-id="${escapeHtml(schedule.id)}">Run Now</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function createReportSchedule() {
+            if (!currentIsAdmin) return;
+            const type = document.getElementById('report-schedule-type')?.value || 'EXECUTIVE';
+            const format = document.getElementById('report-schedule-format')?.value || 'JSON';
+            const cadence = document.getElementById('report-schedule-cadence')?.value || 'WEEKLY';
+            const windowDays = parseInt(document.getElementById('report-schedule-window')?.value, 10) || 7;
+            const limit = parseInt(document.getElementById('report-schedule-limit')?.value, 10) || 0;
+            const payload = { type, format, cadence, windowDays, limit };
+
+            const headers = { 'Content-Type': 'application/json' };
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/reports/schedules`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Schedule creation failed');
+                }
+                showInfoToast('Schedule created.');
+                refreshReportSchedules();
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Schedule create failed: ${error.message}`);
+            }
+        }
+
+        async function toggleReportSchedule(scheduleId, enabled) {
+            if (!currentIsAdmin || !scheduleId) return;
+            const nextEnabled = String(enabled) !== 'true';
+            const headers = { 'Content-Type': 'application/json' };
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/reports/schedules/${scheduleId}`, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify({ enabled: nextEnabled })
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Schedule update failed');
+                }
+                showInfoToast(`Schedule ${nextEnabled ? 'enabled' : 'disabled'}.`);
+                refreshReportSchedules();
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Schedule update failed: ${error.message}`);
+            }
+        }
+
+        async function runReportSchedule(scheduleId) {
+            if (!currentIsAdmin || !scheduleId) return;
+            const headers = {};
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/reports/schedules/${scheduleId}/run`, {
+                    method: 'POST',
+                    headers
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Schedule run failed');
+                }
+                showInfoToast('Schedule export generated.');
+                refreshReportExports();
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Schedule run failed: ${error.message}`);
+            }
+        }
+
+        async function refreshReportExports() {
+            if (!currentIsAdmin) return;
+            const listEl = document.getElementById('report-exports-list');
+            if (listEl) {
+                listEl.innerHTML = '<div class="report-empty">Loading exports...</div>';
+            }
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/reports/exports?limit=25`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Failed to load exports');
+                }
+                reportingState.exports = await response.json();
+                renderReportExports(reportingState.exports);
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                if (listEl) {
+                    listEl.innerHTML = '<div class="report-empty">Unable to load exports.</div>';
+                }
+                showInfoToast(`Export list failed: ${error.message}`);
+            }
+        }
+
+        function renderReportExports(exportsList) {
+            const listEl = document.getElementById('report-exports-list');
+            if (!listEl) return;
+            if (!Array.isArray(exportsList) || exportsList.length === 0) {
+                listEl.innerHTML = '<div class="report-empty">No exports generated yet.</div>';
+                return;
+            }
+            listEl.innerHTML = exportsList.map(exp => `
+                <div class="report-list-item">
+                    <div class="report-list-meta">
+                        <div class="report-list-title">${escapeHtml(exp.type || 'REPORT')} • ${escapeHtml(exp.format || '')}</div>
+                        <div>${escapeHtml(exp.summary || '')}</div>
+                        <div>${escapeHtml(formatTimestamp(exp.createdAt))} • ${escapeHtml(exp.createdBy || 'system')}</div>
+                    </div>
+                    <div class="report-list-actions">
+                        <button class="btn btn-secondary btn-sm" data-action="viewReportExport" data-export-id="${escapeHtml(exp.id)}">View</button>
+                        <button class="btn btn-secondary btn-sm" data-action="downloadReportExport" data-export-id="${escapeHtml(exp.id)}">Download</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function viewReportExport(exportId) {
+            if (!currentIsAdmin || !exportId) return;
+            const exportData = await fetchReportExport(exportId);
+            if (!exportData) return;
+            openReportModal(`${exportData.type || 'Report'} Export`, exportData.content || '', exportData.summary || '');
+        }
+
+        async function downloadReportExport(exportId) {
+            if (!currentIsAdmin || !exportId) return;
+            const exportData = await fetchReportExport(exportId);
+            if (!exportData) return;
+            const format = String(exportData.format || 'JSON').toLowerCase();
+            const filename = `${exportData.type || 'report'}_${exportId}.${format}`;
+            const mimeType = format === 'csv' ? 'text/csv' : 'application/json';
+            downloadReportContent(exportData.content || '', filename, mimeType);
+            showInfoToast('Download started.');
+        }
+
+        async function fetchReportExport(exportId) {
+            try {
+                const response = await guardedFetch(`${API_BASE}/admin/reports/exports/${exportId}`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Export fetch failed');
+                }
+                return await response.json();
+            } catch (error) {
+                if (error && error.code === 'auth') return null;
+                showInfoToast(`Export fetch failed: ${error.message}`);
+                return null;
+            }
+        }
+
+        async function refreshWorkspaceQuota() {
+            if (!currentIsAdmin) return;
+            if (isRegulatedEdition()) {
+                updateReportingControls();
+                return;
+            }
+            const quotaHint = document.getElementById('quota-hint');
+            if (quotaHint) quotaHint.textContent = 'Loading workspace quota...';
+            try {
+                const workspaceId = getWorkspaceId();
+                const workspacesResponse = await guardedFetch(`${API_BASE}/workspaces`);
+                if (!workspacesResponse.ok) {
+                    throw new Error('Failed to load workspaces');
+                }
+                const workspaces = await workspacesResponse.json();
+                const workspace = Array.isArray(workspaces)
+                    ? workspaces.find(ws => ws.id === workspaceId) || workspaces[0]
+                    : null;
+                if (!workspace) {
+                    if (quotaHint) quotaHint.textContent = 'Workspace not found.';
+                    return;
+                }
+                const usageResponse = await guardedFetch(`${API_BASE}/workspaces/${workspace.id}/usage`);
+                if (!usageResponse.ok) {
+                    throw new Error('Usage not available');
+                }
+                const usage = await usageResponse.json();
+                renderWorkspaceQuota(workspace, usage);
+                if (quotaHint) quotaHint.textContent = 'Set zero to remove a limit.';
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                if (quotaHint) quotaHint.textContent = 'Unable to load quota data.';
+                showInfoToast(`Quota refresh failed: ${error.message}`);
+            }
+        }
+
+        function renderWorkspaceQuota(workspace, usage) {
+            const quota = workspace?.quota || {};
+            const maxDocs = document.getElementById('quota-max-docs');
+            const maxQueries = document.getElementById('quota-max-queries');
+            const maxStorage = document.getElementById('quota-max-storage');
+            if (maxDocs) maxDocs.value = quota.maxDocuments ?? 0;
+            if (maxQueries) maxQueries.value = quota.maxQueriesPerDay ?? 0;
+            if (maxStorage) maxStorage.value = quota.maxStorageMb ?? 0;
+
+            setText(document.getElementById('quota-docs-usage'), `Usage: ${usage?.documents ?? 0} docs`);
+            setText(document.getElementById('quota-queries-usage'), `Usage: ${usage?.queriesToday ?? 0} queries today`);
+            setText(document.getElementById('quota-storage-usage'), `Usage: ${formatBytes(usage?.storageBytes ?? 0)}`);
+        }
+
+        async function saveWorkspaceQuota() {
+            if (!currentIsAdmin) return;
+            if (isRegulatedEdition()) {
+                showInfoToast('Quota edits are disabled for regulated editions.');
+                return;
+            }
+            const workspaceId = getWorkspaceId();
+            const maxDocuments = parseInt(document.getElementById('quota-max-docs')?.value, 10) || 0;
+            const maxQueriesPerDay = parseInt(document.getElementById('quota-max-queries')?.value, 10) || 0;
+            const maxStorageMb = parseInt(document.getElementById('quota-max-storage')?.value, 10) || 0;
+
+            const headers = { 'Content-Type': 'application/json' };
+            const csrfToken = await ensureCsrfToken();
+            if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+            try {
+                const response = await guardedFetch(`${API_BASE}/workspaces/${workspaceId}/quota`, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify({ maxDocuments, maxQueriesPerDay, maxStorageMb })
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || err.message || 'Quota update failed');
+                }
+                showInfoToast('Workspace quota updated.');
+                refreshWorkspaceQuota();
+            } catch (error) {
+                if (error && error.code === 'auth') return;
+                showInfoToast(`Quota update failed: ${error.message}`);
+            }
+        }
+
+        function openReportModal(title, content, meta) {
+            const modal = document.getElementById('report-modal');
+            const titleEl = document.getElementById('report-modal-title');
+            const metaEl = document.getElementById('report-modal-meta');
+            const outputEl = document.getElementById('report-modal-output');
+            if (!modal || !titleEl || !outputEl) return;
+            titleEl.textContent = title || 'Report Output';
+            if (metaEl) metaEl.textContent = meta || '';
+            outputEl.textContent = content || '';
+            modal.classList.add('open');
+        }
+
+        function closeReportModal() {
+            const modal = document.getElementById('report-modal');
+            if (modal) {
+                modal.classList.remove('open');
+            }
+        }
+
+        function downloadReportContent(content, filename, mimeType) {
+            try {
+                const blob = new Blob([content], { type: mimeType || 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename || 'report.txt';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            } catch (error) {
+                console.warn('Download failed:', error);
+            }
+        }
+
+        function parseContentDispositionFilename(header) {
+            if (!header) return null;
+            const match = header.match(/filename=([^;]+)/i);
+            if (!match) return null;
+            return match[1].replace(/\"/g, '').trim();
+        }
+
+        function formatTimestamp(value) {
+            if (!value) return '—';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return String(value);
+            }
+            return date.toLocaleString();
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes) return '0 MB';
+            const mb = bytes / (1024 * 1024);
+            return `${mb.toFixed(1)} MB`;
+        }
+
         function loadConversationHistory() {
             try {
                 if (!canPersistCaseData()) {
@@ -2287,15 +2900,9 @@
         }
 
         function switchRightTab(tabName) {
-            const plotTab = document.getElementById('right-tab-plot');
-            const sourceTab = document.getElementById('right-tab-source');
-            const evalTab = document.getElementById('right-tab-eval');
-            const caseTab = document.getElementById('right-tab-case');
-
-            setHidden(plotTab, true);
-            setHidden(sourceTab, true);
-            setHidden(evalTab, true);
-            setHidden(caseTab, true);
+            document.querySelectorAll('.right-panel-content').forEach(tab => {
+                setHidden(tab, true);
+            });
 
             document.querySelectorAll('.right-panel-tab').forEach(btn => {
                 btn.classList.remove('active');
@@ -5258,6 +5865,7 @@
                 evalClearBtn.disabled = evalState.running;
             }
             updateEvalComplianceHint();
+            updateReportingControls();
         }
 
         function applyEditionPolicy(edition) {

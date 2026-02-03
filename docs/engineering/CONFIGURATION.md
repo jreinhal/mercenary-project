@@ -145,6 +145,28 @@ Workspace quotas (per workspace):
 - Enforcement applies to ingestion and query endpoints.
 - Storage tracking uses per-file `fileSizeBytes` metadata on vector store documents.
 
+Workspace quota admin APIs (non-regulated editions):
+- PUT /api/workspaces/{id}/quota
+- GET /api/workspaces/{id}/usage
+
+## Reporting & Scheduled Exports (admin-only)
+- SENTINEL_REPORTING_SCHEDULES_ENABLED (default: false)
+- SENTINEL_REPORTING_SCHEDULES_ALLOW_REGULATED (default: false)
+- SENTINEL_REPORTING_SCHEDULES_INTERVAL_MS (default: 300000)
+
+Reporting APIs:
+- GET /api/admin/reports/executive?days=30
+- GET /api/admin/reports/sla?days=7
+- GET /api/admin/reports/audit/export?days=7&format=json|csv&limit=1000
+- GET /api/admin/reports/hipaa/audit (Medical strict mode)
+- GET /api/admin/reports/hipaa/export?days=7&format=json|csv&limit=1000
+- GET /api/admin/reports/schedules
+- POST /api/admin/reports/schedules
+- PATCH /api/admin/reports/schedules/{id}
+- POST /api/admin/reports/schedules/{id}/run
+- GET /api/admin/reports/exports
+- GET /api/admin/reports/exports/{id}
+
 ## Connectors (admin-only)
 - SENTINEL_CONNECTORS_ENABLED (default: true; disabled in govcloud profile)
 - SENTINEL_CONNECTORS_ALLOW_REGULATED (default: false)
@@ -181,7 +203,6 @@ Workspace quotas (per workspace):
 
 ## Admin APIs (Reporting & Catalog)
 - GET /api/admin/connectors/catalog
-- GET /api/admin/reports/executive?days=30
 
 **Performance Note:** Entity extraction during document upload is fast and always enabled by default. The slow operation is the graph traversal at query time, which is now opt-in per query.
 

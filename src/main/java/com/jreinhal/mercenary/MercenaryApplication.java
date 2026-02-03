@@ -15,8 +15,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
+@EnableScheduling
 public class MercenaryApplication {
     private static final Logger log = LoggerFactory.getLogger(MercenaryApplication.class);
     private final Environment environment;
