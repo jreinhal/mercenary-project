@@ -79,6 +79,9 @@ Recommended inspirations:
 - Marketplace for connectors and sector-specific pipelines.
 - Expanded reporting for compliance and executive summaries.
 
+### Now in Motion
+- Workspace isolation design + staged rollout plan drafted in `docs/engineering/plans/WORKSPACE_ISOLATION.md`.
+
 ## References (UI/UX Inspiration)
 - https://www.splunk.com/en-us/blog/security/use-investigation-workbench-to-reduce-time-to-contain-and-time-to-remediate.html
 - https://www.elastic.co/docs/solutions/security/get-started/elastic-security-ui
