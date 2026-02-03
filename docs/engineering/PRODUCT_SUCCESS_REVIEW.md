@@ -91,6 +91,9 @@ Recommended inspirations:
 - Connector marketplace API added (admin-only catalog endpoint).
 - Compliance/executive reporting pack added (admin-only executive report endpoint).
 
+## Test Ops Note
+- Pre-auth rate limiting should remain ON in normal runs. Disable it only for automated E2E test runs that perform bulk uploads (set `APP_RATE_LIMIT_ENABLED=false`), then re-enable for day-to-day usage.
+
 ## References (UI/UX Inspiration)
 - https://www.splunk.com/en-us/blog/security/use-investigation-workbench-to-reduce-time-to-contain-and-time-to-remediate.html
 - https://www.elastic.co/docs/solutions/security/get-started/elastic-security-ui
