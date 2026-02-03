@@ -125,6 +125,23 @@ public class WorkspaceService {
         }).orElse(false);
     }
 
+    public Workspace updateQuota(String workspaceId, WorkspaceQuota quota, User actor) {
+        assertWorkspaceManagementEnabled();
+        Workspace workspace = requireWorkspace(workspaceId);
+        WorkspaceQuota sanitized = sanitizeQuota(quota);
+        Instant now = Instant.now();
+        Workspace updated = new Workspace(workspace.id(), workspace.name(), workspace.description(),
+                workspace.createdBy(), workspace.createdAt(), now, sanitized, workspace.active());
+        Workspace saved = this.workspaceRepository.save(updated);
+        log.info("Workspace quota updated: {} by {}", workspace.id(), actor != null ? actor.getUsername() : "system");
+        return saved;
+    }
+
+    public Workspace getWorkspace(String workspaceId) {
+        assertWorkspaceManagementEnabled();
+        return requireWorkspace(workspaceId);
+    }
+
     private Workspace requireWorkspace(String workspaceId) {
         if (workspaceId == null || workspaceId.isBlank()) {
             throw new IllegalArgumentException("Workspace id is required");
@@ -188,6 +205,16 @@ public class WorkspaceService {
 
     private String optionalText(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private WorkspaceQuota sanitizeQuota(WorkspaceQuota quota) {
+        if (quota == null) {
+            return WorkspaceQuota.unlimited();
+        }
+        int maxDocs = Math.max(0, quota.maxDocuments());
+        int maxQueries = Math.max(0, quota.maxQueriesPerDay());
+        int maxStorage = Math.max(0, quota.maxStorageMb());
+        return new WorkspaceQuota(maxDocs, maxQueries, maxStorage);
     }
 
     public record WorkspaceCreateRequest(String id, String name, String description, WorkspaceQuota quota) {

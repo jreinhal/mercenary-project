@@ -208,6 +208,12 @@ sentinel:
     allow-regulated: ${SENTINEL_WORKSPACE_ALLOW_REGULATED:false}
     default-id: ${SENTINEL_WORKSPACE_DEFAULT_ID:workspace_default}
 
+  reporting:
+    schedules:
+      enabled: ${SENTINEL_REPORTING_SCHEDULES_ENABLED:false}
+      allow-regulated: ${SENTINEL_REPORTING_SCHEDULES_ALLOW_REGULATED:false}
+      interval-ms: ${SENTINEL_REPORTING_SCHEDULES_INTERVAL_MS:300000}
+
   connectors:
     enabled: ${SENTINEL_CONNECTORS_ENABLED:true}
     allow-regulated: ${SENTINEL_CONNECTORS_ALLOW_REGULATED:false}

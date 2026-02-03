@@ -68,6 +68,27 @@
         </div>
     </div>
 
+    <div class="feedback-modal" id="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+        <div class="feedback-modal-content report-modal-content">
+            <div class="feedback-modal-header">
+                <span class="feedback-modal-title" id="report-modal-title">Report Output</span>
+                <button class="icon-btn" data-action="closeReportModal" aria-label="Close report modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="feedback-modal-body report-modal-body">
+                <div class="report-modal-meta" id="report-modal-meta"></div>
+                <pre class="report-modal-output" id="report-modal-output"></pre>
+            </div>
+            <div class="feedback-modal-footer">
+                <button class="btn btn-secondary" data-action="closeReportModal">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Classification Banner (DoD requirement - shown for high-security sectors) -->
     <div id="classification-banner" class="classification-banner unclassified hidden" role="banner" aria-live="polite">
         UNCLASSIFIED
@@ -628,6 +649,7 @@
                     <button class="right-panel-tab active" data-action="switchRightTab" data-tab="plot" data-tab="plot">Plot</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="source" data-tab="source">Source</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="eval">Eval</button>
+                    <button class="right-panel-tab" data-action="switchRightTab" data-tab="reports">Reports</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="case">Case</button>
                 </div>
             </div>
@@ -860,6 +882,197 @@
 
                     <div class="eval-results" id="eval-results">
                         <div class="eval-empty-state">No evaluation runs yet.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Tab (Admin) -->
+            <div class="right-panel-content hidden" id="right-tab-reports">
+                <div class="reporting-panel">
+                    <div class="reporting-header">
+                        <div>
+                            <div class="reporting-title">Reporting &amp; Exports</div>
+                            <div class="reporting-subtitle">Executive insights, SLA metrics, and audit exports per workspace.</div>
+                        </div>
+                        <span class="reporting-badge" id="reporting-compliance-badge">Admin only</span>
+                    </div>
+                    <div class="reporting-hint" id="reporting-compliance-hint">Admin access required to run reports.</div>
+
+                    <div class="report-grid">
+                        <div class="report-card" id="report-executive-card">
+                            <div class="report-card-header">
+                                <div>
+                                    <div class="report-card-title">Executive Summary</div>
+                                    <div class="report-card-subtitle">Usage + security snapshot for leadership.</div>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" data-action="runExecutiveReport" id="report-executive-btn" data-report-control>Generate</button>
+                            </div>
+                            <div class="report-card-body">
+                                <div class="report-input-row">
+                                    <label for="report-executive-days">Window (days)</label>
+                                    <input type="number" min="1" max="365" value="30" class="report-input" id="report-executive-days" data-report-control>
+                                </div>
+                                <div class="report-metrics" id="report-executive-metrics">
+                                    <div class="report-empty">No report yet.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="report-card" id="report-sla-card">
+                            <div class="report-card-header">
+                                <div>
+                                    <div class="report-card-title">SLA Dashboard</div>
+                                    <div class="report-card-subtitle">Latency + throughput metrics for the last window.</div>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" data-action="runSlaReport" id="report-sla-btn" data-report-control>Generate</button>
+                            </div>
+                            <div class="report-card-body">
+                                <div class="report-input-row">
+                                    <label for="report-sla-days">Window (days)</label>
+                                    <input type="number" min="1" max="365" value="7" class="report-input" id="report-sla-days" data-report-control>
+                                </div>
+                                <div class="report-metrics" id="report-sla-metrics">
+                                    <div class="report-empty">No SLA data yet.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="report-card" id="report-audit-card">
+                        <div class="report-card-header">
+                            <div>
+                                <div class="report-card-title">Audit Export</div>
+                                <div class="report-card-subtitle">Download audit events for the active workspace.</div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" data-action="runAuditExport" id="report-audit-btn" data-report-control>Export</button>
+                        </div>
+                        <div class="report-card-body">
+                            <div class="report-input-grid">
+                                <div class="report-input-row">
+                                    <label for="report-audit-days">Window (days)</label>
+                                    <input type="number" min="1" max="365" value="7" class="report-input" id="report-audit-days" data-report-control>
+                                </div>
+                                <div class="report-input-row">
+                                    <label for="report-audit-limit">Max Events</label>
+                                    <input type="number" min="1" max="5000" value="1000" class="report-input" id="report-audit-limit" data-report-control>
+                                </div>
+                                <div class="report-input-row">
+                                    <label for="report-audit-format">Format</label>
+                                    <select id="report-audit-format" class="report-select" data-report-control>
+                                        <option value="json">JSON</option>
+                                        <option value="csv">CSV</option>
+                                    </select>
+                                </div>
+                                <div class="report-input-row">
+                                    <label for="report-audit-type">Log Type</label>
+                                    <select id="report-audit-type" class="report-select" data-report-control>
+                                        <option value="standard">Standard audit</option>
+                                        <option value="hipaa">HIPAA audit</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="report-hint" id="report-audit-hint"></div>
+                        </div>
+                    </div>
+
+                    <div class="report-card" id="report-schedule-card">
+                        <div class="report-card-header">
+                            <div>
+                                <div class="report-card-title">Scheduled Reports</div>
+                                <div class="report-card-subtitle">Create recurring exports for compliance and leadership.</div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" data-action="refreshReportSchedules" id="report-schedule-refresh" data-report-control data-report-schedule-control>Refresh</button>
+                        </div>
+                        <div class="report-card-body">
+                            <div class="report-input-grid">
+                                <div class="report-input-row">
+                                    <label for="report-schedule-type">Type</label>
+                                    <select id="report-schedule-type" class="report-select" data-report-control data-report-schedule-control>
+                                        <option value="EXECUTIVE">Executive</option>
+                                        <option value="SLA">SLA</option>
+                                        <option value="AUDIT">Audit</option>
+                                    </select>
+                                </div>
+                                <div class="report-input-row">
+                                    <label for="report-schedule-format">Format</label>
+                                    <select id="report-schedule-format" class="report-select" data-report-control data-report-schedule-control>
+                                        <option value="JSON">JSON</option>
+                                        <option value="CSV">CSV</option>
+                                    </select>
+                                </div>
+                                <div class="report-input-row">
+                                    <label for="report-schedule-cadence">Cadence</label>
+                                    <select id="report-schedule-cadence" class="report-select" data-report-control data-report-schedule-control>
+                                        <option value="DAILY">Daily</option>
+                                        <option value="WEEKLY">Weekly</option>
+                                        <option value="MONTHLY">Monthly</option>
+                                    </select>
+                                </div>
+                                <div class="report-input-row">
+                                    <label for="report-schedule-window">Window (days)</label>
+                                    <input type="number" min="1" max="365" value="7" class="report-input" id="report-schedule-window" data-report-control data-report-schedule-control>
+                                </div>
+                                <div class="report-input-row">
+                                    <label for="report-schedule-limit">Limit (audit only)</label>
+                                    <input type="number" min="1" max="5000" value="1000" class="report-input" id="report-schedule-limit" data-report-control data-report-schedule-control>
+                                </div>
+                            </div>
+                            <div class="report-actions">
+                                <button class="btn btn-primary" data-action="createReportSchedule" id="report-schedule-create" data-report-control data-report-schedule-control>Create Schedule</button>
+                            </div>
+                            <div class="report-list" id="report-schedule-list">
+                                <div class="report-empty">No schedules configured.</div>
+                            </div>
+                            <div class="report-hint" id="report-schedule-hint"></div>
+                        </div>
+                    </div>
+
+                    <div class="report-card" id="report-exports-card">
+                        <div class="report-card-header">
+                            <div>
+                                <div class="report-card-title">Recent Exports</div>
+                                <div class="report-card-subtitle">View or download scheduled report exports.</div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" data-action="refreshReportExports" id="report-exports-refresh" data-report-control>Refresh</button>
+                        </div>
+                        <div class="report-card-body">
+                            <div class="report-list" id="report-exports-list">
+                                <div class="report-empty">No exports generated yet.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="report-card" id="report-quotas-card">
+                        <div class="report-card-header">
+                            <div>
+                                <div class="report-card-title">Workspace Quotas</div>
+                                <div class="report-card-subtitle">Adjust limits for the active workspace.</div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" data-action="refreshWorkspaceQuota" id="quota-refresh-btn" data-report-control>Refresh</button>
+                        </div>
+                        <div class="report-card-body">
+                            <div class="quota-grid">
+                                <div class="quota-item">
+                                    <label for="quota-max-docs">Max Documents</label>
+                                    <input type="number" min="0" step="1" class="report-input" id="quota-max-docs" data-report-control>
+                                    <div class="quota-usage" id="quota-docs-usage">Usage: -</div>
+                                </div>
+                                <div class="quota-item">
+                                    <label for="quota-max-queries">Max Queries / Day</label>
+                                    <input type="number" min="0" step="1" class="report-input" id="quota-max-queries" data-report-control>
+                                    <div class="quota-usage" id="quota-queries-usage">Usage: -</div>
+                                </div>
+                                <div class="quota-item">
+                                    <label for="quota-max-storage">Max Storage (MB)</label>
+                                    <input type="number" min="0" step="1" class="report-input" id="quota-max-storage" data-report-control>
+                                    <div class="quota-usage" id="quota-storage-usage">Usage: -</div>
+                                </div>
+                            </div>
+                            <div class="report-actions">
+                                <button class="btn btn-primary" data-action="saveWorkspaceQuota" id="quota-save-btn" data-report-control>Save Quota</button>
+                            </div>
+                            <div class="report-hint" id="quota-hint"></div>
+                        </div>
                     </div>
                 </div>
             </div>

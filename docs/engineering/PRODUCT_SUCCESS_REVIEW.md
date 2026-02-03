@@ -1,6 +1,6 @@
 # Product Success Review - SENTINEL Intelligence Platform
 
-Last updated: 2026-02-02
+Last updated: 2026-02-03
 
 ## Objective
 Scan the software and identify what needs to change to maximize product-market fit and become a top-selling product, with a focus on UI/UX and marketing readiness.
@@ -86,7 +86,8 @@ Recommended inspirations:
 - Workspace isolation Phase 1 implemented (workspaceId tagging + query filters + header-based selection; UI switcher pending).
 - Workspace management APIs (Phase 2) implemented (create/list/membership; non-regulated only).
 - Workspace selector added to Settings sidebar (Phase 3 partial; regulated editions hidden).
-- Workspace quotas enforced (documents/queries/storage) (Phase 4 partial).
+- Workspace quotas enforced + admin quota editor + usage view (Phase 4).
+- Reporting UI + audit exports + SLA dashboard + scheduled exports (config gated) (Phase 4).
 - Connector marketplace API added (admin-only catalog endpoint).
 - Compliance/executive reporting pack added (admin-only executive report endpoint).
 

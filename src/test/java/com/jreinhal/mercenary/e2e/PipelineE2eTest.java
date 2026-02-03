@@ -17,6 +17,8 @@ import java.util.Optional;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.repository.ChatLogRepository;
 import com.jreinhal.mercenary.repository.FeedbackRepository;
+import com.jreinhal.mercenary.repository.ReportExportRepository;
+import com.jreinhal.mercenary.repository.ReportScheduleRepository;
 import com.jreinhal.mercenary.repository.UserRepository;
 import com.jreinhal.mercenary.repository.WorkspaceRepository;
 import com.jreinhal.mercenary.workspace.Workspace;
@@ -67,6 +69,12 @@ class PipelineE2eTest {
 
     @MockitoBean
     private FeedbackRepository feedbackRepository;
+
+    @MockitoBean
+    private ReportScheduleRepository reportScheduleRepository;
+
+    @MockitoBean
+    private ReportExportRepository reportExportRepository;
 
     @MockitoBean
     private WorkspaceRepository workspaceRepository;
