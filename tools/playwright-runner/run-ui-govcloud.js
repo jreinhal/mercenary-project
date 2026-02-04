@@ -354,6 +354,17 @@ function validateEntityStrict({ responseText, sources, entitiesStructured, entit
     if (entityGraph.placeholderVisible) errors.push('Entity graph placeholder still visible');
     if (nodeCount <= 0) errors.push('Entity graph node count is zero');
     if (edgeCount <= 0 && nodeCount > 1) errors.push('Entity graph edges missing');
+  } else {
+    // Empty graphs should show an explicit placeholder (avoid "blank panel" UX).
+    if (nodeCount === 0 && !entityGraph.placeholderVisible) {
+      errors.push('Entity graph is empty but placeholder is not visible');
+    }
+    if (nodeCount > 0 && entityGraph.placeholderVisible) {
+      errors.push('Entity graph has nodes but placeholder is visible');
+    }
+    if (nodeCount > 0 && !entityGraph.graphHasCanvas) {
+      errors.push('Entity graph nodes present but graph did not render');
+    }
   }
 
   if (mode === 'context' && expectEntities) {
@@ -552,7 +563,7 @@ async function run() {
         entitiesStructured: discovery.entitiesStructured,
         entityGraph: discovery.entityGraph,
         mode: 'context',
-        expectEntities: discovery.sources.length > 0
+        expectEntities: Array.isArray(discovery.entitiesStructured) && discovery.entitiesStructured.length > 0
       })
     : { pass: true, errors: [] };
   results.tests.push({
@@ -620,7 +631,7 @@ async function run() {
         entitiesStructured: injection.entitiesStructured,
         entityGraph: injection.entityGraph,
         mode: 'context',
-        expectEntities: false
+        expectEntities: Array.isArray(injection.entitiesStructured) && injection.entitiesStructured.length > 0
       })
     : { pass: true, errors: [] };
   results.tests.push({
