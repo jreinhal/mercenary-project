@@ -388,7 +388,37 @@ async function getQueryGraphState(page) {
     return { total: nodes.length, counts };
   });
   const labelsCount = await page.evaluate(() => document.querySelectorAll('#plotly-graph .graph-label').length);
-  return { placeholderVisible, hasSvg, nodeCounts, labelsCount };
+  const severeLabelOverlaps = await page.evaluate(() => {
+    const labels = Array.from(document.querySelectorAll('#plotly-graph .graph-label')).filter((el) => {
+      const style = window.getComputedStyle(el);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    });
+    const rects = labels.map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
+
+    function overlapArea(a, b) {
+      const dx = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const dy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return dx * dy;
+    }
+
+    let severe = 0;
+    for (let i = 0; i < rects.length; i++) {
+      const a = rects[i];
+      const areaA = a.width * a.height;
+      for (let j = i + 1; j < rects.length; j++) {
+        const b = rects[j];
+        const areaB = b.width * b.height;
+        const area = overlapArea(a, b);
+        if (area <= 0) continue;
+        const minArea = Math.min(areaA, areaB) || 1;
+        const ratio = area / minArea;
+        // "Severe overlap" heuristic: >20% of the smaller label's area overlaps.
+        if (ratio >= 0.2) severe++;
+      }
+    }
+    return severe;
+  });
+  return { placeholderVisible, hasSvg, nodeCounts, labelsCount, severeLabelOverlaps };
 }
 
 async function runQuery(page, query) {
@@ -599,6 +629,7 @@ function queryGraphOk(queryGraph, expectedSourceCount) {
   if (!queryGraph) return false;
   if (queryGraph.placeholderVisible && expectedSourceCount > 0) return false;
   if (!queryGraph.placeholderVisible && !queryGraph.hasSvg && expectedSourceCount > 0) return false;
+  if ((queryGraph.severeLabelOverlaps || 0) > 0) return false;
   if (queryGraph.nodeCounts) {
     const queryCount = queryGraph.nodeCounts.counts?.query || 0;
     const sourceCount = queryGraph.nodeCounts.counts?.source || 0;
