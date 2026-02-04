@@ -3148,14 +3148,15 @@
                 } else {
                     // Context graph uses latest response entities
                     if (contextGraphState.entities.length === 0) {
-                        const placeholder = document.getElementById('entity-placeholder');
-                        const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
-                        const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
+                        const graphEl = document.getElementById('entity-graph');
+                        const placeholder = ensureEntityPlaceholder(graphEl);
+                        const placeholderText = placeholder ? placeholder.querySelector('.entity-placeholder-text') : null;
+                        const placeholderHint = placeholder ? placeholder.querySelector('.entity-placeholder-hint') : null;
                         if (placeholderText) placeholderText.textContent = 'No entities extracted from the latest response';
                         if (placeholderHint) placeholderHint.textContent = 'Ask a question to populate the context graph.';
                         setHidden(placeholder, false);
-                        const graphEl = document.getElementById('entity-graph');
-                        if (graphEl) graphEl.innerHTML = '';
+                        cleanupEntityGraph();
+                        clearEntityGraphSurface(graphEl);
                         setEntityGraphStats(0, 0);
                     } else {
                         renderEntityGraph();
@@ -3175,15 +3176,49 @@
             switchGraphTab('query');
         }
 
+        function ensureEntityPlaceholder(graphEl) {
+            if (!graphEl) return null;
+            let placeholder = graphEl.querySelector('#entity-placeholder');
+            if (placeholder) return placeholder;
+            // Avoid "blank panel" states if previous logic cleared innerHTML.
+            graphEl.insertAdjacentHTML('afterbegin', `
+                <div class="entity-placeholder" id="entity-placeholder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="6" cy="6" r="2"/>
+                        <circle cx="18" cy="6" r="2"/>
+                        <circle cx="6" cy="18" r="2"/>
+                        <circle cx="18" cy="18" r="2"/>
+                        <circle cx="12" cy="12" r="3"/>
+                        <line x1="8" y1="6" x2="10" y2="10"/>
+                        <line x1="16" y1="6" x2="14" y2="10"/>
+                        <line x1="8" y1="18" x2="10" y2="14"/>
+                        <line x1="16" y1="18" x2="14" y2="14"/>
+                    </svg>
+                    <div class="entity-placeholder-text">Entity network will appear here</div>
+                    <div class="entity-placeholder-hint">Entities are extracted during document upload. Enable Deep Analysis to query the entity graph.</div>
+                </div>
+            `);
+            return graphEl.querySelector('#entity-placeholder');
+        }
+
+        function clearEntityGraphSurface(graphEl) {
+            if (!graphEl) return;
+            const placeholder = ensureEntityPlaceholder(graphEl);
+            Array.from(graphEl.children).forEach(child => {
+                if (placeholder && child === placeholder) return;
+                child.remove();
+            });
+        }
+
         async function loadEntityGraph() {
             const dept = sectorSelect?.value || 'ENTERPRISE';
             const statsEl = document.getElementById('entity-explorer-stats');
             const nodeCountEl = document.getElementById('entity-node-count');
             const edgeCountEl = document.getElementById('entity-edge-count');
-            const placeholder = document.getElementById('entity-placeholder');
-            const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
-            const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
             const graphEl = document.getElementById('entity-graph');
+            const placeholder = ensureEntityPlaceholder(graphEl);
+            const placeholderText = placeholder ? placeholder.querySelector('.entity-placeholder-text') : null;
+            const placeholderHint = placeholder ? placeholder.querySelector('.entity-placeholder-hint') : null;
 
             try {
                 if (placeholderText) placeholderText.textContent = 'Loading entity network...';
@@ -3201,7 +3236,8 @@
                     if (placeholderText) placeholderText.textContent = 'Entity graph unavailable';
                     if (placeholderHint) placeholderHint.textContent = stats.error;
                     setHidden(placeholder, false);
-                    graphEl.innerHTML = '';
+                    cleanupEntityGraph();
+                    clearEntityGraphSurface(graphEl);
                     return;
                 }
 
@@ -3210,7 +3246,8 @@
 
                 if (!stats.enabled || stats.entityCount === 0) {
                     setHidden(placeholder, false);
-                    graphEl.innerHTML = '';
+                    cleanupEntityGraph();
+                    clearEntityGraphSurface(graphEl);
                     return;
                 }
 
@@ -3228,7 +3265,8 @@
                     if (placeholderText) placeholderText.textContent = 'Entity graph failed to load';
                     if (placeholderHint) placeholderHint.textContent = entitiesData.error || edgesData.error;
                     setHidden(placeholder, false);
-                    graphEl.innerHTML = '';
+                    cleanupEntityGraph();
+                    clearEntityGraphSurface(graphEl);
                     return;
                 }
 
@@ -3237,7 +3275,8 @@
 
                 if (entityGraphState.entities.length === 0) {
                     setHidden(placeholder, false);
-                    graphEl.innerHTML = '';
+                    cleanupEntityGraph();
+                    clearEntityGraphSurface(graphEl);
                     return;
                 }
 
@@ -3252,7 +3291,8 @@
                 if (placeholderText) placeholderText.textContent = 'Entity graph unavailable';
                 if (placeholderHint) placeholderHint.textContent = 'Failed to load graph data. Please retry.';
                 setHidden(placeholder, false);
-                graphEl.innerHTML = '';
+                cleanupEntityGraph();
+                clearEntityGraphSurface(graphEl);
             }
         }
 
@@ -3278,16 +3318,17 @@
                 btn.classList.toggle('active', isActive);
             });
 
-            const placeholder = document.getElementById('entity-placeholder');
-            const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
-            const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
             const graphEl = document.getElementById('entity-graph');
+            const placeholder = ensureEntityPlaceholder(graphEl);
+            const placeholderText = placeholder ? placeholder.querySelector('.entity-placeholder-text') : null;
+            const placeholderHint = placeholder ? placeholder.querySelector('.entity-placeholder-hint') : null;
 
             if (normalized === 'sector') {
                 if (placeholderText) placeholderText.textContent = 'Loading entity network...';
                 if (placeholderHint) placeholderHint.textContent = 'Fetching sector graph data.';
                 setHidden(placeholder, false);
-                if (graphEl) graphEl.innerHTML = '';
+                cleanupEntityGraph();
+                clearEntityGraphSurface(graphEl);
                 refreshEntityGraph();
                 return;
             }
@@ -3298,7 +3339,8 @@
                 if (placeholderText) placeholderText.textContent = 'No entities extracted from the latest response';
                 if (placeholderHint) placeholderHint.textContent = 'Ask a question to populate the context graph.';
                 setHidden(placeholder, false);
-                if (graphEl) graphEl.innerHTML = '';
+                cleanupEntityGraph();
+                clearEntityGraphSurface(graphEl);
                 return;
             }
 
@@ -3311,9 +3353,10 @@
 
         function updateContextEntityGraph(entities) {
             const normalizedEntities = Array.isArray(entities) ? entities : [];
-            const placeholder = document.getElementById('entity-placeholder');
-            const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
-            const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
+            const graphEl = document.getElementById('entity-graph');
+            const placeholder = ensureEntityPlaceholder(graphEl);
+            const placeholderText = placeholder ? placeholder.querySelector('.entity-placeholder-text') : null;
+            const placeholderHint = placeholder ? placeholder.querySelector('.entity-placeholder-hint') : null;
 
             if (normalizedEntities.length === 0) {
                 contextGraphState.entities = [];
@@ -3323,6 +3366,8 @@
                     if (placeholderText) placeholderText.textContent = 'No entities extracted from the latest response';
                     if (placeholderHint) placeholderHint.textContent = 'Ask a question to populate the context graph.';
                     setHidden(placeholder, false);
+                    cleanupEntityGraph();
+                    clearEntityGraphSurface(graphEl);
                 }
                 return;
             }
@@ -3591,9 +3636,9 @@
             const graphEl = document.getElementById('entity-graph');
             if (!graphEl) return;
 
-            const placeholder = document.getElementById('entity-placeholder');
-            const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
-            const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
+            const placeholder = ensureEntityPlaceholder(graphEl);
+            const placeholderText = placeholder ? placeholder.querySelector('.entity-placeholder-text') : null;
+            const placeholderHint = placeholder ? placeholder.querySelector('.entity-placeholder-hint') : null;
 
             const graphData = prepareEntityGraphData();
             if (!graphData) {
@@ -3605,7 +3650,8 @@
                     placeholderHint.textContent = hasFilter ? 'Clear the search filter to restore results.' : 'Entities are extracted during document upload. Enable Deep Analysis to query the entity graph.';
                 }
                 setHidden(placeholder, false);
-                graphEl.innerHTML = '';
+                cleanupEntityGraph();
+                clearEntityGraphSurface(graphEl);
                 return;
             }
 
@@ -3614,14 +3660,15 @@
                 if (placeholderText) placeholderText.textContent = 'Entity graph engine unavailable';
                 if (placeholderHint) placeholderHint.textContent = 'Reload the page or verify /vendor/force-graph.min.js is accessible.';
                 setHidden(placeholder, false);
-                graphEl.innerHTML = '';
+                cleanupEntityGraph();
+                clearEntityGraphSurface(graphEl);
                 return;
             }
 
             setHidden(placeholder, true);
 
             cleanupEntityGraph();
-            graphEl.innerHTML = '';
+            clearEntityGraphSurface(graphEl);
 
             const width = graphEl.offsetWidth || 400;
             const height = graphEl.offsetHeight || 350;
@@ -4340,12 +4387,13 @@
                 }
 
                 entityGraphState.entities = data.entities || [];
-                const placeholder = document.getElementById('entity-placeholder');
                 const graphEl = document.getElementById('entity-graph');
+                const placeholder = ensureEntityPlaceholder(graphEl);
 
                 if (entityGraphState.entities.length === 0) {
                     setHidden(placeholder, false);
-                    graphEl.innerHTML = '';
+                    cleanupEntityGraph();
+                    clearEntityGraphSurface(graphEl);
                 } else {
                     setHidden(placeholder, true);
                     renderEntityGraph();
