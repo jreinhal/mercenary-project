@@ -1326,7 +1326,8 @@
 
         .graph-label {
             font-family: var(--font-ui);
-            font-size: 0.5px;
+            /* SVG uses a viewBox; size is in viewBox units (not px). Bump for readability. */
+            font-size: 0.7px;
             fill: var(--graph-text);
             pointer-events: none;
             user-select: none;
