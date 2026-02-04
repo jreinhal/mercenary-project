@@ -5225,7 +5225,7 @@
             }
 
             function placeLabel(labelEl, node, preferredKey) {
-                const baseText = labelEl.textContent || '';
+                let baseText = labelEl.textContent || '';
                 labelEl.style.display = '';
                 const candidateKeys = getCandidateKeys(node, preferredKey);
 
@@ -5276,23 +5276,25 @@
                 if (tryPlace(false)) return;
                 if (tryPlace(true)) return;
 
-                // Force-place labels for query and source nodes even if they overlap
-                // Only hide labels for entity nodes when placement fails
                 if (node.type === 'entity') {
                     labelEl.style.display = 'none';
-                } else {
-                    // Force place at preferred position for query/source nodes
-                    const offset = textOffsets[preferredKey] || textOffsets['bottom center'];
-                    const labelX = node.x + offset.dx;
-                    const labelY = node.y + offset.dy;
-                    labelEl.setAttribute('x', labelX);
-                    labelEl.setAttribute('y', labelY);
-                    labelEl.setAttribute('text-anchor', offset.anchor);
-                    labelEl.setAttribute('dominant-baseline', offset.baseline);
-                    // Truncate to fit
-                    const maxWidth = getMaxLabelWidth(labelX, offset.anchor) - 0.1;
-                    fitLabelTextToWidth(labelEl, maxWidth, true);
+                    return;
                 }
+
+                // Last-resort: try a compact label for query/source nodes to avoid severe overlaps.
+                // Tooltips still show the full text when hovering a node.
+                if (node.type === 'source') {
+                    const match = String(node.id || '').match(/source-(\d+)/i);
+                    const suffix = match ? ` ${Number.parseInt(match[1], 10) + 1}` : '';
+                    baseText = `Src${suffix}`;
+                    if (tryPlace(true)) return;
+                } else if (node.type === 'query') {
+                    baseText = 'Query';
+                    if (tryPlace(true)) return;
+                }
+
+                // If we can't place the label without overlapping, hide it (prevents unreadable clutter).
+                labelEl.style.display = 'none';
             }
 
             function buildTooltipHtmlForNode(node, snippet) {
