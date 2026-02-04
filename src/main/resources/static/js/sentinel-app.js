@@ -3186,6 +3186,10 @@
             const graphEl = document.getElementById('entity-graph');
 
             try {
+                if (placeholderText) placeholderText.textContent = 'Loading entity network...';
+                if (placeholderHint) placeholderHint.textContent = 'Fetching sector graph data.';
+                setHidden(placeholder, false);
+
                 // Fetch stats first
                 const statsRes = await guardedFetch(`${API_BASE}/graph/stats?dept=${encodeURIComponent(dept)}`);
                 const stats = await statsRes.json();
@@ -3280,16 +3284,11 @@
             const graphEl = document.getElementById('entity-graph');
 
             if (normalized === 'sector') {
-                if (entityGraphState.entities.length === 0) {
-                    loadEntityGraph();
-                } else {
-                    setEntityGraphStats(entityGraphState.entities.length, entityGraphState.edges.length);
-                    if (placeholderText) placeholderText.textContent = 'Entity network will appear here';
-                    if (placeholderHint) placeholderHint.textContent = 'Entities are extracted during document upload. Enable Deep Analysis to query the entity graph.';
-                    setHidden(placeholder, entityGraphState.entities.length > 0);
-                    if (entityGraphState.entities.length === 0 && graphEl) graphEl.innerHTML = '';
-                    renderEntityGraph();
-                }
+                if (placeholderText) placeholderText.textContent = 'Loading entity network...';
+                if (placeholderHint) placeholderHint.textContent = 'Fetching sector graph data.';
+                setHidden(placeholder, false);
+                if (graphEl) graphEl.innerHTML = '';
+                refreshEntityGraph();
                 return;
             }
 
@@ -3592,11 +3591,12 @@
             const graphEl = document.getElementById('entity-graph');
             if (!graphEl) return;
 
+            const placeholder = document.getElementById('entity-placeholder');
+            const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
+            const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
+
             const graphData = prepareEntityGraphData();
             if (!graphData) {
-                const placeholder = document.getElementById('entity-placeholder');
-                const placeholderText = document.querySelector('#entity-placeholder .entity-placeholder-text');
-                const placeholderHint = document.querySelector('#entity-placeholder .entity-placeholder-hint');
                 const hasFilter = Boolean((entityGraphState.searchFilter || '').trim());
                 if (placeholderText) {
                     placeholderText.textContent = hasFilter ? 'No entities match your search' : 'Entity network will appear here';
@@ -3609,13 +3609,16 @@
                 return;
             }
 
-            const placeholder = document.getElementById('entity-placeholder');
-            setHidden(placeholder, true);
-
             if (typeof ForceGraph === 'undefined') {
                 console.warn('2D force-graph not loaded');
+                if (placeholderText) placeholderText.textContent = 'Entity graph engine unavailable';
+                if (placeholderHint) placeholderHint.textContent = 'Reload the page or verify /vendor/force-graph.min.js is accessible.';
+                setHidden(placeholder, false);
+                graphEl.innerHTML = '';
                 return;
             }
+
+            setHidden(placeholder, true);
 
             cleanupEntityGraph();
             graphEl.innerHTML = '';

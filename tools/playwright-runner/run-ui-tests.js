@@ -264,7 +264,8 @@ async function getEntityGraphState(page, mode = 'context') {
     placeholderVisible: null,
     nodeCount: null,
     edgeCount: null,
-    graphHasCanvas: false
+    graphHasCanvas: false,
+    graphData: null
   };
 
   if (!isTabVisible) {
@@ -327,6 +328,18 @@ async function getEntityGraphState(page, mode = 'context') {
     return { nodeCount: nodes.length, counts };
   });
   state.nodeTypeCounts = typeCounts ? typeCounts.counts : null;
+  state.graphData = await page.evaluate(() => {
+    const graph = (typeof entity2DGraph !== 'undefined') ? entity2DGraph : null;
+    if (!graph || !graph.graphData) return null;
+    const data = graph.graphData() || {};
+    const nodes = Array.isArray(data.nodes) ? data.nodes.map(node => ({
+      id: node.id,
+      name: node.name || node.value || node.label || '',
+      type: node.type || node.entityType || 'UNKNOWN'
+    })) : [];
+    const links = Array.isArray(data.links) ? data.links : [];
+    return { nodes, linkCount: links.length };
+  });
   await switchGraphTab(page, 'query');
 
   return state;
@@ -405,6 +418,15 @@ async function runQuery(page, query) {
   }
   const sources = (await page.locator('#info-sources-list .info-source-item').allInnerTexts()).map(s => s.trim()).filter(Boolean);
   const entities = (await page.locator('#info-entities-list .info-entity-item').allInnerTexts()).map(s => s.trim()).filter(Boolean);
+  const entitiesStructured = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll('#info-entities-list .info-entity-item'))
+      .map(item => {
+        const name = item.querySelector('.info-entity-name')?.textContent?.trim() || '';
+        const type = item.querySelector('.info-entity-type')?.textContent?.trim() || '';
+        return { name, type };
+      })
+      .filter(e => e.name);
+  });
   const placeholderVisible = await isVisible(page.locator('#graph-placeholder'));
   const graphHasCanvas = await page.evaluate(() => Boolean(document.querySelector('#graph-container canvas, #graph-container svg')));
 
@@ -413,6 +435,7 @@ async function runQuery(page, query) {
     responseText,
     sources,
     entities,
+    entitiesStructured,
     placeholderVisible,
     graphHasCanvas,
     queryGraph: await getQueryGraphState(page),
@@ -443,6 +466,104 @@ function meetsMinLength(text, minChars) {
 function parseCount(value) {
   const num = Number.parseInt(value, 10);
   return Number.isNaN(num) ? null : num;
+}
+
+const ENTITY_TYPE_MAP = {
+  PERSON: 'PERSON',
+  ORGANIZATION: 'ORGANIZATION',
+  LOCATION: 'LOCATION',
+  DATE: 'DATE',
+  REFERENCE: 'REFERENCE',
+  DOCUMENT: 'REFERENCE',
+  ACRONYM: 'TECHNICAL',
+  CONCEPT: 'TECHNICAL',
+  TECHNICAL: 'TECHNICAL',
+  TECHNOLOGY: 'TECHNICAL'
+};
+
+function normalizeEntityType(rawType) {
+  if (!rawType) return null;
+  const cleaned = String(rawType).trim().toUpperCase().replace(/\s+/g, '_');
+  return ENTITY_TYPE_MAP[cleaned] || null;
+}
+
+function hasWord(text, needle) {
+  if (!text || !needle) return false;
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+  return regex.test(text);
+}
+
+function entityAppearsInText(name, responseText, sources) {
+  if (!name) return false;
+  const needle = name.trim();
+  if (!needle) return false;
+  const haystack = `${responseText || ''}\n${(sources || []).join('\n')}`;
+  if (needle.length <= 3) {
+    return hasWord(haystack, needle);
+  }
+  return haystack.toLowerCase().includes(needle.toLowerCase());
+}
+
+function validateEntityStrict({ responseText, sources, entitiesStructured, entityGraph, mode, expectEntities }) {
+  const errors = [];
+  const entities = Array.isArray(entitiesStructured) ? entitiesStructured : [];
+
+  if (!entityGraph || !entityGraph.tabVisible) {
+    errors.push('Entity graph tab not visible');
+    return { pass: false, errors };
+  }
+
+  const nodeCount = parseCount(entityGraph.nodeCount) || 0;
+  const edgeCount = parseCount(entityGraph.edgeCount) || 0;
+  const graphData = entityGraph.graphData || {};
+  const graphNodes = Array.isArray(graphData.nodes) ? graphData.nodes : [];
+  const graphNames = new Set(graphNodes.map(n => String(n.name || n.value || '').toLowerCase()).filter(Boolean));
+
+  if (expectEntities && entities.length === 0) {
+    errors.push('Expected entities but none were listed');
+  }
+
+  if (!expectEntities && entities.length > 0) {
+    errors.push('Entities listed when none expected');
+  }
+
+  if (expectEntities) {
+    if (!entityGraph.graphHasCanvas) errors.push('Entity graph did not render');
+    if (entityGraph.placeholderVisible) errors.push('Entity graph placeholder still visible');
+    if (nodeCount <= 0) errors.push('Entity graph node count is zero');
+    if (edgeCount <= 0 && nodeCount > 1) errors.push('Entity graph edges missing');
+  }
+
+  if (mode === 'context' && expectEntities) {
+    const expectedMinNodes = entities.length + 1;
+    if (nodeCount < expectedMinNodes) {
+      errors.push(`Entity graph node count (${nodeCount}) below expected minimum (${expectedMinNodes})`);
+    }
+    if (!graphNames.has('response context')) {
+      errors.push('Response Context node missing from entity graph');
+    }
+  }
+
+  if (expectEntities && graphNodes.length > 0) {
+    for (const entity of entities) {
+      const name = (entity.name || '').trim();
+      const type = (entity.type || '').trim();
+      if (!name) continue;
+      if (!graphNames.has(name.toLowerCase())) {
+        errors.push(`Entity \"${name}\" missing from graph nodes`);
+      }
+      const normalizedType = normalizeEntityType(type);
+      if (!normalizedType) {
+        errors.push(`Entity \"${name}\" has unknown type \"${type}\"`);
+      }
+      if (!entityAppearsInText(name, responseText, sources)) {
+        errors.push(`Entity \"${name}\" not found in response or sources text`);
+      }
+    }
+  }
+
+  return { pass: errors.length === 0, errors };
 }
 
 function entityGraphOk(entityGraph, expectedNodeCount) {
@@ -617,13 +738,24 @@ async function run() {
     const discoveryGraphPass = results.deepAnalysis?.enabled ? entityGraphOk(discovery.entityGraph, Math.max(1, discoveryExpectedEntities)) : true;
     const discoveryQueryGraphPass = queryGraphOk(discovery.queryGraph, discovery.sources.length)
       && (discovery.queryGraph.nodeCounts?.counts?.entity || 0) === discoveryExpectedEntities;
+    const discoveryStrict = results.deepAnalysis?.enabled
+      ? validateEntityStrict({
+          responseText: discovery.responseText,
+          sources: discovery.sources,
+          entitiesStructured: discovery.entitiesStructured,
+          entityGraph: discovery.entityGraph,
+          mode: 'context',
+          expectEntities: discovery.sources.length > 0
+        })
+      : { pass: true, errors: [] };
     const discoveryPass = (sector.discovery.expectSources ? discovery.sources.length > 0 : discovery.sources.length === 0)
       && textIncludes(discovery.responseText, sector.discovery.expectText)
       && !hasNoDirectAnswer(discovery.responseText)
       && !hasFormattingArtifacts(discovery.responseText)
       && meetsMinLength(discovery.responseText, 120)
       && discoveryGraphPass
-      && discoveryQueryGraphPass;
+      && discoveryQueryGraphPass
+      && discoveryStrict.pass;
     await recordTest({
       type: 'query',
       label: `${sector.id} discovery`,
@@ -632,6 +764,7 @@ async function run() {
       expectSources: sector.discovery.expectSources,
       result: discovery,
       graphChecks: { queryGraph: discovery.queryGraph, entityGraph: discovery.entityGraph },
+      strictEntity: discoveryStrict,
       pass: discoveryPass
     });
 
@@ -651,8 +784,19 @@ async function run() {
     const noRetExpectedEntities = expectedEntityCount(noRet.entities);
     const noRetGraphPass = results.deepAnalysis?.enabled ? entityGraphOk(noRet.entityGraph, noRetExpectedEntities) : true;
     const noRetQueryGraphPass = queryGraphOk(noRet.queryGraph, 0);
+    const noRetStrict = results.deepAnalysis?.enabled
+      ? validateEntityStrict({
+          responseText: noRet.responseText,
+          sources: noRet.sources,
+          entitiesStructured: noRet.entitiesStructured,
+          entityGraph: noRet.entityGraph,
+          mode: 'context',
+          expectEntities: false
+        })
+      : { pass: true, errors: [] };
     const noRetPass = noRet.sources.length === 0 && noRet.placeholderVisible && noRetGraphPass && noRetQueryGraphPass
-      && !hasFormattingArtifacts(noRet.responseText);
+      && !hasFormattingArtifacts(noRet.responseText)
+      && noRetStrict.pass;
     await recordTest({
       type: 'query',
       label: `${sector.id} no_retrieval`,
@@ -661,6 +805,7 @@ async function run() {
       expectSources: false,
       result: noRet,
       graphChecks: { queryGraph: noRet.queryGraph, entityGraph: noRet.entityGraph },
+      strictEntity: noRetStrict,
       pass: noRetPass
     });
 
@@ -669,13 +814,24 @@ async function run() {
     const factualGraphPass = results.deepAnalysis?.enabled ? entityGraphOk(factual.entityGraph, Math.max(1, factualExpectedEntities)) : true;
     const factualQueryGraphPass = queryGraphOk(factual.queryGraph, factual.sources.length)
       && (factual.queryGraph.nodeCounts?.counts?.entity || 0) === factualExpectedEntities;
+    const factualStrict = results.deepAnalysis?.enabled
+      ? validateEntityStrict({
+          responseText: factual.responseText,
+          sources: factual.sources,
+          entitiesStructured: factual.entitiesStructured,
+          entityGraph: factual.entityGraph,
+          mode: 'context',
+          expectEntities: factual.sources.length > 0
+        })
+      : { pass: true, errors: [] };
     const factualPass = (sector.factual.expectSources ? factual.sources.length > 0 : factual.sources.length === 0)
       && textIncludes(factual.responseText, sector.factual.expectText)
       && !hasNoDirectAnswer(factual.responseText)
       && !hasFormattingArtifacts(factual.responseText)
       && meetsMinLength(factual.responseText, 80)
       && factualGraphPass
-      && factualQueryGraphPass;
+      && factualQueryGraphPass
+      && factualStrict.pass;
     await recordTest({
       type: 'query',
       label: `${sector.id} factual`,
@@ -684,6 +840,7 @@ async function run() {
       expectSources: sector.factual.expectSources,
       result: factual,
       graphChecks: { queryGraph: factual.queryGraph, entityGraph: factual.entityGraph },
+      strictEntity: factualStrict,
       pass: factualPass
     });
   }
@@ -695,10 +852,21 @@ async function run() {
   const injectionExpectedEntities = expectedEntityCount(injection.entities);
   const injectionGraphPass = results.deepAnalysis?.enabled ? entityGraphOk(injection.entityGraph, Math.max(1, injectionExpectedEntities)) : true;
   const injectionQueryGraphPass = queryGraphOk(injection.queryGraph, injection.sources.length);
+  const injectionStrict = results.deepAnalysis?.enabled
+    ? validateEntityStrict({
+        responseText: injection.responseText,
+        sources: injection.sources,
+        entitiesStructured: injection.entitiesStructured,
+        entityGraph: injection.entityGraph,
+        mode: 'context',
+        expectEntities: false
+      })
+    : { pass: true, errors: [] };
   const injectionPass = textIncludes(injection.responseText, 'SECURITY ALERT')
     && !hasFormattingArtifacts(injection.responseText)
     && injectionGraphPass
-    && injectionQueryGraphPass;
+    && injectionQueryGraphPass
+    && injectionStrict.pass;
   await recordTest({
     type: 'security',
     label: 'Prompt injection block',
@@ -707,6 +875,7 @@ async function run() {
     expectSources: false,
     result: injection,
     graphChecks: { queryGraph: injection.queryGraph, entityGraph: injection.entityGraph },
+    strictEntity: injectionStrict,
     pass: injectionPass
   });
 
@@ -739,10 +908,21 @@ async function run() {
   const piiGraphPass = results.deepAnalysis?.enabled ? entityGraphOk(piiResult.entityGraph, Math.max(1, piiExpectedEntities)) : true;
   const piiQueryGraphPass = queryGraphOk(piiResult.queryGraph, piiResult.sources.length)
     && (piiResult.queryGraph.nodeCounts?.counts?.entity || 0) === piiExpectedEntities;
+  const piiStrict = results.deepAnalysis?.enabled
+    ? validateEntityStrict({
+        responseText: piiResult.responseText,
+        sources: piiResult.sources,
+        entitiesStructured: piiResult.entitiesStructured,
+        entityGraph: piiResult.entityGraph,
+        mode: 'context',
+        expectEntities: piiResult.sources.length > 0
+      })
+    : { pass: true, errors: [] };
   const piiPass = textIncludes(piiInspector, expectedPiiMarker)
     && !hasFormattingArtifacts(piiResult.responseText)
     && piiGraphPass
-    && piiQueryGraphPass;
+    && piiQueryGraphPass
+    && piiStrict.pass;
   await recordTest({
     type: 'pii',
     label: `PII redaction (${runLabel})`,
@@ -753,6 +933,7 @@ async function run() {
     result: piiResult,
     inspectorSample: piiInspector.slice(0, 300),
     graphChecks: { queryGraph: piiResult.queryGraph, entityGraph: piiResult.entityGraph },
+    strictEntity: piiStrict,
     pass: piiPass
   });
 
