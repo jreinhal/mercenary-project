@@ -20,6 +20,34 @@ const expectedPiiMarker = runLabel.toUpperCase().includes('TOKEN') ? '<<TOK:SSN:
 const MIN_ACTION_DELAY_MS = 2500;
 const ENTITY_TAB_PAUSE_MS = Number.parseInt(process.env.ENTITY_TAB_PAUSE_MS || '3000', 10);
 
+function getOrigin(urlStr) {
+  try {
+    return new URL(urlStr).origin;
+  } catch {
+    return null;
+  }
+}
+
+async function enableAirgapNetworkGuard(page, allowedOrigins, violations) {
+  // Air-gap requirement: UI must not fetch any external HTTP(S) resources.
+  await page.route('**/*', (route) => {
+    const req = route.request();
+    const url = req.url();
+
+    if (url.startsWith('data:') || url.startsWith('blob:') || url === 'about:blank') {
+      return route.continue();
+    }
+
+    const origin = getOrigin(url);
+    if (origin && allowedOrigins.has(origin)) {
+      return route.continue();
+    }
+
+    violations.push({ url, resourceType: req.resourceType(), method: req.method() });
+    return route.abort();
+  });
+}
+
 const sectorUploads = {
   ENTERPRISE: [
     'enterprise_compliance_audit.txt',
@@ -691,20 +719,37 @@ async function seedSectorDocuments(page) {
 
 async function clearActiveContextDocs(page) {
   const activeDocs = page.locator('.context-doc.active');
+  let attempts = 0;
   while (await activeDocs.count()) {
-    await activeDocs.first().click();
-    await page.waitForTimeout(150);
+    attempts += 1;
+    if (attempts > 30) {
+      throw new Error('Failed to clear active context docs after 30 attempts (UI may be blocked/overlapped).');
+    }
+    const first = activeDocs.first();
+    await first.scrollIntoViewIfNeeded();
+    await first.click({ force: true, timeout: 15000 });
+    await page.waitForTimeout(200);
   }
   await page.waitForTimeout(500);
 }
 
 async function run() {
   ensureDir(screenshotDir);
+  const allowedOrigins = new Set([
+    getOrigin(baseUrl),
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'http://localhost',
+    'http://127.0.0.1',
+    'https://localhost',
+    'https://127.0.0.1'
+  ].filter(Boolean));
   const results = {
     runLabel,
     runStart: nowIso(),
     baseUrl,
     cspHeader: null,
+    networkViolations: [],
     login: null,
     sectorOptions: [],
     tests: []
@@ -714,6 +759,7 @@ async function run() {
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(240000);
+  await enableAirgapNetworkGuard(page, allowedOrigins, results.networkViolations);
 
   let mainResponse = null;
   page.on('response', (resp) => {
@@ -985,6 +1031,7 @@ async function run() {
   const viewerContext = await browser.newContext();
   const viewerPage = await viewerContext.newPage();
   viewerPage.setDefaultTimeout(60000);
+  await enableAirgapNetworkGuard(viewerPage, allowedOrigins, results.networkViolations);
   await viewerPage.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await waitForLoaded(viewerPage);
   const viewerLogin = await loginIfNeeded(viewerPage, viewerUser, viewerPass);
@@ -1001,6 +1048,17 @@ async function run() {
     visibleSectors: viewerSectors,
     pass: viewerLogin.success && viewerSectors.length > 0 && viewerSectors.length <= results.sectorOptions.length
   });
+
+  if (results.networkViolations.length > 0) {
+    await recordTest({
+      type: 'airgap',
+      label: 'Air-gap network guard',
+      blockedRequests: results.networkViolations.slice(0, 25),
+      blockedCount: results.networkViolations.length,
+      pass: false
+    });
+    throw new Error(`Air-gap network guard blocked ${results.networkViolations.length} external request(s).`);
+  }
 
   await viewerContext.close();
   await context.close();

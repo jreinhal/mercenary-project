@@ -12,6 +12,33 @@ const govUpload = path.join(process.env.TEST_DOCS_DIR || 'D:\\Projects\\mercenar
 const ENTITY_TAB_PAUSE_MS = Number.parseInt(process.env.ENTITY_TAB_PAUSE_MS || '3000', 10);
 const skipSeed = String(process.env.SKIP_SEED_DOCS || '').toLowerCase() === 'true';
 
+function getOrigin(urlStr) {
+  try {
+    return new URL(urlStr).origin;
+  } catch {
+    return null;
+  }
+}
+
+async function enableAirgapNetworkGuard(page, allowedOrigins, violations) {
+  await page.route('**/*', (route) => {
+    const req = route.request();
+    const url = req.url();
+
+    if (url.startsWith('data:') || url.startsWith('blob:') || url === 'about:blank') {
+      return route.continue();
+    }
+
+    const origin = getOrigin(url);
+    if (origin && allowedOrigins.has(origin)) {
+      return route.continue();
+    }
+
+    violations.push({ url, resourceType: req.resourceType(), method: req.method() });
+    return route.abort();
+  });
+}
+
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
@@ -472,10 +499,20 @@ function queryGraphOk(queryGraph, expectedSourceCount, entities) {
 
 async function run() {
   ensureDir(screenshotDir);
+  const allowedOrigins = new Set([
+    getOrigin(baseUrl),
+    'https://localhost:8443',
+    'https://127.0.0.1:8443',
+    'https://localhost',
+    'https://127.0.0.1',
+    'http://localhost',
+    'http://127.0.0.1'
+  ].filter(Boolean));
   const results = {
     runStart: nowIso(),
     baseUrl,
     subjectDn,
+    networkViolations: [],
     sectorOptions: [],
     tests: [],
     requestHeaders: {}
@@ -490,6 +527,7 @@ async function run() {
   const context = await browser.newContext({ ignoreHTTPSErrors: true, extraHTTPHeaders: headers });
   const page = await context.newPage();
   page.setDefaultTimeout(240000);
+  await enableAirgapNetworkGuard(page, allowedOrigins, results.networkViolations);
 
   page.on('request', (req) => {
     const url = req.url();
@@ -688,6 +726,10 @@ async function run() {
 
   await context.close();
   await browser.close();
+
+  if (results.networkViolations.length > 0) {
+    throw new Error(`Air-gap network guard blocked ${results.networkViolations.length} external request(s).`);
+  }
 
   results.runEnd = nowIso();
   fs.writeFileSync(outputJson, JSON.stringify(results, null, 2));
