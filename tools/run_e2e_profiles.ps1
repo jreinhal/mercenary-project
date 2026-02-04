@@ -24,6 +24,7 @@ $script:SupportsSkipCert = (Get-Command Invoke-WebRequest).Parameters.ContainsKe
 $script:SupportsSslProtocol = (Get-Command Invoke-WebRequest).Parameters.ContainsKey("SslProtocol")
 $script:SupportsForm = (Get-Command Invoke-WebRequest).Parameters.ContainsKey("Form")
 $script:SupportsSkipHttpErrorCheck = (Get-Command Invoke-WebRequest).Parameters.ContainsKey("SkipHttpErrorCheck")
+$script:SupportsNoProxy = (Get-Command Invoke-WebRequest).Parameters.ContainsKey("NoProxy")
 if (-not $script:SupportsSkipCert) {
     # PowerShell 5.1: allow self-signed HTTPS for govcloud test runs
     [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
@@ -47,8 +48,16 @@ function Ensure-Ollama($ollamaUrl) {
         throw "ollama CLI not found. Install Ollama and ensure it is in PATH."
     }
     $tagsUrl = "$ollamaUrl/api/tags"
+    $tagsReq = @{
+        Uri = $tagsUrl
+        UseBasicParsing = $true
+        TimeoutSec = 5
+    }
+    if ($script:SupportsNoProxy) {
+        $tagsReq["NoProxy"] = $true
+    }
     try {
-        Invoke-WebRequest -Uri $tagsUrl -UseBasicParsing -TimeoutSec 5 | Out-Null
+        Invoke-WebRequest @tagsReq | Out-Null
         return $true
     } catch {
         Write-Log "Ollama not reachable. Starting 'ollama serve'..."
@@ -56,7 +65,7 @@ function Ensure-Ollama($ollamaUrl) {
         $deadline = (Get-Date).AddSeconds(30)
         while ((Get-Date) -lt $deadline) {
             try {
-                Invoke-WebRequest -Uri $tagsUrl -UseBasicParsing -TimeoutSec 5 | Out-Null
+                Invoke-WebRequest @tagsReq | Out-Null
                 return $true
             } catch {
                 Start-Sleep -Seconds 2
@@ -98,6 +107,10 @@ function Invoke-Request($params, $skipCert) {
     if ($skipCert -and $script:SupportsSslProtocol) {
         $params["SslProtocol"] = "Tls12"
     }
+    if ($script:SupportsNoProxy) {
+        # Prevent WinHTTP/system proxy from intercepting localhost calls (SCIF/offline requirement).
+        $params["NoProxy"] = $true
+    }
     return Invoke-WebRequest @params
 }
 
@@ -107,6 +120,9 @@ function Invoke-RequestAllowError($params, $skipCert) {
     }
     if ($skipCert -and $script:SupportsSslProtocol) {
         $params["SslProtocol"] = "Tls12"
+    }
+    if ($script:SupportsNoProxy) {
+        $params["NoProxy"] = $true
     }
     if ($script:SupportsSkipHttpErrorCheck) {
         $params["SkipHttpErrorCheck"] = $true
