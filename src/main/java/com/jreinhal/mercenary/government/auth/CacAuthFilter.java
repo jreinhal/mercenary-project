@@ -128,11 +128,19 @@ public class CacAuthFilter extends OncePerRequestFilter {
 
             boolean trustedProxy = clientIpResolver.isTrustedProxy(request.getRemoteAddr());
             String dnValue = null;
-            if (certDnHeader != null && !certDnHeader.isBlank()) {
-                dnValue = certDnHeader.trim();
-            } else if (certHeader != null && !certHeader.isBlank()) {
-                // Tests and some reverse proxies URL-encode the DN value.
-                dnValue = URLDecoder.decode(certHeader, StandardCharsets.UTF_8);
+            if (trustedProxy) {
+                if (certDnHeader != null && !certDnHeader.isBlank()) {
+                    dnValue = certDnHeader.trim();
+                } else if (certHeader != null && !certHeader.isBlank()) {
+                    // Tests and some reverse proxies URL-encode the DN value.
+                    try {
+                        dnValue = URLDecoder.decode(certHeader, StandardCharsets.UTF_8);
+                    } catch (IllegalArgumentException e) {
+                        // Fail closed for malformed encodings but don't 500 the request pipeline.
+                        log.warn("Malformed X-Client-Cert header encoding from trusted proxy {}", request.getRemoteAddr());
+                        dnValue = null;
+                    }
+                }
             }
 
             if (trustedProxy && dnValue != null && !dnValue.isBlank()) {
