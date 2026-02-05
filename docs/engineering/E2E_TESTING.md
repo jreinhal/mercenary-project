@@ -81,6 +81,7 @@ Playwright UI outputs (local):
 ## Troubleshooting
 - Govcloud 403 on ingest: confirm `APP_CSRF_BYPASS_INGEST=true` was set for the run.
 - Connection refused: ensure MongoDB and Ollama are running.
+- 429 rate limit exceeded during automated bulk uploads: temporarily set `APP_RATE_LIMIT_ENABLED=false` for the run, then re-enable.
 - `pwsh` not found: install PowerShell 7 or run profiles individually without govcloud.
 
 ## GitHub Actions
