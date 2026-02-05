@@ -25,14 +25,16 @@ implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(CacAuthenticationService.class);
     private final UserRepository userRepository;
     private final ClientIpResolver clientIpResolver;
+    private final CacCertificateParser certificateParser;
     @Value("${app.cac.auto-provision:false}")
     private boolean autoProvision;
     @Value("${app.cac.require-approval:true}")
     private boolean requireApproval;
 
-    public CacAuthenticationService(UserRepository userRepository, ClientIpResolver clientIpResolver) {
+    public CacAuthenticationService(UserRepository userRepository, ClientIpResolver clientIpResolver, CacCertificateParser certificateParser) {
         this.userRepository = userRepository;
         this.clientIpResolver = clientIpResolver;
+        this.certificateParser = certificateParser;
         log.info(">>> CAC/PIV AUTHENTICATION MODE ACTIVE <<<");
         log.info(">>> Ensure mutual TLS is configured on the server <<<");
     }
@@ -43,8 +45,14 @@ implements AuthenticationService {
         String certHeader = request.getHeader("X-Client-Cert");
         String subjectDn = null;
         if (certs != null && certs.length > 0) {
-            subjectDn = certs[0].getSubjectX500Principal().getName();
-            log.debug("Client certificate DN: {}", subjectDn);
+            try {
+                // Defense-in-depth: validate certificate timing even if TLS stack validates it.
+                certs[0].checkValidity();
+            } catch (Exception e) {
+                log.warn("Rejected invalid CAC certificate: {}", e.getMessage());
+                return null;
+            }
+            subjectDn = certs[0].getSubjectX500Principal().getName("RFC2253");
         } else if (certHeader != null && !certHeader.isEmpty()) {
             boolean trustedProxy = this.clientIpResolver.isTrustedProxy(request.getRemoteAddr());
             if (trustedProxy) {
@@ -57,9 +65,9 @@ implements AuthenticationService {
             log.warn("No client certificate provided");
             return null;
         }
-        String commonName = this.extractCn(subjectDn);
-        if (commonName == null) {
-            log.warn("No CN in certificate DN: {}", subjectDn);
+        String commonName = this.certificateParser.extractCommonName(subjectDn);
+        if (commonName == null || commonName.isBlank()) {
+            log.warn("No CN in certificate DN");
             return null;
         }
         User user = this.userRepository.findByExternalId(subjectDn).orElse(null);
@@ -109,15 +117,6 @@ implements AuthenticationService {
         catch (Exception e) {
             return certHeader;
         }
-    }
-
-    private String extractCn(String dn) {
-        for (String part : dn.split(",")) {
-            String trimmed = part.trim();
-            if (!trimmed.startsWith("CN=") && !trimmed.startsWith("cn=")) continue;
-            return trimmed.substring(3);
-        }
-        return null;
     }
 
     @Override

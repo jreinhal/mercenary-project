@@ -600,6 +600,12 @@ sentinel:
     enabled: false
   connectors:
     enabled: false
+  airgap:
+    model-validation:
+      # GovCloud/SCIF deployments must use locally pre-loaded models (no internet).
+      enabled: ${AIRGAP_MODEL_VALIDATION_ENABLED:true}
+      fail-on-missing: ${AIRGAP_MODEL_VALIDATION_FAIL:true}
+      timeout-ms: ${AIRGAP_MODEL_VALIDATION_TIMEOUT_MS:2000}
 
 # Disable Swagger UI in government deployments
 springdoc:
