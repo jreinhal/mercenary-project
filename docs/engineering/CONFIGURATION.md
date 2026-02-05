@@ -14,6 +14,17 @@ This file summarizes the most important configuration keys.
 - TRUSTED_PROXIES: comma-separated proxy IPs for X-Forwarded-For
 - APP_STANDARD_ALLOW_BASIC=true|false
 
+## Rate limiting
+- APP_RATE_LIMIT_ENABLED=true|false (default: true)
+- APP_RATE_LIMIT_VIEWER_RPM (default: 60)
+- APP_RATE_LIMIT_ANALYST_RPM (default: 100)
+- APP_RATE_LIMIT_ADMIN_RPM (default: 200)
+- APP_RATE_LIMIT_ANONYMOUS_RPM (default: 30)
+
+Notes:
+- Pre-auth rate limiting should remain ON in normal runs.
+- Disable it only for automated E2E runs that perform bulk uploads (set `APP_RATE_LIMIT_ENABLED=false`), then re-enable for day-to-day usage.
+
 ## MongoDB
 - MONGODB_URI (default: mongodb://localhost:27017/mercenary)
 
