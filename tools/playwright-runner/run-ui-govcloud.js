@@ -512,6 +512,7 @@ async function run() {
     runStart: nowIso(),
     baseUrl,
     subjectDn,
+    cspHeader: null,
     networkViolations: [],
     sectorOptions: [],
     tests: [],
@@ -529,6 +530,7 @@ async function run() {
   page.setDefaultTimeout(240000);
   await enableAirgapNetworkGuard(page, allowedOrigins, results.networkViolations);
 
+  let mainResponse = null;
   page.on('request', (req) => {
     const url = req.url();
     if (url.includes('/api/config/sectors')) {
@@ -543,6 +545,9 @@ async function run() {
   });
   page.on('response', async (resp) => {
     const url = resp.url();
+    if (url === baseUrl || url === baseUrl + '/') {
+      mainResponse = resp;
+    }
     if (url.includes('/api/config/sectors')) {
       const sectorResponse = { status: resp.status() };
       try {
@@ -569,6 +574,11 @@ async function run() {
   await waitForLoaded(page);
   results.deepAnalysis = await ensureDeepAnalysis(page);
 
+  if (mainResponse) {
+    const headers = mainResponse.headers();
+    results.cspHeader = headers['content-security-policy'] || null;
+  }
+
   const authModal = page.locator('#auth-modal');
   const authVisible = await isVisible(authModal);
   if (authVisible) {
@@ -587,6 +597,15 @@ async function run() {
     // Continue to capture whatever is present.
   }
   results.sectorOptions = await page.locator('#sector-select option:not([disabled])').allInnerTexts();
+
+  // Security posture: for SCIF/air-gapped deployments, CSP must not reference external origins.
+  const cspAllowsExternal = results.cspHeader ? /https?:\/\//i.test(results.cspHeader) : false;
+  results.tests.push({
+    type: 'security',
+    label: 'CSP offline (no external origins)',
+    cspHeader: results.cspHeader,
+    pass: !cspAllowsExternal
+  });
 
   // Ensure GOVERNMENT sector selected if available
   const sectorId = 'GOVERNMENT';
@@ -734,6 +753,11 @@ async function run() {
   results.runEnd = nowIso();
   fs.writeFileSync(outputJson, JSON.stringify(results, null, 2));
   console.log(`Results written to ${outputJson}`);
+
+  const failedFinal = results.tests.filter(t => !t.pass);
+  if (failedFinal.length > 0) {
+    throw new Error(`GovCloud UI suite had ${failedFinal.length} failing test(s). See ${outputJson}`);
+  }
 }
 
 run().catch((err) => {
