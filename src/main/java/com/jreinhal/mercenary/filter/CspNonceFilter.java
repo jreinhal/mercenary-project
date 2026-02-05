@@ -77,7 +77,18 @@ implements Filter {
                 return;
             }
             this.cspHeaderSet = true;
-            String csp = "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+            // SCIF/air-gapped deployments must not depend on public CDNs.
+            // Note: inline scripts are only allowed when explicitly nonced.
+            String csp = "default-src 'self'; "
+                    + "script-src 'self' 'nonce-" + this.nonce + "'; "
+                    + "style-src 'self'; "
+                    + "font-src 'self'; "
+                    + "img-src 'self' data:; "
+                    + "connect-src 'self'; "
+                    + "object-src 'none'; "
+                    + "frame-ancestors 'none'; "
+                    + "base-uri 'self'; "
+                    + "form-action 'self'";
             this.setHeader("Content-Security-Policy", csp);
         }
     }

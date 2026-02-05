@@ -768,7 +768,7 @@ async function run() {
     }
   });
 
-  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+  const navResponse = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await waitForLoaded(page);
 
   const loginResult = await loginIfNeeded(page, adminUser, adminPass);
@@ -781,10 +781,13 @@ async function run() {
   results.sectorOptions = await page.locator('#sector-select option').allInnerTexts();
   results.deepAnalysis = await ensureDeepAnalysis(page);
 
-  if (mainResponse) {
-    const headers = mainResponse.headers();
-    results.cspHeader = headers['content-security-policy'] || null;
-  }
+  // Prefer the navigation response (handles redirects); fall back to response event capture.
+  const navHeaders = navResponse ? navResponse.headers() : null;
+  const mainHeaders = mainResponse ? mainResponse.headers() : null;
+  const csp = (navHeaders && navHeaders['content-security-policy'])
+    || (mainHeaders && mainHeaders['content-security-policy'])
+    || null;
+  results.cspHeader = csp;
 
   function maybeScreenshot(label, pass) {
     if (pass) return null;
@@ -808,6 +811,17 @@ async function run() {
       console.warn('Failed to persist interim results:', err.message);
     }
   }
+
+  // Security posture: for SCIF/air-gapped deployments, CSP must not reference external origins.
+  // (The network guard blocks actual egress, but CSP should not imply a CDN dependency.)
+  const cspPresent = Boolean(results.cspHeader);
+  const cspAllowsExternal = results.cspHeader ? /https?:\/\//i.test(results.cspHeader) : false;
+  await recordTest({
+    type: 'security',
+    label: 'CSP offline (no external origins)',
+    cspHeader: results.cspHeader,
+    pass: cspPresent && !cspAllowsExternal
+  });
 
   // Seed sector documents to align with expected test data
   if (!skipSeed) {
@@ -1060,6 +1074,17 @@ async function run() {
     throw new Error(`Air-gap network guard blocked ${results.networkViolations.length} external request(s).`);
   }
 
+  const failed = results.tests.filter(t => !t.pass);
+  if (failed.length > 0) {
+    const shotPath = path.join(screenshotDir, `ui_fail_${Date.now()}.png`);
+    await page.screenshot({ path: shotPath, fullPage: true });
+    results.failureScreenshot = shotPath;
+    results.failureSummary = {
+      count: failed.length,
+      labels: failed.slice(0, 20).map(t => t.label)
+    };
+  }
+
   await viewerContext.close();
   await context.close();
   await browser.close();
@@ -1068,6 +1093,10 @@ async function run() {
   ensureDir(path.dirname(outputJson));
   fs.writeFileSync(outputJson, JSON.stringify(results, null, 2));
   console.log(`Results written to ${outputJson}`);
+
+  if (failed.length > 0) {
+    throw new Error(`UI suite had ${failed.length} failing test(s). See ${outputJson}`);
+  }
 }
 
 run().catch((err) => {
