@@ -3619,6 +3619,9 @@
                 entity2DGraph._destructor && entity2DGraph._destructor();
                 entity2DGraph = null;
             }
+            // Expose for QA automation (Playwright) and debugging; cleared on teardown.
+            // Playwright's evaluate context can't reliably read top-level `let` bindings.
+            window.entity2DGraph = null;
             // Cleanup mouse listener
             const graphEl = document.getElementById('entity-graph');
             if (graphEl && graphEl._tooltipMouseHandler) {
@@ -4201,6 +4204,11 @@
                 .d3VelocityDecay(0.25)    // Lower friction = more fluid movement
                 .graphData(graphData);
 
+            // Expose graph instance for QA automation + keep placeholder hidden when data is present.
+            window.entity2DGraph = entity2DGraph;
+            const livePlaceholder = graphEl.querySelector('#entity-placeholder');
+            setHidden(livePlaceholder || placeholder, true);
+
             // Configure forces for smooth, professional layout - KeyLines style
             const nodeCount = graphData.nodes.length;
 
@@ -4310,6 +4318,11 @@
                 });
 
                 entity2DGraph.graphData(graphData);
+                // Keep QA-visible reference and avoid placeholder overlay after incremental updates.
+                window.entity2DGraph = entity2DGraph;
+                const graphEl = document.getElementById('entity-graph');
+                const placeholder = graphEl ? graphEl.querySelector('#entity-placeholder') : null;
+                setHidden(placeholder, true);
             } else {
                 renderEntityGraph();
             }
