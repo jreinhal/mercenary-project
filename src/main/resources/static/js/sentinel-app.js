@@ -5139,14 +5139,16 @@
             svg.appendChild(edgesGroup);
 
             const textOffsets = {
-                'top center': { dx: 0, dy: -0.9, anchor: 'middle', baseline: 'baseline' },
-                'bottom center': { dx: 0, dy: 0.95, anchor: 'middle', baseline: 'hanging' },
-                'middle right': { dx: 0.95, dy: 0, anchor: 'start', baseline: 'middle' },
-                'middle left': { dx: -0.95, dy: 0, anchor: 'end', baseline: 'middle' },
-                'top right': { dx: 0.85, dy: -0.75, anchor: 'start', baseline: 'baseline' },
-                'top left': { dx: -0.85, dy: -0.75, anchor: 'end', baseline: 'baseline' },
-                'bottom right': { dx: 0.85, dy: 0.75, anchor: 'start', baseline: 'hanging' },
-                'bottom left': { dx: -0.85, dy: 0.75, anchor: 'end', baseline: 'hanging' }
+                // Label offsets are in the SVG viewBox coordinate system.
+                // Keep labels outside node hitboxes for readability at larger font sizes.
+                'top center': { dx: 0, dy: -1.25, anchor: 'middle', baseline: 'baseline' },
+                'bottom center': { dx: 0, dy: 1.35, anchor: 'middle', baseline: 'hanging' },
+                'middle right': { dx: 1.25, dy: 0, anchor: 'start', baseline: 'middle' },
+                'middle left': { dx: -1.25, dy: 0, anchor: 'end', baseline: 'middle' },
+                'top right': { dx: 1.1, dy: -1.05, anchor: 'start', baseline: 'baseline' },
+                'top left': { dx: -1.1, dy: -1.05, anchor: 'end', baseline: 'baseline' },
+                'bottom right': { dx: 1.1, dy: 1.05, anchor: 'start', baseline: 'hanging' },
+                'bottom left': { dx: -1.1, dy: 1.05, anchor: 'end', baseline: 'hanging' }
             };
 
             const nodesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
