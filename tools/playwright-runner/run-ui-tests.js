@@ -768,7 +768,7 @@ async function run() {
     }
   });
 
-  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+  const navResponse = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await waitForLoaded(page);
 
   const loginResult = await loginIfNeeded(page, adminUser, adminPass);
@@ -781,10 +781,13 @@ async function run() {
   results.sectorOptions = await page.locator('#sector-select option').allInnerTexts();
   results.deepAnalysis = await ensureDeepAnalysis(page);
 
-  if (mainResponse) {
-    const headers = mainResponse.headers();
-    results.cspHeader = headers['content-security-policy'] || null;
-  }
+  // Prefer the navigation response (handles redirects); fall back to response event capture.
+  const navHeaders = navResponse ? navResponse.headers() : null;
+  const mainHeaders = mainResponse ? mainResponse.headers() : null;
+  const csp = (navHeaders && navHeaders['content-security-policy'])
+    || (mainHeaders && mainHeaders['content-security-policy'])
+    || null;
+  results.cspHeader = csp;
 
   function maybeScreenshot(label, pass) {
     if (pass) return null;
@@ -811,12 +814,13 @@ async function run() {
 
   // Security posture: for SCIF/air-gapped deployments, CSP must not reference external origins.
   // (The network guard blocks actual egress, but CSP should not imply a CDN dependency.)
+  const cspPresent = Boolean(results.cspHeader);
   const cspAllowsExternal = results.cspHeader ? /https?:\/\//i.test(results.cspHeader) : false;
   await recordTest({
     type: 'security',
     label: 'CSP offline (no external origins)',
     cspHeader: results.cspHeader,
-    pass: !cspAllowsExternal
+    pass: cspPresent && !cspAllowsExternal
   });
 
   // Seed sector documents to align with expected test data
