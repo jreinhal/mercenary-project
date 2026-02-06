@@ -1327,7 +1327,7 @@
         .graph-label {
             font-family: var(--font-ui);
             /* SVG uses a viewBox; size is in viewBox units (not px). Bump for readability. */
-            font-size: 1px;
+            font-size: 1.5px;
             fill: var(--graph-text);
             pointer-events: none;
             user-select: none;
@@ -1336,7 +1336,7 @@
             letter-spacing: 0.02em;
             paint-order: stroke;
             stroke: var(--graph-label-outline);
-            stroke-width: 0.1px;
+            stroke-width: 0.11px;
         }
 
         .graph-node:hover .graph-node-dot,
