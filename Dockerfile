@@ -54,11 +54,12 @@ ENV JAVA_TOOL_OPTIONS="-Xms512m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 # Default environment variables (set via deployment)
 ENV SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sentinel
 ENV SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
-# Spring Boot natively reads SPRING_PROFILES_ACTIVE — no shell expansion needed
-ENV SPRING_PROFILES_ACTIVE=govcloud
+# Profile selection — consistent with docker-compose and application.yaml's ${APP_PROFILE:dev}
+# Override at runtime: docker run -e APP_PROFILE=standard ...
+ENV APP_PROFILE=govcloud
 
 EXPOSE 8080
 
 # M-17: Exec-form ENTRYPOINT — no shell, PID 1 is Java, immune to env var injection.
-# Profile is controlled via SPRING_PROFILES_ACTIVE env var (override with -e at runtime).
+# APP_PROFILE is read by Spring via application.yaml property placeholder, not shell expansion.
 ENTRYPOINT ["java", "-jar", "app.jar"]

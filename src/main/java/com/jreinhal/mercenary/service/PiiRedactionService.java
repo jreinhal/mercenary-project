@@ -278,9 +278,16 @@ public class PiiRedactionService {
         int count = 0;
         while (matcher.find()) {
             String match = matcher.group();
-            // Brand-specific patterns (first alternative) are trusted; generic 16-digit needs Luhn
-            boolean isBrandSpecific = match.replaceAll("[^0-9]", "").length() != 16
-                || match.matches("^[4-6].*") || match.matches("^3[47].*") || match.matches("^3[068].*");
+            String digits = match.replaceAll("[^0-9]", "");
+            // Brand-specific patterns (first regex alternative) have prefix constraints;
+            // the generic fallback is 4-groups-of-4 digits which is always exactly 16 digits.
+            // Check known brand prefixes on the digits-only string to distinguish the two.
+            boolean isBrandSpecific = digits.matches("^4[0-9]{12,15}$")           // Visa 13-16
+                || digits.matches("^5[1-5][0-9]{14}$")                            // Mastercard
+                || digits.matches("^3[47][0-9]{13}$")                             // Amex
+                || digits.matches("^3(?:0[0-5]|[68][0-9])[0-9]{11}$")             // Diners
+                || digits.matches("^6(?:011|5[0-9]{2})[0-9]{12}$")                // Discover
+                || digits.matches("^(?:2131|1800|35[0-9]{3})[0-9]{11}$");         // JCB
             if (!isBrandSpecific && !isValidCreditCard(match)) {
                 // Preserve non-Luhn 16-digit numbers as-is (e.g., order IDs)
                 matcher.appendReplacement(sb, Matcher.quoteReplacement(match));
@@ -320,7 +327,7 @@ public class PiiRedactionService {
 
     private RedactionMode parseMode(String modeStr) {
         try {
-            return RedactionMode.valueOf(modeStr.toUpperCase());
+            return RedactionMode.valueOf(modeStr.toUpperCase(java.util.Locale.ROOT));
         }
         catch (IllegalArgumentException e) {
             log.warn("Invalid PII redaction mode '{}', defaulting to MASK", modeStr);
