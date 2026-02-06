@@ -35,7 +35,11 @@ public class WorkspaceController {
 
     @GetMapping
     public ResponseEntity<List<WorkspaceSummary>> listWorkspaces() {
+        // S2-02: Defense-in-depth auth check — require authenticated user
         User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         return ResponseEntity.ok(this.workspaceService.listWorkspaces(user));
     }
 
