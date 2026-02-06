@@ -26,7 +26,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
-@Order(value=3)
+@Order(value=4)
 public class RateLimitFilter
 implements Filter {
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);

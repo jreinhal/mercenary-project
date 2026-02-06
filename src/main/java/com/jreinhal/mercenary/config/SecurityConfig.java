@@ -151,7 +151,8 @@ public class SecurityConfig {
                     }
                     auth.requestMatchers(new String[]{"/api/admin/**"}).hasAuthority("ADMIN");
                     auth.requestMatchers(new String[]{"/api/**"}).authenticated();
-                    auth.anyRequest().permitAll();
+                    // H-07: Match govcloud posture — deny-by-default for unmapped paths
+                    auth.anyRequest().authenticated();
                 })
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable);

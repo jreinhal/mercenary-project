@@ -34,7 +34,7 @@ public class HipaaAuditController {
     }
 
     @GetMapping(value={"/events"})
-    public Object getEvents(@RequestParam(value="limit", defaultValue="200") int limit,
+    public ResponseEntity<?> getEvents(@RequestParam(value="limit", defaultValue="200") int limit,
                             @RequestParam(value="since", required=false) String since,
                             @RequestParam(value="until", required=false) String until,
                             @RequestParam(value="type", required=false) String type,
@@ -43,7 +43,7 @@ public class HipaaAuditController {
         if (user == null || !user.hasPermission(UserRole.Permission.VIEW_AUDIT)) {
             log.warn("Unauthorized HIPAA audit log access attempt from: {}", (user != null ? user.getUsername() : "ANONYMOUS"));
             this.auditService.logAccessDenied(user, "/api/hipaa/audit/events", "Missing VIEW_AUDIT permission", request);
-            return Map.of("error", "ACCESS DENIED: HIPAA audit log access requires AUDITOR role.");
+            return ResponseEntity.status(403).body(Map.of("error", "ACCESS DENIED: HIPAA audit log access requires AUDITOR role."));
         }
         if (limit > 2000) {
             limit = 2000;
@@ -52,7 +52,7 @@ public class HipaaAuditController {
         Optional<Instant> untilInstant = parseInstant(until);
         Optional<HipaaAuditService.AuditEventType> eventType = parseType(type);
         List<HipaaAuditService.HipaaAuditEvent> events = this.hipaaAuditService.queryEvents(sinceInstant, untilInstant, eventType, limit);
-        return Map.of("count", events.size(), "events", events, "requestedBy", user.getUsername());
+        return ResponseEntity.ok(Map.of("count", events.size(), "events", events, "requestedBy", user.getUsername()));
     }
 
     @GetMapping(value={"/export"})

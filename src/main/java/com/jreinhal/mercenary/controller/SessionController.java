@@ -217,7 +217,8 @@ public class SessionController {
         try {
             Path exportPath = this.sessionPersistenceService.exportSession(sessionId, user.getId());
             this.auditService.logQuery(user, "session_export_file: " + sessionId, Department.ENTERPRISE, "Session exported to file", request);
-            return ResponseEntity.ok(Map.of("status", "exported", "file", exportPath.getFileName().toString(), "sessionId", sessionId));
+            // L-10: Return opaque identifier instead of server-side filename
+            return ResponseEntity.ok(Map.of("status", "exported", "sessionId", sessionId));
         }
         catch (SecurityException e) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied"));
@@ -227,7 +228,8 @@ public class SessionController {
         }
         catch (IOException e) {
             log.error("Failed to export session to file {}: {}", sessionId, e.getMessage());
-            return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Export failed: " + e.getMessage()));
+            // L-09: Return generic error — details already logged server-side above
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Export failed"));
         }
     }
 

@@ -1,12 +1,21 @@
 package com.jreinhal.mercenary.foundation;
 
+import com.jreinhal.mercenary.filter.SecurityContext;
+import com.jreinhal.mercenary.model.User;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/foundation")
+@PreAuthorize("hasAnyAuthority('ANALYST', 'ADMIN')")
 public class FoundationController {
+
+    private static final int MAX_MODEL_SEQUENCE_LENGTH = 5;
+    private static final int MAX_PROMPT_LENGTH = 4000;
 
     private final ModelOrchestrator orchestrator;
 
@@ -15,15 +24,40 @@ public class FoundationController {
     }
 
     @PostMapping("/chat")
-    public ChatResponse chat(@RequestBody ChatRequest request) {
+    public ResponseEntity<?> chat(@RequestBody ChatRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (request.message() == null || request.message().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Message is required"));
+        }
+        if (request.message().length() > MAX_PROMPT_LENGTH) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Message exceeds maximum length"));
+        }
         String response = orchestrator.chat(request.model(), request.message());
-        return new ChatResponse(request.model(), response);
+        return ResponseEntity.ok(new ChatResponse(request.model(), response));
     }
 
-    // Simple "Debate" or "Bounce" feature
-    // Takes a prompt and chains it through a list of models locally
     @PostMapping("/bounce")
-    public BounceResponse bounce(@RequestBody BounceRequest request) {
+    public ResponseEntity<?> bounce(@RequestBody BounceRequest request) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (request.initialPrompt() == null || request.initialPrompt().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Initial prompt is required"));
+        }
+        if (request.initialPrompt().length() > MAX_PROMPT_LENGTH) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Prompt exceeds maximum length"));
+        }
+        if (request.modelSequence() == null || request.modelSequence().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Model sequence is required"));
+        }
+        if (request.modelSequence().size() > MAX_MODEL_SEQUENCE_LENGTH) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Model sequence exceeds maximum of " + MAX_MODEL_SEQUENCE_LENGTH));
+        }
+
         StringBuilder conversation = new StringBuilder();
         String currentInput = request.initialPrompt();
         conversation.append("USER: ").append(currentInput).append("\n\n");
@@ -31,10 +65,10 @@ public class FoundationController {
         for (String modelId : request.modelSequence()) {
             String response = orchestrator.chat(modelId, "Review and build upon the following idea:\n" + currentInput);
             conversation.append("MODEL [").append(modelId).append("]: ").append(response).append("\n\n");
-            currentInput = response; // Chain the output as input to next
+            currentInput = response;
         }
 
-        return new BounceResponse(conversation.toString(), currentInput);
+        return ResponseEntity.ok(new BounceResponse(conversation.toString(), currentInput));
     }
 
     public record ChatRequest(String model, String message) {
