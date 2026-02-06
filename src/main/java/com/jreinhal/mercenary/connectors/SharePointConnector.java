@@ -4,8 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
@@ -25,8 +27,20 @@ public class SharePointConnector implements Connector {
 
     private final ConnectorPolicy policy;
     private final SecureIngestionService ingestionService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper mapper = new ObjectMapper();
+
+    private static RestTemplate createNoRedirectRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                // H-08: Disable automatic redirect following to prevent SSRF bypass via 3xx redirects
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
+        return new RestTemplate(factory);
+    }
 
     @Value("${sentinel.connectors.sharepoint.enabled:false}")
     private boolean enabled;
@@ -46,6 +60,7 @@ public class SharePointConnector implements Connector {
     public SharePointConnector(ConnectorPolicy policy, SecureIngestionService ingestionService) {
         this.policy = policy;
         this.ingestionService = ingestionService;
+        this.restTemplate = createNoRedirectRestTemplate();
     }
 
     @Override

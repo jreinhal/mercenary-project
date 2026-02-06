@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,7 +19,7 @@ public class LicenseController {
     }
 
     @GetMapping("/status")
-    public ResponseEntity<?> getStatus() {
+    public ResponseEntity<LicenseService.LicenseStatus> getStatus() {
         // M-01: Defense-in-depth auth check
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -28,10 +29,13 @@ public class LicenseController {
     }
 
     @GetMapping("/feature")
-    public ResponseEntity<?> checkFeature(String feature) {
+    public ResponseEntity<FeatureResponse> checkFeature(@RequestParam String feature) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        if (feature == null || feature.isBlank()) {
+            return ResponseEntity.badRequest().build();
         }
         boolean available = this.licenseService.hasFeature(feature);
         return ResponseEntity.ok(new FeatureResponse(feature, available, this.licenseService.getEdition().name()));

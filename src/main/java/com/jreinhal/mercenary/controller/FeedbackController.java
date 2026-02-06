@@ -124,7 +124,7 @@ public class FeedbackController {
     }
 
     @GetMapping("/categories")
-    public ResponseEntity<?> getCategories() {
+    public ResponseEntity<List<CategoryInfo>> getCategories() {
         // L-07: Defense-in-depth auth check consistent with other endpoints in this controller
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
