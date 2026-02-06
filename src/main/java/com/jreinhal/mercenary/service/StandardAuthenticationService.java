@@ -32,7 +32,9 @@ implements AuthenticationService {
     // M-03: Pre-computed dummy bcrypt hash used when user is not found.
     // Ensures the timing of a user-not-found response matches a wrong-password response,
     // preventing username enumeration via timing oracle.
-    private static final String DUMMY_HASH = "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
+    // Valid 60-char bcrypt hash (cost 10, random salt, hash of a garbage password).
+    // Only used to burn CPU time — the comparison will never succeed.
+    private static final String DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
     public StandardAuthenticationService(UserRepository userRepository, PasswordEncoder passwordEncoder, ClientIpResolver clientIpResolver, LoginAttemptService loginAttemptService) {
         this.userRepository = userRepository;
