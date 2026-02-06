@@ -304,6 +304,13 @@ public class ReportingAdminController {
             return "";
         }
         String sanitized = value.replace("\r", " ").replace("\n", " ");
+        // H-06: Prefix formula-triggering characters to prevent CSV injection in spreadsheet apps
+        if (!sanitized.isEmpty()) {
+            char first = sanitized.charAt(0);
+            if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t') {
+                sanitized = "'" + sanitized;
+            }
+        }
         if (sanitized.contains(",") || sanitized.contains("\"")) {
             sanitized = sanitized.replace("\"", "\"\"");
             return "\"" + sanitized + "\"";

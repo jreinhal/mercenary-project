@@ -29,6 +29,10 @@ implements AuthenticationService {
     private final LoginAttemptService loginAttemptService;
     @Value(value="${app.standard.allow-basic:false}")
     private boolean allowBasic;
+    // M-03: Pre-computed dummy bcrypt hash used when user is not found.
+    // Ensures the timing of a user-not-found response matches a wrong-password response,
+    // preventing username enumeration via timing oracle.
+    private static final String DUMMY_HASH = "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
 
     public StandardAuthenticationService(UserRepository userRepository, PasswordEncoder passwordEncoder, ClientIpResolver clientIpResolver, LoginAttemptService loginAttemptService) {
         this.userRepository = userRepository;
@@ -70,6 +74,10 @@ implements AuthenticationService {
         }
         Optional<User> userOpt = this.userRepository.findByUsername(username);
         if (userOpt.isEmpty()) {
+            // M-03: Perform dummy bcrypt comparison to match timing of a real password check.
+            // Without this, the missing-user path returns ~0ms while the wrong-password path
+            // takes ~100ms (bcrypt cost), creating a timing oracle for username enumeration.
+            this.passwordEncoder.matches((CharSequence) password, DUMMY_HASH);
             log.warn("Authentication failed: User '{}' not found", username);
             this.loginAttemptService.recordFailure(lockoutKey);
             return null;

@@ -39,6 +39,7 @@ public final class FilterExpressionBuilder {
         if (value == null) {
             return "";
         }
-        return value.replace("'", "\\'");
+        // M-10: Escape backslashes before single quotes to prevent escape-sequence bypass
+        return value.replace("\\", "\\\\").replace("'", "\\'");
     }
 }

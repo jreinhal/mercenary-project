@@ -339,7 +339,8 @@ public class MercenaryController {
             department = Department.valueOf(dept.toUpperCase());
         }
         catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("INVALID SECTOR: " + dept);
+            // H-05: Do not reflect unsanitized user input in error responses
+            return ResponseEntity.badRequest().body("INVALID SECTOR: unrecognized department value");
         }
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/ingest/file", "Unauthenticated access attempt", request);

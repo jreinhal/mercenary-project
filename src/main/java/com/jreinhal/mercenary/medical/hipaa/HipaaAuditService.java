@@ -81,6 +81,9 @@ public class HipaaAuditService {
         }
         catch (Exception e) {
             log.error("HIPAA AUDIT FAILURE - Event: {}, User: {}, Error: {}", new Object[]{event.eventType(), event.username(), e.getMessage()});
+            // C-07: Fail-closed — HIPAA requires that operations halt if audit logging fails.
+            // Silently swallowing this would allow unaudited PHI access.
+            throw new RuntimeException("HIPAA audit write failed — operation must be aborted", e);
         }
     }
 
@@ -88,10 +91,10 @@ public class HipaaAuditService {
         if (query == null) {
             return "";
         }
-        String sanitized = query.length() > 200 ? query.substring(0, 200) + "..." : query;
-        sanitized = sanitized.replaceAll("\\d{3}-\\d{2}-\\d{4}", "[SSN-REDACTED]");
-        sanitized = sanitized.replaceAll("\\b[A-Z]{2,3}\\d{6,10}\\b", "[MRN-REDACTED]");
-        return sanitized;
+        String truncated = query.length() > 200 ? query.substring(0, 200) + "..." : query;
+        // M-13: Delegate to PiiRedactionService for comprehensive PII/PHI scrubbing
+        // instead of maintaining a separate (incomplete) set of inline regexes
+        return this.piiRedactionService.redact(truncated, Boolean.TRUE).getRedactedContent();
     }
 
     private String sanitizeText(String text) {
