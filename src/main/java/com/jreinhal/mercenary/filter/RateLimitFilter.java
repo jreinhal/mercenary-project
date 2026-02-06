@@ -32,15 +32,15 @@ implements Filter {
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
     private final AuditService auditService;
     private final ClientIpResolver clientIpResolver;
-    @Value(value="${app.rate-limit.enabled:true}")
+    @Value("${app.rate-limit.enabled:true}")
     private boolean enabled;
-    @Value(value="${app.rate-limit.viewer-rpm:60}")
+    @Value("${app.rate-limit.viewer-rpm:60}")
     private int viewerRpm;
-    @Value(value="${app.rate-limit.analyst-rpm:100}")
+    @Value("${app.rate-limit.analyst-rpm:100}")
     private int analystRpm;
-    @Value(value="${app.rate-limit.admin-rpm:200}")
+    @Value("${app.rate-limit.admin-rpm:200}")
     private int adminRpm;
-    @Value(value="${app.rate-limit.anonymous-rpm:30}")
+    @Value("${app.rate-limit.anonymous-rpm:30}")
     private int anonymousRpm;
     private final Cache<String, Bucket> bucketCache = Caffeine.newBuilder().maximumSize(10000L).expireAfterAccess(1L, TimeUnit.HOURS).build();
 

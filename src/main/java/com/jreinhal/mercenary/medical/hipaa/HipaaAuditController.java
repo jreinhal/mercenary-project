@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value={"/api/hipaa/audit"})
+@RequestMapping("/api/hipaa/audit")
 public class HipaaAuditController {
     private static final Logger log = LoggerFactory.getLogger(HipaaAuditController.class);
     private final HipaaAuditService hipaaAuditService;
@@ -33,15 +33,17 @@ public class HipaaAuditController {
         this.auditService = auditService;
     }
 
-    @GetMapping(value={"/events"})
-    public ResponseEntity<?> getEvents(@RequestParam(value="limit", defaultValue="200") int limit,
-                            @RequestParam(value="since", required=false) String since,
-                            @RequestParam(value="until", required=false) String until,
-                            @RequestParam(value="type", required=false) String type,
+    @GetMapping("/events")
+    public ResponseEntity<?> getEvents(@RequestParam(defaultValue="200") int limit,
+                            @RequestParam(required=false) String since,
+                            @RequestParam(required=false) String until,
+                            @RequestParam(required=false) String type,
                             HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null || !user.hasPermission(UserRole.Permission.VIEW_AUDIT)) {
-            log.warn("Unauthorized HIPAA audit log access attempt from: {}", (user != null ? user.getUsername() : "ANONYMOUS"));
+            if (log.isWarnEnabled()) {
+                log.warn("Unauthorized HIPAA audit log access attempt from: {}", user != null ? user.getUsername() : "ANONYMOUS");
+            }
             this.auditService.logAccessDenied(user, "/api/hipaa/audit/events", "Missing VIEW_AUDIT permission", request);
             return ResponseEntity.status(403).body(Map.of("error", "ACCESS DENIED: HIPAA audit log access requires AUDITOR role."));
         }
@@ -55,12 +57,12 @@ public class HipaaAuditController {
         return ResponseEntity.ok(Map.of("count", events.size(), "events", events, "requestedBy", user.getUsername()));
     }
 
-    @GetMapping(value={"/export"})
-    public ResponseEntity<?> exportEvents(@RequestParam(value="limit", defaultValue="2000") int limit,
-                                          @RequestParam(value="format", defaultValue="json") String format,
-                                          @RequestParam(value="since", required=false) String since,
-                                          @RequestParam(value="until", required=false) String until,
-                                          @RequestParam(value="type", required=false) String type,
+    @GetMapping("/export")
+    public ResponseEntity<?> exportEvents(@RequestParam(defaultValue="2000") int limit,
+                                          @RequestParam(defaultValue="json") String format,
+                                          @RequestParam(required=false) String since,
+                                          @RequestParam(required=false) String until,
+                                          @RequestParam(required=false) String type,
                                           HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null || !user.hasPermission(UserRole.Permission.VIEW_AUDIT)) {

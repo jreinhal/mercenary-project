@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value={"/api/audit"})
+@RequestMapping("/api/audit")
 public class AuditController {
     private static final Logger log = LoggerFactory.getLogger(AuditController.class);
     private final AuditService auditService;
@@ -28,11 +28,13 @@ public class AuditController {
         this.auditService = auditService;
     }
 
-    @GetMapping(value={"/events"})
-    public ResponseEntity<?> getRecentEvents(@RequestParam(value="limit", defaultValue="100") int limit, HttpServletRequest request) {
+    @GetMapping("/events")
+    public ResponseEntity<?> getRecentEvents(@RequestParam(defaultValue="100") int limit, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null || !user.hasPermission(UserRole.Permission.VIEW_AUDIT)) {
-            log.warn("Unauthorized audit log access attempt from: {}", (user != null ? user.getUsername() : "ANONYMOUS"));
+            if (log.isWarnEnabled()) {
+                log.warn("Unauthorized audit log access attempt from: {}", user != null ? user.getUsername() : "ANONYMOUS");
+            }
             this.auditService.logAccessDenied(user, "/api/audit/events", "Missing VIEW_AUDIT permission", request);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "ACCESS DENIED: Audit log access requires AUDITOR role."));
         }
@@ -47,7 +49,7 @@ public class AuditController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping(value={"/stats"})
+    @GetMapping("/stats")
     public ResponseEntity<?> getAuditStats(HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null || !user.hasPermission(UserRole.Permission.VIEW_AUDIT)) {

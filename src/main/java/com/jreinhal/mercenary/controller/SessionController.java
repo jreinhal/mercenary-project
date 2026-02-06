@@ -215,7 +215,7 @@ public class SessionController {
             }
         }
         try {
-            Path exportPath = this.sessionPersistenceService.exportSession(sessionId, user.getId());
+            this.sessionPersistenceService.exportSession(sessionId, user.getId());
             this.auditService.logQuery(user, "session_export_file: " + sessionId, Department.ENTERPRISE, "Session exported to file", request);
             // L-10: Return opaque identifier instead of server-side filename
             return ResponseEntity.ok(Map.of("status", "exported", "sessionId", sessionId));
@@ -227,7 +227,9 @@ public class SessionController {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_FOUND).body(Map.of("error", "Session not found"));
         }
         catch (IOException e) {
-            log.error("Failed to export session to file {}: {}", sessionId, e.getMessage());
+            if (log.isErrorEnabled()) {
+                log.error("Failed to export session to file {}: {}", sessionId, e.getMessage());
+            }
             // L-09: Return generic error — details already logged server-side above
             return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Export failed"));
         }

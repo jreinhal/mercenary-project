@@ -144,8 +144,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(new String[]{"/api/health", "/api/status"}).permitAll();
                     auth.requestMatchers(new String[]{"/api/auth/**"}).permitAll();
-                    auth.requestMatchers(new String[]{"/", "/index.html", "/manual.html", "/readme.html"}).permitAll();
-                    auth.requestMatchers(new String[]{"/css/**", "/js/**", "/images/**", "/favicon.ico"}).permitAll();
+                    auth.requestMatchers(new String[]{"/", "/index.html", "/manual.html", "/readme.html", "/docs-index.html", "/docs-index.md"}).permitAll();
+                    auth.requestMatchers(new String[]{"/css/**", "/js/**", "/images/**", "/vendor/**", "/favicon.ico"}).permitAll();
                     if (!this.hipaaPolicy.isStrict(Department.MEDICAL)) {
                         auth.requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"}).permitAll();
                     }
