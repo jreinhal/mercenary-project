@@ -27,7 +27,7 @@ implements AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final ClientIpResolver clientIpResolver;
     private final LoginAttemptService loginAttemptService;
-    @Value(value="${app.standard.allow-basic:false}")
+    @Value("${app.standard.allow-basic:false}")
     private boolean allowBasic;
     // M-03: Pre-computed dummy bcrypt hash used when user is not found.
     // Ensures the timing of a user-not-found response matches a wrong-password response,

@@ -1,6 +1,6 @@
 package com.jreinhal.mercenary.service;
 
-import com.jreinhal.mercenary.service.TokenizationVault;
+
 import java.security.SecureRandom;
 import java.text.Normalizer;
 import java.util.Collections;
@@ -45,51 +45,51 @@ public class PiiRedactionService {
     private static final Pattern NAME_HONORIFIC_PATTERN = Pattern.compile("\\b(?:Mr|Mrs|Ms|Miss|Dr|Prof|Rev|Hon)\\.?\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,2})\\b");
     // M-18: Use possessive quantifiers (++) to prevent catastrophic backtracking (ReDoS)
     private static final Pattern ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,5}\\s++[A-Za-z0-9\\s,]++(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Circle|Cir|Place|Pl)\\.?(?:\\s*+,?\\s*+(?:Apt|Suite|Unit|#)\\s*+[A-Za-z0-9-]++)?\\s*+,?\\s*+[A-Za-z\\s]++,?\\s*+[A-Z]{2}\\s*+\\d{5}(?:-\\d{4})?\\b", 2);
-    @Value(value="${sentinel.pii.enabled:true}")
+    @Value("${sentinel.pii.enabled:true}")
     private boolean enabled;
-    @Value(value="${sentinel.pii.mode:MASK}")
+    @Value("${sentinel.pii.mode:MASK}")
     private String mode;
-    @Value(value="${sentinel.pii.audit-redactions:true}")
+    @Value("${sentinel.pii.audit-redactions:true}")
     private boolean auditRedactions;
-    @Value(value="${sentinel.pii.patterns.ssn:true}")
+    @Value("${sentinel.pii.patterns.ssn:true}")
     private boolean redactSsn;
-    @Value(value="${sentinel.pii.patterns.email:true}")
+    @Value("${sentinel.pii.patterns.email:true}")
     private boolean redactEmail;
-    @Value(value="${sentinel.pii.patterns.phone:true}")
+    @Value("${sentinel.pii.patterns.phone:true}")
     private boolean redactPhone;
-    @Value(value="${sentinel.pii.patterns.credit-card:true}")
+    @Value("${sentinel.pii.patterns.credit-card:true}")
     private boolean redactCreditCard;
-    @Value(value="${sentinel.pii.patterns.dob:true}")
+    @Value("${sentinel.pii.patterns.dob:true}")
     private boolean redactDob;
-    @Value(value="${sentinel.pii.patterns.ip-address:true}")
+    @Value("${sentinel.pii.patterns.ip-address:true}")
     private boolean redactIpAddress;
-    @Value(value="${sentinel.pii.patterns.passport:true}")
+    @Value("${sentinel.pii.patterns.passport:true}")
     private boolean redactPassport;
-    @Value(value="${sentinel.pii.patterns.drivers-license:true}")
+    @Value("${sentinel.pii.patterns.drivers-license:true}")
     private boolean redactDriversLicense;
-    @Value(value="${sentinel.pii.patterns.names:true}")
+    @Value("${sentinel.pii.patterns.names:true}")
     private boolean redactNames;
-    @Value(value="${sentinel.pii.patterns.address:true}")
+    @Value("${sentinel.pii.patterns.address:true}")
     private boolean redactAddress;
-    @Value(value="${sentinel.pii.patterns.medical-id:true}")
+    @Value("${sentinel.pii.patterns.medical-id:true}")
     private boolean redactMedicalId;
-    @Value(value="${sentinel.pii.patterns.account-number:true}")
+    @Value("${sentinel.pii.patterns.account-number:true}")
     private boolean redactAccountNumber;
-    @Value(value="${sentinel.pii.patterns.health-plan-id:true}")
+    @Value("${sentinel.pii.patterns.health-plan-id:true}")
     private boolean redactHealthPlanId;
-    @Value(value="${sentinel.pii.patterns.certificate-number:true}")
+    @Value("${sentinel.pii.patterns.certificate-number:true}")
     private boolean redactCertificateNumber;
-    @Value(value="${sentinel.pii.patterns.vehicle-id:true}")
+    @Value("${sentinel.pii.patterns.vehicle-id:true}")
     private boolean redactVehicleId;
-    @Value(value="${sentinel.pii.patterns.device-id:true}")
+    @Value("${sentinel.pii.patterns.device-id:true}")
     private boolean redactDeviceId;
-    @Value(value="${sentinel.pii.patterns.url:true}")
+    @Value("${sentinel.pii.patterns.url:true}")
     private boolean redactUrl;
-    @Value(value="${sentinel.pii.patterns.biometric:true}")
+    @Value("${sentinel.pii.patterns.biometric:true}")
     private boolean redactBiometric;
-    @Value(value="${sentinel.pii.patterns.date:true}")
+    @Value("${sentinel.pii.patterns.date:true}")
     private boolean redactDate;
-    @Value(value="${sentinel.pii.patterns.age:true}")
+    @Value("${sentinel.pii.patterns.age:true}")
     private boolean redactAge;
 
     public PiiRedactionService(TokenizationVault tokenizationVault) {
@@ -108,7 +108,7 @@ public class PiiRedactionService {
         content = normalizeUnicode(content);
         boolean applyNames = redactNamesOverride != null ? redactNamesOverride : this.redactNames;
         RedactionMode redactionMode = this.parseMode(this.mode);
-        EnumMap<PiiType, Integer> counts = new EnumMap<PiiType, Integer>(PiiType.class);
+        Map<PiiType, Integer> counts = new EnumMap<>(PiiType.class);
         String result = content;
         if (this.redactCreditCard) {
             // M-15: Validate generic 16-digit matches with Luhn check to avoid false positives

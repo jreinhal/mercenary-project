@@ -88,8 +88,9 @@ public class PromptGuardrailService {
         // This defeats homoglyph attacks (e.g., fullwidth 'i' in "ignore")
         String normalized = Normalizer.normalize(query, Normalizer.Form.NFKC);
         for (Pattern pattern : PromptInjectionPatterns.getPatterns()) {
-            if (!pattern.matcher(normalized).find()) continue;
-            return GuardrailResult.blocked("Query matches known injection pattern", "MALICIOUS", 0.95, Map.of("layer", "pattern", "pattern", pattern.pattern()));
+            if (pattern.matcher(normalized).find()) {
+                return GuardrailResult.blocked("Query matches known injection pattern", "MALICIOUS", 0.95, Map.of("layer", "pattern", "pattern", pattern.pattern()));
+            }
         }
         return GuardrailResult.safe();
     }
@@ -159,7 +160,9 @@ public class PromptGuardrailService {
             return GuardrailResult.blocked("LLM guardrail check timed out", "UNKNOWN", 0.5, Map.of("layer", "llm", "error", "timeout", "timeoutMs", this.llmTimeoutMs));
         }
         catch (Exception e) {
-            log.error("LLM guardrail check failed: {}", e.getMessage());
+            if (log.isErrorEnabled()) {
+                log.error("LLM guardrail check failed: {}", e.getMessage());
+            }
             if (this.llmCircuitBreakerEnabled && this.llmCircuitBreaker != null) {
                 this.llmCircuitBreaker.recordFailure(e);
             }

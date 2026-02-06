@@ -80,7 +80,9 @@ public class HipaaAuditService {
             log.debug("HIPAA audit: {} by {} - {}", new Object[]{event.eventType(), event.username(), event.details()});
         }
         catch (Exception e) {
-            log.error("HIPAA AUDIT FAILURE - Event: {}, User: {}, Error: {}", new Object[]{event.eventType(), event.username(), e.getMessage()});
+            if (log.isErrorEnabled()) {
+                log.error("HIPAA AUDIT FAILURE - Event: {}, User: {}, Error: {}", new Object[]{event.eventType(), event.username(), e.getMessage()});
+            }
             // C-07: Fail-closed — HIPAA requires that operations halt if audit logging fails.
             // Silently swallowing this would allow unaudited PHI access.
             throw new RuntimeException("HIPAA audit write failed — operation must be aborted", e);
