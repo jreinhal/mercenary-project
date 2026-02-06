@@ -32,7 +32,7 @@ extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(SecurityFilter.class);
     private final AuthenticationService authService;
     private final AuditService auditService;
-    public static final String[] PUBLIC_PATHS = new String[]{"/", "/index.html", "/manual.html", "/readme.html", "/css/", "/js/", "/images/", "/vendor/", "/favicon.ico", "/api/auth/", "/api/health"};
+    private static final String[] PUBLIC_PATHS = new String[]{"/", "/index.html", "/manual.html", "/readme.html", "/css/", "/js/", "/favicon.ico", "/api/auth/", "/api/health"};
 
     public SecurityFilter(AuthenticationService authService, AuditService auditService) {
         this.authService = authService;

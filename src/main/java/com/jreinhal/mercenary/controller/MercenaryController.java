@@ -174,7 +174,9 @@ public class MercenaryController {
             this.docCount.set((int)count);
         }
         catch (Exception e) {
-            log.error("Failed to initialize doc count", (Throwable)e);
+            if (log.isErrorEnabled()) {
+                log.error("Failed to initialize doc count", (Throwable)e);
+            }
         }
         // R-08: LLM config at debug level to avoid leaking infrastructure details in production logs
         if (log.isDebugEnabled()) {
@@ -187,11 +189,12 @@ public class MercenaryController {
         }
     }
 
-    @GetMapping(value={"/status"})
+    @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getSystemStatus() {
         // R-03: Require authentication — status exposes operational metrics
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
+            this.auditService.logAccessDenied(null, "/api/status", "Unauthenticated access attempt", null);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         long avgLat = this.ragOrchestrationService.getAverageLatencyMs();
@@ -206,11 +209,12 @@ public class MercenaryController {
         return ResponseEntity.ok(Map.of("vectorDb", dbOnline ? "ONLINE" : "OFFLINE", "docsIndexed", this.docCount.get(), "avgLatency", avgLat + "ms", "queriesToday", qCount, "systemStatus", "NOMINAL"));
     }
 
-    @GetMapping(value={"/telemetry"})
+    @GetMapping("/telemetry")
     public ResponseEntity<TelemetryResponse> getTelemetry() {
         // R-02: Require authentication — telemetry exposes system metrics
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
+            this.auditService.logAccessDenied(null, "/api/telemetry", "Unauthenticated access attempt", null);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         long avgLat = this.ragOrchestrationService.getAverageLatencyMs();
@@ -229,7 +233,9 @@ public class MercenaryController {
         }
         catch (Exception e) {
             llmOnline = false;
-            log.debug("LLM health check failed: {}", e.getMessage());
+            if (log.isDebugEnabled()) {
+                log.debug("LLM health check failed: {}", e.getMessage());
+            }
         }
         return ResponseEntity.ok(new TelemetryResponse((int)liveDocCount, qCount, avgLat, dbOnline, llmOnline));
     }
@@ -262,7 +268,7 @@ public class MercenaryController {
             this.auditService.logAccessDenied(user, "/api/inspect", "Missing QUERY permission", null);
             return new InspectResponse("ACCESS DENIED: Insufficient permissions.", List.of(), false, 0);
         }
-        String dept = deptParam.toUpperCase(java.util.Locale.ROOT);
+        String dept = deptParam.toUpperCase(Locale.ROOT);
         if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
             if (log.isWarnEnabled()) {
                 log.warn("SECURITY: Invalid department in inspect request: {}", deptParam);
