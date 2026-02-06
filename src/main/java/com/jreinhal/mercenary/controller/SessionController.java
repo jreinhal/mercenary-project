@@ -120,8 +120,13 @@ public class SessionController {
         if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
+        // S3-01: Sector/HIPAA check — parity with getConversationContext and getSessionTraces
+        Department dept = this.safeDepartment(session.get().department());
+        if (dept != null && this.hipaaPolicy.shouldDisableSessionMemory(dept)) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         this.conversationMemoryService.clearSession(user.getId(), sessionId);
-        this.auditService.logQuery(user, "session_clear: " + sessionId, Department.ENTERPRISE, "Session cleared", request);
+        this.auditService.logQuery(user, "session_clear: " + sessionId, dept != null ? dept : Department.ENTERPRISE, "Session cleared", request);
         return ResponseEntity.ok(Map.of("status", "cleared", "sessionId", sessionId));
     }
 

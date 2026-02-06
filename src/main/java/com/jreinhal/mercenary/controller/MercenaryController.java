@@ -622,7 +622,8 @@ public class MercenaryController {
                         sendSseStep(emitter, "llm_generation", "Response Synthesis", "Timeout - using fallback response");
                     } else {
                         response = "An error occurred generating the response.";
-                        sendSseStep(emitter, "llm_generation", "Response Synthesis", "Error: " + errorMsg.get());
+                        // S3-02: Generic step detail — raw errorMsg may contain internal stack/class info
+                        sendSseStep(emitter, "llm_generation", "Response Synthesis", "Error generating response");
                     }
                 } else {
                     response = cleanLlmResponse(responseBuilder.toString());
@@ -650,9 +651,10 @@ public class MercenaryController {
             } catch (Exception e) {
                 log.error("SSE stream error", e);
                 try {
+                    // S3-02: Generic error — raw e.getMessage() may leak internal details
                     emitter.send(SseEmitter.event()
                         .name("error")
-                        .data("{\"error\":\"" + escapeJson(e.getMessage()) + "\"}"));
+                        .data("{\"error\":\"An unexpected error occurred. Please try again.\"}"));
                     emitter.complete();
                 } catch (Exception ex) {
                     emitter.completeWithError(ex);
