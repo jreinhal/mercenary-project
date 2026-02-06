@@ -604,20 +604,21 @@ public class MercenaryController {
                         .doOnComplete(() -> streamComplete.set(true))
                         .doOnError(e -> {
                             hasError.set(true);
-                            errorMsg.set(e.getMessage());
+                            errorMsg.set(e.getMessage() != null ? e.getMessage() : "");
                             log.error("Stream error: {}", e.getMessage());
                         })
                         .blockLast(Duration.ofSeconds(llmTimeoutSeconds));
 
                 } catch (Exception e) {
                     hasError.set(true);
-                    errorMsg.set(e.getMessage());
+                    errorMsg.set(e.getMessage() != null ? e.getMessage() : "");
                     log.error("Streaming failed: {}", e.getMessage());
                 }
 
                 String response;
                 if (hasError.get()) {
-                    if (errorMsg.get().contains("timeout") || errorMsg.get().toLowerCase().contains("deadline")) {
+                    String errText = errorMsg.get() != null ? errorMsg.get() : "";
+                    if (errText.contains("timeout") || errText.toLowerCase(java.util.Locale.ROOT).contains("deadline")) {
                         response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try simplifying your question.";
                         sendSseStep(emitter, "llm_generation", "Response Synthesis", "Timeout - using fallback response");
                     } else {
@@ -650,15 +651,8 @@ public class MercenaryController {
 
             } catch (Exception e) {
                 log.error("SSE stream error", e);
-                try {
-                    // S3-02: Generic error — raw e.getMessage() may leak internal details
-                    emitter.send(SseEmitter.event()
-                        .name("error")
-                        .data("{\"error\":\"An unexpected error occurred. Please try again.\"}"));
-                    emitter.complete();
-                } catch (Exception ex) {
-                    emitter.completeWithError(ex);
-                }
+                // S3-02: Generic error via helper — raw e.getMessage() may leak internal details
+                sendSseError(emitter, "An unexpected error occurred. Please try again.");
             }
         });
 
