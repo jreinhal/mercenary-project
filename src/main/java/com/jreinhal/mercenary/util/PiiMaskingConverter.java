@@ -19,6 +19,9 @@ public class PiiMaskingConverter extends ClassicConverter {
     );
     // EDIPI is commonly 10 digits; also catches similar identifiers.
     private static final Pattern TEN_DIGIT_ID = Pattern.compile("\\b\\d{10}\\b");
+    // M-12: Additional PII patterns missing from log scrubbing
+    private static final Pattern PHONE = Pattern.compile("\\b(?:\\+?1[-.\\s]?)?\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}\\b");
+    private static final Pattern IPV4 = Pattern.compile("\\b(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\b");
 
     @Override
     public String convert(ILoggingEvent event) {
@@ -31,6 +34,8 @@ public class PiiMaskingConverter extends ClassicConverter {
         sanitized = SSN.matcher(sanitized).replaceAll("[SSN-REDACTED]");
         sanitized = CREDIT_CARD.matcher(sanitized).replaceAll("[CC-REDACTED]");
         sanitized = EMAIL.matcher(sanitized).replaceAll("[EMAIL-REDACTED]");
+        sanitized = PHONE.matcher(sanitized).replaceAll("[PHONE-REDACTED]");
+        sanitized = IPV4.matcher(sanitized).replaceAll("[IP-REDACTED]");
         sanitized = TEN_DIGIT_ID.matcher(sanitized).replaceAll("[ID-REDACTED]");
 
         return sanitized;

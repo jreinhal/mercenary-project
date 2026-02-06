@@ -15,8 +15,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<Map<String, Object>> handleSecurity(SecurityException ex) {
+        // L-05: Log the real message server-side but return generic message to client
+        if (log.isWarnEnabled()) {
+            log.warn("Security exception: {}", ex.getMessage());
+        }
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("error", ex.getMessage(), "timestamp", Instant.now().toString()));
+                .body(Map.of("error", "Access denied", "timestamp", Instant.now().toString()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

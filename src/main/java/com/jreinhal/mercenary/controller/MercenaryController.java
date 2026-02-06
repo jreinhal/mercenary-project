@@ -336,10 +336,11 @@ public class MercenaryController {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
-            department = Department.valueOf(dept.toUpperCase());
+            department = Department.valueOf(dept.toUpperCase(Locale.ROOT));
         }
         catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("INVALID SECTOR: " + dept);
+            // H-05: Do not reflect unsanitized user input in error responses
+            return ResponseEntity.badRequest().body("INVALID SECTOR: unrecognized department value");
         }
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/ingest/file", "Unauthenticated access attempt", request);
@@ -455,11 +456,10 @@ public class MercenaryController {
             return emitter;
         }
 
-        Department department;
         try {
-            department = Department.valueOf(dept.toUpperCase());
+            Department.valueOf(dept.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            sendSseError(emitter, "Invalid sector: " + dept);
+            sendSseError(emitter, "INVALID SECTOR: unrecognized department value");
             return emitter;
         }
 
