@@ -10,7 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
-@ConditionalOnProperty(name={"app.auth-mode"}, havingValue="DEV", matchIfMissing=true)
+@ConditionalOnProperty(name={"app.auth-mode"}, havingValue="DEV", matchIfMissing=false)
 public class DevAuthenticationService
 implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(DevAuthenticationService.class);
@@ -34,6 +34,14 @@ implements AuthenticationService {
             operatorId = request.getParameter("operator");
         }
         if (operatorId == null || operatorId.isEmpty()) {
+            operatorId = "DEMO_USER";
+        }
+        // H-03: Sanitize operatorId — allow only alphanumeric, dash, underscore; max 64 chars
+        operatorId = operatorId.replaceAll("[^a-zA-Z0-9_-]", "");
+        if (operatorId.length() > 64) {
+            operatorId = operatorId.substring(0, 64);
+        }
+        if (operatorId.isEmpty()) {
             operatorId = "DEMO_USER";
         }
         return User.devUser(operatorId);
