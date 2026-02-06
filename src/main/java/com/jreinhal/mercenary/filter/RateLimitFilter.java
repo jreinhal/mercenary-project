@@ -113,6 +113,7 @@ implements Filter {
     }
 
     private boolean isExemptPath(String path) {
-        return path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/images/") || path.startsWith("/fonts/") || "/favicon.ico".equals(path) || "/api/health".equals(path) || "/api/status".equals(path);
+        // R-03: /api/status removed — now requires auth and should be rate-limited
+        return path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/images/") || path.startsWith("/fonts/") || "/favicon.ico".equals(path) || "/api/health".equals(path);
     }
 }

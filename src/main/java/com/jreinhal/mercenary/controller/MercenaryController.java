@@ -176,16 +176,24 @@ public class MercenaryController {
         catch (Exception e) {
             log.error("Failed to initialize doc count", (Throwable)e);
         }
-        log.info("=== LLM Configuration ===");
-        log.info("  Model: {}", this.llmOptions.getModel());
-        log.info("  Temperature: {}", this.llmOptions.getTemperature());
-        log.info("  Max Tokens (num_predict): {}", this.llmOptions.getNumPredict());
-        log.info("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
-        log.info("=========================");
+        // R-08: LLM config at debug level to avoid leaking infrastructure details in production logs
+        if (log.isDebugEnabled()) {
+            log.debug("=== LLM Configuration ===");
+            log.debug("  Model: {}", this.llmOptions.getModel());
+            log.debug("  Temperature: {}", this.llmOptions.getTemperature());
+            log.debug("  Max Tokens (num_predict): {}", this.llmOptions.getNumPredict());
+            log.debug("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
+            log.debug("=========================");
+        }
     }
 
     @GetMapping(value={"/status"})
-    public Map<String, Object> getSystemStatus() {
+    public ResponseEntity<Map<String, Object>> getSystemStatus() {
+        // R-03: Require authentication — status exposes operational metrics
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         long avgLat = this.ragOrchestrationService.getAverageLatencyMs();
         int qCount = this.ragOrchestrationService.getQueryCount();
         boolean dbOnline = true;
@@ -195,11 +203,16 @@ public class MercenaryController {
         catch (Exception e) {
             dbOnline = false;
         }
-        return Map.of("vectorDb", dbOnline ? "ONLINE" : "OFFLINE", "docsIndexed", this.docCount.get(), "avgLatency", avgLat + "ms", "queriesToday", qCount, "systemStatus", "NOMINAL");
+        return ResponseEntity.ok(Map.of("vectorDb", dbOnline ? "ONLINE" : "OFFLINE", "docsIndexed", this.docCount.get(), "avgLatency", avgLat + "ms", "queriesToday", qCount, "systemStatus", "NOMINAL"));
     }
 
     @GetMapping(value={"/telemetry"})
-    public TelemetryResponse getTelemetry() {
+    public ResponseEntity<TelemetryResponse> getTelemetry() {
+        // R-02: Require authentication — telemetry exposes system metrics
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         long avgLat = this.ragOrchestrationService.getAverageLatencyMs();
         int qCount = this.ragOrchestrationService.getQueryCount();
         boolean dbOnline = true;
@@ -218,7 +231,7 @@ public class MercenaryController {
             llmOnline = false;
             log.debug("LLM health check failed: {}", e.getMessage());
         }
-        return new TelemetryResponse((int)liveDocCount, qCount, avgLat, dbOnline, llmOnline);
+        return ResponseEntity.ok(new TelemetryResponse((int)liveDocCount, qCount, avgLat, dbOnline, llmOnline));
     }
 
     @GetMapping(value={"/user/context"})
@@ -239,13 +252,8 @@ public class MercenaryController {
         String body = "";
         boolean redacted = false;
         int redactionCount = 0;
-        String dept = deptParam.toUpperCase();
-        if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
-            log.warn("SECURITY: Invalid department in inspect request: {}", deptParam);
-            return new InspectResponse("ERROR: Invalid sector.", List.of(), false, 0);
-        }
+        // R-01: Auth check BEFORE input validation to avoid leaking info to unauthenticated users
         User user = SecurityContext.getCurrentUser();
-        Department department = Department.valueOf(dept);
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/inspect", "Unauthenticated access attempt", null);
             return new InspectResponse("ACCESS DENIED: Authentication required.", List.of(), false, 0);
@@ -254,6 +262,14 @@ public class MercenaryController {
             this.auditService.logAccessDenied(user, "/api/inspect", "Missing QUERY permission", null);
             return new InspectResponse("ACCESS DENIED: Insufficient permissions.", List.of(), false, 0);
         }
+        String dept = deptParam.toUpperCase(java.util.Locale.ROOT);
+        if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
+            if (log.isWarnEnabled()) {
+                log.warn("SECURITY: Invalid department in inspect request: {}", deptParam);
+            }
+            return new InspectResponse("ERROR: Invalid sector.", List.of(), false, 0);
+        }
+        Department department = Department.valueOf(dept);
         if (this.sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
             this.auditService.logAccessDenied(user, "/api/inspect", "Insufficient clearance for " + dept, null);
             return new InspectResponse("ACCESS DENIED: Insufficient clearance for " + dept, List.of(), false, 0);
