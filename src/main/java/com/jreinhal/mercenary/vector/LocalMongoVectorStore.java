@@ -148,7 +148,9 @@ implements VectorStore {
                 return new ParsedFilter(List.of(List.of(new Condition(key, "==", List.of(this.stripQuotes(value))))));
             }
             catch (Exception e) {
-                log.warn("Failed to parse Spring AI Expression: {}", filter, e);
+                // Do not log the raw filter expression; it may contain sensitive key/value pairs.
+                log.warn("Failed to parse Spring AI Expression filter (redacted): {}", e.getMessage());
+                log.debug("Spring AI Expression parse failure details", e);
                 return null;
             }
         }

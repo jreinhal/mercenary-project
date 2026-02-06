@@ -53,10 +53,18 @@ public class CacAuthFilter extends OncePerRequestFilter {
 
     @Value("${app.cac.chain-validation.enabled:true}")
     private boolean chainValidationEnabled;
+    @Value("${app.cac.chain-validation.require-truststore:false}")
+    private boolean chainValidationRequireTrustStore;
     @Value("${app.cac.truststore.path:}")
     private String trustStorePath;
     @Value("${app.cac.truststore.password:}")
     private String trustStorePassword;
+
+    // Prefer Spring Boot TLS settings when present (common for mTLS deployments).
+    @Value("${server.ssl.trust-store:}")
+    private String serverSslTrustStore;
+    @Value("${server.ssl.trust-store-password:}")
+    private String serverSslTrustStorePassword;
 
     @Value("${app.cac.crl-check-enabled:false}")
     private boolean crlCheckEnabled;
@@ -187,7 +195,12 @@ public class CacAuthFilter extends OncePerRequestFilter {
             // Only run PKIX validation when we can load a trust store. Mutual TLS already validates
             // trust at the transport layer; this is defense-in-depth and a safety net for misconfig.
             KeyStore trustStore = loadTrustStore();
-            if (trustStore != null && chain != null && chain.length > 0) {
+            if (trustStore == null) {
+                if (this.chainValidationRequireTrustStore) {
+                    log.warn("CAC chain validation enabled but no trust store is configured/loaded");
+                    return false;
+                }
+            } else if (chain != null && chain.length > 0) {
                 if (!validateChainPkix(chain, trustStore)) {
                     return false;
                 }
@@ -247,9 +260,14 @@ public class CacAuthFilter extends OncePerRequestFilter {
             return this.cachedTrustStore;
         }
 
-        String path = (this.trustStorePath != null && !this.trustStorePath.isBlank())
-            ? this.trustStorePath.trim()
-            : System.getProperty("javax.net.ssl.trustStore");
+        String path = null;
+        if (this.trustStorePath != null && !this.trustStorePath.isBlank()) {
+            path = this.trustStorePath.trim();
+        } else if (this.serverSslTrustStore != null && !this.serverSslTrustStore.isBlank()) {
+            path = this.serverSslTrustStore.trim();
+        } else {
+            path = System.getProperty("javax.net.ssl.trustStore");
+        }
 
         if (path == null || path.isBlank()) {
             return null;
@@ -264,9 +282,13 @@ public class CacAuthFilter extends OncePerRequestFilter {
                 type = "JKS";
             }
             KeyStore ks = KeyStore.getInstance(type);
-            char[] pass = (this.trustStorePassword != null && !this.trustStorePassword.isBlank())
-                ? this.trustStorePassword.toCharArray()
-                : null;
+            String passString = null;
+            if (this.trustStorePassword != null && !this.trustStorePassword.isBlank()) {
+                passString = this.trustStorePassword;
+            } else if (this.serverSslTrustStorePassword != null && !this.serverSslTrustStorePassword.isBlank()) {
+                passString = this.serverSslTrustStorePassword;
+            }
+            char[] pass = passString != null ? passString.toCharArray() : null;
             ks.load(in, pass);
             this.cachedTrustStore = ks;
             return ks;

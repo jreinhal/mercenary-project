@@ -594,6 +594,16 @@ app:
     # Least-privilege defaults if auto-provision is enabled
     default-role: ${CAC_DEFAULT_ROLE:VIEWER}
     default-clearance: ${CAC_DEFAULT_CLEARANCE:UNCLASSIFIED}
+    chain-validation:
+      enabled: ${CAC_CHAIN_VALIDATION_ENABLED:true}
+      # Fail closed in SCIF deployments if chain validation is enabled but no trust store is configured.
+      require-truststore: ${CAC_CHAIN_VALIDATION_REQUIRE_TRUSTSTORE:true}
+    truststore:
+      path: ${CAC_TRUSTSTORE_PATH:}
+      password: ${CAC_TRUSTSTORE_PASSWORD:}
+    # Revocation checking is recommended for government deployments. Provide a local CRL file.
+    crl-check-enabled: ${CAC_CRL_CHECK_ENABLED:true}
+    crl-path: ${CAC_CRL_PATH:}
 
 sentinel:
   demo:
