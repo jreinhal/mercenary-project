@@ -75,6 +75,15 @@ spring:
 # Server/Cookie Security
 # ============================================
 server:
+  # M-14: Tomcat request body and connection limits to prevent resource exhaustion
+  tomcat:
+    max-http-form-post-size: 52428800  # 50MB — match multipart limit
+    connection-timeout: 20000          # 20 seconds
+    max-connections: 200
+    threads:
+      max: 200
+      min-spare: 10
+    accept-count: 100
   servlet:
     session:
       cookie:

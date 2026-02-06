@@ -4,8 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.tika.Tika;
 import org.slf4j.Logger;
@@ -15,6 +19,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
@@ -23,11 +28,30 @@ import org.springframework.web.client.RestTemplate;
 public class ConfluenceConnector implements Connector {
     private static final Logger log = LoggerFactory.getLogger(ConfluenceConnector.class);
 
+    // M-08: Trusted Confluence/Atlassian domains for SSRF prevention
+    private static final Set<String> TRUSTED_CONFLUENCE_DOMAINS = Set.of(
+            ".atlassian.net",
+            ".atlassian.com",
+            ".jira.com"
+    );
+
     private final ConnectorPolicy policy;
     private final SecureIngestionService ingestionService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper mapper = new ObjectMapper();
     private final Tika tika = new Tika();
+
+    private static RestTemplate createNoRedirectRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                // M-08: Disable automatic redirect following to prevent SSRF bypass via 3xx redirects
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
+        return new RestTemplate(factory);
+    }
 
     @Value("${sentinel.connectors.confluence.enabled:false}")
     private boolean enabled;
@@ -49,6 +73,7 @@ public class ConfluenceConnector implements Connector {
     public ConfluenceConnector(ConnectorPolicy policy, SecureIngestionService ingestionService) {
         this.policy = policy;
         this.ingestionService = ingestionService;
+        this.restTemplate = createNoRedirectRestTemplate();
     }
 
     @Override
@@ -71,6 +96,13 @@ public class ConfluenceConnector implements Connector {
         }
         if (!StringUtils.hasText(baseUrl) || !StringUtils.hasText(spaceKey)) {
             return new ConnectorSyncResult(getName(), false, 0, 0, "Missing Confluence configuration");
+        }
+        // M-08: Validate base URL points to a trusted Atlassian/Confluence domain (SSRF prevention)
+        if (!isTrustedConfluenceUrl(baseUrl)) {
+            if (log.isWarnEnabled()) {
+                log.warn("Confluence base URL blocked (untrusted domain)");
+            }
+            return new ConnectorSyncResult(getName(), false, 0, 0, "Confluence URL not in trusted domain allowlist");
         }
 
         int loaded = 0;
@@ -128,5 +160,27 @@ public class ConfluenceConnector implements Connector {
     private String sanitizeTitle(String title) {
         if (title == null || title.isBlank()) return "page";
         return title.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]+", "_");
+    }
+
+    private boolean isTrustedConfluenceUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            String host = uri.getHost();
+            if (host == null) {
+                return false;
+            }
+            String lowerHost = host.toLowerCase(Locale.ROOT);
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
+                return false;
+            }
+            for (String trusted : TRUSTED_CONFLUENCE_DOMAINS) {
+                if (lowerHost.endsWith(trusted)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 }

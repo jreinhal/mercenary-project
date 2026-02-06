@@ -96,7 +96,7 @@ public class SecurityConfig {
                     }
                 })
                 .headers(headers -> headers.httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31536000L).includeSubDomains(true).preload(true)).frameOptions(HeadersConfigurer.FrameOptionsConfig::deny).contentTypeOptions(contentType -> {}).xssProtection(xss -> xss.disable()))
-                .authorizeHttpRequests(auth -> ((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)auth.requestMatchers(new String[]{"/api/health", "/api/status"})).permitAll().requestMatchers(new String[]{"/", "/index.html", "/manual.html"})).permitAll().requestMatchers(new String[]{"/css/**", "/js/**", "/favicon.ico"})).permitAll().requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"})).permitAll().requestMatchers(new String[]{"/api/auth/csrf"})).permitAll().requestMatchers(new String[]{"/api/admin/**"})).hasAuthority("ADMIN").requestMatchers(new String[]{"/api/ingest/**"})).hasAnyAuthority(new String[]{"OPERATOR", "ADMIN"}).requestMatchers(new String[]{"/api/ask/**", "/api/reasoning/**"})).authenticated().requestMatchers(new String[]{"/api/**"})).authenticated().anyRequest()).authenticated());
+                .authorizeHttpRequests(auth -> ((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)((AuthorizeHttpRequestsConfigurer.AuthorizedUrl)auth.requestMatchers(new String[]{"/api/health", "/api/status"})).permitAll().requestMatchers(new String[]{"/", "/index.html", "/manual.html"})).permitAll().requestMatchers(new String[]{"/css/**", "/js/**", "/favicon.ico"})).permitAll().requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"})).authenticated().requestMatchers(new String[]{"/api/auth/csrf"})).permitAll().requestMatchers(new String[]{"/api/admin/**"})).hasAuthority("ADMIN").requestMatchers(new String[]{"/api/ingest/**"})).hasAnyAuthority(new String[]{"OPERATOR", "ADMIN"}).requestMatchers(new String[]{"/api/ask/**", "/api/reasoning/**"})).authenticated().requestMatchers(new String[]{"/api/**"})).authenticated().anyRequest()).authenticated());
         return (SecurityFilterChain)http.build();
     }
 
@@ -146,9 +146,9 @@ public class SecurityConfig {
                     auth.requestMatchers(new String[]{"/api/auth/**"}).permitAll();
                     auth.requestMatchers(new String[]{"/", "/index.html", "/manual.html", "/readme.html", "/docs-index.html", "/docs-index.md"}).permitAll();
                     auth.requestMatchers(new String[]{"/css/**", "/js/**", "/images/**", "/vendor/**", "/favicon.ico"}).permitAll();
-                    if (!this.hipaaPolicy.isStrict(Department.MEDICAL)) {
-                        auth.requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"}).permitAll();
-                    }
+                    // M-05: Swagger/OpenAPI endpoints now require authentication in all profiles
+                    // (removed permitAll for swagger — API surface should not be exposed to anonymous users)
+                    auth.requestMatchers(new String[]{"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"}).authenticated();
                     auth.requestMatchers(new String[]{"/api/admin/**"}).hasAuthority("ADMIN");
                     auth.requestMatchers(new String[]{"/api/**"}).authenticated();
                     // H-07: Match govcloud posture — deny-by-default for unmapped paths

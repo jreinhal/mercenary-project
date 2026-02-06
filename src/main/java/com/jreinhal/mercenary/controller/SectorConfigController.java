@@ -7,6 +7,7 @@ import com.jreinhal.mercenary.model.User;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,32 +18,29 @@ import org.springframework.web.bind.annotation.RestController;
 public class SectorConfigController {
     @GetMapping(value={"/sectors"})
     public ResponseEntity<List<SectorInfo>> getAvailableSectors() {
+        // M-02: Defense-in-depth auth check — require authenticated user
         User user = SecurityContext.getCurrentUser();
-        ArrayList<SectorInfo> availableSectors = new ArrayList<SectorInfo>();
         if (user == null) {
-            for (Department dept : Department.values()) {
-                if (dept.getRequiredClearance() != ClearanceLevel.UNCLASSIFIED) continue;
-                availableSectors.add(this.toSectorInfo(dept, false));
-            }
-        } else {
-            ClearanceLevel userClearance = user.getClearance();
-            Set<Department> allowedSectors = user.getAllowedSectors();
-            for (Department dept : Department.values()) {
-                boolean isAllowed;
-                boolean hasClearance = userClearance.ordinal() >= dept.getRequiredClearance().ordinal();
-                boolean bl = isAllowed = allowedSectors == null || allowedSectors.isEmpty() || allowedSectors.contains(dept);
-                if (!hasClearance || !isAllowed) continue;
-                availableSectors.add(this.toSectorInfo(dept, true));
-            }
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        ArrayList<SectorInfo> availableSectors = new ArrayList<SectorInfo>();
+        ClearanceLevel userClearance = user.getClearance();
+        Set<Department> allowedSectors = user.getAllowedSectors();
+        for (Department dept : Department.values()) {
+            boolean hasClearance = userClearance.ordinal() >= dept.getRequiredClearance().ordinal();
+            boolean isAllowed = allowedSectors == null || allowedSectors.isEmpty() || allowedSectors.contains(dept);
+            if (!hasClearance || !isAllowed) continue;
+            availableSectors.add(this.toSectorInfo(dept, true));
         }
         return ResponseEntity.ok(availableSectors);
     }
 
     @GetMapping(value={"/current-sector"})
     public ResponseEntity<SectorInfo> getCurrentSector() {
+        // M-02: Defense-in-depth auth check
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
-            return ResponseEntity.ok(this.toSectorInfo(Department.ENTERPRISE, false));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         Set<Department> allowed = user.getAllowedSectors();
         Department current = allowed != null && !allowed.isEmpty() ? allowed.iterator().next() : Department.ENTERPRISE;
