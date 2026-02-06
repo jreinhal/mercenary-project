@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.casework;
 
+import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.repository.UserRepository;
@@ -8,6 +9,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -73,19 +75,20 @@ public class CaseService {
         }
 
         String caseId = normalize(payload.caseId());
+        String workspaceId = currentWorkspaceId();
         CaseRecord existing = caseId != null ? mongoTemplate.findById(caseId, CaseRecord.class, COLLECTION) : null;
         if (existing == null && caseId != null) {
-            Query collisionCheck = new Query(Criteria.where("caseId").is(caseId));
-            CaseRecord otherWorkspace = mongoTemplate.findOne(collisionCheck, CaseRecord.class, COLLECTION);
-            if (otherWorkspace != null) {
-                throw new SecurityException("Case belongs to another workspace");
+            // L-01: Include workspace filter in collision check to avoid cross-workspace info leakage
+            Query collisionCheck = new Query(Criteria.where("caseId").is(caseId).and("workspaceId").is(workspaceId));
+            CaseRecord sameWorkspace = mongoTemplate.findOne(collisionCheck, CaseRecord.class, COLLECTION);
+            if (sameWorkspace != null) {
+                throw new SecurityException("Case ID already exists");
             }
         }
         if (existing != null && !canAccess(user, existing)) {
             throw new SecurityException("Access denied");
         }
 
-        String workspaceId = currentWorkspaceId();
         String finalId = existing != null ? existing.caseId() : (caseId != null ? caseId : generateCaseId());
         String ownerId = existing != null ? existing.ownerId() : user.getId();
         boolean ownerOrAdmin = existing == null || isOwnerOrAdmin(user, existing);
@@ -95,6 +98,10 @@ public class CaseService {
         }
         if (sector == null) {
             sector = "ENTERPRISE";
+        }
+        // M-16: Validate user has access to the target sector
+        if (!canAccessSector(user, sector)) {
+            throw new SecurityException("User does not have clearance for sector: " + sector);
         }
 
         CaseRecord.CaseStatus status = ownerOrAdmin ? parseStatus(payload.status()) : null;
@@ -349,6 +356,22 @@ public class CaseService {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    // M-16: Verify user has clearance for the given sector
+    private boolean canAccessSector(User user, String sector) {
+        if (sector == null || sector.isEmpty()) {
+            return true;
+        }
+        try {
+            Department dept = Department.valueOf(sector.toUpperCase(Locale.ROOT));
+            boolean hasClearance = user.getClearance().ordinal() >= dept.getRequiredClearance().ordinal();
+            java.util.Set<Department> allowedSectors = user.getAllowedSectors();
+            boolean isAllowed = allowedSectors == null || allowedSectors.isEmpty() || allowedSectors.contains(dept);
+            return hasClearance && isAllowed;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private String currentWorkspaceId() {
