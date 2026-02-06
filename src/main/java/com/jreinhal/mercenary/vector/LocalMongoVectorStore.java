@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -109,7 +111,14 @@ implements VectorStore {
 
     private FilterEvaluator buildFilterEvaluator(Object filterExpression) {
         ParsedFilter parsed = this.parseFilterExpression(filterExpression);
-        if (parsed == null || parsed.orGroups().isEmpty()) {
+        if (parsed == null) {
+            return metadata -> true;
+        }
+        if (parsed.invalid()) {
+            // Fail closed: if a filter was provided but we couldn't safely parse it, return nothing.
+            return metadata -> false;
+        }
+        if (parsed.orGroups().isEmpty()) {
             return metadata -> true;
         }
         return metadata -> {
@@ -141,17 +150,18 @@ implements VectorStore {
         // Format: Expression[type=EQ, left=Key[key=dept], right=Value[value=ENTERPRISE]]
         if (filter.contains("Key[key=") && filter.contains("Value[value=")) {
             try {
-                String key = this.extractBetween(filter, "Key[key=", "]");
-                String value = this.extractBetween(filter, "Value[value=", "]");
-                // Keys/values may be sensitive in regulated deployments; avoid logging raw values.
-                log.debug("Parsed Spring AI Expression filter for key='{}'", key);
-                return new ParsedFilter(List.of(List.of(new Condition(key, "==", List.of(this.stripQuotes(value))))));
+                ParsedFilter parsed = this.parseSpringAiExpression(filter);
+                if (parsed != null) {
+                    return parsed;
+                }
+                log.warn("Failed to parse Spring AI Expression filter (redacted): unsupported expression shape");
+                return new ParsedFilter(List.of(), true);
             }
             catch (Exception e) {
                 // Do not log the raw filter expression; it may contain sensitive key/value pairs.
                 log.warn("Failed to parse Spring AI Expression filter (redacted): {}", e.getMessage());
                 log.debug("Spring AI Expression parse failure details", e);
-                return null;
+                return new ParsedFilter(List.of(), true);
             }
         }
         String[] orParts = filter.split("\\s*\\|\\|\\s*");
@@ -170,9 +180,11 @@ implements VectorStore {
             }
         }
         if (groups.isEmpty()) {
-            return null;
+            // Fail closed: a non-blank filter expression with no parseable conditions should not match anything.
+            log.warn("Failed to parse filter expression (redacted): no parseable conditions");
+            return new ParsedFilter(List.of(), true);
         }
-        return new ParsedFilter(groups);
+        return new ParsedFilter(groups, false);
     }
 
     private Condition parseCondition(String condition) {
@@ -338,7 +350,14 @@ implements VectorStore {
 
     private Query buildPrefilterQuery(Object filterExpression) {
         ParsedFilter parsed = this.parseFilterExpression(filterExpression);
-        if (parsed == null || parsed.orGroups().isEmpty()) {
+        if (parsed == null) {
+            return null;
+        }
+        if (parsed.invalid()) {
+            // Fail closed: if a filter was supplied but couldn't be parsed, return a query that matches nothing.
+            return new Query((CriteriaDefinition)Criteria.where((String)"_id").is("__filter_parse_failure__"));
+        }
+        if (parsed.orGroups().isEmpty()) {
             return null;
         }
         List<List<Condition>> groups = parsed.orGroups();
@@ -458,7 +477,44 @@ implements VectorStore {
     private record Condition(String key, String op, List<String> values) {
     }
 
-    private record ParsedFilter(List<List<Condition>> orGroups) {
+    private ParsedFilter parseSpringAiExpression(String filter) {
+        // Example legacy format (Spring AI Expression#toString):
+        // Expression[type=AND, left=Expression[type=EQ, left=Key[key=dept], right=Value[value=ENTERPRISE]], right=Expression[type=EQ, left=Key[key=workspaceId], right=Value[value=abc]]]
+        //
+        // We intentionally parse only explicit key/value comparisons, then treat them as a single AND-group.
+        // If we can't extract any comparisons, the caller will fail closed.
+        Pattern pattern = Pattern.compile("Expression\\[type=(EQ|NE|IN),\\s*left=Key\\[key=([^\\]]+)\\],\\s*right=Value\\[value=([^\\]]+)\\]\\]");
+        Matcher matcher = pattern.matcher(filter);
+        ArrayList<Condition> conditions = new ArrayList<>();
+        while (matcher.find()) {
+            String type = matcher.group(1);
+            String key = matcher.group(2);
+            String value = matcher.group(3);
+            if (type == null || key == null || value == null) {
+                continue;
+            }
+            String op = switch (type) {
+                case "EQ" -> "==";
+                case "NE" -> "!=";
+                case "IN" -> "in";
+                default -> null;
+            };
+            if (op == null) {
+                continue;
+            }
+            List<String> values = op.equals("in") ? this.parseList(value) : List.of(this.stripQuotes(value));
+            conditions.add(new Condition(key, op, values));
+        }
+        if (conditions.isEmpty()) {
+            return null;
+        }
+        // Keys/values may be sensitive in regulated deployments; avoid logging raw values.
+        Set<String> keys = conditions.stream().map(Condition::key).collect(Collectors.toSet());
+        log.debug("Parsed Spring AI Expression filter (keys={})", keys);
+        return new ParsedFilter(List.of(conditions), false);
+    }
+
+    private record ParsedFilter(List<List<Condition>> orGroups, boolean invalid) {
     }
 
     @FunctionalInterface
