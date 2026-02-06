@@ -303,8 +303,9 @@ public class ReportingAdminController {
         if (value == null) {
             return "";
         }
-        String sanitized = value.replace("\r", " ").replace("\n", " ");
+        String sanitized = value.replace("\r", " ").replace("\n", " ").stripLeading();
         // H-06: Prefix formula-triggering characters to prevent CSV injection in spreadsheet apps
+        // stripLeading() prevents whitespace-prefixed payloads like " =cmd|..." from bypassing
         if (!sanitized.isEmpty()) {
             char first = sanitized.charAt(0);
             if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t') {

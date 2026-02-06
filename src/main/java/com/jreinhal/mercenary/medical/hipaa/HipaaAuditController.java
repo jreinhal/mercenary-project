@@ -126,8 +126,9 @@ public class HipaaAuditController {
         if (value == null) {
             return "";
         }
-        String normalized = value.replace("\"", "\"\"");
+        String normalized = value.replace("\"", "\"\"").stripLeading();
         // H-06: Prefix formula-triggering characters to prevent CSV injection in spreadsheet apps
+        // stripLeading() prevents whitespace-prefixed payloads like " =cmd|..." from bypassing
         if (!normalized.isEmpty()) {
             char first = normalized.charAt(0);
             if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {

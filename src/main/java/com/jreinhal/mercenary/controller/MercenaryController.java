@@ -336,7 +336,7 @@ public class MercenaryController {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
-            department = Department.valueOf(dept.toUpperCase(java.util.Locale.ROOT));
+            department = Department.valueOf(dept.toUpperCase(Locale.ROOT));
         }
         catch (IllegalArgumentException e) {
             // H-05: Do not reflect unsanitized user input in error responses
@@ -456,11 +456,10 @@ public class MercenaryController {
             return emitter;
         }
 
-        Department department;
         try {
-            department = Department.valueOf(dept.toUpperCase(java.util.Locale.ROOT));
+            Department.valueOf(dept.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            sendSseError(emitter, "Invalid sector: " + dept);
+            sendSseError(emitter, "INVALID SECTOR: unrecognized department value");
             return emitter;
         }
 

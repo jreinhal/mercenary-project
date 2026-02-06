@@ -77,7 +77,9 @@ public class HipaaAuditService {
     private void saveEvent(HipaaAuditEvent event) {
         try {
             this.mongoTemplate.save(event, COLLECTION_NAME);
-            log.debug("HIPAA audit: {} by {} - {}", new Object[]{event.eventType(), event.username(), event.details()});
+            if (log.isDebugEnabled()) {
+                log.debug("HIPAA audit: {} by {} - {}", new Object[]{event.eventType(), event.username(), event.details()});
+            }
         }
         catch (Exception e) {
             if (log.isErrorEnabled()) {

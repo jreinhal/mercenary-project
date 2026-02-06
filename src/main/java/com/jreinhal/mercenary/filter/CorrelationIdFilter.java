@@ -15,7 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class CorrelationIdFilter extends OncePerRequestFilter {
     public static final String HEADER_NAME = "X-Correlation-Id";
     public static final String MDC_KEY = "correlationId";
-    // L-04: Only accept safe correlation ID formats (UUID, alphanumeric+dash, max 64 chars)
+    // L-04: Only accept safe correlation ID formats (alphanumeric, dash, underscore, dot; max 64 chars)
     private static final Pattern SAFE_CORRELATION_ID = Pattern.compile("^[a-zA-Z0-9\\-_.]{1,64}$");
 
     @Override

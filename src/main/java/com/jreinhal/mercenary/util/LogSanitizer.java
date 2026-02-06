@@ -1,7 +1,7 @@
 package com.jreinhal.mercenary.util;
 
 public final class LogSanitizer {
-    // L-08: Pattern to strip control characters that enable log injection/forging
+    // L-08: Strip non-printable control characters (excluding tab, CR, LF which are handled separately)
     private static final java.util.regex.Pattern CONTROL_CHARS = java.util.regex.Pattern.compile("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]");
 
     private LogSanitizer() {
