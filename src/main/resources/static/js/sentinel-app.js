@@ -5205,8 +5205,55 @@
             }
 
             function fitLabelTextToWidth(labelEl, maxWidth, allowTruncate) {
-                // Always allow labels - don't truncate them
-                // The SVG will handle overflow with the expanded viewBox
+                if (!labelEl || !Number.isFinite(maxWidth) || maxWidth <= 0) {
+                    return false;
+                }
+
+                const currentText = (labelEl.textContent || '').trim();
+                const fullText = (labelEl.getAttribute('data-full-text') || currentText).trim();
+                labelEl.setAttribute('data-full-text', fullText);
+
+                const measure = () => {
+                    try {
+                        return labelEl.getComputedTextLength();
+                    } catch {
+                        return Infinity;
+                    }
+                };
+
+                labelEl.textContent = fullText;
+                if (measure() <= maxWidth) {
+                    return true;
+                }
+
+                if (!allowTruncate) {
+                    return false;
+                }
+
+                const ellipsis = '...';
+                labelEl.textContent = ellipsis;
+                if (measure() > maxWidth) {
+                    labelEl.textContent = fullText;
+                    return false;
+                }
+
+                // Binary search the longest prefix that fits with an ellipsis.
+                let low = 0;
+                let high = fullText.length;
+                let best = ellipsis;
+                while (low <= high) {
+                    const mid = Math.floor((low + high) / 2);
+                    const candidate = (fullText.slice(0, mid).trimEnd() || '').replace(/\s+/g, ' ') + ellipsis;
+                    labelEl.textContent = candidate;
+                    if (measure() <= maxWidth) {
+                        best = candidate;
+                        low = mid + 1;
+                    } else {
+                        high = mid - 1;
+                    }
+                }
+
+                labelEl.textContent = best;
                 return true;
             }
 
@@ -5518,15 +5565,38 @@
         function extractEntities(text, excludeDocuments = false) {
             const entities = [];
             const seen = new Set();
+            const stopNames = new Set([
+                'title', 'sector', 'summary', 'doc_id', 'docid', 'doc id', 'document id',
+                'source', 'sources', 'citation', 'citations', 'entity', 'entities',
+                'response', 'response context', 'query', 'query results',
+                'information panel', 'entity network', 'view reasoning chain',
+                'relevant excerpts', 'closest excerpts', 'no direct answer',
+                'based on the retrieved documents'
+            ]);
+            const denyPersonWords = new Set([
+                'assessment', 'protocol', 'report', 'plan', 'roadmap', 'metrics',
+                'performance', 'budget', 'compliance', 'cybersecurity', 'infrastructure',
+                'innovation', 'personnel', 'summary', 'transformation', 'investment',
+                'investments', 'vendor', 'audit', 'policy', 'program', 'trial', 'release'
+            ]);
 
             function addEntity(name, type, description = '') {
-                const key = `${name.toLowerCase()}-${type}`;
-                if (!seen.has(key) && name.length > 1 && name.length < 100) {
+                if (!name) return;
+                const cleanedName = String(name).trim();
+                if (!cleanedName) return;
+
+                const lowerName = cleanedName.toLowerCase();
+                if (lowerName.includes('redacted')) return;
+                if (stopNames.has(lowerName)) return;
+                if (/^src\s*\d+$/i.test(cleanedName)) return;
+
+                const key = `${cleanedName.toLowerCase()}-${type}`;
+                if (!seen.has(key) && cleanedName.length > 1 && cleanedName.length < 100) {
                     seen.add(key);
                     if (!description) {
-                        description = generateEntityDescription(name, type, text);
+                        description = generateEntityDescription(cleanedName, type, text);
                     }
-                    entities.push({ name: name.trim(), type, description });
+                    entities.push({ name: cleanedName, type, description });
                 }
             }
 
@@ -5569,8 +5639,19 @@
                         addEntity(term, 'organization');
                     } else if (term.match(/\b(Street|Avenue|Road|City|County|State|Country|Building|Floor|Suite)\b/i)) {
                         addEntity(term, 'location');
-                    } else if (term.split(' ').length === 2 && !term.match(/[0-9]/)) {
-                        addEntity(term, 'person');
+                    } else {
+                        const parts = term.split(' ').filter(Boolean);
+                        const looksLikePerson = parts.length === 2
+                            && !term.match(/[0-9]/)
+                            && parts.every(p => /^[A-Z][a-z]+$/.test(p))
+                            && !denyPersonWords.has(parts[0].toLowerCase())
+                            && !denyPersonWords.has(parts[1].toLowerCase());
+
+                        if (looksLikePerson) {
+                            addEntity(term, 'person');
+                        } else {
+                            addEntity(term, 'concept');
+                        }
                     }
                 }
             }
@@ -5589,7 +5670,11 @@
             const acronymPattern = /\b([A-Z]{2,6})\b/g;
             while ((match = acronymPattern.exec(text)) !== null) {
                 const acronym = match[1];
-                const skipAcronyms = ['THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HAD', 'HER', 'WAS', 'ONE', 'OUR', 'OUT'];
+                const skipAcronyms = [
+                    'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HAD', 'HER',
+                    'WAS', 'ONE', 'OUR', 'OUT', 'TITLE', 'SECTOR', 'SUMMARY', 'SOURCE', 'SOURCES',
+                    'DOC', 'DOCID'
+                ];
                 if (!skipAcronyms.includes(acronym)) {
                     addEntity(acronym, 'acronym');
                 }

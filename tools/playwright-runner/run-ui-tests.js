@@ -100,8 +100,8 @@ const sectors = [
   {
     id: 'GOVERNMENT',
     discovery: {
-      query: 'Summarize the Government After Action Report - Logistics.',
-      expectText: 'After Action Report',
+      query: 'Summarize the Operational Test Report (ORV-25).',
+      expectText: 'ORV-25',
       expectSources: true
     },
     factual: {
@@ -117,8 +117,8 @@ const sectors = [
   {
     id: 'MEDICAL',
     discovery: {
-      query: 'Summarize the Medical Clinical Trial Summary (Infrastructure).',
-      expectText: 'Clinical Trial Summary',
+      query: 'Summarize the Clinical Trial Status Report for Protocol SENT-2025-001.',
+      expectText: 'SENT-2025-001',
       expectSources: true
     },
     factual: {

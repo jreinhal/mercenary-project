@@ -37,6 +37,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -103,6 +104,7 @@ public class RagOrchestrationService {
     private final OllamaOptions llmOptions;
     private static final String NO_RELEVANT_RECORDS = "No relevant records found.";
     private static final Pattern STRICT_CITATION_PATTERN = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?[^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp)\\]", 2);
+    private static final Pattern STRICT_CITATION_FILENAME_PATTERN = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?([^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp))\\]", 2);
     private static final Pattern METRIC_HINT_PATTERN = Pattern.compile("\\b(metric|metrics|performance|availability|uptime|latency|sla|kpi|mttd|mttr|throughput|error rate|response time|accuracy|precision|recall|f1|cost|risk|budget|revenue|expense|income|profit|loss|spend|spending|amount|total|price|value|rate|percentage|count|number|quantity|allocation|funding|compliance)\\b", 2);
     private static final Pattern NAME_CONTEXT_PATTERN = Pattern.compile("\\b(sponsor|author|lead|director|manager|officer|chief|head|principal|coordinator|owner|contact|prepared by|reviewed by|approved by|submitted by)\\s*:?\\s*", 2);
     private static final Pattern SUMMARY_HINT_PATTERN = Pattern.compile("\\b(summarize|summary|overview|brief|synopsis|recap)\\b", 2);
@@ -357,9 +359,21 @@ public class RagOrchestrationService {
             boolean hasEvidence = RagOrchestrationService.hasRelevantEvidence(extractiveDocs, query) || !visualDocs.isEmpty();
             int citationCount = RagOrchestrationService.countCitations(response);
             boolean rescueApplied = false;
+            boolean citationRepairApplied = false;
             boolean excerptFallbackApplied = false;
             boolean evidenceAppendApplied = false;
-            if (responsePolicy != null && responsePolicy.enforceCitations() && llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
+            if (responsePolicy != null && responsePolicy.enforceCitations() && llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !RagOrchestrationService.isNoInfoResponse(response)) {
+                String repaired = this.repairCitationsIfNeeded(response, query, information, responsePolicy, department, extractiveDocs, llmTimeoutSeconds);
+                if (repaired != null && !repaired.equals(response)) {
+                    int repairedCitations = RagOrchestrationService.countCitations(repaired);
+                    if (repairedCitations > 0) {
+                        response = repaired;
+                        citationRepairApplied = true;
+                        citationCount = repairedCitations;
+                    }
+                }
+            }
+            if (!citationRepairApplied && responsePolicy != null && responsePolicy.enforceCitations() && llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
                 response = rescued;
                 rescueApplied = true;
                 citationCount = RagOrchestrationService.countCitations(response);
@@ -406,6 +420,8 @@ public class RagOrchestrationService {
             }
             if (usedAnswerabilityGate) {
                 log.info("Answerability gate applied (citations={}, answerable=false) for query {}", citationCount, LogSanitizer.querySummary(query));
+            } else if (citationRepairApplied) {
+                log.info("Citation repair applied (LLM rewrite with citations) for query {}", LogSanitizer.querySummary(query));
             } else if (rescueApplied) {
                 log.info("Citation rescue applied (extractive fallback) for query {}", LogSanitizer.querySummary(query));
             } else if (excerptFallbackApplied) {
@@ -703,9 +719,21 @@ public class RagOrchestrationService {
             boolean hasEvidence = RagOrchestrationService.hasRelevantEvidence(extractiveDocs, query) || !visualDocs.isEmpty();
             int citationCount = RagOrchestrationService.countCitations(response);
             boolean rescueApplied = false;
+            boolean citationRepairApplied = false;
             boolean excerptFallbackApplied = false;
             boolean evidenceAppendApplied = false;
-            if (responsePolicy != null && responsePolicy.enforceCitations() && llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
+            if (responsePolicy != null && responsePolicy.enforceCitations() && llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !RagOrchestrationService.isNoInfoResponse(response)) {
+                String repaired = this.repairCitationsIfNeeded(response, query, information, responsePolicy, department, extractiveDocs, llmTimeoutSeconds);
+                if (repaired != null && !repaired.equals(response)) {
+                    int repairedCitations = RagOrchestrationService.countCitations(repaired);
+                    if (repairedCitations > 0) {
+                        response = repaired;
+                        citationRepairApplied = true;
+                        citationCount = repairedCitations;
+                    }
+                }
+            }
+            if (!citationRepairApplied && responsePolicy != null && responsePolicy.enforceCitations() && llmSuccess && citationCount == 0 && hasEvidence && !isTimeoutResponse && !NO_RELEVANT_RECORDS.equals(rescued = RagOrchestrationService.buildExtractiveResponse(extractiveDocs, query))) {
                 response = rescued;
                 rescueApplied = true;
                 citationCount = RagOrchestrationService.countCitations(response);
@@ -750,7 +778,17 @@ public class RagOrchestrationService {
                     citationCount = RagOrchestrationService.countCitations(response);
                 }
             }
-            String gateDetail = isTimeoutResponse ? "System response (timeout)" : (rescueApplied ? "Citation rescue applied (extractive evidence)" : (excerptFallbackApplied ? "No direct answer; showing excerpts" : (usedAnswerabilityGate ? "No answer returned (missing citations or no evidence)" : "Answerable with citations")));
+            String gateDetail = isTimeoutResponse
+                ? "System response (timeout)"
+                : (citationRepairApplied
+                    ? "Citation repair applied (LLM rewrite with citations)"
+                    : (rescueApplied
+                        ? "Citation rescue applied (extractive evidence)"
+                        : (excerptFallbackApplied
+                            ? "No direct answer; showing excerpts"
+                            : (usedAnswerabilityGate
+                                ? "No answer returned (missing citations or no evidence)"
+                                : "Answerable with citations"))));
             this.reasoningTracer.addStep(ReasoningStep.StepType.CITATION_VERIFICATION, "Answerability Gate", gateDetail, System.currentTimeMillis() - stepStart, Map.of("answerable", answerable, "citationCount", citationCount, "gateApplied", usedAnswerabilityGate, "rescueApplied", rescueApplied, "excerptFallbackApplied", excerptFallbackApplied));
             stepStart = System.currentTimeMillis();
             // Skip hallucination check for extractive or fully cited responses
@@ -887,6 +925,126 @@ public class RagOrchestrationService {
                 .withNumPredict(Integer.valueOf(tokens));
     }
 
+    private ChatOptions optionsForCitationRepair(ResponsePolicy policy) {
+        int tokens = policy != null ? Math.max(256, policy.maxTokens) : this.llmNumPredict;
+        // Citation repair should be as deterministic as possible to maximize adherence to format.
+        double temperature = Math.min(this.llmTemperature, 0.2);
+        return OllamaOptions.create()
+                .withModel(this.llmModel)
+                .withTemperature(temperature)
+                .withNumPredict(Integer.valueOf(tokens));
+    }
+
+    private String repairCitationsIfNeeded(String draft,
+                                          String query,
+                                          String information,
+                                          ResponsePolicy policy,
+                                          Department department,
+                                          List<Document> extractiveDocs,
+                                          long llmTimeoutSeconds) {
+        if (draft == null || draft.isBlank()) {
+            return draft;
+        }
+        if (policy == null || !policy.enforceCitations()) {
+            return draft;
+        }
+        if (RagOrchestrationService.countCitations(draft) > 0) {
+            return draft;
+        }
+        if (information == null || information.isBlank()) {
+            return draft;
+        }
+
+        Set<String> allowedSources = RagOrchestrationService.collectAllowedSources(extractiveDocs);
+
+        String format = buildResponseFormat(policy, department);
+        String repairSystem =
+                "You are a citation repair assistant.\n\n" +
+                "TASK: Rewrite the DRAFT ANSWER so that it is fully supported by the DOCUMENTS.\n\n" +
+                "RULES:\n" +
+                "- Use ONLY facts found in the DOCUMENTS section.\n" +
+                "- After every sentence or bullet that contains a factual claim, append one or more citations in the exact format [filename].\n" +
+                "- Only cite filenames that appear as document headers in the DOCUMENTS section.\n" +
+                "- Do NOT invent citations. If a claim cannot be supported, remove it or rewrite it as uncertainty.\n" +
+                "- Keep the answer informative and roughly the same structure.\n\n" +
+                format + "\n" +
+                "DOCUMENTS:\n" + information + "\n";
+
+        String repairUser =
+                "QUESTION:\n" + (query != null ? query : "") + "\n\n" +
+                "DRAFT ANSWER:\n" + draft + "\n\n" +
+                "Return only the revised answer.";
+
+        try {
+            String sysMsg = repairSystem.replace("{", "[").replace("}", "]");
+            String userMsg = repairUser.replace("{", "[").replace("}", "]");
+            long timeout = Math.max(5L, Math.min(llmTimeoutSeconds, 90L));
+            ChatOptions options = optionsForCitationRepair(policy);
+            String raw = CompletableFuture
+                    .supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userMsg).options(options).call().content())
+                    .get(timeout, TimeUnit.SECONDS);
+
+            if (raw == null || raw.isBlank()) {
+                return draft;
+            }
+            String repaired = cleanLlmResponse(raw);
+            if (RagOrchestrationService.countCitations(repaired) == 0) {
+                return draft;
+            }
+            if (!allowedSources.isEmpty() && !RagOrchestrationService.citationsWithinScope(repaired, allowedSources)) {
+                // Fail closed: if the model cited unknown sources, do not accept the repaired answer.
+                log.warn("Citation repair produced out-of-scope citations; falling back to extractive evidence");
+                return draft;
+            }
+            return repaired;
+        } catch (Exception e) {
+            log.warn("Citation repair failed; falling back to extractive evidence: {}", e.getMessage());
+            return draft;
+        }
+    }
+
+    private static Set<String> collectAllowedSources(List<Document> docs) {
+        if (docs == null || docs.isEmpty()) {
+            return Set.of();
+        }
+        HashSet<String> allowed = new HashSet<>();
+        for (Document doc : docs) {
+            if (doc == null || doc.getMetadata() == null) {
+                continue;
+            }
+            Object source = doc.getMetadata().get("source");
+            if (source == null) {
+                source = doc.getMetadata().get("filename");
+            }
+            if (source == null) {
+                continue;
+            }
+            String normalized = String.valueOf(source).trim().toLowerCase(Locale.ROOT);
+            if (!normalized.isBlank()) {
+                allowed.add(normalized);
+            }
+        }
+        return allowed;
+    }
+
+    private static boolean citationsWithinScope(String response, Set<String> allowedSources) {
+        if (response == null || response.isBlank() || allowedSources == null || allowedSources.isEmpty()) {
+            return true;
+        }
+        Matcher matcher = STRICT_CITATION_FILENAME_PATTERN.matcher(response);
+        while (matcher.find()) {
+            String cited = matcher.group(1);
+            if (cited == null) {
+                continue;
+            }
+            String normalized = cited.trim().toLowerCase(Locale.ROOT);
+            if (!allowedSources.contains(normalized)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private String buildResponseFormat(ResponsePolicy policy, Department department) {
         if (policy == null) {
             return "Return a concise summary with citations after each factual claim.";
@@ -976,28 +1134,49 @@ public class RagOrchestrationService {
         }
 
         String trimmed = response.trim();
+        // Normalize away common invisible prefix characters that can appear in some model responses
+        // (e.g., BOM/zero-width spaces) so prefix checks don't fail silently.
+        String normalized = trimmed.replace("\uFEFF", "");
+        normalized = normalized.replaceAll("^[\\u200B\\u200C\\u200D\\u2060]+", "");
+
+        // Some Ollama / tool-call misfires emit a Go-like placeholder such as:
+        // "{object <nil> <nil> [] {\"expression\":{\"type\":\"string\"}}}"
+        // This is not useful to end users and should never appear in the UI. Strip it early so
+        // downstream gating can fall back to evidence excerpts instead of rendering garbage.
+        if (normalized.startsWith("{object") && normalized.contains("<nil>")) {
+            String[] lines = normalized.split("\\R");
+            if (lines.length > 1) {
+                String remainder = String.join("\n", Arrays.copyOfRange(lines, 1, lines.length)).trim();
+                if (!remainder.isBlank()) {
+                    log.warn("Stripped malformed tool-call placeholder from LLM response (kept remainder)");
+                    return remainder;
+                }
+            }
+            log.warn("Stripped malformed tool-call placeholder from LLM response (no remainder)");
+            return "";
+        }
 
         // Detect function call JSON pattern: {"name": "...", "parameters": {...}}
-        if (trimmed.startsWith("{\"name\"") && trimmed.contains("\"parameters\"")) {
+        if (normalized.startsWith("{\"name\"") && normalized.contains("\"parameters\"")) {
             try {
                 // Try to extract the expression/content from the function call
-                int exprStart = trimmed.indexOf("\"expression\"");
+                int exprStart = normalized.indexOf("\"expression\"");
                 if (exprStart == -1) {
-                    exprStart = trimmed.indexOf("\"content\"");
+                    exprStart = normalized.indexOf("\"content\"");
                 }
                 if (exprStart == -1) {
-                    exprStart = trimmed.indexOf("\"value\"");
+                    exprStart = normalized.indexOf("\"value\"");
                 }
 
                 if (exprStart != -1) {
                     // Find the value after the key
-                    int colonPos = trimmed.indexOf(":", exprStart);
+                    int colonPos = normalized.indexOf(":", exprStart);
                     if (colonPos != -1) {
-                        int valueStart = trimmed.indexOf("\"", colonPos + 1);
+                        int valueStart = normalized.indexOf("\"", colonPos + 1);
                         if (valueStart != -1) {
-                            int valueEnd = trimmed.lastIndexOf("\"");
+                            int valueEnd = normalized.lastIndexOf("\"");
                             if (valueEnd > valueStart) {
-                                String extracted = trimmed.substring(valueStart + 1, valueEnd);
+                                String extracted = normalized.substring(valueStart + 1, valueEnd);
                                 // Unescape JSON string
                                 extracted = extracted.replace("\\\"", "\"")
                                                    .replace("\\n", "\n")
@@ -1011,7 +1190,7 @@ public class RagOrchestrationService {
                 }
 
                 // If we can't extract, return a warning message
-                log.error("Unable to parse function call response: {}", trimmed.substring(0, Math.min(200, trimmed.length())));
+                log.error("Unable to parse function call response: {}", normalized.substring(0, Math.min(200, normalized.length())));
                 return "The system encountered a formatting issue. Please try rephrasing your question.";
 
             } catch (Exception e) {
@@ -1021,7 +1200,7 @@ public class RagOrchestrationService {
         }
 
         // Also handle array of function calls: [{"name": ...}]
-        if (trimmed.startsWith("[{\"name\"")) {
+        if (normalized.startsWith("[{\"name\"")) {
             log.warn("Detected array function call response, returning fallback");
             return "The system encountered a formatting issue. Please try rephrasing your question.";
         }
@@ -1105,11 +1284,8 @@ public class RagOrchestrationService {
                     }
                 }
             }
-            if (wantsSummary && snippet.length() < 120) {
-                String extra = RagOrchestrationService.extractSupplementalSnippet(doc.getContent(), keywords, snippet);
-                if (!extra.isBlank() && !extra.equals(snippet)) {
-                    snippet = snippet + " — " + extra;
-                }
+            if (wantsSummary && snippet.length() < 160) {
+                snippet = RagOrchestrationService.augmentSnippetForSummary(doc.getContent(), keywords, snippet);
             }
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
             summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]\n");
@@ -1179,11 +1355,8 @@ public class RagOrchestrationService {
                     }
                 }
             }
-            if (wantsSummary && snippet.length() < 120) {
-                String extra = RagOrchestrationService.extractSupplementalSnippet(doc.getContent(), keywords, snippet);
-                if (!extra.isBlank() && !extra.equals(snippet)) {
-                    snippet = snippet + " — " + extra;
-                }
+            if (wantsSummary && snippet.length() < 160) {
+                snippet = RagOrchestrationService.augmentSnippetForSummary(doc.getContent(), keywords, snippet);
             }
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
             summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]\n");
@@ -1280,10 +1453,9 @@ public class RagOrchestrationService {
                 return true;
             }
         }
-        if (hasAnyContent && !wantsMetrics) {
-            return true;
-        }
-        return false;
+        // Treat any non-empty retrieved document set as evidence for answerability.
+        // Even if a query mentions "metrics", we may only have qualitative support and should still answer (with citations).
+        return hasAnyContent;
     }
 
     private static List<Document> sortByKeywordPreference(List<Document> docs, Set<String> keywords) {
@@ -1769,6 +1941,84 @@ public class RagOrchestrationService {
                 candidate = candidate.substring(0, maxLen - 3).trim() + "...";
             }
             return candidate;
+        }
+        return "";
+    }
+
+    /**
+     * Builds a more substantive snippet for "summarize" style queries without relying on the LLM.
+     * This is used as part of the extractive fallback path (e.g., when citations are required or the
+     * model can't answer). Keep output reasonably bounded to avoid flooding the UI.
+     */
+    private static String augmentSnippetForSummary(String content, Set<String> keywords, String snippet) {
+        if (content == null || content.isBlank()) {
+            return snippet == null ? "" : snippet;
+        }
+        int targetLen = 180;
+        int maxLen = 360;
+        int maxParts = 5;
+
+        LinkedHashSet<String> parts = new LinkedHashSet<String>();
+        HashSet<String> seenLower = new HashSet<String>();
+        if (snippet != null && !snippet.isBlank()) {
+            parts.add(snippet);
+            seenLower.add(snippet.toLowerCase(Locale.ROOT));
+        }
+
+        while (parts.size() < maxParts) {
+            String combined = String.join((CharSequence)" - ", parts).trim();
+            if (combined.length() >= targetLen && !combined.isBlank()) {
+                break;
+            }
+            String extra = RagOrchestrationService.extractSupplementalSnippetForSummary(content, keywords, seenLower);
+            if (extra.isBlank()) {
+                break;
+            }
+            if (parts.add(extra)) {
+                seenLower.add(extra.toLowerCase(Locale.ROOT));
+            } else {
+                break;
+            }
+        }
+
+        String combined = String.join((CharSequence)" - ", parts).trim();
+        if (combined.length() > maxLen) {
+            combined = combined.substring(0, maxLen - 3).trim() + "...";
+        }
+        return combined;
+    }
+
+    private static String extractSupplementalSnippetForSummary(String content, Set<String> keywords, Set<String> seenLower) {
+        if (content == null) {
+            return "";
+        }
+        String[] lines = content.split("\\R");
+        for (String rawLine : lines) {
+            String trimmed = rawLine.trim();
+            if (trimmed.isEmpty() || RagOrchestrationService.isTableSeparator(trimmed) || RagOrchestrationService.isFileMarkerLine(trimmed) || RagOrchestrationService.isMetadataLine(trimmed) || RagOrchestrationService.isBoilerplateLine(trimmed)) {
+                continue;
+            }
+            String candidate = RagOrchestrationService.sanitizeSnippet(trimmed);
+            if (candidate.isBlank()) {
+                continue;
+            }
+            String lower = candidate.toLowerCase(Locale.ROOT);
+            if (seenLower != null && seenLower.contains(lower)) {
+                continue;
+            }
+
+            boolean hasKeyword = keywords != null && !keywords.isEmpty() && RagOrchestrationService.containsKeyword(candidate, keywords);
+            boolean hasMetric = NUMERIC_PATTERN.matcher(candidate).find()
+                || candidate.contains("%")
+                || candidate.contains("$")
+                || lower.contains("p-value")
+                || lower.contains("confidence interval");
+            boolean hasKeyValue = candidate.contains(":") && candidate.length() <= 160;
+
+            if (!hasKeyword && !hasMetric && !hasKeyValue) {
+                continue;
+            }
+            return RagOrchestrationService.truncateSnippet(candidate);
         }
         return "";
     }
