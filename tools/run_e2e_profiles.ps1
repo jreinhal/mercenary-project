@@ -177,12 +177,18 @@ db.users.updateOne(
 }
 
 function Start-App($profile, $port, $extraEnv, $logPath) {
+    function Escape-PsSingleQuoted([string]$value) {
+        if ($null -eq $value) { return "" }
+        # Escape for PowerShell single-quoted strings: ' -> ''
+        return $value -replace "'", "''"
+    }
+
     $envAssignments = @(
-        "`$env:APP_PROFILE='$profile'",
-        "`$env:APP_AUTH_MODE='$($extraEnv.APP_AUTH_MODE)'",
-        "`$env:AUTH_MODE='$($extraEnv.AUTH_MODE)'",
-        "`$env:MONGODB_URI='$MongoUri'",
-        "`$env:OLLAMA_URL='$OllamaUrl'",
+        "`$env:APP_PROFILE='$(Escape-PsSingleQuoted $profile)'",
+        "`$env:APP_AUTH_MODE='$(Escape-PsSingleQuoted $extraEnv.APP_AUTH_MODE)'",
+        "`$env:AUTH_MODE='$(Escape-PsSingleQuoted $extraEnv.AUTH_MODE)'",
+        "`$env:MONGODB_URI='$(Escape-PsSingleQuoted $MongoUri)'",
+        "`$env:OLLAMA_URL='$(Escape-PsSingleQuoted $OllamaUrl)'",
         "`$env:SPRING_AUTOCONFIGURE_EXCLUDE='org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration,org.springframework.ai.autoconfigure.azure.openai.AzureOpenAiAutoConfiguration,org.springframework.ai.autoconfigure.vectorstore.mongo.MongoDBAtlasVectorStoreAutoConfiguration,org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration,org.springframework.ai.autoconfigure.vertexai.palm2.VertexAiPalm2AutoConfiguration'",
         "`$env:SPRING_AI_MODEL_CHAT='ollama'",
         "`$env:SPRING_AI_MODEL_EMBEDDING='ollama'",
@@ -201,7 +207,7 @@ function Start-App($profile, $port, $extraEnv, $logPath) {
     )
     foreach ($kvp in $extraEnv.GetEnumerator()) {
         if ($kvp.Key -in @("AUTH_MODE")) { continue }
-        $envAssignments += "`$env:$($kvp.Key)='$($kvp.Value)'"
+        $envAssignments += "`$env:$($kvp.Key)='$(Escape-PsSingleQuoted $kvp.Value)'"
     }
     $envPrefix = ($envAssignments -join "; ")
     $cmd = "$envPrefix; cd '$PWD'; ./gradlew bootRun"
@@ -232,11 +238,6 @@ function Wait-ForHealth($baseUrl, $timeoutSec, $skipCert, $port) {
             }
         } catch {
             $lastError = $_
-            if (-not $skipCert) {
-                if (Test-NetConnection -ComputerName "127.0.0.1" -Port $port -InformationLevel Quiet -WarningAction SilentlyContinue) {
-                    return $true
-                }
-            }
             Start-Sleep -Seconds 2
         }
     }
@@ -248,30 +249,51 @@ function Wait-ForHealth($baseUrl, $timeoutSec, $skipCert, $port) {
 
 function Get-CsrfToken($baseUrl, $skipCert) {
     $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    $csrfResp = Invoke-Request @{
+    $csrfResp = Invoke-RequestAllowError @{
         Uri = "$baseUrl/api/auth/csrf"
         WebSession = $session
         UseBasicParsing = $true
         TimeoutSec = $RequestTimeoutSec
     } $skipCert
+    if ($csrfResp.StatusCode -ne 200) {
+        throw "CSRF request failed: HTTP $($csrfResp.StatusCode) $($csrfResp.Content)"
+    }
     $json = $csrfResp.Content | ConvertFrom-Json
     return @{ Session = $session; Token = $json.token }
 }
 
 function Login-Standard($baseUrl, $adminPassword, $skipCert) {
-    $csrf = Get-CsrfToken $baseUrl $skipCert
-    $body = @{ username = "admin"; password = $adminPassword } | ConvertTo-Json
-    Invoke-Request @{
-        Uri = "$baseUrl/api/auth/login"
-        Method = "Post"
-        WebSession = $csrf.Session
-        Headers = @{ "X-XSRF-TOKEN" = $csrf.Token }
-        ContentType = "application/json"
-        Body = $body
-        UseBasicParsing = $true
-        TimeoutSec = $RequestTimeoutSec
-    } $skipCert | Out-Null
-    return $csrf
+    $deadline = (Get-Date).AddSeconds(60)
+    $lastErr = $null
+
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $csrf = Get-CsrfToken $baseUrl $skipCert
+            $body = @{ username = "admin"; password = $adminPassword } | ConvertTo-Json
+            $loginResp = Invoke-RequestAllowError @{
+                Uri = "$baseUrl/api/auth/login"
+                Method = "Post"
+                WebSession = $csrf.Session
+                Headers = @{ "X-XSRF-TOKEN" = $csrf.Token }
+                ContentType = "application/json"
+                Body = $body
+                UseBasicParsing = $true
+                TimeoutSec = $RequestTimeoutSec
+            } $skipCert
+
+            if ($loginResp.StatusCode -eq 200) {
+                return $csrf
+            }
+
+            $lastErr = "Login failed: HTTP $($loginResp.StatusCode) $($loginResp.Content)"
+        } catch {
+            $lastErr = $_.Exception.Message
+        }
+
+        Start-Sleep -Seconds 2
+    }
+
+    throw $lastErr
 }
 
 function Get-CsrfTokenGovcloud($baseUrl, $skipCert, $authHeaders) {
@@ -454,10 +476,13 @@ foreach ($profile in $Profiles) {
     $extraEnv = @{}
 
     if ($profile -eq "dev") {
+        # Use a non-default port to avoid clobbering a manually-running UI on 8080.
+        $port = 18080
         $extraEnv["AUTH_MODE"] = "DEV"
         $extraEnv["APP_AUTH_MODE"] = "DEV"
         $extraEnv["COOKIE_SECURE"] = "false"
     } elseif ($profile -eq "govcloud") {
+        $port = 18443
         $extraEnv["AUTH_MODE"] = "CAC"
         $extraEnv["APP_AUTH_MODE"] = "CAC"
         $extraEnv["TRUSTED_PROXIES"] = "127.0.0.1,::1,0:0:0:0:0:0:0:1"
@@ -466,6 +491,7 @@ foreach ($profile in $Profiles) {
         $extraEnv["APP_CSRF_BYPASS_INGEST"] = "true"
         $extraEnv["COOKIE_SECURE"] = "true"
     } elseif ($profile -in @("standard", "enterprise")) {
+        $port = if ($profile -eq "enterprise") { 18082 } else { 18081 }
         $extraEnv["AUTH_MODE"] = "STANDARD"
         $extraEnv["APP_AUTH_MODE"] = "STANDARD"
         $extraEnv["SENTINEL_BOOTSTRAP_ENABLED"] = "true"
@@ -475,8 +501,11 @@ foreach ($profile in $Profiles) {
         $extraEnv["COOKIE_SECURE"] = "false"
     }
 
+    # Keep profiles isolated (and avoid conflicts with a manually-running UI on 8080).
+    $extraEnv["SERVER_PORT"] = "$port"
+    $baseUrl = "http://127.0.0.1:$port"
+
     if ($profile -eq "govcloud") {
-        $port = 8443
         $baseUrl = "https://localhost:$port"
         $skipCert = $true
         $keystoreDir = Join-Path $OutputDir "ssl"
