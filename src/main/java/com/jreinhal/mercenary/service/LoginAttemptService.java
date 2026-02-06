@@ -98,7 +98,7 @@ public class LoginAttemptService {
     }
 
     public String buildKey(String username, String clientIp) {
-        String safeUser = username == null ? "unknown" : username.trim().toLowerCase();
+        String safeUser = username == null ? "unknown" : username.trim().toLowerCase(java.util.Locale.ROOT);
         String safeIp = clientIp == null ? "unknown" : clientIp.trim();
         return safeUser + "|" + safeIp;
     }

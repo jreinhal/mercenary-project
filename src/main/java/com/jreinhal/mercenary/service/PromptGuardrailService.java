@@ -126,9 +126,6 @@ public class PromptGuardrailService {
     private GuardrailResult checkWithLlm(String query) {
         if (this.llmCircuitBreakerEnabled && this.llmCircuitBreaker != null && !this.llmCircuitBreaker.allowRequest()) {
             log.warn("LLM guardrail circuit breaker open; skipping LLM check");
-            if (this.strictMode) {
-                return GuardrailResult.blocked("LLM guardrail unavailable (circuit open)", "UNKNOWN", 0.5, Map.of("layer", "llm", "circuitBreaker", "OPEN"));
-            }
             // H-04: Fail-closed when circuit breaker is open — unknown queries are blocked
             return GuardrailResult.blocked("LLM guardrail unavailable (circuit open)", "UNKNOWN", 0.5, Map.of("layer", "llm", "circuitBreaker", "OPEN"));
         }
@@ -138,7 +135,7 @@ public class PromptGuardrailService {
             String userMessage = String.format(CLASSIFICATION_USER_TEMPLATE, query);
             future = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(CLASSIFICATION_SYSTEM).user(userMessage).call().content());
             String response = future.get(this.llmTimeoutMs, TimeUnit.MILLISECONDS);
-            String classification = response.trim().toUpperCase();
+            String classification = response.trim().toUpperCase(java.util.Locale.ROOT);
             if (this.llmCircuitBreakerEnabled && this.llmCircuitBreaker != null) {
                 this.llmCircuitBreaker.recordSuccess();
             }
