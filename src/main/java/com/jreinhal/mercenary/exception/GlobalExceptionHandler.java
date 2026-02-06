@@ -31,13 +31,17 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", safeMessage, "timestamp", Instant.now().toString()));
     }
 
+    private static final java.util.regex.Pattern PACKAGE_PATTERN =
+            java.util.regex.Pattern.compile("\\w+(\\.\\w+){2,}");
+
     private static String sanitizeExceptionMessage(String message) {
         if (message == null || message.isBlank()) {
             return "Invalid request";
         }
-        // Strip file paths, class names, and stack-trace-like content
+        // Strip file paths, class names, package names, and stack-trace-like content
         if (message.contains("/") || message.contains("\\")
                 || message.contains("Exception") || message.contains("at ")
+                || PACKAGE_PATTERN.matcher(message).find()
                 || message.length() > 200) {
             return "Invalid request";
         }
