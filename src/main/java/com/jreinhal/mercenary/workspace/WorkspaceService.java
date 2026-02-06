@@ -174,8 +174,9 @@ public class WorkspaceService {
     }
 
     private WorkspaceMember toMember(User user) {
+        // L-06: Don't leak all workspace IDs — return empty set to prevent cross-workspace info disclosure
         return new WorkspaceMember(user.getId(), user.getUsername(), user.getDisplayName(),
-                user.getRoles(), user.isActive(), user.getLastLoginAt(), user.getWorkspaceIds());
+                user.getRoles(), user.isActive(), user.getLastLoginAt(), Set.of());
     }
 
     private void assertWorkspaceManagementEnabled() {

@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -105,6 +107,14 @@ public class SharePointConnector implements Connector {
                     skipped++;
                     continue;
                 }
+                // H-08: Validate download URL points to a trusted Microsoft domain (SSRF prevention)
+                if (!isTrustedDownloadUrl(downloadUrl)) {
+                    if (log.isWarnEnabled()) {
+                        log.warn("SharePoint download URL blocked (untrusted domain) for file: {}", name);
+                    }
+                    skipped++;
+                    continue;
+                }
                 try {
                     byte[] bytes = restTemplate.getForObject(downloadUrl, byte[].class);
                     if (bytes == null || bytes.length == 0) {
@@ -122,6 +132,35 @@ public class SharePointConnector implements Connector {
         } catch (Exception e) {
             log.warn("SharePoint connector failed: {}", e.getMessage());
             return new ConnectorSyncResult(getName(), false, loaded, skipped, "SharePoint sync failed: " + e.getMessage());
+        }
+    }
+
+    private static final Set<String> TRUSTED_DOWNLOAD_DOMAINS = Set.of(
+            ".sharepoint.com",
+            ".sharepoint.cn",
+            ".sharepoint-df.com",
+            ".svc.ms"
+    );
+
+    private boolean isTrustedDownloadUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            String host = uri.getHost();
+            if (host == null) {
+                return false;
+            }
+            String lowerHost = host.toLowerCase(Locale.ROOT);
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
+                return false;
+            }
+            for (String trusted : TRUSTED_DOWNLOAD_DOMAINS) {
+                if (lowerHost.endsWith(trusted)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (IllegalArgumentException e) {
+            return false;
         }
     }
 

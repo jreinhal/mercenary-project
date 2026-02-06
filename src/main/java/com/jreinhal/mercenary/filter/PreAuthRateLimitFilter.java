@@ -78,6 +78,7 @@ extends OncePerRequestFilter {
     }
 
     private boolean isExemptPath(String path) {
-        return path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/images/") || path.startsWith("/fonts/") || path.equals("/favicon.ico") || path.equals("/api/health") || path.equals("/api/status") || path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs");
+        // L-03: Swagger/OpenAPI endpoints are no longer exempt from rate limiting
+        return path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/images/") || path.startsWith("/fonts/") || path.equals("/favicon.ico") || path.equals("/api/health") || path.equals("/api/status");
     }
 }
