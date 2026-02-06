@@ -197,26 +197,30 @@ public class HyperGraphController {
 
         try {
             String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
-            // First verify the source node belongs to the requested department
             HGNode sourceNode = mongoTemplate.findById(nodeId, HGNode.class, NODES_COLLECTION);
             if (sourceNode == null) {
                 return new NeighborResponse(List.of(), List.of(), "Node not found.");
             }
 
+            // R-05: Check workspace isolation FIRST, then sector boundary
+            if (sourceNode.getWorkspaceId() != null && !sourceNode.getWorkspaceId().equalsIgnoreCase(workspaceId)) {
+                if (log.isWarnEnabled()) {
+                    log.warn("SECURITY: Cross-workspace node access attempt: user={}, requested={}, node_workspace={}",
+                            user.getDisplayName(), workspaceId, sourceNode.getWorkspaceId());
+                }
+                auditService.logAccessDenied(user, "/api/graph/neighbors",
+                        "Cross-workspace access blocked", null);
+                return new NeighborResponse(List.of(), List.of(), "ACCESS DENIED: Node belongs to different workspace.");
+            }
             // SECURITY: Enforce sector boundary - node must belong to requested department
             if (!dept.equals(sourceNode.getDepartment())) {
-                log.warn("SECURITY: Cross-sector node access attempt: user={}, requested={}, node_dept={}",
-                        user.getDisplayName(), dept, sourceNode.getDepartment());
+                if (log.isWarnEnabled()) {
+                    log.warn("SECURITY: Cross-sector node access attempt: user={}, requested={}, node_dept={}",
+                            user.getDisplayName(), dept, sourceNode.getDepartment());
+                }
                 auditService.logAccessDenied(user, "/api/graph/neighbors",
-                        "Cross-sector access blocked: " + sourceNode.getDepartment(), null);
+                        "Cross-sector access blocked", null);
                 return new NeighborResponse(List.of(), List.of(), "ACCESS DENIED: Node belongs to different sector.");
-            }
-            if (sourceNode.getWorkspaceId() != null && !sourceNode.getWorkspaceId().equalsIgnoreCase(workspaceId)) {
-                log.warn("SECURITY: Cross-workspace node access attempt: user={}, requested={}, node_workspace={}",
-                        user.getDisplayName(), workspaceId, sourceNode.getWorkspaceId());
-                auditService.logAccessDenied(user, "/api/graph/neighbors",
-                        "Cross-workspace access blocked: " + sourceNode.getWorkspaceId(), null);
-                return new NeighborResponse(List.of(), List.of(), "ACCESS DENIED: Node belongs to different workspace.");
             }
 
             // SECURITY: Find edges containing this node, filtered by department

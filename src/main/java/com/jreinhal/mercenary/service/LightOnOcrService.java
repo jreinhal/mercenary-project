@@ -10,11 +10,14 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.util.Base64;
 import java.util.List;
 
@@ -51,8 +54,20 @@ public class LightOnOcrService {
     @Value("${sentinel.ocr.max-pages:50}")
     private int maxPages;
 
+    // R-04: Disable automatic redirect following to prevent SSRF bypass via 3xx redirects
+    private static RestTemplate createNoRedirectRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
+        return new RestTemplate(factory);
+    }
+
     public LightOnOcrService() {
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = createNoRedirectRestTemplate();
         this.objectMapper = new ObjectMapper();
     }
 
@@ -117,6 +132,13 @@ public class LightOnOcrService {
                 OcrResponse.class
             );
 
+            // R-04: Log redirect responses (SSRF defense — redirects are disabled)
+            if (response.getStatusCode().is3xxRedirection()) {
+                if (log.isWarnEnabled()) {
+                    log.warn("OCR service returned redirect for image {} — possible misconfiguration", filename);
+                }
+                return "";
+            }
             if (response.getBody() != null) {
                 log.info(">> LightOnOCR: Extracted {} chars from {} in {}ms",
                     response.getBody().text.length(),
@@ -170,6 +192,13 @@ public class LightOnOcrService {
                 PdfOcrResponse.class
             );
 
+            // R-04: Log redirect responses (SSRF defense — redirects are disabled)
+            if (response.getStatusCode().is3xxRedirection()) {
+                if (log.isWarnEnabled()) {
+                    log.warn("OCR service returned redirect for PDF {} — possible misconfiguration", filename);
+                }
+                return "";
+            }
             if (response.getBody() != null && response.getBody().pages != null) {
                 StringBuilder combined = new StringBuilder();
                 for (PageOcrResult page : response.getBody().pages) {

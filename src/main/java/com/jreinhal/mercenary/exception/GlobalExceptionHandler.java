@@ -25,8 +25,27 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException ex) {
+        // R-06: Sanitize exception message — don't expose internal details to client
+        String safeMessage = sanitizeExceptionMessage(ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", ex.getMessage(), "timestamp", Instant.now().toString()));
+                .body(Map.of("error", safeMessage, "timestamp", Instant.now().toString()));
+    }
+
+    private static final java.util.regex.Pattern PACKAGE_PATTERN =
+            java.util.regex.Pattern.compile("\\w+(\\.\\w+){2,}");
+
+    private static String sanitizeExceptionMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "Invalid request";
+        }
+        // Strip file paths, class names, package names, and stack-trace-like content
+        if (message.contains("/") || message.contains("\\")
+                || message.contains("Exception") || message.contains("at ")
+                || PACKAGE_PATTERN.matcher(message).find()
+                || message.length() > 200) {
+            return "Invalid request";
+        }
+        return message;
     }
 
     @ExceptionHandler(Exception.class)
