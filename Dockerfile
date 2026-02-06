@@ -54,10 +54,11 @@ ENV JAVA_TOOL_OPTIONS="-Xms512m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 # Default environment variables (set via deployment)
 ENV SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sentinel
 ENV SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
-ENV APP_PROFILE=govcloud
+# Spring Boot natively reads SPRING_PROFILES_ACTIVE — no shell expansion needed
+ENV SPRING_PROFILES_ACTIVE=govcloud
 
 EXPOSE 8080
 
-# M-17: Exec-form ENTRYPOINT — no shell, PID 1 is Java, immune to env var injection
+# M-17: Exec-form ENTRYPOINT — no shell, PID 1 is Java, immune to env var injection.
+# Profile is controlled via SPRING_PROFILES_ACTIVE env var (override with -e at runtime).
 ENTRYPOINT ["java", "-jar", "app.jar"]
-CMD ["--spring.profiles.active=govcloud"]

@@ -282,7 +282,9 @@ public class PiiRedactionService {
             boolean isBrandSpecific = match.replaceAll("[^0-9]", "").length() != 16
                 || match.matches("^[4-6].*") || match.matches("^3[47].*") || match.matches("^3[068].*");
             if (!isBrandSpecific && !isValidCreditCard(match)) {
-                continue; // Skip generic 16-digit numbers that fail Luhn
+                // Preserve non-Luhn 16-digit numbers as-is (e.g., order IDs)
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(match));
+                continue;
             }
             String replacement = this.generateReplacement(match, PiiType.CREDIT_CARD, mode);
             matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
