@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.controller;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
+import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
 import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
 import com.jreinhal.mercenary.service.AuditService;
@@ -235,13 +236,19 @@ public class SessionController {
         }
     }
 
-    @GetMapping(value={"/stats"})
+    @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStatistics(HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        Map<String, Object> stats = this.sessionPersistenceService.getStatistics();
+        // M-06: Only include global stats for admin users; non-admins see only their own
+        Map<String, Object> stats;
+        if (user.hasRole(UserRole.ADMIN)) {
+            stats = this.sessionPersistenceService.getStatistics();
+        } else {
+            stats = new java.util.HashMap<>();
+        }
         List<SessionPersistenceService.ActiveSession> userSessions = this.sessionPersistenceService.getUserSessions(user.getId());
         stats.put("userActiveSessions", userSessions.size());
         stats.put("userTotalMessages", userSessions.stream().mapToInt(SessionPersistenceService.ActiveSession::messageCount).sum());
