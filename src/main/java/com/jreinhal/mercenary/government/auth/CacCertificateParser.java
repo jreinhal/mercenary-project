@@ -48,7 +48,8 @@ public class CacCertificateParser {
             String firstName = cacMatcher.group(2);
             String middleName = cacMatcher.group(3);
             String edipi = cacMatcher.group(4);
-            log.debug("Parsed DoD CAC: EDIPI={}, Name={} {}", new Object[]{edipi, firstName, lastName});
+            // Avoid logging EDIPI or names (PII) even at DEBUG; keep log message generic.
+            log.debug("Parsed DoD CAC identity (redacted)");
             return new CacIdentity(edipi, this.capitalize(firstName), this.capitalize(lastName), middleName != null ? this.capitalize(middleName) : null, cn, this.extractEmail(dn), this.extractOrganization(dn));
         }
         String edipi = this.extractEdipi(cn);

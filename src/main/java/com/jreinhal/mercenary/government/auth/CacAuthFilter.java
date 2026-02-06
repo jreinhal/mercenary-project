@@ -126,8 +126,12 @@ public class CacAuthFilter extends OncePerRequestFilter {
             if (identity != null) {
                 request.setAttribute(CAC_IDENTITY_ATTRIBUTE, identity);
                 request.setAttribute(CAC_CERTIFICATE_ATTRIBUTE, clientCert);
-                log.debug("CAC identity extracted: EDIPI={}, Name={}",
-                         identity.edipi(), identity.toDisplayName());
+                // Avoid logging EDIPI or names (PII) even at DEBUG; keep log message generic.
+                log.debug(
+                    "CAC identity extracted (redacted, hasEdipi={}, hasName={})",
+                    identity.edipi() != null,
+                    identity.firstName() != null && identity.lastName() != null
+                );
             }
         } else {
             // Check for certificate passed via header (reverse proxy scenario)
@@ -162,8 +166,12 @@ public class CacAuthFilter extends OncePerRequestFilter {
                 CacIdentity identity = certificateParser.parseDn(dnValue);
                 if (identity != null) {
                     request.setAttribute(CAC_IDENTITY_ATTRIBUTE, identity);
-                    log.debug("CAC identity from header: EDIPI={}, Name={}",
-                             identity.edipi(), identity.toDisplayName());
+                    // Avoid logging EDIPI or names (PII) even at DEBUG; keep log message generic.
+                    log.debug(
+                        "CAC identity extracted from header (redacted, hasEdipi={}, hasName={})",
+                        identity.edipi() != null,
+                        identity.firstName() != null && identity.lastName() != null
+                    );
                 }
             } else if ((certHeader != null && !certHeader.isEmpty()) || (certDnHeader != null && !certDnHeader.isEmpty())) {
                 log.warn("Ignoring CAC headers from untrusted proxy: {}", request.getRemoteAddr());

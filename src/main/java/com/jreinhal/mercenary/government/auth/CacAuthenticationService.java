@@ -73,7 +73,7 @@ implements AuthenticationService {
         User user = this.userRepository.findByExternalId(subjectDn).orElse(null);
         if (user == null) {
             if (!this.autoProvision) {
-                log.warn("CAC user {} not found and auto-provisioning disabled", commonName);
+                log.warn("CAC user not found and auto-provisioning disabled (principalId={})", principalId(subjectDn));
                 return null;
             }
             user = new User();
@@ -89,20 +89,20 @@ implements AuthenticationService {
                 user.setActive(false);
                 user.setPendingApproval(true);
                 user = (User)this.userRepository.save(user);
-                log.info("Auto-provisioned new CAC user pending approval: {}", commonName);
+                log.info("Auto-provisioned new CAC user pending approval (principalId={})", principalId(subjectDn));
                 return null;
             }
             user.setActive(true);
             user.setPendingApproval(false);
             user = (User)this.userRepository.save(user);
-            log.info("Auto-provisioned new CAC user: {}", commonName);
+            log.info("Auto-provisioned new CAC user (principalId={})", principalId(subjectDn));
         }
         if (user.isPendingApproval()) {
-            log.warn("CAC user {} is pending approval", commonName);
+            log.warn("CAC user pending approval (principalId={})", principalId(subjectDn));
             return null;
         }
         if (!user.isActive()) {
-            log.warn("CAC user {} is deactivated", commonName);
+            log.warn("CAC user deactivated (principalId={})", principalId(subjectDn));
             return null;
         }
         user.setLastLoginAt(Instant.now());
@@ -122,5 +122,12 @@ implements AuthenticationService {
     @Override
     public String getAuthMode() {
         return "CAC";
+    }
+
+    private static String principalId(String subjectDn) {
+        if (subjectDn == null) {
+            return "none";
+        }
+        return Integer.toHexString(subjectDn.hashCode());
     }
 }

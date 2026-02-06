@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Mask common PII/PHI tokens from log output by default. -->
+    <conversionRule conversionWord="maskedMsg"
+                    converterClass="com.jreinhal.mercenary.util.PiiMaskingConverter"/>
+
+    <!-- Allow overriding root log level via Spring config (logging.level.root). -->
+    <springProperty scope="context" name="ROOT_LEVEL" source="logging.level.root" defaultValue="INFO"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{correlationId:-}] %-5level %logger{36} - %maskedMsg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Regulated deployments should reduce verbosity to minimize accidental data exposure. -->
+    <springProfile name="govcloud,medical">
+        <logger name="com.jreinhal.mercenary" level="INFO"/>
+        <logger name="com.jreinhal.mercenary.vector" level="WARN"/>
+        <logger name="com.jreinhal.mercenary.rag" level="WARN"/>
+        <logger name="com.jreinhal.mercenary.service" level="INFO"/>
+    </springProfile>
+
+    <root level="${ROOT_LEVEL}">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
+
