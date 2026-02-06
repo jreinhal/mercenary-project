@@ -94,6 +94,11 @@ dependencyManagement {
     }
 }
 
+// SCIF/air-gapped builds benefit from reproducible dependency resolution.
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 // Edition-specific source sets with actual exclusion logic
 sourceSets {
     main {

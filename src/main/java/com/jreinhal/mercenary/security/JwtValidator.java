@@ -16,7 +16,10 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +31,8 @@ public class JwtValidator {
     private static final Logger log = LoggerFactory.getLogger(JwtValidator.class);
     private final JwksKeyProvider keyProvider;
     private final HipaaPolicy hipaaPolicy;
+    private final Map<String, Instant> revokedTokenIds = new ConcurrentHashMap<>();
+    private final AtomicLong lastCleanupMs = new AtomicLong(0L);
     @Value(value="${app.oidc.issuer:}")
     private String expectedIssuer;
     @Value(value="${app.oidc.client-id:}")
@@ -46,10 +51,31 @@ public class JwtValidator {
     private String mfaClaimValues;
     @Value(value="${app.oidc.mfa-acr-values:}")
     private String mfaAcrValues;
+    @Value(value="${app.oidc.blocklist.enabled:true}")
+    private boolean blocklistEnabled;
+    @Value(value="${app.oidc.blocklist.cleanup-interval-seconds:300}")
+    private long blocklistCleanupIntervalSeconds;
+    @Value(value="${app.oidc.require-jti:false}")
+    private boolean requireJti;
 
     public JwtValidator(JwksKeyProvider keyProvider, HipaaPolicy hipaaPolicy) {
         this.keyProvider = keyProvider;
         this.hipaaPolicy = hipaaPolicy;
+    }
+
+    /**
+     * Block (revoke) a JWT by JTI until its natural expiration.
+     * NOTE: This is an in-memory blocklist; restart clears the list.
+     */
+    public void blockToken(String jti, Instant expiry) {
+        if (!this.blocklistEnabled) {
+            return;
+        }
+        if (jti == null || jti.isBlank() || expiry == null) {
+            return;
+        }
+        this.revokedTokenIds.put(jti, expiry);
+        log.warn("SECURITY: Token revoked (jti={})", jti);
     }
 
     public ValidationResult validate(String token) {
@@ -98,6 +124,10 @@ public class JwtValidator {
         Instant notBefore;
         Instant expiry;
         Instant now = Instant.now();
+
+        // Opportunistic cleanup to avoid background threads in hardened deployments.
+        this.cleanupBlocklistIfNeeded(now);
+
         Date expirationTime = claims.getExpirationTime();
         if (expirationTime != null && now.isAfter(expiry = expirationTime.toInstant().plusSeconds(this.clockSkewSeconds))) {
             return ValidationResult.failure("Token has expired");
@@ -119,10 +149,53 @@ public class JwtValidator {
         if (claims.getSubject() == null || claims.getSubject().isEmpty()) {
             return ValidationResult.failure("Token missing subject claim");
         }
+
+        String jti = claims.getJWTID();
+        if (jti == null || jti.isBlank()) {
+            if (this.requireJti) {
+                return ValidationResult.failure("Token missing jti claim");
+            }
+        } else if (this.isTokenRevoked(jti, now)) {
+            return ValidationResult.failure("Token has been revoked");
+        }
+
         if (this.isMfaRequired() && !this.isMfaSatisfied(claims)) {
             return ValidationResult.failure("MFA required but token lacks required AMR/ACR claims");
         }
         return ValidationResult.success(claims);
+    }
+
+    private boolean isTokenRevoked(String jti, Instant now) {
+        if (!this.blocklistEnabled) {
+            return false;
+        }
+        Instant expiry = this.revokedTokenIds.get(jti);
+        if (expiry == null) {
+            return false;
+        }
+        if (now.isAfter(expiry)) {
+            // Expired token revocation entry; drop it.
+            this.revokedTokenIds.remove(jti);
+            return false;
+        }
+        log.warn("SECURITY: Blocked token attempted (jti={})", jti);
+        return true;
+    }
+
+    private void cleanupBlocklistIfNeeded(Instant now) {
+        if (!this.blocklistEnabled) {
+            return;
+        }
+        long intervalMs = Math.max(1, this.blocklistCleanupIntervalSeconds) * 1000L;
+        long last = this.lastCleanupMs.get();
+        long current = now.toEpochMilli();
+        if ((current - last) < intervalMs) {
+            return;
+        }
+        if (!this.lastCleanupMs.compareAndSet(last, current)) {
+            return;
+        }
+        this.revokedTokenIds.entrySet().removeIf(entry -> now.isAfter(entry.getValue()));
     }
 
     private boolean isAllowedAlgorithm(JWSAlgorithm algorithm) {

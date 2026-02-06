@@ -4,6 +4,9 @@ import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
 import javax.security.auth.x500.X500Principal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +15,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class CacCertificateParser {
     private static final Logger log = LoggerFactory.getLogger(CacCertificateParser.class);
-    private static final Pattern CN_PATTERN = Pattern.compile("CN=([^,]+)", 2);
     private static final Pattern DOD_CAC_PATTERN = Pattern.compile("^([A-Z'-]+)\\.([A-Z'-]+)(?:\\.([A-Z'-]*))?\\.?(\\d{10})(?:\\.\\w+)?$", 2);
     private static final Pattern EDIPI_PATTERN = Pattern.compile("(\\d{10})");
 
@@ -36,7 +38,7 @@ public class CacCertificateParser {
         if (dn == null || dn.isEmpty()) {
             return new CacIdentity(null, null, null, null, null, null, null);
         }
-        log.debug("Parsing DN: {}", dn);
+        // DN can contain sensitive identity fields; avoid logging it even at DEBUG.
         String cn = this.extractCn(dn);
         if (cn == null) {
             cn = dn;
@@ -54,11 +56,15 @@ public class CacCertificateParser {
     }
 
     private String extractCn(String dn) {
-        Matcher matcher = CN_PATTERN.matcher(dn);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
-        }
-        return null;
+        return this.extractDnAttribute(dn, "CN");
+    }
+
+    /**
+     * Extract the Common Name (CN) from a Distinguished Name (DN) using RFC2253 parsing.
+     * Returns null if the DN is invalid or does not contain a CN attribute.
+     */
+    public String extractCommonName(String dn) {
+        return this.extractDnAttribute(dn, "CN");
     }
 
     public String extractEdipi(String text) {
@@ -73,19 +79,35 @@ public class CacCertificateParser {
     }
 
     private String extractEmail(String dn) {
-        Pattern emailPattern = Pattern.compile("(?:E|emailAddress)=([^,]+)", 2);
-        Matcher matcher = emailPattern.matcher(dn);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
-        }
-        return null;
+        // Different environments can encode email as E=, emailAddress=, or OID 1.2.840.113549.1.9.1
+        String email = this.extractDnAttribute(dn, "E", "EMAILADDRESS", "1.2.840.113549.1.9.1");
+        return email != null ? email.trim() : null;
     }
 
     private String extractOrganization(String dn) {
-        Pattern orgPattern = Pattern.compile("O=([^,]+)", 2);
-        Matcher matcher = orgPattern.matcher(dn);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
+        String org = this.extractDnAttribute(dn, "O");
+        return org != null ? org.trim() : null;
+    }
+
+    private String extractDnAttribute(String dn, String... types) {
+        if (dn == null || dn.isBlank()) {
+            return null;
+        }
+        try {
+            LdapName ldapName = new LdapName(dn);
+            for (Rdn rdn : ldapName.getRdns()) {
+                if (rdn == null || rdn.getType() == null) {
+                    continue;
+                }
+                for (String type : types) {
+                    if (type != null && type.equalsIgnoreCase(rdn.getType())) {
+                        Object value = rdn.getValue();
+                        return value != null ? value.toString() : null;
+                    }
+                }
+            }
+        } catch (InvalidNameException e) {
+            log.warn("Invalid certificate DN format (unable to extract attributes)");
         }
         return null;
     }

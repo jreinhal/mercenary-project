@@ -51,7 +51,8 @@ implements VectorStore {
                     }
                 }
                 if (embedding == null || embedding.isEmpty()) {
-                    log.debug("Generating embedding for doc: {}", doc.getId());
+                    // Avoid logging document identifiers in regulated deployments.
+                    log.debug("Generating embedding for document (id redacted)");
                     float[] embeddingArray = this.embeddingModel.embed(doc.getContent());
                     embedding = new java.util.ArrayList<>(embeddingArray.length);
                     for (float f : embeddingArray) {
@@ -142,11 +143,14 @@ implements VectorStore {
             try {
                 String key = this.extractBetween(filter, "Key[key=", "]");
                 String value = this.extractBetween(filter, "Value[value=", "]");
-                log.debug("Parsed Spring AI Expression: key={}, value={}", key, value);
+                // Keys/values may be sensitive in regulated deployments; avoid logging raw values.
+                log.debug("Parsed Spring AI Expression filter for key='{}'", key);
                 return new ParsedFilter(List.of(List.of(new Condition(key, "==", List.of(this.stripQuotes(value))))));
             }
             catch (Exception e) {
-                log.warn("Failed to parse Spring AI Expression: {}", filter, e);
+                // Do not log the raw filter expression; it may contain sensitive key/value pairs.
+                log.warn("Failed to parse Spring AI Expression filter (redacted): {}", e.getMessage());
+                log.debug("Spring AI Expression parse failure details", e);
                 return null;
             }
         }

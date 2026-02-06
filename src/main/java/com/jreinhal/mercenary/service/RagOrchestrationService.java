@@ -283,11 +283,14 @@ public class RagOrchestrationService {
             }
             ArrayList<Document> rawDocs = new ArrayList<Document>(allDocs);
             List<Document> orderedDocs = this.sortDocumentsDeterministically(rawDocs);
-            if (!this.hipaaPolicy.shouldSuppressSensitiveLogs(department)) {
-                log.info("Retrieved {} documents for query {}", rawDocs.size(), LogSanitizer.querySummary(query));
-                rawDocs.forEach(doc -> log.info("  - Source: {}, Content preview: {}", doc.getMetadata().get("source"), doc.getContent().substring(0, Math.min(50, doc.getContent().length()))));
-            } else {
-                log.info("Retrieved {} documents for query (suppressed content preview)", rawDocs.size());
+            final boolean suppressSensitiveLogs =
+                this.hipaaPolicy.shouldSuppressSensitiveLogs(department) ||
+                this.licenseService.getEdition() == LicenseService.Edition.GOVERNMENT;
+
+            // Never log document content previews (they may contain PHI/PII or classified text).
+            log.info("Retrieved {} documents for query {}", rawDocs.size(), LogSanitizer.querySummary(query));
+            if (suppressSensitiveLogs) {
+                log.debug("Sensitive document previews suppressed (regulated mode).");
             }
             List<Document> topDocs = orderedDocs.stream().limit(15L).toList();
             if (hipaaStrict && this.hipaaAuditService != null) {
@@ -310,18 +313,17 @@ public class RagOrchestrationService {
                     String visualResponse = this.megaRagService.generateWithVisualContext(query, topDocs, visualDocs);
                     response = visualResponse != null ? cleanLlmResponse(visualResponse) : "";
                 } else {
-                    String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
-                    String userQuery = query.replace("{", "[").replace("}", "]");
-                    ChatOptions options = optionsForPolicy(responsePolicy);
-                    String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options(options).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
-                    if (!this.hipaaPolicy.shouldSuppressSensitiveLogs(department)) {
-                        log.info("LLM RAW RESPONSE for /ask: {}", rawResponse != null ? rawResponse.substring(0, Math.min(500, rawResponse.length())) : "null");
-                    } else {
-                        log.info("LLM RAW RESPONSE for /ask (suppressed)");
+                     String sysMsg = systemMessage.replace("{", "[").replace("}", "]");
+                     String userQuery = query.replace("{", "[").replace("}", "]");
+                     ChatOptions options = optionsForPolicy(responsePolicy);
+                     String rawResponse = CompletableFuture.supplyAsync(() -> this.chatClient.prompt().system(sysMsg).user(userQuery).options(options).call().content()).get(llmTimeoutSeconds, TimeUnit.SECONDS);
+                    // Never log raw model output; it may contain sensitive data.
+                    if (log.isDebugEnabled()) {
+                        log.debug("LLM response received for /ask (len={})", rawResponse != null ? rawResponse.length() : 0);
                     }
                     response = cleanLlmResponse(rawResponse);
-                }
-            }
+                 }
+             }
             catch (TimeoutException te) {
                 llmSuccess = false;
                 log.warn("LLM response timed out after {}s for query {}", llmTimeoutSeconds, LogSanitizer.querySummary(query));

@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Pattern;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -69,8 +70,11 @@ public class QueryDecompositionService {
         if (subQueries.isEmpty()) {
             return Collections.singletonList(query);
         }
-        log.info("Decomposed query into {} sub-queries:", subQueries.size());
-        subQueries.forEach(sq -> log.info("  -> {}", sq));
+        // Never log raw query strings (may contain PII/PHI/classified content).
+        log.info("Decomposed query into {} sub-queries for query {}", subQueries.size(), LogSanitizer.querySummary(query));
+        if (log.isDebugEnabled()) {
+            subQueries.forEach(sq -> log.debug("Sub-query {}", LogSanitizer.querySummary(sq)));
+        }
         return subQueries;
     }
 
