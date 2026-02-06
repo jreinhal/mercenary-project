@@ -50,9 +50,19 @@ public class SessionController {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
         String dept = department != null ? department : Department.ENTERPRISE.name();
+        // S2-03: Validate department enum and sector access before creating session
+        Department sector;
+        try {
+            sector = Department.valueOf(dept.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!user.canAccessSector(sector)) {
+            this.auditService.logAccessDenied(user, "/api/sessions/create", "Not authorized for sector " + sector.name(), request);
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         String sessionId = this.sessionPersistenceService.generateSessionId();
         SessionPersistenceService.ActiveSession session = this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
-        Department sector = Department.valueOf(dept);
         this.auditService.logQuery(user, "session_create: " + sessionId, sector, "Session created", request);
         return ResponseEntity.ok(new SessionResponse(session.sessionId(), session.department(), session.createdAt().toString(), "Session created successfully"));
     }

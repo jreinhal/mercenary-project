@@ -88,7 +88,8 @@ public class ReportingAdminController {
             sinceInstant = resolveSince(days, since);
             untilInstant = resolveInstant(until);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"" + e.getMessage() + "\"}");
+            // S2-06: Generic message — don't reflect user input in error response
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"Invalid timestamp parameter\"}");
         }
         AuditExportService.AuditExportResult result = auditExportService.buildExport(sinceInstant, untilInstant, limit);
         String content;
@@ -123,7 +124,8 @@ public class ReportingAdminController {
             untilInstant = Optional.ofNullable(resolveInstant(until));
             eventType = resolveHipaaType(type);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+            // S2-06: Generic message — don't reflect user input in error response
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid timestamp or event type parameter"));
         }
         return ResponseEntity.ok(hipaaAuditService.queryEvents(sinceInstant, untilInstant, eventType, limit));
     }
@@ -148,7 +150,8 @@ public class ReportingAdminController {
             untilInstant = resolveInstant(until);
             eventType = resolveHipaaType(type);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"" + e.getMessage() + "\"}");
+            // S2-06: Generic message — don't reflect user input in error response
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"Invalid timestamp or event type parameter\"}");
         }
         List<HipaaAuditService.HipaaAuditEvent> events = hipaaAuditService.queryEvents(
                 Optional.ofNullable(sinceInstant), Optional.ofNullable(untilInstant), eventType, limit);
@@ -303,7 +306,8 @@ public class ReportingAdminController {
         if (value == null) {
             return "";
         }
-        String sanitized = value.replace("\r", " ").replace("\n", " ").stripLeading();
+        // S2-08: Strip null bytes that could bypass sanitization in some CSV parsers
+        String sanitized = value.replace("\0", "").replace("\r", " ").replace("\n", " ").stripLeading();
         // H-06: Prefix formula-triggering characters to prevent CSV injection in spreadsheet apps
         // stripLeading() prevents whitespace-prefixed payloads like " =cmd|..." from bypassing
         if (!sanitized.isEmpty()) {

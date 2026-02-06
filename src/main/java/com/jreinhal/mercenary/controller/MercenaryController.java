@@ -388,14 +388,20 @@ public class MercenaryController {
                 this.ingestionService.ingest(file, department);
             }
             catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
-                log.warn("Workspace quota exceeded for {}: {}", filename, e.getMessage());
+                if (log.isWarnEnabled()) {
+                    log.warn("Workspace quota exceeded for {}: {}", filename, e.getMessage());
+                }
                 this.auditService.logAccessDenied(user, "/api/ingest/file", "Workspace quota exceeded: " + e.getQuotaType(), request);
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("QUOTA EXCEEDED: " + e.getMessage());
+                // S2-04: Use safe quota type label instead of raw exception message
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("QUOTA EXCEEDED: " + e.getQuotaType() + " limit reached");
             }
             catch (SecurityException e) {
-                log.warn("SECURITY: Ingestion blocked for {}: {}", filename, e.getMessage());
+                if (log.isWarnEnabled()) {
+                    log.warn("SECURITY: Ingestion blocked for {}: {}", filename, e.getMessage());
+                }
                 this.auditService.logAccessDenied(user, "/api/ingest/file", "Blocked file type: " + e.getMessage(), request);
-                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body("BLOCKED: " + e.getMessage());
+                // S2-04: Generic message — details already logged server-side
+                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body("BLOCKED: File type not permitted for ingestion.");
             }
             catch (Exception e) {
                 log.warn("Persistence Failed (DB Offline). Proceeding with RAM Cache.", (Throwable)e);
@@ -478,8 +484,9 @@ public class MercenaryController {
             return emitter;
         }
 
+        Department department;
         try {
-            Department.valueOf(dept.toUpperCase(Locale.ROOT));
+            department = Department.valueOf(dept.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             sendSseError(emitter, "INVALID SECTOR: unrecognized department value");
             return emitter;
@@ -487,6 +494,18 @@ public class MercenaryController {
 
         if (!user.hasPermission(UserRole.Permission.QUERY)) {
             sendSseError(emitter, "Insufficient permissions");
+            return emitter;
+        }
+
+        // S2-01: Sector clearance checks consistent with /api/ask and /api/ask/enhanced
+        if (this.sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
+            this.auditService.logAccessDenied(user, "/api/ask/stream", "Insufficient clearance for " + department.name(), null);
+            sendSseError(emitter, "Insufficient clearance for this sector");
+            return emitter;
+        }
+        if (!user.canAccessSector(department)) {
+            this.auditService.logAccessDenied(user, "/api/ask/stream", "Not authorized for sector " + department.name(), null);
+            sendSseError(emitter, "Not authorized for this sector");
             return emitter;
         }
 

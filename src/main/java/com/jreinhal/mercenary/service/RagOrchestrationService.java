@@ -223,7 +223,8 @@ public class RagOrchestrationService {
             this.workspaceQuotaService.enforceQueryQuota(com.jreinhal.mercenary.workspace.WorkspaceContext.getCurrentWorkspaceId());
         } catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
             this.auditService.logAccessDenied(user, "/api/ask", "Workspace quota exceeded: " + e.getQuotaType(), request);
-            return "ACCESS DENIED: " + e.getMessage();
+            // S2-05: Use safe quota type label instead of raw exception message
+            return "ACCESS DENIED: " + e.getQuotaType() + " limit reached for this workspace.";
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
@@ -511,7 +512,8 @@ public class RagOrchestrationService {
             this.workspaceQuotaService.enforceQueryQuota(com.jreinhal.mercenary.workspace.WorkspaceContext.getCurrentWorkspaceId());
         } catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
             this.auditService.logAccessDenied(user, "/api/ask/enhanced", "Workspace quota exceeded: " + e.getQuotaType(), request);
-            return new EnhancedAskResponse("ACCESS DENIED: " + e.getMessage(), List.of(), List.of(),
+            // S2-05: Use safe quota type label instead of raw exception message
+            return new EnhancedAskResponse("ACCESS DENIED: " + e.getQuotaType() + " limit reached for this workspace.", List.of(), List.of(),
                     Map.of("error", "WORKSPACE_QUOTA", "quota", e.getQuotaType()), null);
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
