@@ -4535,6 +4535,31 @@
             cursor: pointer;
         }
 
+        /* Inline sector/workspace selects above chat input */
+        .chat-input-header {
+            display: flex;
+            gap: 8px;
+            padding: 0 0 8px;
+            align-items: center;
+        }
+
+        .sector-select-inline,
+        .workspace-select-inline {
+            width: auto;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .sector-select-inline:focus,
+        .workspace-select-inline:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-muted);
+        }
+
         /* Settings Panel Styles */
         .settings-description {
             font-size: 11px;
