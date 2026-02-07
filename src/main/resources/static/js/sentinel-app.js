@@ -494,12 +494,7 @@
                     case 'addMessageToCase': addMessageToCase(el.dataset.msgId); break;
                     case 'jumpToMessage': jumpToMessage(el.dataset.msgId); break;
                     case 'loadDemoDataset': loadDemoDataset(); break;
-                    case 'refreshConnectors': refreshConnectorStatus(); break;
-                    case 'syncConnectors': syncConnectors(); break;
-                    case 'refreshConnectorCatalog': refreshConnectorCatalog(); break;
-                    case 'toggleConnectorDetails': toggleConnectorDetails(el.dataset.connectorId); break;
-                    case 'copyConnectorConfig': copyConnectorConfig(el.dataset.connectorId); break;
-                    case 'applyPipelinePreset': applyPipelinePreset(el.dataset.preset); break;
+                    case 'openAdmin': openAdmin(); break;
                     case 'openMessageSources': openMessageSources(el.dataset.msgId); break;
                     case 'openMessageGraph': openMessageGraph(el.dataset.msgId); break;
                     case 'toggleConversationList': toggleConversationList(); break;
@@ -513,19 +508,6 @@
                     case 'regenerateResponse': regenerateResponse(); break;
                     case 'runEvalSuite': runEvalSuite(); break;
                     case 'clearEvalResults': clearEvalResults(); break;
-                    case 'runExecutiveReport': runExecutiveReport(); break;
-                    case 'runSlaReport': runSlaReport(); break;
-                    case 'runAuditExport': runAuditExport(); break;
-                    case 'refreshReportSchedules': refreshReportSchedules(); break;
-                    case 'createReportSchedule': createReportSchedule(); break;
-                    case 'toggleReportSchedule': toggleReportSchedule(el.dataset.scheduleId, el.dataset.enabled); break;
-                    case 'runReportSchedule': runReportSchedule(el.dataset.scheduleId); break;
-                    case 'refreshReportExports': refreshReportExports(); break;
-                    case 'viewReportExport': viewReportExport(el.dataset.exportId); break;
-                    case 'downloadReportExport': downloadReportExport(el.dataset.exportId); break;
-                    case 'refreshWorkspaceQuota': refreshWorkspaceQuota(); break;
-                    case 'saveWorkspaceQuota': saveWorkspaceQuota(); break;
-                    case 'closeReportModal': closeReportModal(); break;
                     case 'switchRightTab': switchRightTab(el.dataset.tab); break;
                     case 'switchGraphTab': switchGraphTab(el.dataset.graphTab); break;
                     case 'setEntityGraphMode': setEntityGraphMode(el.dataset.entityGraphMode); break;
@@ -789,6 +771,7 @@
                         localStorage.setItem('sentinel_operator', userContext.displayName);
                     }
                     currentIsAdmin = Boolean(userContext.isAdmin);
+                    setHidden(document.getElementById('admin-nav-link'), !currentIsAdmin);
                     if (userContext.clearance) {
                         currentClearance = String(userContext.clearance).toUpperCase();
                     }
@@ -1654,6 +1637,7 @@
             }
         }
 
+        /* Connector helper stubs (UI elements moved to admin.js) */
         function resolveConnectorId(name) {
             if (!name) return '';
             const normalized = String(name).toLowerCase().trim();
@@ -1662,59 +1646,16 @@
             if (normalized === 's3') return 's3';
             return normalized.replace(/[^a-z0-9_-]/g, '');
         }
-
-        function setConnectorStatus(id, text, stateClass = '') {
-            const el = document.getElementById(`connector-status-${id}`);
-            if (!el) return;
-            el.textContent = text;
-            el.classList.remove('enabled', 'disabled', 'blocked', 'error', 'syncing');
-            if (stateClass) el.classList.add(stateClass);
-        }
-
-        function setConnectorTitle(id, title) {
-            const el = document.getElementById(`connector-status-${id}`);
-            if (!el) return;
-            el.title = title || '';
-        }
-
-        function setConnectorStatusesDefault(label, stateClass = 'disabled') {
-            ['sharepoint', 'confluence', 's3'].forEach(id => {
-                setConnectorStatus(id, label, stateClass);
-                setConnectorTitle(id, '');
-            });
-        }
-
+        function setConnectorStatus() {}
+        function setConnectorTitle() {}
+        function setConnectorStatusesDefault() {}
         function formatConnectorStatus(status) {
-            if (!status) {
-                return { label: 'Unknown', stateClass: 'disabled', title: '' };
-            }
-            let label = status.enabled ? 'Enabled' : 'Disabled';
-            let stateClass = status.enabled ? 'enabled' : 'disabled';
-            let title = '';
-
-            if (status.lastResult) {
-                const message = status.lastResult.message || '';
-                if (status.lastResult.success === false) {
-                    label = 'Error';
-                    stateClass = 'error';
-                    title = message || 'Sync failed';
-                } else if (status.lastResult.success === true) {
-                    label = status.lastResult.loaded > 0 ? 'Synced' : 'Ready';
-                    stateClass = status.enabled ? 'enabled' : 'disabled';
-                    title = message || 'Sync complete';
-                }
-            }
-            if (status.lastSync) {
-                const lastSync = new Date(status.lastSync).toLocaleString();
-                title = title ? `${title} (Last sync ${lastSync})` : `Last sync ${lastSync}`;
-            }
-            return { label, stateClass, title };
+            if (!status) return { label: 'Unknown', stateClass: 'disabled', title: '' };
+            return { label: status.enabled ? 'Enabled' : 'Disabled', stateClass: status.enabled ? 'enabled' : 'disabled', title: '' };
         }
 
         async function refreshConnectorStatus() {
             if (!currentIsAdmin) {
-                setConnectorStatusesDefault('Admin only', 'blocked');
-                updateComplianceControls();
                 return;
             }
 
@@ -3070,6 +3011,10 @@
         function openDocsIndex() {
             window.open('docs-index.html', '_blank');
             closeResourcesDropdown({ target: document.body });
+        }
+
+        function openAdmin() {
+            window.open('admin.html', '_blank');
         }
 
         function switchRightTab(tabName) {

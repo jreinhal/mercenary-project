@@ -128,38 +128,6 @@
             </button>
         </div>
         <div class="sidebar-content">
-            <!-- Active Sector -->
-            <div class="sidebar-section hidden" id="workspace-section">
-                <div class="sidebar-section-title">Active Workspace</div>
-                <p class="settings-description">Select the tenant workspace to use.</p>
-                <select class="sector-select workspace-select" id="workspace-select" aria-label="Select Workspace">
-                    <!-- Populated dynamically -->
-                </select>
-                <div class="settings-hint" id="workspace-hint"></div>
-            </div>
-
-            <div class="sidebar-section" id="sector-section">
-                <div class="sidebar-section-title">Active Sector</div>
-                <p class="settings-description">Select the document collection to search within.</p>
-                <select class="sector-select" id="sector-select" aria-label="Select Target Sector">
-                    <!-- Populated dynamically based on edition -->
-                </select>
-            </div>
-
-            <!-- Sector Pipeline Presets -->
-            <div class="sidebar-section" id="pipeline-presets-section">
-                <div class="sidebar-section-title">Sector Pipeline Presets</div>
-                <p class="settings-description">Apply recommended retrieval settings for each sector.</p>
-                <div class="pipeline-preset-list">
-                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="ENTERPRISE">Enterprise</button>
-                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="GOVERNMENT">Government</button>
-                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="MEDICAL">Medical</button>
-                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="FINANCE">Finance</button>
-                    <button class="btn btn-secondary pipeline-preset-btn" data-action="applyPipelinePreset" data-preset="ACADEMIC">Academic</button>
-                </div>
-                <div class="settings-hint" id="pipeline-presets-hint">Applies locally; use “Save Settings” to persist.</div>
-            </div>
-
             <!-- Appearance -->
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Appearance</div>
@@ -271,44 +239,6 @@
                 </div>
             </div>
 
-            <!-- Integrations -->
-            <div class="sidebar-section" id="connectors-section">
-                <div class="sidebar-section-title">Integrations</div>
-                <p class="settings-description">Sync from external knowledge sources (admin-only).</p>
-                <div class="connector-list">
-                    <div class="connector-item">
-                        <div class="connector-name">SharePoint</div>
-                        <div class="connector-status" id="connector-status-sharepoint">Unknown</div>
-                    </div>
-                    <div class="connector-item">
-                        <div class="connector-name">Confluence</div>
-                        <div class="connector-status" id="connector-status-confluence">Unknown</div>
-                    </div>
-                    <div class="connector-item">
-                        <div class="connector-name">S3</div>
-                        <div class="connector-status" id="connector-status-s3">Unknown</div>
-                    </div>
-                </div>
-                <div class="settings-actions">
-                    <button class="btn btn-secondary" data-action="refreshConnectors" id="connector-refresh-btn">Refresh</button>
-                    <button class="btn btn-primary" data-action="syncConnectors" id="connector-sync-btn">Sync Now</button>
-                </div>
-                <div class="settings-hint" id="connector-compliance-hint"></div>
-            </div>
-
-            <!-- Connector Marketplace -->
-            <div class="sidebar-section" id="connector-marketplace-section">
-                <div class="sidebar-section-title">Connector Marketplace</div>
-                <p class="settings-description">Browse available connectors and required configuration keys (admin-only).</p>
-                <div class="connector-marketplace-list" id="connector-catalog-list">
-                    <div class="connector-empty">Loading connector catalog...</div>
-                </div>
-                <div class="settings-actions">
-                    <button class="btn btn-secondary" data-action="refreshConnectorCatalog" id="connector-catalog-refresh">Refresh Catalog</button>
-                </div>
-                <div class="settings-hint" id="connector-catalog-hint"></div>
-            </div>
-
             <!-- Advanced -->
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Advanced</div>
@@ -387,7 +317,7 @@
             </div>
         </div>
         <div class="sidebar-footer">
-            <div class="version-info">SENTINEL v1.0.0</div>
+            <div class="version-info">SENTINEL v2.2.0</div>
         </div>
     </aside>
 
@@ -406,6 +336,7 @@
             </div>
         </div>
         <a href="#" class="menu-item" data-action="toggleSidebar">Settings</a>
+        <a href="#" class="menu-item hidden" id="admin-nav-link" data-action="openAdmin">Admin</a>
         <span class="menu-bar-spacer"></span>
         <div class="menu-bar-right">
             <div class="workspace-quick-switcher hidden" id="workspace-quick-switcher">
@@ -641,6 +572,14 @@
 
             <!-- Chat Input -->
             <div class="chat-input-container">
+                <div class="chat-input-header">
+                    <select class="sector-select sector-select-inline" id="sector-select" aria-label="Select Target Sector">
+                        <!-- Populated dynamically based on edition -->
+                    </select>
+                    <select class="sector-select workspace-select workspace-select-inline hidden" id="workspace-select" aria-label="Select Workspace">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
                 <div class="chat-input-wrapper">
                     <input type="text" class="chat-input" id="query-input" placeholder="Chat input"
                         autocomplete="off" aria-label="Chat input">
@@ -685,7 +624,6 @@
                     <button class="right-panel-tab active" data-action="switchRightTab" data-tab="plot" data-tab="plot">Plot</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="source" data-tab="source">Source</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="eval">Eval</button>
-                    <button class="right-panel-tab" data-action="switchRightTab" data-tab="reports">Reports</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="case">Case</button>
                 </div>
             </div>
@@ -918,197 +856,6 @@
 
                     <div class="eval-results" id="eval-results">
                         <div class="eval-empty-state">No evaluation runs yet.</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Reports Tab (Admin) -->
-            <div class="right-panel-content hidden" id="right-tab-reports">
-                <div class="reporting-panel">
-                    <div class="reporting-header">
-                        <div>
-                            <div class="reporting-title">Reporting &amp; Exports</div>
-                            <div class="reporting-subtitle">Executive insights, SLA metrics, and audit exports per workspace.</div>
-                        </div>
-                        <span class="reporting-badge" id="reporting-compliance-badge">Admin only</span>
-                    </div>
-                    <div class="reporting-hint" id="reporting-compliance-hint">Admin access required to run reports.</div>
-
-                    <div class="report-grid">
-                        <div class="report-card" id="report-executive-card">
-                            <div class="report-card-header">
-                                <div>
-                                    <div class="report-card-title">Executive Summary</div>
-                                    <div class="report-card-subtitle">Usage + security snapshot for leadership.</div>
-                                </div>
-                                <button class="btn btn-secondary btn-sm" data-action="runExecutiveReport" id="report-executive-btn" data-report-control>Generate</button>
-                            </div>
-                            <div class="report-card-body">
-                                <div class="report-input-row">
-                                    <label for="report-executive-days">Window (days)</label>
-                                    <input type="number" min="1" max="365" value="30" class="report-input" id="report-executive-days" data-report-control>
-                                </div>
-                                <div class="report-metrics" id="report-executive-metrics">
-                                    <div class="report-empty">No report yet.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="report-card" id="report-sla-card">
-                            <div class="report-card-header">
-                                <div>
-                                    <div class="report-card-title">SLA Dashboard</div>
-                                    <div class="report-card-subtitle">Latency + throughput metrics for the last window.</div>
-                                </div>
-                                <button class="btn btn-secondary btn-sm" data-action="runSlaReport" id="report-sla-btn" data-report-control>Generate</button>
-                            </div>
-                            <div class="report-card-body">
-                                <div class="report-input-row">
-                                    <label for="report-sla-days">Window (days)</label>
-                                    <input type="number" min="1" max="365" value="7" class="report-input" id="report-sla-days" data-report-control>
-                                </div>
-                                <div class="report-metrics" id="report-sla-metrics">
-                                    <div class="report-empty">No SLA data yet.</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="report-card" id="report-audit-card">
-                        <div class="report-card-header">
-                            <div>
-                                <div class="report-card-title">Audit Export</div>
-                                <div class="report-card-subtitle">Download audit events for the active workspace.</div>
-                            </div>
-                            <button class="btn btn-secondary btn-sm" data-action="runAuditExport" id="report-audit-btn" data-report-control>Export</button>
-                        </div>
-                        <div class="report-card-body">
-                            <div class="report-input-grid">
-                                <div class="report-input-row">
-                                    <label for="report-audit-days">Window (days)</label>
-                                    <input type="number" min="1" max="365" value="7" class="report-input" id="report-audit-days" data-report-control>
-                                </div>
-                                <div class="report-input-row">
-                                    <label for="report-audit-limit">Max Events</label>
-                                    <input type="number" min="1" max="5000" value="1000" class="report-input" id="report-audit-limit" data-report-control>
-                                </div>
-                                <div class="report-input-row">
-                                    <label for="report-audit-format">Format</label>
-                                    <select id="report-audit-format" class="report-select" data-report-control>
-                                        <option value="json">JSON</option>
-                                        <option value="csv">CSV</option>
-                                    </select>
-                                </div>
-                                <div class="report-input-row">
-                                    <label for="report-audit-type">Log Type</label>
-                                    <select id="report-audit-type" class="report-select" data-report-control>
-                                        <option value="standard">Standard audit</option>
-                                        <option value="hipaa">HIPAA audit</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="report-hint" id="report-audit-hint"></div>
-                        </div>
-                    </div>
-
-                    <div class="report-card" id="report-schedule-card">
-                        <div class="report-card-header">
-                            <div>
-                                <div class="report-card-title">Scheduled Reports</div>
-                                <div class="report-card-subtitle">Create recurring exports for compliance and leadership.</div>
-                            </div>
-                            <button class="btn btn-secondary btn-sm" data-action="refreshReportSchedules" id="report-schedule-refresh" data-report-control data-report-schedule-control>Refresh</button>
-                        </div>
-                        <div class="report-card-body">
-                            <div class="report-input-grid">
-                                <div class="report-input-row">
-                                    <label for="report-schedule-type">Type</label>
-                                    <select id="report-schedule-type" class="report-select" data-report-control data-report-schedule-control>
-                                        <option value="EXECUTIVE">Executive</option>
-                                        <option value="SLA">SLA</option>
-                                        <option value="AUDIT">Audit</option>
-                                    </select>
-                                </div>
-                                <div class="report-input-row">
-                                    <label for="report-schedule-format">Format</label>
-                                    <select id="report-schedule-format" class="report-select" data-report-control data-report-schedule-control>
-                                        <option value="JSON">JSON</option>
-                                        <option value="CSV">CSV</option>
-                                    </select>
-                                </div>
-                                <div class="report-input-row">
-                                    <label for="report-schedule-cadence">Cadence</label>
-                                    <select id="report-schedule-cadence" class="report-select" data-report-control data-report-schedule-control>
-                                        <option value="DAILY">Daily</option>
-                                        <option value="WEEKLY">Weekly</option>
-                                        <option value="MONTHLY">Monthly</option>
-                                    </select>
-                                </div>
-                                <div class="report-input-row">
-                                    <label for="report-schedule-window">Window (days)</label>
-                                    <input type="number" min="1" max="365" value="7" class="report-input" id="report-schedule-window" data-report-control data-report-schedule-control>
-                                </div>
-                                <div class="report-input-row">
-                                    <label for="report-schedule-limit">Limit (audit only)</label>
-                                    <input type="number" min="1" max="5000" value="1000" class="report-input" id="report-schedule-limit" data-report-control data-report-schedule-control>
-                                </div>
-                            </div>
-                            <div class="report-actions">
-                                <button class="btn btn-primary" data-action="createReportSchedule" id="report-schedule-create" data-report-control data-report-schedule-control>Create Schedule</button>
-                            </div>
-                            <div class="report-list" id="report-schedule-list">
-                                <div class="report-empty">No schedules configured.</div>
-                            </div>
-                            <div class="report-hint" id="report-schedule-hint"></div>
-                        </div>
-                    </div>
-
-                    <div class="report-card" id="report-exports-card">
-                        <div class="report-card-header">
-                            <div>
-                                <div class="report-card-title">Recent Exports</div>
-                                <div class="report-card-subtitle">View or download scheduled report exports.</div>
-                            </div>
-                            <button class="btn btn-secondary btn-sm" data-action="refreshReportExports" id="report-exports-refresh" data-report-control>Refresh</button>
-                        </div>
-                        <div class="report-card-body">
-                            <div class="report-list" id="report-exports-list">
-                                <div class="report-empty">No exports generated yet.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="report-card" id="report-quotas-card">
-                        <div class="report-card-header">
-                            <div>
-                                <div class="report-card-title">Workspace Quotas</div>
-                                <div class="report-card-subtitle">Adjust limits for the active workspace.</div>
-                            </div>
-                            <button class="btn btn-secondary btn-sm" data-action="refreshWorkspaceQuota" id="quota-refresh-btn" data-report-control>Refresh</button>
-                        </div>
-                        <div class="report-card-body">
-                            <div class="quota-grid">
-                                <div class="quota-item">
-                                    <label for="quota-max-docs">Max Documents</label>
-                                    <input type="number" min="0" step="1" class="report-input" id="quota-max-docs" data-report-control>
-                                    <div class="quota-usage" id="quota-docs-usage">Usage: -</div>
-                                </div>
-                                <div class="quota-item">
-                                    <label for="quota-max-queries">Max Queries / Day</label>
-                                    <input type="number" min="0" step="1" class="report-input" id="quota-max-queries" data-report-control>
-                                    <div class="quota-usage" id="quota-queries-usage">Usage: -</div>
-                                </div>
-                                <div class="quota-item">
-                                    <label for="quota-max-storage">Max Storage (MB)</label>
-                                    <input type="number" min="0" step="1" class="report-input" id="quota-max-storage" data-report-control>
-                                    <div class="quota-usage" id="quota-storage-usage">Usage: -</div>
-                                </div>
-                            </div>
-                            <div class="report-actions">
-                                <button class="btn btn-primary" data-action="saveWorkspaceQuota" id="quota-save-btn" data-report-control>Save Quota</button>
-                            </div>
-                            <div class="report-hint" id="quota-hint"></div>
-                        </div>
                     </div>
                 </div>
             </div>
