@@ -228,7 +228,6 @@
 
         const pendingBody = document.getElementById('pending-body');
         if (pendingBody) {
-            const badgeClass = pending > 0 ? 'admin-badge-warning' : 'admin-badge-success';
             pendingBody.innerHTML = `
                 <div class="admin-stat">
                     <div class="admin-stat-value">${pending}</div>
