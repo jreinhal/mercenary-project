@@ -827,8 +827,12 @@
             });
 
             initEvalHarness();
-            initReportingPanel();
-            refreshReportingData();
+            // Reports UI has been moved to admin.html, so skip initialization
+            // if the reports panel is not present in the DOM
+            if (document.getElementById('right-tab-reports')) {
+                initReportingPanel();
+                refreshReportingData();
+            }
             refreshConnectorStatus();
             refreshConnectorCatalog();
             refreshCaseLibrary();
@@ -899,7 +903,9 @@
                     : 'Single workspace';
             }
 
-            workspaceSection.classList.remove('hidden');
+            if (workspaceSection) {
+                workspaceSection.classList.remove('hidden');
+            }
             if (quickSwitcher) {
                 if (workspaces.length > 1) {
                     quickSwitcher.classList.remove('hidden');
@@ -921,7 +927,10 @@
                 refreshCaseLibrary();
                 refreshConnectorStatus();
                 refreshConnectorCatalog();
-                refreshReportingData();
+                // Reports UI has been moved to admin.html
+                if (document.getElementById('right-tab-reports')) {
+                    refreshReportingData();
+                }
             };
 
             workspaceSelect.addEventListener('change', () => {
@@ -1656,6 +1665,12 @@
 
         async function refreshConnectorStatus() {
             if (!currentIsAdmin) {
+                return;
+            }
+
+            // Connector UI has been moved to admin.html, skip network request
+            // and DOM updates if connector status elements are not present
+            if (!document.querySelector('[id^="connector-status-"]')) {
                 return;
             }
 
@@ -3014,7 +3029,7 @@
         }
 
         function openAdmin() {
-            window.open('admin.html', '_blank');
+            window.open('admin.html', '_blank', 'noopener,noreferrer');
         }
 
         function switchRightTab(tabName) {
