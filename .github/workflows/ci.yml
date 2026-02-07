@@ -14,7 +14,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      SONAR_AUTO_ANALYSIS: ${{ vars.SONAR_AUTO_ANALYSIS || 'true' }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: Checkout
@@ -36,7 +35,7 @@ jobs:
         run: ./gradlew ciE2eTest
 
       - name: SonarCloud analysis
-        if: ${{ env.SONAR_TOKEN != '' && env.SONAR_AUTO_ANALYSIS != 'true' }}
+        if: ${{ env.SONAR_TOKEN != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
