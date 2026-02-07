@@ -899,7 +899,7 @@
                     : 'Single workspace';
             }
 
-            workspaceSection.classList.remove('hidden');
+            if (workspaceSection) workspaceSection.classList.remove('hidden');
             if (quickSwitcher) {
                 if (workspaces.length > 1) {
                     quickSwitcher.classList.remove('hidden');
