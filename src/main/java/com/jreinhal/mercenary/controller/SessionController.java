@@ -197,7 +197,11 @@ public class SessionController {
             this.auditService.logQuery(user, "trace_access_denied: " + traceId, Department.ENTERPRISE, "Access denied", request);
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
+        // S5-01: HIPAA parity — consistent with getSession/clearSessionHistory/getConversationContext/getSessionTraces
         Department dept = this.safeDepartment(trace.get().department());
+        if (dept != null && this.hipaaPolicy.shouldDisableSessionMemory(dept)) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         this.auditService.logQuery(user, "trace_get: " + traceId, dept != null ? dept : Department.ENTERPRISE, "Trace retrieved", request);
         return ResponseEntity.ok(trace.get());
     }

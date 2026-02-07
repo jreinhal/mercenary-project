@@ -17,7 +17,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
-@Order(value=0)
+@Order(-1)
 public class CspNonceFilter
 implements Filter {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
