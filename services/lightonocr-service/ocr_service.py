@@ -167,11 +167,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS for browser-based clients (KinCircle)
+# CORS for browser-based clients
+# When credentials are needed, explicit origins are required (CORS spec forbids * with credentials)
+_cors_origins = os.getenv("CORS_ORIGINS", "").strip()
+_allowed_origins = [o.strip() for o in _cors_origins.split(",") if o.strip()] if _cors_origins else []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
+    allow_origins=_allowed_origins if _allowed_origins else ["*"],
+    allow_credentials=bool(_allowed_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )
