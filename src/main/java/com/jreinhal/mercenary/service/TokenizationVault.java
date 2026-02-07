@@ -232,15 +232,21 @@ public class TokenizationVault {
             throw new IllegalStateException("HIPAA medical deployments require configured tokenization keys.");
         }
 
-        byte[] randomKey = new byte[32];
-        new SecureRandom().nextBytes(randomKey);
-        log.warn("=================================================================");
-        log.warn("  TOKENIZATION VAULT: Using randomly generated key (DEV MODE)");
-        log.warn("  Tokens will NOT be consistent across application restarts!");
-        log.warn("  Set app.tokenization.secret-key for production use.");
-        log.warn("=================================================================");
+        // M-11: Use separate random keys for HMAC and AES (key separation principle)
+        byte[] hmacKey = new byte[32];
+        byte[] aesKey = new byte[32];
+        SecureRandom secureRandom = new SecureRandom();
+        secureRandom.nextBytes(hmacKey);
+        secureRandom.nextBytes(aesKey);
+        if (log.isWarnEnabled()) {
+            log.warn("=================================================================");
+            log.warn("  TOKENIZATION VAULT: Using randomly generated keys (DEV MODE)");
+            log.warn("  Tokens will NOT be consistent across application restarts!");
+            log.warn("  Set app.tokenization.secret-key for production use.");
+            log.warn("=================================================================");
+        }
         Map<String, TokenizationKey> keys = new LinkedHashMap<>();
-        keys.put("dev", new TokenizationKey(randomKey, randomKey));
+        keys.put("dev", new TokenizationKey(hmacKey, aesKey));
         return new TokenizationKeyRing("dev", keys);
     }
 

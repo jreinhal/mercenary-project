@@ -175,12 +175,15 @@ public class RagOrchestrationService {
                 .withModel(llmModel)
                 .withTemperature(llmTemperature)
                 .withNumPredict(Integer.valueOf(llmNumPredict));
-        log.info("=== LLM Configuration ===");
-        log.info("  Model: {}", this.llmOptions.getModel());
-        log.info("  Temperature: {}", this.llmOptions.getTemperature());
-        log.info("  Max Tokens (num_predict): {}", this.llmOptions.getNumPredict());
-        log.info("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
-        log.info("=========================");
+        // S4-09: LLM config at debug level — parity with MercenaryController R-08 fix
+        if (log.isDebugEnabled()) {
+            log.debug("=== LLM Configuration ===");
+            log.debug("  Model: {}", this.llmOptions.getModel());
+            log.debug("  Temperature: {}", this.llmOptions.getTemperature());
+            log.debug("  Max Tokens (num_predict): {}", this.llmOptions.getNumPredict());
+            log.debug("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
+            log.debug("=========================");
+        }
     }
 
     public int getQueryCount() {
@@ -201,7 +204,7 @@ public class RagOrchestrationService {
             department = Department.valueOf(dept.toUpperCase());
         }
         catch (IllegalArgumentException e) {
-            return "INVALID SECTOR: " + dept;
+            return "INVALID SECTOR: unrecognized department value";
         }
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/ask", "Unauthenticated access attempt", request);
@@ -223,7 +226,8 @@ public class RagOrchestrationService {
             this.workspaceQuotaService.enforceQueryQuota(com.jreinhal.mercenary.workspace.WorkspaceContext.getCurrentWorkspaceId());
         } catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
             this.auditService.logAccessDenied(user, "/api/ask", "Workspace quota exceeded: " + e.getQuotaType(), request);
-            return "ACCESS DENIED: " + e.getMessage();
+            // S2-05: Use safe quota type label instead of raw exception message
+            return "ACCESS DENIED: " + e.getQuotaType() + " limit reached for this workspace.";
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
@@ -489,7 +493,7 @@ public class RagOrchestrationService {
             department = Department.valueOf(dept.toUpperCase());
         }
         catch (IllegalArgumentException e) {
-            return new EnhancedAskResponse("INVALID SECTOR: " + dept, List.of(), List.of(), Map.of(), null);
+            return new EnhancedAskResponse("INVALID SECTOR: unrecognized department value", List.of(), List.of(), Map.of(), null);
         }
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/ask/enhanced", "Unauthenticated access attempt", request);
@@ -511,7 +515,8 @@ public class RagOrchestrationService {
             this.workspaceQuotaService.enforceQueryQuota(com.jreinhal.mercenary.workspace.WorkspaceContext.getCurrentWorkspaceId());
         } catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
             this.auditService.logAccessDenied(user, "/api/ask/enhanced", "Workspace quota exceeded: " + e.getQuotaType(), request);
-            return new EnhancedAskResponse("ACCESS DENIED: " + e.getMessage(), List.of(), List.of(),
+            // S2-05: Use safe quota type label instead of raw exception message
+            return new EnhancedAskResponse("ACCESS DENIED: " + e.getQuotaType() + " limit reached for this workspace.", List.of(), List.of(),
                     Map.of("error", "WORKSPACE_QUOTA", "quota", e.getQuotaType()), null);
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);

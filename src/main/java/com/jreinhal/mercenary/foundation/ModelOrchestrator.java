@@ -37,8 +37,7 @@ public class ModelOrchestrator {
             if (clients.containsKey("local")) {
                 return clients.get("local").prompt(prompt).call().content() + "\n[Note: Fallback to Local Model]";
             }
-            throw new IllegalArgumentException(
-                    "Model '" + modelId + "' not available. configured: " + clients.keySet());
+            throw new IllegalArgumentException("Requested model is not available");
         }
 
         return client.prompt(prompt).call().content();

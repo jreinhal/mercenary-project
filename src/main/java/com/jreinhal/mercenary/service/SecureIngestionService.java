@@ -161,7 +161,7 @@ public class SecureIngestionService {
             log.info("Securely ingested {} memory points. Total PII redactions: {}", finalDocuments.size(), totalRedactions);
         }
         catch (IOException e) {
-            throw new SecureIngestionException("Secure Ingestion Failed: " + e.getMessage(), e);
+            throw new SecureIngestionException("Secure Ingestion Failed", e);
         }
     }
 
@@ -331,6 +331,12 @@ public class SecureIngestionService {
         try {
             AutoDetectParser parser = new AutoDetectParser();
             ParseContext context = new ParseContext();
+            // C-09: Disable XXE by configuring SAXParserFactory with external entity restrictions
+            javax.xml.parsers.SAXParserFactory spf = javax.xml.parsers.SAXParserFactory.newInstance();
+            spf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            spf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            spf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            context.set(javax.xml.parsers.SAXParserFactory.class, spf);
             Metadata metadata = new Metadata();
             if (filename != null) {
                 metadata.set("resourceName", filename);

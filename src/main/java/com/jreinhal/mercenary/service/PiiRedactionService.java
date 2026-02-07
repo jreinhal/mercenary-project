@@ -1,8 +1,11 @@
 package com.jreinhal.mercenary.service;
 
-import com.jreinhal.mercenary.service.TokenizationVault;
+
+import java.security.SecureRandom;
+import java.text.Normalizer;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -14,6 +17,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class PiiRedactionService {
     private static final Logger log = LoggerFactory.getLogger(PiiRedactionService.class);
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private final TokenizationVault tokenizationVault;
     private static final Pattern SSN_PATTERN = Pattern.compile("\\b(?!000|666|9\\d{2})\\d{3}[- ]?(?!00)\\d{2}[- ]?(?!0000)\\d{4}\\b");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b", 2);
@@ -39,52 +43,53 @@ public class PiiRedactionService {
     private static final Pattern AGE_PATTERN = Pattern.compile("\\b(?:age|aged)\\s*(9\\d|[1-9]\\d{2,})\\b", 2);
     private static final Pattern NAME_CONTEXT_PATTERN = Pattern.compile("(?:Name|Patient|Employee|Client|Customer|Attn|Attention|Contact|Applicant|Recipient|Beneficiary|Account Holder)\\s*:?\\s*([A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,3})", 2);
     private static final Pattern NAME_HONORIFIC_PATTERN = Pattern.compile("\\b(?:Mr|Mrs|Ms|Miss|Dr|Prof|Rev|Hon)\\.?\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,2})\\b");
-    private static final Pattern ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,5}\\s+[A-Za-z0-9\\s,]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Circle|Cir|Place|Pl)\\.?(?:\\s*,?\\s*(?:Apt|Suite|Unit|#)\\s*[A-Za-z0-9-]+)?\\s*,?\\s*[A-Za-z\\s]+,?\\s*[A-Z]{2}\\s*\\d{5}(?:-\\d{4})?\\b", 2);
-    @Value(value="${sentinel.pii.enabled:true}")
+    // M-18: Use possessive quantifiers (++) to prevent catastrophic backtracking (ReDoS)
+    private static final Pattern ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,5}\\s++[A-Za-z0-9\\s,]++(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Circle|Cir|Place|Pl)\\.?(?:\\s*+,?\\s*+(?:Apt|Suite|Unit|#)\\s*+[A-Za-z0-9-]++)?\\s*+,?\\s*+[A-Za-z\\s]++,?\\s*+[A-Z]{2}\\s*+\\d{5}(?:-\\d{4})?\\b", 2);
+    @Value("${sentinel.pii.enabled:true}")
     private boolean enabled;
-    @Value(value="${sentinel.pii.mode:MASK}")
+    @Value("${sentinel.pii.mode:MASK}")
     private String mode;
-    @Value(value="${sentinel.pii.audit-redactions:true}")
+    @Value("${sentinel.pii.audit-redactions:true}")
     private boolean auditRedactions;
-    @Value(value="${sentinel.pii.patterns.ssn:true}")
+    @Value("${sentinel.pii.patterns.ssn:true}")
     private boolean redactSsn;
-    @Value(value="${sentinel.pii.patterns.email:true}")
+    @Value("${sentinel.pii.patterns.email:true}")
     private boolean redactEmail;
-    @Value(value="${sentinel.pii.patterns.phone:true}")
+    @Value("${sentinel.pii.patterns.phone:true}")
     private boolean redactPhone;
-    @Value(value="${sentinel.pii.patterns.credit-card:true}")
+    @Value("${sentinel.pii.patterns.credit-card:true}")
     private boolean redactCreditCard;
-    @Value(value="${sentinel.pii.patterns.dob:true}")
+    @Value("${sentinel.pii.patterns.dob:true}")
     private boolean redactDob;
-    @Value(value="${sentinel.pii.patterns.ip-address:true}")
+    @Value("${sentinel.pii.patterns.ip-address:true}")
     private boolean redactIpAddress;
-    @Value(value="${sentinel.pii.patterns.passport:true}")
+    @Value("${sentinel.pii.patterns.passport:true}")
     private boolean redactPassport;
-    @Value(value="${sentinel.pii.patterns.drivers-license:true}")
+    @Value("${sentinel.pii.patterns.drivers-license:true}")
     private boolean redactDriversLicense;
-    @Value(value="${sentinel.pii.patterns.names:true}")
+    @Value("${sentinel.pii.patterns.names:true}")
     private boolean redactNames;
-    @Value(value="${sentinel.pii.patterns.address:true}")
+    @Value("${sentinel.pii.patterns.address:true}")
     private boolean redactAddress;
-    @Value(value="${sentinel.pii.patterns.medical-id:true}")
+    @Value("${sentinel.pii.patterns.medical-id:true}")
     private boolean redactMedicalId;
-    @Value(value="${sentinel.pii.patterns.account-number:true}")
+    @Value("${sentinel.pii.patterns.account-number:true}")
     private boolean redactAccountNumber;
-    @Value(value="${sentinel.pii.patterns.health-plan-id:true}")
+    @Value("${sentinel.pii.patterns.health-plan-id:true}")
     private boolean redactHealthPlanId;
-    @Value(value="${sentinel.pii.patterns.certificate-number:true}")
+    @Value("${sentinel.pii.patterns.certificate-number:true}")
     private boolean redactCertificateNumber;
-    @Value(value="${sentinel.pii.patterns.vehicle-id:true}")
+    @Value("${sentinel.pii.patterns.vehicle-id:true}")
     private boolean redactVehicleId;
-    @Value(value="${sentinel.pii.patterns.device-id:true}")
+    @Value("${sentinel.pii.patterns.device-id:true}")
     private boolean redactDeviceId;
-    @Value(value="${sentinel.pii.patterns.url:true}")
+    @Value("${sentinel.pii.patterns.url:true}")
     private boolean redactUrl;
-    @Value(value="${sentinel.pii.patterns.biometric:true}")
+    @Value("${sentinel.pii.patterns.biometric:true}")
     private boolean redactBiometric;
-    @Value(value="${sentinel.pii.patterns.date:true}")
+    @Value("${sentinel.pii.patterns.date:true}")
     private boolean redactDate;
-    @Value(value="${sentinel.pii.patterns.age:true}")
+    @Value("${sentinel.pii.patterns.age:true}")
     private boolean redactAge;
 
     public PiiRedactionService(TokenizationVault tokenizationVault) {
@@ -99,12 +104,15 @@ public class PiiRedactionService {
         if (!this.enabled || content == null || content.isEmpty()) {
             return new RedactionResult(content, Collections.emptyMap());
         }
+        // C-08: Normalize Unicode to defeat zero-width char and homoglyph bypass
+        content = normalizeUnicode(content);
         boolean applyNames = redactNamesOverride != null ? redactNamesOverride : this.redactNames;
         RedactionMode redactionMode = this.parseMode(this.mode);
-        EnumMap<PiiType, Integer> counts = new EnumMap<PiiType, Integer>(PiiType.class);
+        Map<PiiType, Integer> counts = new EnumMap<>(PiiType.class);
         String result = content;
         if (this.redactCreditCard) {
-            result = this.redactPattern(result, CREDIT_CARD_PATTERN, PiiType.CREDIT_CARD, redactionMode, counts);
+            // M-15: Validate generic 16-digit matches with Luhn check to avoid false positives
+            result = this.redactCreditCardPattern(result, redactionMode, counts);
         }
         if (this.redactSsn) {
             result = this.redactPattern(result, SSN_PATTERN, PiiType.SSN, redactionMode, counts);
@@ -183,6 +191,7 @@ public class PiiRedactionService {
         if (!this.enabled || content == null || content.isEmpty()) {
             return false;
         }
+        content = normalizeUnicode(content);
         return this.redactSsn && SSN_PATTERN.matcher(content).find()
             || this.redactEmail && EMAIL_PATTERN.matcher(content).find()
             || this.redactPhone && PHONE_PATTERN.matcher(content).find()
@@ -255,14 +264,70 @@ public class PiiRedactionService {
             return this.tokenizationVault.tokenize(original, type.name(), "SYSTEM");
         }
         catch (Exception e) {
-            log.warn("Tokenization vault unavailable, using hash fallback");
-            return Integer.toHexString(original.hashCode()).substring(0, Math.min(6, Integer.toHexString(original.hashCode()).length()));
+            // C-06: Use cryptographically secure random token instead of reversible hashCode
+            log.warn("Tokenization vault unavailable, using secure random fallback");
+            byte[] randomBytes = new byte[8];
+            SECURE_RANDOM.nextBytes(randomBytes);
+            return "OPAQUE-" + HexFormat.of().formatHex(randomBytes);
         }
+    }
+
+    private String redactCreditCardPattern(String content, RedactionMode mode, Map<PiiType, Integer> counts) {
+        Matcher matcher = CREDIT_CARD_PATTERN.matcher(content);
+        StringBuilder sb = new StringBuilder();
+        int count = 0;
+        while (matcher.find()) {
+            String match = matcher.group();
+            String digits = match.replaceAll("[^0-9]", "");
+            // Brand-specific patterns (first regex alternative) have prefix constraints;
+            // the generic fallback is 4-groups-of-4 digits which is always exactly 16 digits.
+            // Check known brand prefixes on the digits-only string to distinguish the two.
+            boolean isBrandSpecific = digits.matches("^4[0-9]{12,15}$")           // Visa 13-16
+                || digits.matches("^5[1-5][0-9]{14}$")                            // Mastercard
+                || digits.matches("^3[47][0-9]{13}$")                             // Amex
+                || digits.matches("^3(?:0[0-5]|[68][0-9])[0-9]{11}$")             // Diners
+                || digits.matches("^6(?:011|5[0-9]{2})[0-9]{12}$")                // Discover
+                || digits.matches("^(?:2131|1800|35[0-9]{3})[0-9]{11}$");         // JCB
+            if (!isBrandSpecific && !isValidCreditCard(match)) {
+                // Preserve non-Luhn 16-digit numbers as-is (e.g., order IDs)
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(match));
+                continue;
+            }
+            String replacement = this.generateReplacement(match, PiiType.CREDIT_CARD, mode);
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+            ++count;
+        }
+        matcher.appendTail(sb);
+        if (count > 0) {
+            counts.merge(PiiType.CREDIT_CARD, count, Integer::sum);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * C-08: Strip zero-width characters and normalize Unicode to prevent PII pattern bypass.
+     * Applies NFKC normalization to convert fullwidth/variant digits to ASCII equivalents.
+     */
+    static String normalizeUnicode(String input) {
+        if (input == null) {
+            return null;
+        }
+        // Strip zero-width characters that can split PII tokens
+        String stripped = input
+            .replace("\u200B", "")  // zero-width space
+            .replace("\u200C", "")  // zero-width non-joiner
+            .replace("\u200D", "")  // zero-width joiner
+            .replace("\uFEFF", "")  // byte order mark
+            .replace("\u00AD", "")  // soft hyphen
+            .replace("\u2060", "")  // word joiner
+            .replace("\u180E", ""); // Mongolian vowel separator
+        // NFKC normalizes fullwidth digits, mathematical digits, etc. to ASCII
+        return Normalizer.normalize(stripped, Normalizer.Form.NFKC);
     }
 
     private RedactionMode parseMode(String modeStr) {
         try {
-            return RedactionMode.valueOf(modeStr.toUpperCase());
+            return RedactionMode.valueOf(modeStr.toUpperCase(java.util.Locale.ROOT));
         }
         catch (IllegalArgumentException e) {
             log.warn("Invalid PII redaction mode '{}', defaulting to MASK", modeStr);

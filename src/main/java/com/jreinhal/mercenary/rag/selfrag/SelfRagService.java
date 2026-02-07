@@ -84,7 +84,7 @@ public class SelfRagService {
         }
         catch (Exception e) {
             log.error("Self-RAG verification failed: {}", e.getMessage());
-            return new SelfRagResult(response, response, List.of(), false, List.of(), 0.5, Map.of("error", e.getMessage()));
+            return new SelfRagResult(response, response, List.of(), false, List.of(), 0.5, Map.of("error", "verification_failed"));
         }
     }
 
@@ -146,7 +146,7 @@ public class SelfRagService {
             return new SelfRagResult(response, response, List.of(), false, List.of(), 0.7, Map.of("mode", "standard", "elapsed", elapsed));
         }
         catch (Exception e) {
-            return new SelfRagResult("Unable to generate response.", "Unable to generate response.", List.of(), false, List.of(), 0.0, Map.of("error", e.getMessage()));
+            return new SelfRagResult("Unable to generate response.", "Unable to generate response.", List.of(), false, List.of(), 0.0, Map.of("error", "generation_failed"));
         }
     }
 

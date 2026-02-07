@@ -65,7 +65,7 @@ public class CitationVerificationService {
         }
         catch (Exception e) {
             log.warn("Error verifying citation: {}", e.getMessage());
-            return new CitationResult(citation, docIndex, docSource, false, 0.0, null, "Verification error: " + e.getMessage());
+            return new CitationResult(citation, docIndex, docSource, false, 0.0, null, "Citation verification temporarily unavailable");
         }
     }
 

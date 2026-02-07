@@ -40,7 +40,7 @@ import java.util.List;
  * Only active when app.auth-mode=CAC (government deployments).
  */
 @Component
-@Order(1)
+@Order(0)
 @ConditionalOnProperty(name = "app.auth-mode", havingValue = "CAC")
 public class CacAuthFilter extends OncePerRequestFilter {
 

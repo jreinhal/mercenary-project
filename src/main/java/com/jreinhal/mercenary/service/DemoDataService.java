@@ -71,7 +71,7 @@ public class DemoDataService {
 
             return new DemoLoadResult(true, loaded, skipped, "Demo data loaded");
         } catch (IOException e) {
-            return new DemoLoadResult(false, loaded, skipped, "Demo data load failed: " + e.getMessage());
+            return new DemoLoadResult(false, loaded, skipped, "Demo data load failed");
         }
     }
 

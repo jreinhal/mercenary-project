@@ -174,18 +174,29 @@ public class MercenaryController {
             this.docCount.set((int)count);
         }
         catch (Exception e) {
-            log.error("Failed to initialize doc count", (Throwable)e);
+            if (log.isErrorEnabled()) {
+                log.error("Failed to initialize doc count", (Throwable)e);
+            }
         }
-        log.info("=== LLM Configuration ===");
-        log.info("  Model: {}", this.llmOptions.getModel());
-        log.info("  Temperature: {}", this.llmOptions.getTemperature());
-        log.info("  Max Tokens (num_predict): {}", this.llmOptions.getNumPredict());
-        log.info("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
-        log.info("=========================");
+        // R-08: LLM config at debug level to avoid leaking infrastructure details in production logs
+        if (log.isDebugEnabled()) {
+            log.debug("=== LLM Configuration ===");
+            log.debug("  Model: {}", this.llmOptions.getModel());
+            log.debug("  Temperature: {}", this.llmOptions.getTemperature());
+            log.debug("  Max Tokens (num_predict): {}", this.llmOptions.getNumPredict());
+            log.debug("  Ollama Base URL: {}", System.getProperty("spring.ai.ollama.base-url", "http://localhost:11434"));
+            log.debug("=========================");
+        }
     }
 
-    @GetMapping(value={"/status"})
-    public Map<String, Object> getSystemStatus() {
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> getSystemStatus() {
+        // R-03: Require authentication — status exposes operational metrics
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            this.auditService.logAccessDenied(null, "/api/status", "Unauthenticated access attempt", null);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         long avgLat = this.ragOrchestrationService.getAverageLatencyMs();
         int qCount = this.ragOrchestrationService.getQueryCount();
         boolean dbOnline = true;
@@ -195,11 +206,17 @@ public class MercenaryController {
         catch (Exception e) {
             dbOnline = false;
         }
-        return Map.of("vectorDb", dbOnline ? "ONLINE" : "OFFLINE", "docsIndexed", this.docCount.get(), "avgLatency", avgLat + "ms", "queriesToday", qCount, "systemStatus", "NOMINAL");
+        return ResponseEntity.ok(Map.of("vectorDb", dbOnline ? "ONLINE" : "OFFLINE", "docsIndexed", this.docCount.get(), "avgLatency", avgLat + "ms", "queriesToday", qCount, "systemStatus", "NOMINAL"));
     }
 
-    @GetMapping(value={"/telemetry"})
-    public TelemetryResponse getTelemetry() {
+    @GetMapping("/telemetry")
+    public ResponseEntity<TelemetryResponse> getTelemetry() {
+        // R-02: Require authentication — telemetry exposes system metrics
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            this.auditService.logAccessDenied(null, "/api/telemetry", "Unauthenticated access attempt", null);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         long avgLat = this.ragOrchestrationService.getAverageLatencyMs();
         int qCount = this.ragOrchestrationService.getQueryCount();
         boolean dbOnline = true;
@@ -216,9 +233,11 @@ public class MercenaryController {
         }
         catch (Exception e) {
             llmOnline = false;
-            log.debug("LLM health check failed: {}", e.getMessage());
+            if (log.isDebugEnabled()) {
+                log.debug("LLM health check failed: {}", e.getMessage());
+            }
         }
-        return new TelemetryResponse((int)liveDocCount, qCount, avgLat, dbOnline, llmOnline);
+        return ResponseEntity.ok(new TelemetryResponse((int)liveDocCount, qCount, avgLat, dbOnline, llmOnline));
     }
 
     @GetMapping(value={"/user/context"})
@@ -239,13 +258,8 @@ public class MercenaryController {
         String body = "";
         boolean redacted = false;
         int redactionCount = 0;
-        String dept = deptParam.toUpperCase();
-        if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
-            log.warn("SECURITY: Invalid department in inspect request: {}", deptParam);
-            return new InspectResponse("ERROR: Invalid sector.", List.of(), false, 0);
-        }
+        // R-01: Auth check BEFORE input validation to avoid leaking info to unauthenticated users
         User user = SecurityContext.getCurrentUser();
-        Department department = Department.valueOf(dept);
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/inspect", "Unauthenticated access attempt", null);
             return new InspectResponse("ACCESS DENIED: Authentication required.", List.of(), false, 0);
@@ -254,6 +268,14 @@ public class MercenaryController {
             this.auditService.logAccessDenied(user, "/api/inspect", "Missing QUERY permission", null);
             return new InspectResponse("ACCESS DENIED: Insufficient permissions.", List.of(), false, 0);
         }
+        String dept = deptParam.toUpperCase(Locale.ROOT);
+        if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
+            if (log.isWarnEnabled()) {
+                log.warn("SECURITY: Invalid department in inspect request: {}", deptParam);
+            }
+            return new InspectResponse("ERROR: Invalid sector.", List.of(), false, 0);
+        }
+        Department department = Department.valueOf(dept);
         if (this.sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
             this.auditService.logAccessDenied(user, "/api/inspect", "Insufficient clearance for " + dept, null);
             return new InspectResponse("ACCESS DENIED: Insufficient clearance for " + dept, List.of(), false, 0);
@@ -278,8 +300,11 @@ public class MercenaryController {
                 List<Document> potentialDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)normalizedFileName)
                         .withTopK(20)
                         .withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
-                log.info("INSPECT DEBUG: Searching for '{}'. Found {} potential candidates.", normalizedFileName, potentialDocs.size());
-                potentialDocs.forEach(d -> log.info("  >> Candidate Meta: {}", d.getMetadata()));
+                // S4-10: Debug-level logging — document metadata should not be at INFO in production
+                if (log.isDebugEnabled()) {
+                    log.debug("INSPECT: Searching for '{}'. Found {} potential candidates.", normalizedFileName, potentialDocs.size());
+                    potentialDocs.forEach(d -> log.debug("  >> Candidate Meta: {}", d.getMetadata()));
+                }
                 Optional<Document> match = potentialDocs.stream().filter(doc -> normalizedFileName.equals(doc.getMetadata().get("source")) || this.apiKeyMatch(normalizedFileName, doc.getMetadata())).findFirst();
                 if (!match.isPresent()) {
                     return new InspectResponse("ERROR: Document archived in Deep Storage.\nPlease re-ingest file to refresh active cache.", List.of(), false, 0);
@@ -336,10 +361,11 @@ public class MercenaryController {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
-            department = Department.valueOf(dept.toUpperCase());
+            department = Department.valueOf(dept.toUpperCase(Locale.ROOT));
         }
         catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("INVALID SECTOR: " + dept);
+            // H-05: Do not reflect unsanitized user input in error responses
+            return ResponseEntity.badRequest().body("INVALID SECTOR: unrecognized department value");
         }
         if (user == null) {
             this.auditService.logAccessDenied(null, "/api/ingest/file", "Unauthenticated access attempt", request);
@@ -365,14 +391,20 @@ public class MercenaryController {
                 this.ingestionService.ingest(file, department);
             }
             catch (com.jreinhal.mercenary.workspace.WorkspaceQuotaExceededException e) {
-                log.warn("Workspace quota exceeded for {}: {}", filename, e.getMessage());
+                if (log.isWarnEnabled()) {
+                    log.warn("Workspace quota exceeded for {}: {}", filename, e.getMessage());
+                }
                 this.auditService.logAccessDenied(user, "/api/ingest/file", "Workspace quota exceeded: " + e.getQuotaType(), request);
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("QUOTA EXCEEDED: " + e.getMessage());
+                // S2-04: Use safe quota type label instead of raw exception message
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("QUOTA EXCEEDED: " + e.getQuotaType() + " limit reached");
             }
             catch (SecurityException e) {
-                log.warn("SECURITY: Ingestion blocked for {}: {}", filename, e.getMessage());
+                if (log.isWarnEnabled()) {
+                    log.warn("SECURITY: Ingestion blocked for {}: {}", filename, e.getMessage());
+                }
                 this.auditService.logAccessDenied(user, "/api/ingest/file", "Blocked file type: " + e.getMessage(), request);
-                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body("BLOCKED: " + e.getMessage());
+                // S2-04: Generic message — details already logged server-side
+                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body("BLOCKED: File type not permitted for ingestion.");
             }
             catch (Exception e) {
                 log.warn("Persistence Failed (DB Offline). Proceeding with RAM Cache.", (Throwable)e);
@@ -457,14 +489,26 @@ public class MercenaryController {
 
         Department department;
         try {
-            department = Department.valueOf(dept.toUpperCase());
+            department = Department.valueOf(dept.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            sendSseError(emitter, "Invalid sector: " + dept);
+            sendSseError(emitter, "INVALID SECTOR: unrecognized department value");
             return emitter;
         }
 
         if (!user.hasPermission(UserRole.Permission.QUERY)) {
             sendSseError(emitter, "Insufficient permissions");
+            return emitter;
+        }
+
+        // S2-01: Sector clearance checks consistent with /api/ask and /api/ask/enhanced
+        if (this.sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
+            this.auditService.logAccessDenied(user, "/api/ask/stream", "Insufficient clearance for " + department.name(), null);
+            sendSseError(emitter, "Insufficient clearance for this sector");
+            return emitter;
+        }
+        if (!user.canAccessSector(department)) {
+            this.auditService.logAccessDenied(user, "/api/ask/stream", "Not authorized for sector " + department.name(), null);
+            sendSseError(emitter, "Not authorized for this sector");
             return emitter;
         }
 
@@ -563,25 +607,27 @@ public class MercenaryController {
                         .doOnComplete(() -> streamComplete.set(true))
                         .doOnError(e -> {
                             hasError.set(true);
-                            errorMsg.set(e.getMessage());
+                            errorMsg.set(e.getMessage() != null ? e.getMessage() : "");
                             log.error("Stream error: {}", e.getMessage());
                         })
                         .blockLast(Duration.ofSeconds(llmTimeoutSeconds));
 
                 } catch (Exception e) {
                     hasError.set(true);
-                    errorMsg.set(e.getMessage());
+                    errorMsg.set(e.getMessage() != null ? e.getMessage() : "");
                     log.error("Streaming failed: {}", e.getMessage());
                 }
 
                 String response;
                 if (hasError.get()) {
-                    if (errorMsg.get().contains("timeout") || errorMsg.get().toLowerCase().contains("deadline")) {
+                    String errText = errorMsg.get() != null ? errorMsg.get() : "";
+                    if (errText.contains("timeout") || errText.toLowerCase(java.util.Locale.ROOT).contains("deadline")) {
                         response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try simplifying your question.";
                         sendSseStep(emitter, "llm_generation", "Response Synthesis", "Timeout - using fallback response");
                     } else {
                         response = "An error occurred generating the response.";
-                        sendSseStep(emitter, "llm_generation", "Response Synthesis", "Error: " + errorMsg.get());
+                        // S3-02: Generic step detail — raw errorMsg may contain internal stack/class info
+                        sendSseStep(emitter, "llm_generation", "Response Synthesis", "Error generating response");
                     }
                 } else {
                     response = cleanLlmResponse(responseBuilder.toString());
@@ -608,14 +654,8 @@ public class MercenaryController {
 
             } catch (Exception e) {
                 log.error("SSE stream error", e);
-                try {
-                    emitter.send(SseEmitter.event()
-                        .name("error")
-                        .data("{\"error\":\"" + escapeJson(e.getMessage()) + "\"}"));
-                    emitter.complete();
-                } catch (Exception ex) {
-                    emitter.completeWithError(ex);
-                }
+                // S3-02: Generic error via helper — raw e.getMessage() may leak internal details
+                sendSseError(emitter, "An unexpected error occurred. Please try again.");
             }
         });
 

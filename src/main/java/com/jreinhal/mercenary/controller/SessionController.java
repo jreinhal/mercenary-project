@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.controller;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
+import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
 import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
 import com.jreinhal.mercenary.service.AuditService;
@@ -49,9 +50,19 @@ public class SessionController {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
         String dept = department != null ? department : Department.ENTERPRISE.name();
+        // S2-03: Validate department enum and sector access before creating session
+        Department sector;
+        try {
+            sector = Department.valueOf(dept.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!user.canAccessSector(sector)) {
+            this.auditService.logAccessDenied(user, "/api/sessions/create", "Not authorized for sector " + sector.name(), request);
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         String sessionId = this.sessionPersistenceService.generateSessionId();
         SessionPersistenceService.ActiveSession session = this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
-        Department sector = Department.valueOf(dept);
         this.auditService.logQuery(user, "session_create: " + sessionId, sector, "Session created", request);
         return ResponseEntity.ok(new SessionResponse(session.sessionId(), session.department(), session.createdAt().toString(), "Session created successfully"));
     }
@@ -70,7 +81,11 @@ public class SessionController {
             this.auditService.logQuery(user, "session_access_denied: " + sessionId, Department.ENTERPRISE, "Access denied", request);
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
+        // S4-14: HIPAA parity check — consistent with getConversationContext/getSessionTraces/clearSessionHistory
         Department dept = this.safeDepartment(session.get().department());
+        if (dept != null && this.hipaaPolicy.shouldDisableSessionMemory(dept)) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         this.auditService.logQuery(user, "session_get: " + sessionId, dept != null ? dept : Department.ENTERPRISE, "Session retrieved", request);
         return ResponseEntity.ok(session.get());
     }
@@ -93,9 +108,20 @@ public class SessionController {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
         String dept = department != null ? department : Department.ENTERPRISE.name();
+        // S4-01: Validate department enum and sector access — parity with createSession
+        Department sector;
+        try {
+            sector = Department.valueOf(dept.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!user.canAccessSector(sector)) {
+            this.auditService.logAccessDenied(user, "/api/sessions/" + sessionId + "/touch",
+                "Not authorized for sector " + sector.name(), request);
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         SessionPersistenceService.ActiveSession session = this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
-        Department sector = this.safeDepartment(dept);
-        this.auditService.logQuery(user, "session_touch: " + sessionId, sector != null ? sector : Department.ENTERPRISE, "Session touched", request);
+        this.auditService.logQuery(user, "session_touch: " + sessionId, sector, "Session touched", request);
         return ResponseEntity.ok(session);
     }
 
@@ -109,8 +135,13 @@ public class SessionController {
         if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
+        // S3-01: Sector/HIPAA check — parity with getConversationContext and getSessionTraces
+        Department dept = this.safeDepartment(session.get().department());
+        if (dept != null && this.hipaaPolicy.shouldDisableSessionMemory(dept)) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         this.conversationMemoryService.clearSession(user.getId(), sessionId);
-        this.auditService.logQuery(user, "session_clear: " + sessionId, Department.ENTERPRISE, "Session cleared", request);
+        this.auditService.logQuery(user, "session_clear: " + sessionId, dept != null ? dept : Department.ENTERPRISE, "Session cleared", request);
         return ResponseEntity.ok(Map.of("status", "cleared", "sessionId", sessionId));
     }
 
@@ -166,7 +197,11 @@ public class SessionController {
             this.auditService.logQuery(user, "trace_access_denied: " + traceId, Department.ENTERPRISE, "Access denied", request);
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
+        // S5-01: HIPAA parity — consistent with getSession/clearSessionHistory/getConversationContext/getSessionTraces
         Department dept = this.safeDepartment(trace.get().department());
+        if (dept != null && this.hipaaPolicy.shouldDisableSessionMemory(dept)) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         this.auditService.logQuery(user, "trace_get: " + traceId, dept != null ? dept : Department.ENTERPRISE, "Trace retrieved", request);
         return ResponseEntity.ok(trace.get());
     }
@@ -215,9 +250,10 @@ public class SessionController {
             }
         }
         try {
-            Path exportPath = this.sessionPersistenceService.exportSession(sessionId, user.getId());
+            this.sessionPersistenceService.exportSession(sessionId, user.getId());
             this.auditService.logQuery(user, "session_export_file: " + sessionId, Department.ENTERPRISE, "Session exported to file", request);
-            return ResponseEntity.ok(Map.of("status", "exported", "file", exportPath.getFileName().toString(), "sessionId", sessionId));
+            // L-10: Return opaque identifier instead of server-side filename
+            return ResponseEntity.ok(Map.of("status", "exported", "sessionId", sessionId));
         }
         catch (SecurityException e) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).body(Map.of("error", "Access denied"));
@@ -226,18 +262,27 @@ public class SessionController {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_FOUND).body(Map.of("error", "Session not found"));
         }
         catch (IOException e) {
-            log.error("Failed to export session to file {}: {}", sessionId, e.getMessage());
-            return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Export failed: " + e.getMessage()));
+            if (log.isErrorEnabled()) {
+                log.error("Failed to export session to file {}: {}", sessionId, e.getMessage());
+            }
+            // L-09: Return generic error — details already logged server-side above
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Export failed"));
         }
     }
 
-    @GetMapping(value={"/stats"})
+    @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getStatistics(HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
-        Map<String, Object> stats = this.sessionPersistenceService.getStatistics();
+        // M-06: Only include global stats for admin users; non-admins see only their own
+        Map<String, Object> stats;
+        if (user.hasRole(UserRole.ADMIN)) {
+            stats = this.sessionPersistenceService.getStatistics();
+        } else {
+            stats = new java.util.HashMap<>();
+        }
         List<SessionPersistenceService.ActiveSession> userSessions = this.sessionPersistenceService.getUserSessions(user.getId());
         stats.put("userActiveSessions", userSessions.size());
         stats.put("userTotalMessages", userSessions.stream().mapToInt(SessionPersistenceService.ActiveSession::messageCount).sum());

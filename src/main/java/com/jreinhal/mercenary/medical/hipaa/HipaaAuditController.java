@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value={"/api/hipaa/audit"})
+@RequestMapping("/api/hipaa/audit")
 public class HipaaAuditController {
     private static final Logger log = LoggerFactory.getLogger(HipaaAuditController.class);
     private final HipaaAuditService hipaaAuditService;
@@ -33,17 +33,19 @@ public class HipaaAuditController {
         this.auditService = auditService;
     }
 
-    @GetMapping(value={"/events"})
-    public Object getEvents(@RequestParam(value="limit", defaultValue="200") int limit,
-                            @RequestParam(value="since", required=false) String since,
-                            @RequestParam(value="until", required=false) String until,
-                            @RequestParam(value="type", required=false) String type,
+    @GetMapping("/events")
+    public ResponseEntity<?> getEvents(@RequestParam(defaultValue="200") int limit,
+                            @RequestParam(required=false) String since,
+                            @RequestParam(required=false) String until,
+                            @RequestParam(required=false) String type,
                             HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null || !user.hasPermission(UserRole.Permission.VIEW_AUDIT)) {
-            log.warn("Unauthorized HIPAA audit log access attempt from: {}", (user != null ? user.getUsername() : "ANONYMOUS"));
+            if (log.isWarnEnabled()) {
+                log.warn("Unauthorized HIPAA audit log access attempt from: {}", user != null ? user.getUsername() : "ANONYMOUS");
+            }
             this.auditService.logAccessDenied(user, "/api/hipaa/audit/events", "Missing VIEW_AUDIT permission", request);
-            return Map.of("error", "ACCESS DENIED: HIPAA audit log access requires AUDITOR role.");
+            return ResponseEntity.status(403).body(Map.of("error", "ACCESS DENIED: HIPAA audit log access requires AUDITOR role."));
         }
         if (limit > 2000) {
             limit = 2000;
@@ -52,15 +54,15 @@ public class HipaaAuditController {
         Optional<Instant> untilInstant = parseInstant(until);
         Optional<HipaaAuditService.AuditEventType> eventType = parseType(type);
         List<HipaaAuditService.HipaaAuditEvent> events = this.hipaaAuditService.queryEvents(sinceInstant, untilInstant, eventType, limit);
-        return Map.of("count", events.size(), "events", events, "requestedBy", user.getUsername());
+        return ResponseEntity.ok(Map.of("count", events.size(), "events", events, "requestedBy", user.getUsername()));
     }
 
-    @GetMapping(value={"/export"})
-    public ResponseEntity<?> exportEvents(@RequestParam(value="limit", defaultValue="2000") int limit,
-                                          @RequestParam(value="format", defaultValue="json") String format,
-                                          @RequestParam(value="since", required=false) String since,
-                                          @RequestParam(value="until", required=false) String until,
-                                          @RequestParam(value="type", required=false) String type,
+    @GetMapping("/export")
+    public ResponseEntity<?> exportEvents(@RequestParam(defaultValue="2000") int limit,
+                                          @RequestParam(defaultValue="json") String format,
+                                          @RequestParam(required=false) String since,
+                                          @RequestParam(required=false) String until,
+                                          @RequestParam(required=false) String type,
                                           HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null || !user.hasPermission(UserRole.Permission.VIEW_AUDIT)) {
@@ -126,7 +128,16 @@ public class HipaaAuditController {
         if (value == null) {
             return "";
         }
-        String normalized = value.replace("\"", "\"\"");
+        // S2-07: Strip null bytes that could bypass sanitization in some CSV parsers
+        String normalized = value.replace("\0", "").replace("\"", "\"\"").replace("\r", " ").stripLeading();
+        // H-06: Prefix formula-triggering characters to prevent CSV injection in spreadsheet apps
+        // stripLeading() prevents whitespace-prefixed payloads like " =cmd|..." from bypassing
+        if (!normalized.isEmpty()) {
+            char first = normalized.charAt(0);
+            if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t') {
+                normalized = "'" + normalized;
+            }
+        }
         if (normalized.contains(",") || normalized.contains("\n")) {
             return "\"" + normalized + "\"";
         }
