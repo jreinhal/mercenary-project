@@ -269,9 +269,9 @@ public class ReportingAdminController {
             return Optional.empty();
         }
         try {
-            return Optional.of(AuditEventType.valueOf(type.trim().toUpperCase()));
+            return Optional.of(AuditEventType.valueOf(type.trim().toUpperCase(java.util.Locale.ROOT)));
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid HIPAA audit type: " + type);
+            throw new IllegalArgumentException("Invalid HIPAA audit type: " + type, e);
         }
     }
 

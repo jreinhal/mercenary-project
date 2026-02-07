@@ -135,9 +135,9 @@ public class MercenaryController {
     private int maxVisualDocs;
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryProvider conversationMemoryService, SessionPersistenceProvider sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache, LicenseService licenseService,
-                               @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
-                               @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
-                               @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
+                               @Value("${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
+                               @Value("${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
+                               @Value("${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
         this.chatClient = builder.defaultFunctions(new String[]{"calculator", "currentDate"}).build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;

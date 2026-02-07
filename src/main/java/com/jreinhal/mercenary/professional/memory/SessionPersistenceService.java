@@ -52,15 +52,15 @@ public class SessionPersistenceService implements SessionPersistenceProvider {
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.service.IntegritySigner integritySigner;
     private final ObjectMapper objectMapper;
-    @Value(value="${sentinel.sessions.data-dir:${user.home}/.sentinel/sessions}")
+    @Value("${sentinel.sessions.data-dir:${user.home}/.sentinel/sessions}")
     private String sessionDataDir;
-    @Value(value="${sentinel.sessions.file-backup-enabled:true}")
+    @Value("${sentinel.sessions.file-backup-enabled:true}")
     private boolean fileBackupEnabled;
-    @Value(value="${sentinel.sessions.trace-retention-hours:24}")
+    @Value("${sentinel.sessions.trace-retention-hours:24}")
     private int traceRetentionHours;
-    @Value(value="${sentinel.sessions.session-timeout-minutes:60}")
+    @Value("${sentinel.sessions.session-timeout-minutes:60}")
     private int sessionTimeoutMinutes;
-    @Value(value="${sentinel.sessions.max-traces-per-session:100}")
+    @Value("${sentinel.sessions.max-traces-per-session:100}")
     private int maxTracesPerSession;
 
     public SessionPersistenceService(MongoTemplate mongoTemplate, ConversationMemoryProvider conversationMemoryService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.service.IntegritySigner integritySigner) {
@@ -208,7 +208,7 @@ public class SessionPersistenceService implements SessionPersistenceProvider {
         }
         ConversationMemoryProvider.ConversationContext context = this.conversationMemoryService.getContext(userId, sessionId);
         List<PersistedTrace> traces = this.getSessionTraces(sessionId);
-        HashMap<String, Object> summary = new HashMap<String, Object>();
+        Map<String, Object> summary = new HashMap<>();
         summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
         summary.put("averageResponseTime", traces.isEmpty() ? 0.0 : traces.stream().mapToLong(PersistedTrace::durationMs).average().orElse(0.0));
         summary.put("topicsDiscussed", context.activeTopics());
@@ -236,7 +236,7 @@ public class SessionPersistenceService implements SessionPersistenceProvider {
         }
         ConversationMemoryProvider.ConversationContext context = this.conversationMemoryService.getContext(userId, sessionId);
         List<PersistedTrace> traces = this.getSessionTraces(sessionId);
-        HashMap<String, Object> summary = new HashMap<String, Object>();
+        Map<String, Object> summary = new HashMap<>();
         summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
         summary.put("topicsDiscussed", context.activeTopics());
         SessionExport unsigned = new SessionExport(sessionId, userId, session.workspaceId(), session.department(), session.createdAt(), session.lastActivityAt(), context.recentMessages().size(), traces.size(), context.recentMessages(), traces, summary, null, null);

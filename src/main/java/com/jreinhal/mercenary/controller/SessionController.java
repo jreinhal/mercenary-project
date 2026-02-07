@@ -11,7 +11,6 @@ import com.jreinhal.mercenary.service.SessionPersistenceProvider;
 import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping(value={"/api/sessions"})
+@RequestMapping("/api/sessions")
 public class SessionController {
     private static final Logger log = LoggerFactory.getLogger(SessionController.class);
     private final SessionPersistenceProvider sessionPersistenceService;
@@ -48,7 +47,7 @@ public class SessionController {
         return this.sessionPersistenceService == null || this.conversationMemoryService == null;
     }
 
-    @PostMapping(value={"/create"})
+    @PostMapping("/create")
     public ResponseEntity<SessionResponse> createSession(@RequestParam(required=false) String department, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -75,7 +74,7 @@ public class SessionController {
         return ResponseEntity.ok(new SessionResponse(session.sessionId(), session.department(), session.createdAt().toString(), "Session created successfully"));
     }
 
-    @GetMapping(value={"/{sessionId}"})
+    @GetMapping("/{sessionId}")
     public ResponseEntity<SessionPersistenceProvider.ActiveSession> getSession(@PathVariable String sessionId, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -115,7 +114,7 @@ public class SessionController {
         return ResponseEntity.ok(sessions);
     }
 
-    @PostMapping(value={"/{sessionId}/touch"})
+    @PostMapping("/{sessionId}/touch")
     public ResponseEntity<SessionPersistenceProvider.ActiveSession> touchSession(@PathVariable String sessionId, @RequestParam(required=false) String department, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -142,7 +141,7 @@ public class SessionController {
         return ResponseEntity.ok(session);
     }
 
-    @DeleteMapping(value={"/{sessionId}/history"})
+    @DeleteMapping("/{sessionId}/history")
     public ResponseEntity<Map<String, String>> clearSessionHistory(@PathVariable String sessionId, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -165,7 +164,7 @@ public class SessionController {
         return ResponseEntity.ok(Map.of("status", "cleared", "sessionId", sessionId));
     }
 
-    @GetMapping(value={"/{sessionId}/context"})
+    @GetMapping("/{sessionId}/context")
     public ResponseEntity<ConversationMemoryProvider.ConversationContext> getConversationContext(@PathVariable String sessionId, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -187,7 +186,7 @@ public class SessionController {
         return ResponseEntity.ok(context);
     }
 
-    @GetMapping(value={"/{sessionId}/traces"})
+    @GetMapping("/{sessionId}/traces")
     public ResponseEntity<List<SessionPersistenceProvider.PersistedTrace>> getSessionTraces(@PathVariable String sessionId, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -209,7 +208,7 @@ public class SessionController {
         return ResponseEntity.ok(traces);
     }
 
-    @GetMapping(value={"/traces/{traceId}"})
+    @GetMapping("/traces/{traceId}")
     public ResponseEntity<SessionPersistenceProvider.PersistedTrace> getTrace(@PathVariable String traceId, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -235,7 +234,7 @@ public class SessionController {
         return ResponseEntity.ok(trace.get());
     }
 
-    @GetMapping(value={"/{sessionId}/export"}, produces={"application/json"})
+    @GetMapping(value = "/{sessionId}/export", produces = "application/json")
     public ResponseEntity<String> exportSession(@PathVariable String sessionId, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
@@ -268,7 +267,7 @@ public class SessionController {
         }
     }
 
-    @PostMapping(value={"/{sessionId}/export/file"})
+    @PostMapping("/{sessionId}/export/file")
     public ResponseEntity<Map<String, String>> exportSessionToFile(@PathVariable String sessionId, HttpServletRequest request) {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
