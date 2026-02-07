@@ -4,8 +4,8 @@ import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.config.SectorConfig;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
-import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
-import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
+import com.jreinhal.mercenary.service.ConversationMemoryProvider;
+import com.jreinhal.mercenary.service.SessionPersistenceProvider;
 import com.jreinhal.mercenary.rag.ModalityRouter;
 import com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService;
 import com.jreinhal.mercenary.rag.agentic.AgenticRagOrchestrator;
@@ -106,9 +106,9 @@ class MercenaryControllerTest {
     @MockitoBean
     private PiiRedactionService piiRedactionService;
     @MockitoBean
-    private ConversationMemoryService conversationMemoryService;
+    private ConversationMemoryProvider conversationMemoryService;
     @MockitoBean
-    private SessionPersistenceService sessionPersistenceService;
+    private SessionPersistenceProvider sessionPersistenceService;
     @MockitoBean
     private RagOrchestrationService ragOrchestrationService;
     @MockitoBean

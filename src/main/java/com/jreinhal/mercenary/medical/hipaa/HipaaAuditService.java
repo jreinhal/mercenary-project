@@ -14,10 +14,13 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.CriteriaDefinition;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.domain.Sort;
+import com.jreinhal.mercenary.service.HipaaAuditProvider;
+import com.jreinhal.mercenary.service.HipaaAuditProvider.AuditEventType;
+import com.jreinhal.mercenary.service.HipaaAuditProvider.HipaaAuditEvent;
 import org.springframework.stereotype.Service;
 
 @Service
-public class HipaaAuditService {
+public class HipaaAuditService implements HipaaAuditProvider {
     private static final Logger log = LoggerFactory.getLogger(HipaaAuditService.class);
     private static final String COLLECTION_NAME = "hipaa_audit_log";
     private final MongoTemplate mongoTemplate;
@@ -146,24 +149,4 @@ public class HipaaAuditService {
         return this.mongoTemplate.find(query, HipaaAuditEvent.class, COLLECTION_NAME);
     }
 
-    public static enum AuditEventType {
-        PHI_ACCESS,
-        PHI_CREATE,
-        PHI_MODIFY,
-        PHI_DELETE,
-        PHI_DISCLOSURE,
-        PHI_EXPORT,
-        PHI_PRINT,
-        PHI_QUERY,
-        AUTH_SUCCESS,
-        AUTH_FAILURE,
-        PERMISSION_DENIED;
-
-    }
-
-    public record HipaaAuditEvent(AuditEventType eventType, String username, String userId, String ipAddress, String workspaceId, Map<String, Object> details, Instant timestamp, String id) {
-        public HipaaAuditEvent(AuditEventType eventType, String username, String userId, String ipAddress, String workspaceId, Map<String, Object> details) {
-            this(eventType, username, userId, ipAddress, workspaceId, details, Instant.now(), null);
-        }
-    }
 }

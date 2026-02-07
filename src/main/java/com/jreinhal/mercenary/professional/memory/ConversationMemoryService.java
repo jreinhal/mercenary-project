@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.professional.memory;
 
+import com.jreinhal.mercenary.service.ConversationMemoryProvider;
 import com.mongodb.client.result.DeleteResult;
 import java.time.Instant;
 import java.util.Collections;
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Service;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 
 @Service
-public class ConversationMemoryService {
+public class ConversationMemoryService implements ConversationMemoryProvider {
     private static final Logger log = LoggerFactory.getLogger(ConversationMemoryService.class);
     private static final String COLLECTION_NAME = "conversation_memory";
     private final MongoTemplate mongoTemplate;
@@ -194,16 +195,4 @@ public class ConversationMemoryService {
         return str.length() <= maxLen ? str : str.substring(0, maxLen) + "...";
     }
 
-    public static enum MessageRole {
-        USER,
-        ASSISTANT,
-        SYSTEM;
-
-    }
-
-    public record ConversationMessage(String id, String userId, String sessionId, String workspaceId, MessageRole role, String content, Instant timestamp, Map<String, Object> metadata) {
-    }
-
-    public record ConversationContext(List<ConversationMessage> recentMessages, List<String> activeTopics, Map<String, Object> sessionMetadata, String formattedContext) {
-    }
 }

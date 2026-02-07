@@ -3383,17 +3383,20 @@
         // Graph instance
         let entity2DGraph = null;
 
-        // Color palette for entity types
-        // Okabe-Ito colorblind-safe palette - matches filter buttons in index.html
+        // Unified Okabe-Ito colorblind-safe entity color palette
+        // Single source of truth — used by both entity filter UI and force-graph renderer
         const entityTypeColors = {
             'PERSON': '#0077bb',       // Blue - people
             'ORGANIZATION': '#ee7733', // Orange - organizations
             'LOCATION': '#009988',     // Teal - locations
-            'TECHNICAL': '#8b5cf6',    // Violet - technical terms (backend type)
-            'TECHNOLOGY': '#8b5cf6',   // Violet - technology (filter alias)
+            'TECHNICAL': '#D55E00',    // Vermillion - technical terms
+            'TECHNOLOGY': '#D55E00',   // Vermillion - technology (alias)
+            'EVENT': '#CC79A7',        // Pink - temporal events
+            'DOCUMENT': '#56B4E9',     // Sky blue - informational
             'DATE': '#33bbee',         // Cyan - dates
-            'REFERENCE': '#94a3b8',    // Gray - references/documents
-            'default': '#64748b'       // Slate - unknown
+            'REFERENCE': '#F0E442',    // Yellow - reference material
+            'DEFAULT': '#999999',      // Gray - fallback
+            'default': '#999999'       // Gray - fallback (lowercase alias)
         };
 
         // Get current node limit from slider
@@ -3685,18 +3688,8 @@
             }
 
             // Okabe-Ito colorblind-safe palette for entity types
-            const entityColors = {
-                PERSON: '#0072B2',       // Blue - trustworthy, human
-                ORGANIZATION: '#E69F00', // Orange - institutional
-                LOCATION: '#009E73',     // Teal-green - geographic
-                EVENT: '#CC79A7',        // Pink/purple - temporal
-                DOCUMENT: '#56B4E9',     // Sky blue - informational
-                TECHNOLOGY: '#D55E00',   // Vermillion - technical
-                TECHNICAL: '#D55E00',    // Vermillion - technical (backend type alias)
-                DATE: '#33bbee',         // Cyan - dates/temporal
-                REFERENCE: '#F0E442',    // Yellow - reference material
-                DEFAULT: '#999999'       // Gray - fallback
-            };
+            // Reuse the unified entity color palette (defined above)
+            const entityColors = entityTypeColors;
 
             // Apply colorblind-safe colors to nodes
             graphData.nodes.forEach(node => {

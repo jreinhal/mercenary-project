@@ -3,7 +3,9 @@ package com.jreinhal.mercenary.professional.admin;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.filter.SecurityContext;
-import com.jreinhal.mercenary.medical.hipaa.HipaaAuditService;
+import com.jreinhal.mercenary.service.HipaaAuditProvider;
+import com.jreinhal.mercenary.service.HipaaAuditProvider.AuditEventType;
+import com.jreinhal.mercenary.service.HipaaAuditProvider.HipaaAuditEvent;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.reporting.AuditExportService;
 import com.jreinhal.mercenary.reporting.ExecutiveReport;
@@ -43,7 +45,7 @@ public class ReportingAdminController {
     private final SlaReportService slaReportService;
     private final AuditExportService auditExportService;
     private final ReportScheduleService scheduleService;
-    private final HipaaAuditService hipaaAuditService;
+    private final HipaaAuditProvider hipaaAuditService;
     private final HipaaPolicy hipaaPolicy;
     private final ObjectMapper objectMapper;
 
@@ -51,7 +53,7 @@ public class ReportingAdminController {
                                     SlaReportService slaReportService,
                                     AuditExportService auditExportService,
                                     ReportScheduleService scheduleService,
-                                    HipaaAuditService hipaaAuditService,
+                                    @org.springframework.lang.Nullable HipaaAuditProvider hipaaAuditService,
                                     HipaaPolicy hipaaPolicy,
                                     ObjectMapper objectMapper) {
         this.reportService = reportService;
@@ -113,12 +115,12 @@ public class ReportingAdminController {
             @RequestParam(value = "until", required = false) String until,
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "limit", defaultValue = "500") int limit) {
-        if (!hipaaPolicy.isStrict(Department.MEDICAL)) {
+        if (!hipaaPolicy.isStrict(Department.MEDICAL) || hipaaAuditService == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "HIPAA audit log is only available for Medical strict mode"));
         }
         Optional<Instant> sinceInstant;
         Optional<Instant> untilInstant;
-        Optional<HipaaAuditService.AuditEventType> eventType;
+        Optional<AuditEventType> eventType;
         try {
             sinceInstant = Optional.ofNullable(resolveInstant(since));
             untilInstant = Optional.ofNullable(resolveInstant(until));
@@ -138,13 +140,13 @@ public class ReportingAdminController {
             @RequestParam(value = "until", required = false) String until,
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "limit", defaultValue = "1000") int limit) {
-        if (!hipaaPolicy.isStrict(Department.MEDICAL)) {
+        if (!hipaaPolicy.isStrict(Department.MEDICAL) || hipaaAuditService == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("{\"error\": \"HIPAA audit export is only available for Medical strict mode\"}");
         }
         ReportSchedule.ReportFormat resolvedFormat = resolveFormat(format);
         Instant sinceInstant;
         Instant untilInstant;
-        Optional<HipaaAuditService.AuditEventType> eventType;
+        Optional<AuditEventType> eventType;
         try {
             sinceInstant = resolveSince(days, since);
             untilInstant = resolveInstant(until);
@@ -153,7 +155,7 @@ public class ReportingAdminController {
             // S2-06: Generic message — don't reflect user input in error response
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("{\"error\": \"Invalid timestamp or event type parameter\"}");
         }
-        List<HipaaAuditService.HipaaAuditEvent> events = hipaaAuditService.queryEvents(
+        List<HipaaAuditEvent> events = hipaaAuditService.queryEvents(
                 Optional.ofNullable(sinceInstant), Optional.ofNullable(untilInstant), eventType, limit);
         String content;
         try {
@@ -262,14 +264,14 @@ public class ReportingAdminController {
         }
     }
 
-    private Optional<HipaaAuditService.AuditEventType> resolveHipaaType(String type) {
+    private Optional<AuditEventType> resolveHipaaType(String type) {
         if (type == null || type.isBlank()) {
             return Optional.empty();
         }
         try {
-            return Optional.of(HipaaAuditService.AuditEventType.valueOf(type.trim().toUpperCase()));
+            return Optional.of(AuditEventType.valueOf(type.trim().toUpperCase(java.util.Locale.ROOT)));
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid HIPAA audit type: " + type);
+            throw new IllegalArgumentException("Invalid HIPAA audit type: " + type, e);
         }
     }
 
@@ -282,10 +284,10 @@ public class ReportingAdminController {
         return headers;
     }
 
-    private String hipaaToCsv(List<HipaaAuditService.HipaaAuditEvent> events) {
+    private String hipaaToCsv(List<HipaaAuditEvent> events) {
         StringBuilder sb = new StringBuilder();
         sb.append("timestamp,eventType,username,userId,workspaceId,details\n");
-        for (HipaaAuditService.HipaaAuditEvent event : events) {
+        for (HipaaAuditEvent event : events) {
             sb.append(csv(event.timestamp() != null ? event.timestamp().toString() : ""))
               .append(',')
               .append(csv(event.eventType() != null ? event.eventType().name() : ""))

@@ -1,0 +1,15 @@
+# LightOnOCR Service Dependencies
+# Install transformers from source for LightOnOCR support
+git+https://github.com/huggingface/transformers
+
+# Core dependencies
+torch>=2.0.0
+pillow>=10.0.0
+pypdfium2>=4.0.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+
+# Optional: For GPU acceleration
+# torch with CUDA - install separately based on your CUDA version
+# pip install torch --index-url https://download.pytorch.org/whl/cu121

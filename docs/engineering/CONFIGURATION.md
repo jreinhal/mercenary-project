@@ -94,13 +94,16 @@ Notes:
 The OCR service uses the LightOnOCR-2-1B vision-language model for extracting text from scanned documents and images.
 
 ```bash
-# Start the microservice
-cd D:/Projects/lightonocr-service
+# Start the microservice (from repo root)
+cd services/lightonocr-service
+python -m venv venv
+.\venv\Scripts\activate  # Windows (or: source venv/bin/activate)
 pip install -r requirements.txt
 python ocr_service.py
 
 # Or with Docker
-docker run -p 8090:8090 -v ./models:/app/models lightonocr-service
+docker build -t lightonocr-service services/lightonocr-service
+docker run -p 8090:8090 --gpus all lightonocr-service
 ```
 
 ### Supported Formats

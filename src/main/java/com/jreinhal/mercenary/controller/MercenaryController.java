@@ -8,8 +8,8 @@ import com.jreinhal.mercenary.dto.EnhancedAskResponse;
 import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
-import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
-import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
+import com.jreinhal.mercenary.service.ConversationMemoryProvider;
+import com.jreinhal.mercenary.service.SessionPersistenceProvider;
 import com.jreinhal.mercenary.rag.ModalityRouter;
 import com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService;
 import com.jreinhal.mercenary.rag.agentic.AgenticRagOrchestrator;
@@ -109,8 +109,8 @@ public class MercenaryController {
     private final SectorConfig sectorConfig;
     private final PromptGuardrailService guardrailService;
     private final PiiRedactionService piiRedactionService;
-    private final ConversationMemoryService conversationMemoryService;
-    private final SessionPersistenceService sessionPersistenceService;
+    private final ConversationMemoryProvider conversationMemoryService;
+    private final SessionPersistenceProvider sessionPersistenceService;
     private final RagOrchestrationService ragOrchestrationService;
     private final Cache<String, String> secureDocCache;
     private final LicenseService licenseService;
@@ -134,10 +134,10 @@ public class MercenaryController {
     @Value("${sentinel.rag.max-visual-docs:8}")
     private int maxVisualDocs;
 
-    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache, LicenseService licenseService,
-                               @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
-                               @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
-                               @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
+    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryProvider conversationMemoryService, SessionPersistenceProvider sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache, LicenseService licenseService,
+                               @Value("${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
+                               @Value("${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
+                               @Value("${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
         this.chatClient = builder.defaultFunctions(new String[]{"calculator", "currentDate"}).build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;

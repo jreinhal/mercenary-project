@@ -9,8 +9,8 @@ plugins {
 group = 'com.jreinhal'
 version = '2.2.0'
 
-// Edition selection via -Pedition=xxx (default: government)
-def edition = project.hasProperty('edition') ? project.property('edition') : 'government'
+// Edition selection via -Pedition=xxx (default: professional)
+def edition = project.hasProperty('edition') ? project.property('edition') : 'professional'
 ext.edition = edition
 
 // Log the edition being built
@@ -100,30 +100,33 @@ dependencyLocking {
 }
 
 // Edition-specific source sets with actual exclusion logic
+def editionExcludes = { ->
+    if (!(edition in ['trial', 'professional', 'medical', 'government'])) {
+        exclude '**/professional/**'
+        exclude '**/medical/**'
+        exclude '**/government/**'
+    } else if (edition in ['trial', 'professional']) {
+        exclude '**/medical/**'
+        exclude '**/government/**'
+    } else if (edition == 'medical') {
+        exclude '**/government/**'
+    }
+    // Government edition includes all packages (no exclusions)
+}
+
 sourceSets {
     main {
         java {
             srcDirs = ['src/main/java']
-
-            // Apply exclusions based on edition
-            if (!(edition in ['trial', 'professional', 'medical', 'government'])) {
-                // Unknown edition - exclude all premium packages
-                exclude '**/professional/**'
-                exclude '**/medical/**'
-                exclude '**/government/**'
-            } else if (edition == 'trial') {
-                // Trial: Include professional, exclude medical and government
-                exclude '**/medical/**'
-                exclude '**/government/**'
-            } else if (edition == 'professional') {
-                // Professional: Include professional, exclude medical and government
-                exclude '**/medical/**'
-                exclude '**/government/**'
-            } else if (edition == 'medical') {
-                // Medical: Include professional and medical, exclude government
-                exclude '**/government/**'
-            }
-            // Government edition includes all packages (no exclusions)
+            editionExcludes.delegate = delegate
+            editionExcludes()
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src/test/java']
+            editionExcludes.delegate = delegate
+            editionExcludes()
         }
     }
 }
