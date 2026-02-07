@@ -525,7 +525,9 @@ public class RagOrchestrationService {
         String effectiveQuery = query;
         if (sessionId != null && !sessionId.isBlank()) {
             try {
-                if (!this.hipaaPolicy.shouldDisableSessionMemory(department)) {
+                if (!this.hipaaPolicy.shouldDisableSessionMemory(department)
+                        && this.conversationMemoryService != null
+                        && this.sessionPersistenceService != null) {
                     this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
                     this.conversationMemoryService.saveUserMessage(user.getId(), sessionId, query);
                     if (this.conversationMemoryService.isFollowUp(query)) {
@@ -533,6 +535,8 @@ public class RagOrchestrationService {
                         effectiveQuery = this.conversationMemoryService.expandFollowUp(query, context);
                         log.debug("Expanded follow-up query for session {}", sessionId);
                     }
+                } else if (this.conversationMemoryService == null || this.sessionPersistenceService == null) {
+                    log.debug("Session memory unavailable (edition does not include professional features)");
                 } else {
                     log.info("HIPAA strict: conversation memory disabled for medical session {}", sessionId);
                 }

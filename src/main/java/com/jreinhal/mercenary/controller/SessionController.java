@@ -8,6 +8,7 @@ import com.jreinhal.mercenary.service.AuditService;
 import com.jreinhal.mercenary.service.ConversationMemoryProvider;
 import com.jreinhal.mercenary.service.HipaaPolicy;
 import com.jreinhal.mercenary.service.SessionPersistenceProvider;
+import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -36,11 +37,15 @@ public class SessionController {
     private final AuditService auditService;
     private final HipaaPolicy hipaaPolicy;
 
-    public SessionController(SessionPersistenceProvider sessionPersistenceService, ConversationMemoryProvider conversationMemoryService, AuditService auditService, HipaaPolicy hipaaPolicy) {
+    public SessionController(@Nullable SessionPersistenceProvider sessionPersistenceService, @Nullable ConversationMemoryProvider conversationMemoryService, AuditService auditService, HipaaPolicy hipaaPolicy) {
         this.sessionPersistenceService = sessionPersistenceService;
         this.conversationMemoryService = conversationMemoryService;
         this.auditService = auditService;
         this.hipaaPolicy = hipaaPolicy;
+    }
+
+    private boolean sessionFeaturesUnavailable() {
+        return this.sessionPersistenceService == null || this.conversationMemoryService == null;
     }
 
     @PostMapping(value={"/create"})
@@ -48,6 +53,9 @@ public class SessionController {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
         }
         String dept = department != null ? department : Department.ENTERPRISE.name();
         // S2-03: Validate department enum and sector access before creating session
@@ -73,6 +81,9 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
+        }
         Optional<SessionPersistenceProvider.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
         if (session.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -96,6 +107,9 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
+        }
         List<SessionPersistenceProvider.ActiveSession> sessions = this.sessionPersistenceService.getUserSessions(user.getId());
         this.auditService.logQuery(user, "session_list", Department.ENTERPRISE, "Listed sessions", request);
         return ResponseEntity.ok(sessions);
@@ -106,6 +120,9 @@ public class SessionController {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
         }
         String dept = department != null ? department : Department.ENTERPRISE.name();
         // S4-01: Validate department enum and sector access — parity with createSession
@@ -131,6 +148,9 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
+        }
         Optional<SessionPersistenceProvider.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
         if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
@@ -151,6 +171,9 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
+        }
         Optional<SessionPersistenceProvider.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
         if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
@@ -170,6 +193,9 @@ public class SessionController {
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
+        }
         Optional<SessionPersistenceProvider.ActiveSession> session = this.sessionPersistenceService.getSession(sessionId);
         if (session.isEmpty() || !session.get().userId().equals(user.getId())) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
@@ -188,6 +214,9 @@ public class SessionController {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
         }
         Optional<SessionPersistenceProvider.PersistedTrace> trace = this.sessionPersistenceService.getPersistedTrace(traceId);
         if (trace.isEmpty()) {
@@ -211,6 +240,9 @@ public class SessionController {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
         }
         Optional<SessionPersistenceProvider.ActiveSession> sessionOpt = this.sessionPersistenceService.getSession(sessionId);
         if (sessionOpt.isPresent()) {
@@ -241,6 +273,9 @@ public class SessionController {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
         }
         Optional<SessionPersistenceProvider.ActiveSession> sessionOpt = this.sessionPersistenceService.getSession(sessionId);
         if (sessionOpt.isPresent()) {
@@ -275,6 +310,9 @@ public class SessionController {
         User user = SecurityContext.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
+        }
+        if (sessionFeaturesUnavailable()) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.NOT_IMPLEMENTED).build();
         }
         // M-06: Only include global stats for admin users; non-admins see only their own
         Map<String, Object> stats;
