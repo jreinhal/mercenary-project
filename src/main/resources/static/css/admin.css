@@ -976,7 +976,6 @@ a:hover {
 .admin-edition-government { display: none; }
 
 body.edition-medical .admin-edition-medical,
-body.edition-government .admin-edition-medical,
 body.edition-government .admin-edition-government {
     display: block;
 }

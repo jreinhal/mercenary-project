@@ -1658,6 +1658,8 @@
             if (!currentIsAdmin) {
                 return;
             }
+            // Connector UI moved to admin console; skip API calls when DOM targets absent
+            if (!document.getElementById('connector-sharepoint-status')) return;
 
             ['sharepoint', 'confluence', 's3'].forEach(id => setConnectorStatus(id, 'Loading...', 'syncing'));
             try {
@@ -2119,12 +2121,16 @@
 
         // ==================== Reporting ====================
         function initReportingPanel() {
+            // Reports UI moved to admin console; skip when DOM targets absent
+            if (!document.getElementById('reporting-compliance-badge')) return;
             renderExecutiveReport(reportingState.executive);
             renderSlaReport(reportingState.sla);
             updateReportingControls();
         }
 
         function refreshReportingData() {
+            // Reports UI moved to admin console; skip API calls when DOM targets absent
+            if (!document.getElementById('reporting-compliance-badge')) return;
             if (!currentIsAdmin) {
                 updateReportingControls();
                 return;
@@ -3014,7 +3020,7 @@
         }
 
         function openAdmin() {
-            window.open('admin.html', '_blank');
+            window.open('admin.html', '_blank', 'noopener,noreferrer');
         }
 
         function switchRightTab(tabName) {

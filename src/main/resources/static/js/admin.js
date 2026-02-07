@@ -101,11 +101,6 @@
         return date.toLocaleString();
     }
 
-    function formatBytes(bytes) {
-        if (!bytes) return '0 MB';
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    }
-
     // ── Toast Notifications ────────────────────────────────
 
     function showToast(message, type = 'info') {
@@ -413,6 +408,14 @@
 
     // ── Section: Sectors & Pipelines ───────────────────────
 
+    const pipelinePresets = {
+        ENTERPRISE: { label: 'Enterprise', topK: 6, similarity: 0.72, hyde: false, graphrag: true, rerank: true },
+        GOVERNMENT: { label: 'Government', topK: 5, similarity: 0.78, hyde: false, graphrag: true, rerank: true },
+        MEDICAL:    { label: 'Medical',    topK: 5, similarity: 0.80, hyde: false, graphrag: true, rerank: true },
+        FINANCE:    { label: 'Finance',    topK: 6, similarity: 0.74, hyde: false, graphrag: false, rerank: true },
+        ACADEMIC:   { label: 'Academic',   topK: 8, similarity: 0.68, hyde: true,  graphrag: true, rerank: true }
+    };
+
     async function loadSectors() {
         try {
             const response = await guardedFetch(`${API_BASE}/config/sectors`);
@@ -423,6 +426,34 @@
             if (error.code === 'auth') return;
             setText(document.getElementById('sectors-body'), 'Unable to load sectors.');
         }
+        renderPipelineDefaults();
+    }
+
+    function renderPipelineDefaults() {
+        const listEl = document.getElementById('pipeline-config-list');
+        if (!listEl) return;
+        const entries = Object.entries(pipelinePresets);
+        if (entries.length === 0) {
+            listEl.innerHTML = '<div class="admin-text-muted">No pipeline presets defined.</div>';
+            return;
+        }
+        const toggleLabel = (val) => val ? '✓' : '—';
+        listEl.innerHTML = `
+            <table class="admin-table" style="margin-top:8px;">
+                <thead><tr>
+                    <th>Preset</th><th>Top-K</th><th>Similarity</th><th>HyDE</th><th>GraphRAG</th><th>Re-rank</th>
+                </tr></thead>
+                <tbody>${entries.map(([, p]) => `
+                    <tr>
+                        <td>${escapeHtml(p.label)}</td>
+                        <td>${p.topK}</td>
+                        <td>${p.similarity.toFixed(2)}</td>
+                        <td>${toggleLabel(p.hyde)}</td>
+                        <td>${toggleLabel(p.graphrag)}</td>
+                        <td>${toggleLabel(p.rerank)}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>`;
     }
 
     function renderSectors(sectors) {
