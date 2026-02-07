@@ -121,7 +121,7 @@ public class AdaptiveRagService {
             }
             catch (Exception e) {
                 log.error("Semantic Router failed, falling back to heuristics: {}", e.getMessage());
-                signals.put("routerError", e.getMessage());
+                signals.put("routerError", "classification_failed");
             }
         }
         long documentPatternMatches = DOCUMENT_PATTERNS.stream().filter(p -> p.matcher(normalizedQuery).find()).count();

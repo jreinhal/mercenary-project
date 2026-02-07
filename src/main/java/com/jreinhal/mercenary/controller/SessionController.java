@@ -81,7 +81,11 @@ public class SessionController {
             this.auditService.logQuery(user, "session_access_denied: " + sessionId, Department.ENTERPRISE, "Access denied", request);
             return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
         }
+        // S4-14: HIPAA parity check — consistent with getConversationContext/getSessionTraces/clearSessionHistory
         Department dept = this.safeDepartment(session.get().department());
+        if (dept != null && this.hipaaPolicy.shouldDisableSessionMemory(dept)) {
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         this.auditService.logQuery(user, "session_get: " + sessionId, dept != null ? dept : Department.ENTERPRISE, "Session retrieved", request);
         return ResponseEntity.ok(session.get());
     }
@@ -104,9 +108,20 @@ public class SessionController {
             return ResponseEntity.status((HttpStatusCode)HttpStatus.UNAUTHORIZED).build();
         }
         String dept = department != null ? department : Department.ENTERPRISE.name();
+        // S4-01: Validate department enum and sector access — parity with createSession
+        Department sector;
+        try {
+            sector = Department.valueOf(dept.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!user.canAccessSector(sector)) {
+            this.auditService.logAccessDenied(user, "/api/sessions/" + sessionId + "/touch",
+                "Not authorized for sector " + sector.name(), request);
+            return ResponseEntity.status((HttpStatusCode)HttpStatus.FORBIDDEN).build();
+        }
         SessionPersistenceService.ActiveSession session = this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
-        Department sector = this.safeDepartment(dept);
-        this.auditService.logQuery(user, "session_touch: " + sessionId, sector != null ? sector : Department.ENTERPRISE, "Session touched", request);
+        this.auditService.logQuery(user, "session_touch: " + sessionId, sector, "Session touched", request);
         return ResponseEntity.ok(session);
     }
 

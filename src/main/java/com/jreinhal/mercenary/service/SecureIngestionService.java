@@ -161,7 +161,7 @@ public class SecureIngestionService {
             log.info("Securely ingested {} memory points. Total PII redactions: {}", finalDocuments.size(), totalRedactions);
         }
         catch (IOException e) {
-            throw new SecureIngestionException("Secure Ingestion Failed: " + e.getMessage(), e);
+            throw new SecureIngestionException("Secure Ingestion Failed", e);
         }
     }
 

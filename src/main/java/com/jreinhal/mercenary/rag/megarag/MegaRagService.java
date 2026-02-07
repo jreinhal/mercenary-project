@@ -103,7 +103,7 @@ public class MegaRagService {
         }
         catch (Exception e) {
             log.error("MegaRAG: Visual ingestion failed for '{}': {}", new Object[]{filename, e.getMessage(), e});
-            return new VisualIngestionResult(false, e.getMessage(), List.of(), null);
+            return new VisualIngestionResult(false, "Visual ingestion failed", List.of(), null);
         }
     }
 
