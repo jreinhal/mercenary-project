@@ -1658,8 +1658,11 @@
             if (!currentIsAdmin) {
                 return;
             }
-            // Connector UI moved to admin console; skip API calls when DOM targets absent
-            if (!document.getElementById('connector-sharepoint-status')) return;
+            // If there is no connector status UI on the current page, skip the
+            // network request and DOM updates to avoid unnecessary overhead.
+            if (typeof document === 'undefined' || !document.querySelector('[id^="connector-status-"]')) {
+                return;
+            }
 
             ['sharepoint', 'confluence', 's3'].forEach(id => setConnectorStatus(id, 'Loading...', 'syncing'));
             try {
