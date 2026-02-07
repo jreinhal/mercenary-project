@@ -61,7 +61,7 @@ public class SelfReflectiveRagService {
         }
         catch (Exception e) {
             log.error("Error generating answer: {}", e.getMessage());
-            return "Unable to generate answer: " + e.getMessage();
+            return "Unable to generate answer. The language model is temporarily unavailable.";
         }
     }
 
@@ -99,7 +99,7 @@ public class SelfReflectiveRagService {
         }
         catch (Exception e) {
             log.warn("Error verifying claim: {}", e.getMessage());
-            return new ClaimVerification(claim, false, "error", 0.0, "Verification failed: " + e.getMessage());
+            return new ClaimVerification(claim, false, "error", 0.0, "Verification temporarily unavailable");
         }
     }
 

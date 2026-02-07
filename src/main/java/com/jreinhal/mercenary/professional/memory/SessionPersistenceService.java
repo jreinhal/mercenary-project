@@ -327,7 +327,7 @@ public class SessionPersistenceService {
             stats.put("dataDirectory", this.sessionDataDir);
         }
         catch (Exception e) {
-            stats.put("error", e.getMessage());
+            stats.put("error", "Failed to retrieve session statistics");
         }
         return stats;
     }

@@ -300,8 +300,11 @@ public class MercenaryController {
                 List<Document> potentialDocs = this.vectorStore.similaritySearch(SearchRequest.query((String)normalizedFileName)
                         .withTopK(20)
                         .withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
-                log.info("INSPECT DEBUG: Searching for '{}'. Found {} potential candidates.", normalizedFileName, potentialDocs.size());
-                potentialDocs.forEach(d -> log.info("  >> Candidate Meta: {}", d.getMetadata()));
+                // S4-10: Debug-level logging — document metadata should not be at INFO in production
+                if (log.isDebugEnabled()) {
+                    log.debug("INSPECT: Searching for '{}'. Found {} potential candidates.", normalizedFileName, potentialDocs.size());
+                    potentialDocs.forEach(d -> log.debug("  >> Candidate Meta: {}", d.getMetadata()));
+                }
                 Optional<Document> match = potentialDocs.stream().filter(doc -> normalizedFileName.equals(doc.getMetadata().get("source")) || this.apiKeyMatch(normalizedFileName, doc.getMetadata())).findFirst();
                 if (!match.isPresent()) {
                     return new InspectResponse("ERROR: Document archived in Deep Storage.\nPlease re-ingest file to refresh active cache.", List.of(), false, 0);
