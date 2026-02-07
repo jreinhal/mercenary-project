@@ -837,11 +837,28 @@
         ).join('');
     }
 
+    function getOrCreateExportViewer() {
+        let viewer = document.getElementById('report-export-viewer');
+        if (viewer) {
+            return viewer;
+        }
+        const listEl = document.getElementById('export-list');
+        if (!listEl || !listEl.parentNode) {
+            return null;
+        }
+        viewer = document.createElement('pre');
+        viewer.id = 'report-export-viewer';
+        viewer.className = 'report-export-viewer';
+        viewer.textContent = '';
+        listEl.parentNode.insertBefore(viewer, listEl.nextSibling);
+        return viewer;
+    }
+
     async function viewReportExport(exportId) {
         if (!exportId) return;
         const exportData = await fetchExport(exportId);
         if (!exportData) return;
-        const outputEl = document.getElementById('report-exec-output');
+        const outputEl = getOrCreateExportViewer();
         if (outputEl) {
             outputEl.textContent = exportData.content || '';
             outputEl.classList.add('visible');
