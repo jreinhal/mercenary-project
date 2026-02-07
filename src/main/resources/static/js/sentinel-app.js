@@ -899,7 +899,9 @@
                     : 'Single workspace';
             }
 
-            workspaceSection.classList.remove('hidden');
+            if (workspaceSection) {
+                workspaceSection.classList.remove('hidden');
+            }
             if (quickSwitcher) {
                 if (workspaces.length > 1) {
                     quickSwitcher.classList.remove('hidden');
@@ -1659,6 +1661,12 @@
                 return;
             }
 
+            // If there is no connector status UI on the current page, skip the
+            // network request and DOM updates to avoid unnecessary overhead.
+            if (typeof document === 'undefined' || !document.querySelector('[id^="connector-status-"]')) {
+                return;
+            }
+
             ['sharepoint', 'confluence', 's3'].forEach(id => setConnectorStatus(id, 'Loading...', 'syncing'));
             try {
                 const response = await guardedFetch(`${API_BASE}/admin/connectors/status`);
@@ -2119,6 +2127,10 @@
 
         // ==================== Reporting ====================
         function initReportingPanel() {
+            // Reports UI has been moved to admin.html, skip if not present
+            if (!document.getElementById('right-tab-reports')) {
+                return;
+            }
             renderExecutiveReport(reportingState.executive);
             renderSlaReport(reportingState.sla);
             updateReportingControls();
@@ -2127,6 +2139,10 @@
         function refreshReportingData() {
             if (!currentIsAdmin) {
                 updateReportingControls();
+                return;
+            }
+            // Reports UI has been moved to admin.html, skip API calls if not present
+            if (!document.getElementById('right-tab-reports')) {
                 return;
             }
             refreshReportSchedules();
@@ -3014,7 +3030,8 @@
         }
 
         function openAdmin() {
-            window.open('admin.html', '_blank');
+            const newWindow = window.open('admin.html', '_blank', 'noopener,noreferrer');
+            if (newWindow) newWindow.opener = null;
         }
 
         function switchRightTab(tabName) {

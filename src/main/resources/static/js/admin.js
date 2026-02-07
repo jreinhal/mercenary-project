@@ -101,10 +101,7 @@
         return date.toLocaleString();
     }
 
-    function formatBytes(bytes) {
-        if (!bytes) return '0 MB';
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    }
+
 
     // ── Toast Notifications ────────────────────────────────
 
@@ -147,11 +144,24 @@
             case 'overview': loadOverview(); break;
             case 'users': loadUsers(); break;
             case 'workspaces': loadWorkspaces(); break;
-            case 'sectors': loadSectors(); break;
+            case 'sectors': loadSectors(); initPipelineDefaultsUI(); break;
             case 'connectors': loadConnectors(); break;
             case 'reports': loadReports(); break;
             case 'platform': loadPlatform(); break;
         }
+    }
+
+    function initPipelineDefaultsUI() {
+        const container = document.getElementById('pipeline-config-list');
+        if (!container) return;
+
+        // Avoid overwriting any existing content that may be rendered elsewhere.
+        if (container.children.length > 0) return;
+
+        const emptyState = document.createElement('div');
+        emptyState.className = 'empty-state';
+        emptyState.textContent = 'No pipeline defaults are configured.';
+        container.appendChild(emptyState);
     }
 
     // ── Section: Overview ──────────────────────────────────
