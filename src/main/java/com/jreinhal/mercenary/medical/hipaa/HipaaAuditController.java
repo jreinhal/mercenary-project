@@ -4,6 +4,8 @@ import com.jreinhal.mercenary.filter.SecurityContext;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.service.AuditService;
+import com.jreinhal.mercenary.service.HipaaAuditProvider.AuditEventType;
+import com.jreinhal.mercenary.service.HipaaAuditProvider.HipaaAuditEvent;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -52,8 +54,8 @@ public class HipaaAuditController {
         }
         Optional<Instant> sinceInstant = parseInstant(since);
         Optional<Instant> untilInstant = parseInstant(until);
-        Optional<HipaaAuditService.AuditEventType> eventType = parseType(type);
-        List<HipaaAuditService.HipaaAuditEvent> events = this.hipaaAuditService.queryEvents(sinceInstant, untilInstant, eventType, limit);
+        Optional<AuditEventType> eventType = parseType(type);
+        List<HipaaAuditEvent> events = this.hipaaAuditService.queryEvents(sinceInstant, untilInstant, eventType, limit);
         return ResponseEntity.ok(Map.of("count", events.size(), "events", events, "requestedBy", user.getUsername()));
     }
 
@@ -71,8 +73,8 @@ public class HipaaAuditController {
         }
         Optional<Instant> sinceInstant = parseInstant(since);
         Optional<Instant> untilInstant = parseInstant(until);
-        Optional<HipaaAuditService.AuditEventType> eventType = parseType(type);
-        List<HipaaAuditService.HipaaAuditEvent> events = this.hipaaAuditService.queryEvents(sinceInstant, untilInstant, eventType, limit);
+        Optional<AuditEventType> eventType = parseType(type);
+        List<HipaaAuditEvent> events = this.hipaaAuditService.queryEvents(sinceInstant, untilInstant, eventType, limit);
         if ("csv".equalsIgnoreCase(format)) {
             String csv = toCsv(events);
             return ResponseEntity.ok()
@@ -97,21 +99,21 @@ public class HipaaAuditController {
         }
     }
 
-    private Optional<HipaaAuditService.AuditEventType> parseType(String type) {
+    private Optional<AuditEventType> parseType(String type) {
         if (type == null || type.isBlank()) {
             return Optional.empty();
         }
         try {
-            return Optional.of(HipaaAuditService.AuditEventType.valueOf(type.trim().toUpperCase()));
+            return Optional.of(AuditEventType.valueOf(type.trim().toUpperCase()));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
     }
 
-    private String toCsv(List<HipaaAuditService.HipaaAuditEvent> events) {
+    private String toCsv(List<HipaaAuditEvent> events) {
         StringBuilder builder = new StringBuilder();
         builder.append("timestamp,eventType,username,userId,ipAddress,details\n");
-        for (HipaaAuditService.HipaaAuditEvent event : events) {
+        for (HipaaAuditEvent event : events) {
             StringJoiner joiner = new StringJoiner(",");
             joiner.add(safe(event.timestamp() != null ? event.timestamp().toString() : ""));
             joiner.add(safe(event.eventType() != null ? event.eventType().name() : ""));

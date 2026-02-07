@@ -5,10 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.jreinhal.mercenary.Department;
-import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
 import com.jreinhal.mercenary.reasoning.ReasoningTrace;
+import com.jreinhal.mercenary.service.ConversationMemoryProvider;
 import com.jreinhal.mercenary.service.HipaaPolicy;
 import com.jreinhal.mercenary.service.IntegritySigner;
+import com.jreinhal.mercenary.service.SessionPersistenceProvider;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import com.mongodb.client.result.DeleteResult;
 import jakarta.annotation.PostConstruct;
@@ -41,13 +42,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Service
-public class SessionPersistenceService {
+public class SessionPersistenceService implements SessionPersistenceProvider {
     private static final Logger log = LoggerFactory.getLogger(SessionPersistenceService.class);
     private static final String TRACES_COLLECTION = "reasoning_traces";
     private static final String SESSIONS_COLLECTION = "active_sessions";
     private static final DateTimeFormatter FILE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss").withZone(ZoneId.systemDefault());
     private final MongoTemplate mongoTemplate;
-    private final ConversationMemoryService conversationMemoryService;
+    private final ConversationMemoryProvider conversationMemoryService;
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.service.IntegritySigner integritySigner;
     private final ObjectMapper objectMapper;
@@ -62,7 +63,7 @@ public class SessionPersistenceService {
     @Value(value="${sentinel.sessions.max-traces-per-session:100}")
     private int maxTracesPerSession;
 
-    public SessionPersistenceService(MongoTemplate mongoTemplate, ConversationMemoryService conversationMemoryService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.service.IntegritySigner integritySigner) {
+    public SessionPersistenceService(MongoTemplate mongoTemplate, ConversationMemoryProvider conversationMemoryService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.service.IntegritySigner integritySigner) {
         this.mongoTemplate = mongoTemplate;
         this.conversationMemoryService = conversationMemoryService;
         this.hipaaPolicy = hipaaPolicy;
@@ -205,7 +206,7 @@ public class SessionPersistenceService {
         if (!session.userId().equals(userId)) {
             throw new SecurityException("User does not own this session");
         }
-        ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(userId, sessionId);
+        ConversationMemoryProvider.ConversationContext context = this.conversationMemoryService.getContext(userId, sessionId);
         List<PersistedTrace> traces = this.getSessionTraces(sessionId);
         HashMap<String, Object> summary = new HashMap<String, Object>();
         summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
@@ -233,7 +234,7 @@ public class SessionPersistenceService {
         if (!session.userId().equals(userId)) {
             throw new SecurityException("User does not own this session");
         }
-        ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(userId, sessionId);
+        ConversationMemoryProvider.ConversationContext context = this.conversationMemoryService.getContext(userId, sessionId);
         List<PersistedTrace> traces = this.getSessionTraces(sessionId);
         HashMap<String, Object> summary = new HashMap<String, Object>();
         summary.put("totalDurationMs", traces.stream().mapToLong(PersistedTrace::durationMs).sum());
@@ -332,14 +333,6 @@ public class SessionPersistenceService {
         return stats;
     }
 
-    public record ActiveSession(String sessionId, String userId, String workspaceId, String department, Instant createdAt, Instant lastActivityAt, int messageCount, int traceCount, List<String> traceIds, Map<String, Object> metadata) {
-    }
-
-    public record PersistedTrace(String traceId, String sessionId, String userId, String workspaceId, String department, String query, Instant timestamp, long durationMs, int stepCount, List<Map<String, Object>> steps, Map<String, Object> metrics, boolean completed, String integrityHash, String integrityKeyId) {
-    }
-
-    public record SessionExport(String sessionId, String userId, String workspaceId, String department, Instant startTime, Instant endTime, int totalMessages, int totalTraces, List<ConversationMemoryService.ConversationMessage> messages, List<PersistedTrace> traces, Map<String, Object> summary, String integrityHash, String integrityKeyId) {
-    }
 
     private PersistedTrace attachIntegrity(PersistedTrace unsigned) {
         if (!this.integritySigner.isEnabled()) {

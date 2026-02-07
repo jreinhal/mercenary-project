@@ -6,11 +6,11 @@ import com.jreinhal.mercenary.config.SectorConfig;
 import com.jreinhal.mercenary.core.license.LicenseService;
 import com.jreinhal.mercenary.dto.EnhancedAskResponse;
 import com.jreinhal.mercenary.filter.SecurityContext;
-import com.jreinhal.mercenary.medical.hipaa.HipaaAuditService;
+import com.jreinhal.mercenary.service.HipaaAuditProvider;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
-import com.jreinhal.mercenary.professional.memory.ConversationMemoryService;
-import com.jreinhal.mercenary.professional.memory.SessionPersistenceService;
+import com.jreinhal.mercenary.service.ConversationMemoryProvider;
+import com.jreinhal.mercenary.service.SessionPersistenceProvider;
 import com.jreinhal.mercenary.rag.ModalityRouter;
 import com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService;
 import com.jreinhal.mercenary.rag.agentic.AgenticRagOrchestrator;
@@ -88,12 +88,12 @@ public class RagOrchestrationService {
     private final ModalityRouter modalityRouter;
     private final SectorConfig sectorConfig;
     private final PromptGuardrailService guardrailService;
-    private final ConversationMemoryService conversationMemoryService;
-    private final SessionPersistenceService sessionPersistenceService;
+    private final ConversationMemoryProvider conversationMemoryService;
+    private final SessionPersistenceProvider sessionPersistenceService;
     private final LicenseService licenseService;
     private final PiiRedactionService piiRedactionService;
     private final HipaaPolicy hipaaPolicy;
-    private final HipaaAuditService hipaaAuditService;
+    private final HipaaAuditProvider hipaaAuditService;
     private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final AtomicInteger queryCount = new AtomicInteger(0);
     private final AtomicLong totalLatencyMs = new AtomicLong(0L);
@@ -137,7 +137,7 @@ public class RagOrchestrationService {
     @Value("${sentinel.rag.max-docs:16}")
     private int maxDocs;
 
-    public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, ConversationMemoryService conversationMemoryService, SessionPersistenceService sessionPersistenceService, LicenseService licenseService, PiiRedactionService piiRedactionService, HipaaPolicy hipaaPolicy, HipaaAuditService hipaaAuditService, Cache<String, String> secureDocCache, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService,
+    public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, @org.springframework.lang.Nullable ConversationMemoryProvider conversationMemoryService, @org.springframework.lang.Nullable SessionPersistenceProvider sessionPersistenceService, LicenseService licenseService, PiiRedactionService piiRedactionService, HipaaPolicy hipaaPolicy, @org.springframework.lang.Nullable HipaaAuditProvider hipaaAuditService, Cache<String, String> secureDocCache, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService,
                                   @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
                                   @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
                                   @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
@@ -529,7 +529,7 @@ public class RagOrchestrationService {
                     this.sessionPersistenceService.touchSession(user.getId(), sessionId, dept);
                     this.conversationMemoryService.saveUserMessage(user.getId(), sessionId, query);
                     if (this.conversationMemoryService.isFollowUp(query)) {
-                        ConversationMemoryService.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
+                        ConversationMemoryProvider.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
                         effectiveQuery = this.conversationMemoryService.expandFollowUp(query, context);
                         log.debug("Expanded follow-up query for session {}", sessionId);
                     }
