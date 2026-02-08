@@ -54,6 +54,7 @@ public class SecureIngestionService {
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final Tika tika;
+    private static final String PDF_MIME_TYPE = "application/pdf";
     private static final Set<String> BLOCKED_MIME_TYPES = Set.of(
         "application/x-executable", "application/x-msdos-program", "application/x-msdownload",
         "application/x-sh", "application/x-shellscript", "text/x-shellscript",
@@ -110,7 +111,7 @@ public class SecureIngestionService {
                 return;
             }
             InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(fileBytes));
-            if ("application/pdf".equals(detectedMimeType)) {
+            if (PDF_MIME_TYPE.equals(detectedMimeType)) {
                 log.info(">> DETECTED PDF: Engaging Optical Character Recognition / PDF Stream...");
                 PagePdfDocumentReader pdfReader = new PagePdfDocumentReader((Resource)resource);
                 rawDocuments = pdfReader.get();
@@ -240,25 +241,27 @@ public class SecureIngestionService {
     }
 
     private void validateFileType(String filename, String detectedMimeType, byte[] bytes) {
+        String safeFilename = LogSanitizer.sanitize(filename);
+        String safeMimeType = LogSanitizer.sanitize(detectedMimeType);
         if (BLOCKED_MIME_TYPES.contains(detectedMimeType)) {
-            log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", LogSanitizer.sanitize(filename), LogSanitizer.sanitize(detectedMimeType));
+            log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", safeFilename, safeMimeType);
             throw new SecurityException("File type not allowed: " + detectedMimeType + ". Executable and script files are blocked.");
         }
         if (this.hasExecutableMagic(bytes)) {
-            log.error("SECURITY: Blocked executable magic bytes. File: {}", LogSanitizer.sanitize(filename));
+            log.error("SECURITY: Blocked executable magic bytes. File: {}", safeFilename);
             throw new SecurityException("File content appears to be an executable and is not allowed: " + filename);
         }
         String extension = this.getExtension(filename).toLowerCase();
-        if ("pdf".equals(extension) && !"application/pdf".equals(detectedMimeType)) {
-            log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", LogSanitizer.sanitize(detectedMimeType), LogSanitizer.sanitize(filename));
+        if ("pdf".equals(extension) && !PDF_MIME_TYPE.equals(detectedMimeType)) {
+            log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", safeMimeType, safeFilename);
         }
         // Fix #4: Block content-type/extension mismatch — PDF content with non-PDF extension
-        if ("application/pdf".equals(detectedMimeType) && !"pdf".equals(extension)) {
-            log.error("SECURITY: PDF content disguised as .{} file: {}", LogSanitizer.sanitize(extension), LogSanitizer.sanitize(filename));
+        if (PDF_MIME_TYPE.equals(detectedMimeType) && !"pdf".equals(extension)) {
+            log.error("SECURITY: PDF content disguised as .{} file: {}", LogSanitizer.sanitize(extension), safeFilename);
             throw new SecurityException("Content type mismatch: file contains PDF data but has ." + extension + " extension.");
         }
         if (Set.of("exe", "dll", "bat", "sh", "cmd", "ps1", "jar").contains(extension)) {
-            log.error("SECURITY: Executable extension blocked: {}", LogSanitizer.sanitize(filename));
+            log.error("SECURITY: Executable extension blocked: {}", safeFilename);
             throw new SecurityException("Executable files are not allowed: " + filename);
         }
     }

@@ -25,7 +25,10 @@ import org.springframework.stereotype.Service;
 public class PromptGuardrailService {
     private static final Logger log = LoggerFactory.getLogger(PromptGuardrailService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final List<String> VALID_CLASSIFICATIONS = List.of("SAFE", "SUSPICIOUS", "MALICIOUS");
+    private static final String CLASSIFICATION_SAFE = "SAFE";
+    private static final String CLASSIFICATION_SUSPICIOUS = "SUSPICIOUS";
+    private static final String CLASSIFICATION_MALICIOUS = "MALICIOUS";
+    private static final List<String> VALID_CLASSIFICATIONS = List.of(CLASSIFICATION_SAFE, CLASSIFICATION_SUSPICIOUS, CLASSIFICATION_MALICIOUS);
     private final ChatClient chatClient;
     @Value("${app.guardrails.enabled:true}")
     private boolean enabled;
@@ -95,7 +98,7 @@ public class PromptGuardrailService {
         String normalized = Normalizer.normalize(query, Normalizer.Form.NFKC);
         for (Pattern pattern : PromptInjectionPatterns.getPatterns()) {
             if (pattern.matcher(normalized).find()) {
-                return GuardrailResult.blocked("Query matches known injection pattern", "MALICIOUS", 0.95, Map.of("layer", "pattern", "pattern", pattern.pattern()));
+                return GuardrailResult.blocked("Query matches known injection pattern", CLASSIFICATION_MALICIOUS, 0.95, Map.of("layer", "pattern", "pattern", pattern.pattern()));
             }
         }
         return GuardrailResult.safe();
@@ -104,16 +107,16 @@ public class PromptGuardrailService {
     private GuardrailResult checkSemantics(String normalizedQuery) {
         for (String keyword : DANGEROUS_KEYWORDS) {
             if (!normalizedQuery.contains(keyword)) continue;
-            return GuardrailResult.blocked("Query contains dangerous keyword: " + keyword, "SUSPICIOUS", 0.8, Map.of("layer", "semantic", "keyword", keyword));
+            return GuardrailResult.blocked("Query contains dangerous keyword: " + keyword, CLASSIFICATION_SUSPICIOUS, 0.8, Map.of("layer", "semantic", "keyword", keyword));
         }
         if (this.strictMode) {
             for (String phrase : SUSPICIOUS_PHRASES) {
                 if (!normalizedQuery.contains(phrase)) continue;
-                return GuardrailResult.blocked("Query contains suspicious phrase: " + phrase, "SUSPICIOUS", 0.6, Map.of("layer", "semantic", "phrase", phrase, "strictMode", true));
+                return GuardrailResult.blocked("Query contains suspicious phrase: " + phrase, CLASSIFICATION_SUSPICIOUS, 0.6, Map.of("layer", "semantic", "phrase", phrase, "strictMode", true));
             }
         }
         if (this.hasEncodingAttackPatterns(normalizedQuery)) {
-            return GuardrailResult.blocked("Query contains suspicious encoding patterns", "SUSPICIOUS", 0.7, Map.of("layer", "semantic", "type", "encoding_attack"));
+            return GuardrailResult.blocked("Query contains suspicious encoding patterns", CLASSIFICATION_SUSPICIOUS, 0.7, Map.of("layer", "semantic", "type", "encoding_attack"));
         }
         return GuardrailResult.safe();
     }
@@ -157,11 +160,11 @@ public class PromptGuardrailService {
             // Parse classification from response using safe extraction (no .contains() anti-pattern)
             String classification = extractClassification(response);
             log.debug("LLM guardrail raw='{}', parsed='{}'", response, classification);
-            if ("MALICIOUS".equals(classification)) {
-                return GuardrailResult.blocked("LLM classifier detected prompt injection", "MALICIOUS", 0.9, Map.of("layer", "llm", "llmResponse", response));
+            if (CLASSIFICATION_MALICIOUS.equals(classification)) {
+                return GuardrailResult.blocked("LLM classifier detected prompt injection", CLASSIFICATION_MALICIOUS, 0.9, Map.of("layer", "llm", "llmResponse", response));
             }
-            if ("SUSPICIOUS".equals(classification) && this.strictMode) {
-                return GuardrailResult.blocked("LLM classifier flagged query as suspicious (strict mode)", "SUSPICIOUS", 0.7, Map.of("layer", "llm", "llmResponse", response, "strictMode", true));
+            if (CLASSIFICATION_SUSPICIOUS.equals(classification) && this.strictMode) {
+                return GuardrailResult.blocked("LLM classifier flagged query as suspicious (strict mode)", CLASSIFICATION_SUSPICIOUS, 0.7, Map.of("layer", "llm", "llmResponse", response, "strictMode", true));
             }
             return GuardrailResult.safe();
         }
@@ -197,7 +200,7 @@ public class PromptGuardrailService {
      */
     static String extractClassification(String response) {
         if (response == null || response.isBlank()) {
-            return "SAFE";
+            return CLASSIFICATION_SAFE;
         }
         String trimmed = response.trim();
 
@@ -230,7 +233,7 @@ public class PromptGuardrailService {
             log.warn("LLM guardrail returned unrecognized response (defaulting to SAFE): {}",
                 trimmed.length() > 100 ? trimmed.substring(0, 100) + "..." : trimmed);
         }
-        return "SAFE";
+        return CLASSIFICATION_SAFE;
     }
 
     public boolean isPromptInjection(String query) {
