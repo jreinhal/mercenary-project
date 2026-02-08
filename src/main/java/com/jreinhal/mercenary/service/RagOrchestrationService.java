@@ -926,7 +926,6 @@ public class RagOrchestrationService {
                     List<String> responseSources = sources;
                     this.conversationMemoryService.saveAssistantMessage(user.getId(), effectiveSessionId, response, responseSources);
                     this.sessionPersistenceService.incrementMessageCount(effectiveSessionId);
-                    this.sessionPersistenceService.incrementMessageCount(effectiveSessionId);
                     if (completedTrace != null) {
                         this.sessionPersistenceService.persistTrace(completedTrace, effectiveSessionId);
                     }

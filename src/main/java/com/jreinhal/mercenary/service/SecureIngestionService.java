@@ -109,7 +109,7 @@ public class SecureIngestionService {
                 return;
             }
             InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(fileBytes));
-            if (detectedMimeType.equals("application/pdf")) {
+            if ("application/pdf".equals(detectedMimeType)) {
                 log.info(">> DETECTED PDF: Engaging Optical Character Recognition / PDF Stream...");
                 PagePdfDocumentReader pdfReader = new PagePdfDocumentReader((Resource)resource);
                 rawDocuments = pdfReader.get();
@@ -248,11 +248,11 @@ public class SecureIngestionService {
             throw new SecurityException("File content appears to be an executable and is not allowed: " + filename);
         }
         String extension = this.getExtension(filename).toLowerCase();
-        if (extension.equals("pdf") && !detectedMimeType.equals("application/pdf")) {
+        if ("pdf".equals(extension) && !"application/pdf".equals(detectedMimeType)) {
             log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", detectedMimeType, filename);
         }
         // Fix #4: Block content-type/extension mismatch — PDF content with non-PDF extension
-        if (detectedMimeType.equals("application/pdf") && !extension.equals("pdf")) {
+        if ("application/pdf".equals(detectedMimeType) && !"pdf".equals(extension)) {
             log.error("SECURITY: PDF content disguised as .{} file: {}", extension, filename);
             throw new SecurityException("Content type mismatch: file contains PDF data but has ." + extension + " extension.");
         }

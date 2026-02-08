@@ -219,8 +219,9 @@ public class PromptGuardrailService {
 
         // Strategy 2: First-word extraction (avoids .contains() anti-pattern)
         String upper = trimmed.toUpperCase(Locale.ROOT);
-        String firstWord = upper.split("[\\s,.:;!?{}\"]+")[0];
-        if (VALID_CLASSIFICATIONS.contains(firstWord)) {
+        String[] tokens = upper.split("[\\s,.:;!?{}\"]+");
+        String firstWord = tokens.length > 0 ? tokens[0] : "";
+        if (!firstWord.isEmpty() && VALID_CLASSIFICATIONS.contains(firstWord)) {
             return firstWord;
         }
 

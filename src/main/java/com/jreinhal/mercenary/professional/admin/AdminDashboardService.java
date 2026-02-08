@@ -153,8 +153,7 @@ public class AdminDashboardService {
     }
 
     public HealthStatus getHealthStatus() {
-        long memoryMax;
-        ArrayList<String> warnings = new ArrayList<String>();
+        List<String> warnings = new ArrayList<>();
         boolean mongoConnected = this.checkMongoConnection();
         if (!mongoConnected) {
             warnings.add("MongoDB connection failed");
@@ -165,7 +164,8 @@ public class AdminDashboardService {
         }
         Runtime runtime = Runtime.getRuntime();
         long memoryUsed = (runtime.totalMemory() - runtime.freeMemory()) / 0x100000L;
-        if ((double)memoryUsed > (double)(memoryMax = runtime.maxMemory() / 0x100000L) * 0.9) {
+        long memoryMax = runtime.maxMemory() / 0x100000L;
+        if ((double) memoryUsed > (double) memoryMax * 0.9) {
             warnings.add("Memory usage above 90%");
         }
         double cpuUsage = this.getSystemCpuLoad();
@@ -202,14 +202,20 @@ public class AdminDashboardService {
     private double getSystemCpuLoad() {
         try {
             OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
-            double load = osBean.getSystemLoadAverage();
-            if (load < 0) {
-                // getSystemLoadAverage() returns -1 on Windows; fall back to available processors ratio
-                int processors = osBean.getAvailableProcessors();
-                return Math.min(1.0, Runtime.getRuntime().availableProcessors() > 0 ? 0.0 : 0.0);
+            // Try com.sun.management API for accurate CPU load (works on Windows)
+            if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOsBean) {
+                double cpuLoad = sunOsBean.getCpuLoad();
+                if (cpuLoad >= 0.0) {
+                    return Math.min(1.0, cpuLoad);
+                }
             }
-            int processors = osBean.getAvailableProcessors();
-            return Math.min(1.0, load / Math.max(1, processors));
+            // Fallback: getSystemLoadAverage (returns -1 on Windows)
+            double load = osBean.getSystemLoadAverage();
+            if (load >= 0) {
+                int processors = osBean.getAvailableProcessors();
+                return Math.min(1.0, load / Math.max(1, processors));
+            }
+            return 0.0;
         } catch (Exception e) {
             return 0.0;
         }
@@ -247,7 +253,7 @@ public class AdminDashboardService {
                     Aggregation.group(field).count().as("count")
             );
             AggregationResults<Document> results = this.mongoTemplate.aggregate(agg, collection, Document.class);
-            LinkedHashMap<String, Long> map = new LinkedHashMap<>();
+            Map<String, Long> map = new LinkedHashMap<>();
             for (Document doc : results.getMappedResults()) {
                 String key = doc.getString("_id");
                 if (key != null && !key.isEmpty()) {
