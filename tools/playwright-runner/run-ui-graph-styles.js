@@ -49,15 +49,15 @@ const EXPECTED_DARK_CSS = {
   '--accent-glow': true,                          // Must exist (new variable)
   '--accent-border': true,                        // Must exist (new variable)
   '--accent-emphasis': true,                      // Must exist (new variable)
-  '--graph-center-node': '#2dd4bf',               // Teal
-  '--graph-source-node': '#7dd3fc',               // Light sky blue
-  '--graph-entity-node': '#38bdf8',               // Bright cyan
+  '--graph-center-node': '#475569',               // Slate steel - command node
+  '--graph-source-node': '#4a7c59',               // Muted olive-sage - source docs
+  '--graph-entity-node': '#92754c',               // Dim amber-tan - entities
 };
 
 const EXPECTED_LIGHT_CSS = {
-  '--graph-center-node': '#009e73',               // Teal-green
-  '--graph-source-node': '#56b4e9',               // Sky blue
-  '--graph-entity-node': '#0072b2',               // Blue
+  '--graph-center-node': '#64748b',               // Slate steel - command node
+  '--graph-source-node': '#6b9e7a',               // Muted olive-sage - source docs
+  '--graph-entity-node': '#b8976a',               // Dim amber-tan - entities
 };
 
 // Unified entity type colors (Okabe-Ito, single source of truth)

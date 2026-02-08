@@ -54,7 +54,7 @@
             --classification-top-secret: #991b1b;    /* Dark Red */
 
             /* Focus indicator (508 requirement) */
-            --focus-ring: #1f4e79;       /* Matches primary */
+            --focus-ring: #1f4e79;       /* Dedicated focus color (distinct from accent primary) */
             --focus-ring-offset: 2px;
 
             /* Shadows (Kotaemon-style soft, diffuse elevation) */

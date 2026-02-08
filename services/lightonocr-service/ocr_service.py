@@ -16,6 +16,7 @@ Endpoints:
 import base64
 import io
 import logging
+import os
 from typing import Optional
 from contextlib import asynccontextmanager
 
@@ -170,7 +171,7 @@ app = FastAPI(
 # CORS for browser-based clients
 # When credentials are needed, explicit origins are required (CORS spec forbids * with credentials)
 _cors_origins = os.getenv("CORS_ORIGINS", "").strip()
-_allowed_origins = [o.strip() for o in _cors_origins.split(",") if o.strip()] if _cors_origins else []
+_allowed_origins = [o.strip() for o in _cors_origins.split(",") if o.strip() and o.strip() != "*"] if _cors_origins else []
 
 app.add_middleware(
     CORSMiddleware,
