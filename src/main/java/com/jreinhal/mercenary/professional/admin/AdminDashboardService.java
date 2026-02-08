@@ -194,7 +194,9 @@ public class AdminDashboardService {
             conn.disconnect();
             return status == 200;
         } catch (Exception e) {
-            log.warn("Ollama health check failed: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Ollama health check failed: {}", e.getMessage());
+            }
             return false;
         }
     }
@@ -263,7 +265,9 @@ public class AdminDashboardService {
             }
             return map;
         } catch (Exception e) {
-            log.warn("Aggregation on {}.{} failed: {}", collection, field, e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Aggregation on {}.{} failed: {}", collection, field, e.getMessage());
+            }
             return Map.of();
         }
     }

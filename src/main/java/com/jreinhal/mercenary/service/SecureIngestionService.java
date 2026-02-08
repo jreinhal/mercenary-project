@@ -63,11 +63,11 @@ public class SecureIngestionService {
         "application/vnd.rar", "application/x-tar", "application/gzip",
         "application/x-bzip2", "application/x-xz"
     );
-    @Value(value="${sentinel.miarag.min-chunks-for-mindscape:10}")
+    @Value("${sentinel.miarag.min-chunks-for-mindscape:10}")
     private int minChunksForMindscape;
-    @Value(value="${sentinel.megarag.extract-images-from-pdf:true}")
+    @Value("${sentinel.megarag.extract-images-from-pdf:true}")
     private boolean extractImagesFromPdf;
-    @Value(value="${sentinel.ocr.fallback-for-scanned-pdf:true}")
+    @Value("${sentinel.ocr.fallback-for-scanned-pdf:true}")
     private boolean ocrFallbackForScannedPdf;
 
     public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {

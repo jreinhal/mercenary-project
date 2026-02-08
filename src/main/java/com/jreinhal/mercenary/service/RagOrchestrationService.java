@@ -541,7 +541,6 @@ public class RagOrchestrationService {
         // Fix #3: Redact PII from user query BEFORE any pipeline processing.
         query = this.piiRedactionService.redact(query, hipaaStrict ? Boolean.TRUE : null).getRedactedContent();
         String effectiveSessionId = sessionId;
-        String effectiveQuery = query;
         if (sessionId != null && !sessionId.isBlank()) {
             try {
                 if (!this.hipaaPolicy.shouldDisableSessionMemory(department)
@@ -551,7 +550,7 @@ public class RagOrchestrationService {
                     this.conversationMemoryService.saveUserMessage(user.getId(), sessionId, query);
                     if (this.conversationMemoryService.isFollowUp(query)) {
                         ConversationMemoryProvider.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
-                        effectiveQuery = this.conversationMemoryService.expandFollowUp(query, context);
+                        query = this.conversationMemoryService.expandFollowUp(query, context);
                         log.debug("Expanded follow-up query for session {}", sessionId);
                     }
                 } else if (this.conversationMemoryService == null || this.sessionPersistenceService == null) {
@@ -930,7 +929,9 @@ public class RagOrchestrationService {
                         this.sessionPersistenceService.persistTrace(completedTrace, effectiveSessionId);
                     }
                 } catch (Exception memEx) {
-                    log.warn("Session persistence failed (non-fatal): {}", memEx.getMessage());
+                    if (log.isWarnEnabled()) {
+                        log.warn("Session persistence failed (non-fatal): {}", memEx.getMessage());
+                    }
                 }
             }
             return new EnhancedAskResponse(response, completedTrace != null ? completedTrace.getStepsAsMaps() : List.of(), sources, metrics, completedTrace != null ? completedTrace.getTraceId() : null);

@@ -27,21 +27,21 @@ public class PromptGuardrailService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final List<String> VALID_CLASSIFICATIONS = List.of("SAFE", "SUSPICIOUS", "MALICIOUS");
     private final ChatClient chatClient;
-    @Value(value="${app.guardrails.enabled:true}")
+    @Value("${app.guardrails.enabled:true}")
     private boolean enabled;
-    @Value(value="${app.guardrails.llm-enabled:false}")
+    @Value("${app.guardrails.llm-enabled:false}")
     private boolean llmEnabled;
-    @Value(value="${app.guardrails.strict-mode:false}")
+    @Value("${app.guardrails.strict-mode:false}")
     private boolean strictMode;
-    @Value(value="${app.guardrails.llm-timeout-ms:3000}")
+    @Value("${app.guardrails.llm-timeout-ms:3000}")
     private long llmTimeoutMs;
-    @Value(value="${app.guardrails.llm-circuit-breaker.enabled:true}")
+    @Value("${app.guardrails.llm-circuit-breaker.enabled:true}")
     private boolean llmCircuitBreakerEnabled;
-    @Value(value="${app.guardrails.llm-circuit-breaker.failure-threshold:3}")
+    @Value("${app.guardrails.llm-circuit-breaker.failure-threshold:3}")
     private int llmCircuitBreakerFailureThreshold;
-    @Value(value="${app.guardrails.llm-circuit-breaker.open-seconds:30}")
+    @Value("${app.guardrails.llm-circuit-breaker.open-seconds:30}")
     private long llmCircuitBreakerOpenSeconds;
-    @Value(value="${app.guardrails.llm-circuit-breaker.half-open-max-calls:1}")
+    @Value("${app.guardrails.llm-circuit-breaker.half-open-max-calls:1}")
     private int llmCircuitBreakerHalfOpenCalls;
     private SimpleCircuitBreaker llmCircuitBreaker;
     private static final List<String> DANGEROUS_KEYWORDS = List.of("jailbreak", "bypass", "override", "injection", "exploit", "sudo", "admin mode", "god mode", "unrestricted", "ignore safety", "disable filters", "no limits");
@@ -226,8 +226,10 @@ public class PromptGuardrailService {
         }
 
         // Strategy 3: Unrecognized response — default to SAFE and log warning
-        log.warn("LLM guardrail returned unrecognized response (defaulting to SAFE): {}",
-            trimmed.length() > 100 ? trimmed.substring(0, 100) + "..." : trimmed);
+        if (log.isWarnEnabled()) {
+            log.warn("LLM guardrail returned unrecognized response (defaulting to SAFE): {}",
+                trimmed.length() > 100 ? trimmed.substring(0, 100) + "..." : trimmed);
+        }
         return "SAFE";
     }
 
