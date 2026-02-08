@@ -3571,30 +3571,42 @@
             if (!tooltip) {
                 tooltip = document.createElement('div');
                 tooltip.id = 'entity-graph-tooltip';
+                tooltip.classList.add('entity-graph-tooltip');
                 tooltip.style.cssText = `
                     position: fixed;
-                    background: rgba(30,41,59,0.95);
                     padding: 10px 14px;
                     border-radius: 6px;
-                    border: 1px solid rgba(100,116,139,0.3);
                     font-size: 12px;
-                    color: #e2e8f0;
                     pointer-events: none;
                     opacity: 0;
                     transition: opacity 0.15s ease;
                     z-index: 1000;
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
                     max-width: 220px;
                     font-family: var(--font-mono, monospace);
                 `;
                 document.body.appendChild(tooltip);
             }
+            // Update theme-dependent styles each time (handles live theme switch)
+            const light = document.documentElement.getAttribute('data-theme') !== 'dark';
+            tooltip.style.background = light ? 'rgba(255,255,255,0.97)' : 'rgba(30,41,59,0.95)';
+            tooltip.style.color = light ? '#1e293b' : '#e2e8f0';
+            tooltip.style.border = light ? '1px solid rgba(71,85,105,0.2)' : '1px solid rgba(100,116,139,0.3)';
+            tooltip.style.boxShadow = light ? '0 4px 16px rgba(0,0,0,0.1)' : '0 4px 16px rgba(0,0,0,0.3)';
             return tooltip;
         }
 
         // Show tooltip with entity info
         function showEntityTooltip(node, x, y) {
             const tooltip = getEntityTooltip();
+            const light = document.documentElement.getAttribute('data-theme') !== 'dark';
+            // Theme-aware inline colors
+            const ttTitle = light ? '#0f172a' : '#f1f5f9';
+            const ttMuted = light ? '#475569' : '#94a3b8';
+            const ttValue = light ? '#1e293b' : '#e2e8f0';
+            const ttDim = light ? '#64748b' : '#64748b';
+            const ttBorder = light ? 'rgba(71,85,105,0.15)' : 'rgba(100,116,139,0.3)';
+            const ttBorderLight = light ? 'rgba(71,85,105,0.1)' : 'rgba(100,116,139,0.2)';
+
             // Count connections for this node
             const activeState = getActiveEntityGraphState();
             const connections = (activeState.edges || []).filter(edge =>
@@ -3612,37 +3624,37 @@
             });
 
             const relationsHtml = connectedRelations.size > 0
-                ? `<div style="color: #94a3b8; font-size: 11px; display: flex; justify-content: space-between; gap: 8px;">
-                        <span>Relations:</span><span style="color: #e2e8f0; font-weight: 500;">${[...connectedRelations].slice(0, 3).join(', ')}</span>
+                ? `<div style="color: ${ttMuted}; font-size: 11px; display: flex; justify-content: space-between; gap: 8px;">
+                        <span>Relations:</span><span style="color: ${ttValue}; font-weight: 500;">${[...connectedRelations].slice(0, 3).join(', ')}</span>
                    </div>` : '';
 
             const sourceHtml = connectedSources.size > 0
-                ? `<div style="border-top: 1px solid rgba(100,116,139,0.2); padding-top: 5px; margin-top: 5px;">
-                        <div style="color: #64748b; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Sources</div>
+                ? `<div style="border-top: 1px solid ${ttBorderLight}; padding-top: 5px; margin-top: 5px;">
+                        <div style="color: ${ttDim}; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Sources</div>
                         ${[...connectedSources].slice(0, 3).map(s => {
                             const name = s.split('/').pop().split('\\\\').pop();
-                            return `<div style="color: #94a3b8; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(name)}</div>`;
+                            return `<div style="color: ${ttMuted}; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(name)}</div>`;
                         }).join('')}
-                        ${connectedSources.size > 3 ? `<div style="color: #64748b; font-size: 10px;">+${connectedSources.size - 3} more</div>` : ''}
+                        ${connectedSources.size > 3 ? `<div style="color: ${ttDim}; font-size: 10px;">+${connectedSources.size - 3} more</div>` : ''}
                    </div>` : '';
 
             tooltip.innerHTML = `
-                <div style="font-weight: 600; margin-bottom: 6px; color: #f1f5f9; font-size: 13px;">${escapeHtml(node.name)}</div>
+                <div style="font-weight: 600; margin-bottom: 6px; color: ${ttTitle}; font-size: 13px;">${escapeHtml(node.name)}</div>
                 <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
                     <span style="width: 8px; height: 8px; border-radius: 50%; background: ${node.color};"></span>
-                    <span style="color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">${node.type}</span>
+                    <span style="color: ${ttMuted}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">${node.type}</span>
                 </div>
-                <div style="border-top: 1px solid rgba(100,116,139,0.3); padding-top: 6px; margin-top: 4px;">
-                    <div style="color: #94a3b8; font-size: 11px; display: flex; justify-content: space-between;">
-                        <span>Mentions:</span><span style="color: #e2e8f0; font-weight: 500;">${node.val}</span>
+                <div style="border-top: 1px solid ${ttBorder}; padding-top: 6px; margin-top: 4px;">
+                    <div style="color: ${ttMuted}; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Mentions:</span><span style="color: ${ttValue}; font-weight: 500;">${node.val}</span>
                     </div>
-                    <div style="color: #94a3b8; font-size: 11px; display: flex; justify-content: space-between;">
-                        <span>Connections:</span><span style="color: #e2e8f0; font-weight: 500;">${connections}</span>
+                    <div style="color: ${ttMuted}; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Connections:</span><span style="color: ${ttValue}; font-weight: 500;">${connections}</span>
                     </div>
                     ${relationsHtml}
                 </div>
                 ${sourceHtml}
-                <div style="color: #64748b; font-size: 10px; margin-top: 6px; font-style: italic;">Click to explore relationships</div>
+                <div style="color: ${ttDim}; font-size: 10px; margin-top: 6px; font-style: italic;">Click to explore relationships</div>
             `;
             // Position tooltip, then clamp to viewport
             tooltip.style.opacity = '0';
@@ -3680,10 +3692,18 @@
         }
 
         // Cleanup existing graph instance
+        // ResizeObserver instance for entity graph (stored for cleanup)
+        let entityGraphResizeObs = null;
+
         function cleanupEntityGraph() {
             if (entity2DGraph) {
                 entity2DGraph._destructor && entity2DGraph._destructor();
                 entity2DGraph = null;
+            }
+            // Disconnect resize observer
+            if (entityGraphResizeObs) {
+                entityGraphResizeObs.disconnect();
+                entityGraphResizeObs = null;
             }
             // Expose for QA automation (Playwright) and debugging; cleared on teardown.
             // Playwright's evaluate context can't reliably read top-level `let` bindings.
@@ -3739,8 +3759,9 @@
             cleanupEntityGraph();
             clearEntityGraphSurface(graphEl);
 
-            const width = graphEl.offsetWidth || 400;
-            const height = graphEl.offsetHeight || 350;
+            // Read dimensions — clientWidth is more reliable than offsetWidth after tab switches
+            let width = graphEl.clientWidth || graphEl.offsetWidth || 400;
+            let height = graphEl.clientHeight || graphEl.offsetHeight || 350;
 
             // Track mouse for tooltip - use document-level listener to capture all movements
             // Store in graphEl dataset to avoid memory leak from multiple listeners
@@ -3809,6 +3830,37 @@
                 node.color = entityColors[nodeType] || entityColors.DEFAULT;
             });
 
+            // Theme-aware canvas color helper (reads live from DOM)
+            function isLightTheme() {
+                return document.documentElement.getAttribute('data-theme') !== 'dark';
+            }
+
+            // Convert hex color to perceived luminance (0-1).
+            // Colors with high luminance (yellow, cyan) need darkening in light mode.
+            function hexLuminance(hex) {
+                const c = hex.replace('#', '');
+                const r = parseInt(c.substring(0, 2), 16) / 255;
+                const g = parseInt(c.substring(2, 4), 16) / 255;
+                const b = parseInt(c.substring(4, 6), 16) / 255;
+                return 0.299 * r + 0.587 * g + 0.114 * b;
+            }
+
+            // Return a link color with adequate contrast for the current theme.
+            // Light mode: all links use a neutral dark slate for consistent,
+            // readable edges against the light canvas background.
+            // Dark mode: tint links with the source node color at given opacity.
+            function linkColorForTheme(nodeColor, opacity) {
+                if (isLightTheme()) {
+                    return `rgba(71,85,105,${opacity})`;
+                }
+                // Dark mode: tint with source color
+                if (!nodeColor || !nodeColor.startsWith('#')) {
+                    return `rgba(100,116,139,${opacity})`;
+                }
+                const hexOpacity = Math.round(opacity * 255).toString(16).padStart(2, '0');
+                return nodeColor + hexOpacity;
+            }
+
             entity2DGraph = ForceGraph()(graphEl)
                 .width(width)
                 .height(height)
@@ -3820,7 +3872,8 @@
                 .maxZoom(5)
                 .nodeColor(node => {
                     if (highlightNodes.size > 0) {
-                        return highlightNodes.has(node) ? node.color : 'rgba(100,116,139,0.15)';
+                        return highlightNodes.has(node) ? node.color
+                            : (isLightTheme() ? 'rgba(100,116,139,0.25)' : 'rgba(100,116,139,0.15)');
                     }
                     return node.color;
                 })
@@ -3863,7 +3916,7 @@
                     const zoomLevel = globalScale;
                     const showLabel = zoomLevel > 0.5;  // Hide labels when zoomed out
                     const fontSize = Math.max(9, Math.min(12, 9 / Math.sqrt(zoomLevel)));
-                    const maxChars = zoomLevel > 1.5 ? 20 : (zoomLevel > 0.8 ? 14 : 10);
+                    const maxChars = zoomLevel > 3 ? 60 : (zoomLevel > 1.5 ? 30 : (zoomLevel > 0.8 ? 14 : 10));
                     const label = node.name.length > maxChars ? node.name.substring(0, maxChars) + '…' : node.name;
 
                     // Draw rounded square node with subtle depth shadow - KeyLines style
@@ -3888,7 +3941,9 @@
                     // Fill with gradient for subtle 3D effect
                     const fillOpacity = 1 - (dimAmount * 0.7);
                     if (dimAmount > 0.1) {
-                        ctx.fillStyle = `rgba(40,50,60,${0.3 + dimAmount * 0.2})`;
+                        ctx.fillStyle = isLightTheme()
+                            ? `rgba(200,205,215,${0.3 + dimAmount * 0.2})`
+                            : `rgba(40,50,60,${0.3 + dimAmount * 0.2})`;
                     } else {
                         // Create subtle gradient for depth
                         const gradient = ctx.createLinearGradient(
@@ -3907,14 +3962,16 @@
                     // Subtle inner highlight (top edge)
                     ctx.beginPath();
                     ctx.roundRect(node.x - nodeSize/2 + 2, node.y - nodeSize/2 + 2, nodeSize - 4, nodeSize/3, [cornerRadius - 2, cornerRadius - 2, 0, 0]);
-                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.fillStyle = isLightTheme() ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)';
                     ctx.fill();
 
                     // Border with animated intensity
                     ctx.beginPath();
                     ctx.roundRect(node.x - nodeSize/2, node.y - nodeSize/2, nodeSize, nodeSize, cornerRadius);
                     const borderOpacity = 0.2 + (highlightIntensity * 0.7);
-                    ctx.strokeStyle = `rgba(255,255,255,${borderOpacity})`;
+                    ctx.strokeStyle = isLightTheme()
+                        ? `rgba(15,23,42,${borderOpacity * 0.4})`
+                        : `rgba(255,255,255,${borderOpacity})`;
                     ctx.lineWidth = 1 + (highlightIntensity * 1.5);
                     ctx.stroke();
 
@@ -4084,9 +4141,15 @@
                         // Clean text rendering with subtle shadow for readability — no background box
                         const labelTextOpacity = 0.9 - (dimAmount * 0.5);
                         ctx.save();
-                        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                        ctx.shadowBlur = 3;
-                        ctx.fillStyle = `rgba(226,232,240,${labelTextOpacity})`;
+                        if (isLightTheme()) {
+                            ctx.shadowColor = 'rgba(255,255,255,0.8)';
+                            ctx.shadowBlur = 3;
+                            ctx.fillStyle = `rgba(30,41,59,${labelTextOpacity})`;
+                        } else {
+                            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                            ctx.shadowBlur = 3;
+                            ctx.fillStyle = `rgba(226,232,240,${labelTextOpacity})`;
+                        }
                         ctx.fillText(label, labelX, labelY);
                         ctx.restore();
                     }
@@ -4103,20 +4166,21 @@
 
                     if (highlightLinks.size > 0) {
                         if (highlightLinks.has(link) && sourceNode) {
-                            return sourceNode.color + 'cc';  // 80% opacity
+                            return linkColorForTheme(sourceNode.color, 0.8);
                         }
-                        return 'rgba(70,80,90,0.06)';  // Faded but not invisible
+                        return isLightTheme() ? 'rgba(70,80,90,0.1)' : 'rgba(70,80,90,0.06)';
                     }
                     // Default: visible source color tint
                     if (sourceNode) {
-                        return sourceNode.color + '35';  // 21% opacity - visible
+                        return linkColorForTheme(sourceNode.color, isLightTheme() ? 0.38 : 0.21);
                     }
-                    return 'rgba(100,116,139,0.15)';
+                    return linkColorForTheme(null, isLightTheme() ? 0.3 : 0.15);
                 })
                 .linkWidth(link => {
                     const w = link.weight || 1;
                     if (highlightLinks.has(link)) return 1.5 + Math.min(w * 0.5, 2);
-                    return 0.6 + Math.min(w * 0.3, 1);
+                    const base = isLightTheme() ? 1.0 : 0.6;
+                    return base + Math.min(w * 0.3, 1);
                 })
                 .linkDirectionalArrowLength(link => highlightLinks.has(link) ? 4 : 0)
                 .linkDirectionalArrowRelPos(1)
@@ -4163,7 +4227,9 @@
 
                     // Background pill
                     ctx.globalAlpha = labelOpacity;
-                    ctx.fillStyle = isHighlighted ? 'rgba(15,23,42,0.92)' : 'rgba(15,23,42,0.75)';
+                    ctx.fillStyle = isLightTheme()
+                        ? (isHighlighted ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.85)')
+                        : (isHighlighted ? 'rgba(15,23,42,0.92)' : 'rgba(15,23,42,0.75)');
                     ctx.beginPath();
                     ctx.roundRect(-textWidth/2 - padding, -fontSize/2 - 2, textWidth + padding*2, fontSize + 4, 3);
                     ctx.fill();
@@ -4179,7 +4245,9 @@
                     // Text
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillStyle = isHighlighted ? 'rgba(226,232,240,0.95)' : 'rgba(203,213,225,0.8)';
+                    ctx.fillStyle = isLightTheme()
+                        ? (isHighlighted ? 'rgba(30,41,59,0.95)' : 'rgba(51,65,85,0.8)')
+                        : (isHighlighted ? 'rgba(226,232,240,0.95)' : 'rgba(203,213,225,0.8)');
                     ctx.fillText(labelText, 0, 0);
 
                     ctx.globalAlpha = 1;
@@ -4363,13 +4431,19 @@
                 });
             });
 
-            window.addEventListener('resize', () => {
+            // ResizeObserver: automatically resize graph when container dimensions change
+            // (covers window resize, tab switches, panel collapse/expand, sidebar toggle)
+            entityGraphResizeObs = new ResizeObserver(entries => {
                 if (!entity2DGraph) return;
-                const container = document.getElementById('entity-graph');
-                if (!container) return;
-                entity2DGraph.width(container.clientWidth);
-                entity2DGraph.height(container.clientHeight);
+                for (const entry of entries) {
+                    const { width: w, height: h } = entry.contentRect;
+                    if (w > 0 && h > 0) {
+                        entity2DGraph.width(w);
+                        entity2DGraph.height(h);
+                    }
+                }
             });
+            entityGraphResizeObs.observe(graphEl);
         });
 
         // Update graph data without full re-render
@@ -5261,7 +5335,8 @@
             const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             gridGroup.setAttribute('class', 'graph-radial-grid');
             gridGroup.setAttribute('aria-hidden', 'true');
-            const gridStroke = 'rgba(100,116,139,0.08)';
+            const computedStyle = getComputedStyle(document.documentElement);
+            const gridStroke = computedStyle.getPropertyValue('--graph-grid-line').trim() || 'rgba(100,116,139,0.08)';
             const gridStrokeWidth = '0.5';
             const gridDash = '0.8 1.2';
             // Concentric range rings
@@ -5289,7 +5364,7 @@
                     tick.setAttribute('y1', isHoriz ? cy - tickLen : cy);
                     tick.setAttribute('x2', isHoriz ? cx : cx + tickLen);
                     tick.setAttribute('y2', isHoriz ? cy + tickLen : cy);
-                    tick.setAttribute('stroke', 'rgba(100,116,139,0.15)');
+                    tick.setAttribute('stroke', computedStyle.getPropertyValue('--graph-grid-tick').trim() || 'rgba(100,116,139,0.15)');
                     tick.setAttribute('stroke-width', '0.3');
                     gridGroup.appendChild(tick);
                 });
@@ -5308,16 +5383,16 @@
             arrowMarker.setAttribute('orient', 'auto-start-reverse');
             const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             arrowPath.setAttribute('d', 'M 0 0.5 L 10 4 L 0 7.5 Z');
-            arrowPath.setAttribute('fill', 'rgba(148,163,184,0.45)');
+            arrowPath.setAttribute('fill', computedStyle.getPropertyValue('--graph-arrow-default').trim() || 'rgba(148,163,184,0.45)');
             arrowMarker.appendChild(arrowPath);
             defs.appendChild(arrowMarker);
 
             // Confidence-colored arrow markers for source edges
             const confColors = {
-                high:   { fill: 'rgba(16,185,129,0.6)',  cls: 'high' },
-                medium: { fill: 'rgba(59,130,246,0.6)',  cls: 'medium' },
-                low:    { fill: 'rgba(245,158,11,0.6)',  cls: 'low' },
-                none:   { fill: 'rgba(148,163,184,0.45)', cls: 'none' }
+                high:   { fill: computedStyle.getPropertyValue('--graph-arrow-high').trim() || 'rgba(16,185,129,0.6)',  cls: 'high' },
+                medium: { fill: computedStyle.getPropertyValue('--graph-arrow-medium').trim() || 'rgba(59,130,246,0.6)',  cls: 'medium' },
+                low:    { fill: computedStyle.getPropertyValue('--graph-arrow-low').trim() || 'rgba(245,158,11,0.6)',  cls: 'low' },
+                none:   { fill: computedStyle.getPropertyValue('--graph-arrow-default').trim() || 'rgba(148,163,184,0.45)', cls: 'none' }
             };
             Object.entries(confColors).forEach(([key, { fill }]) => {
                 const m = arrowMarker.cloneNode(true);

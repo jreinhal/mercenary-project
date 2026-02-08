@@ -84,6 +84,18 @@
             --graph-panel-glow: var(--accent-subtle);
             --graph-node-shadow: rgba(15, 23, 42, 0.2);
             --graph-label-outline: rgba(255, 255, 255, 0.9);
+            --graph-canvas-bg: radial-gradient(ellipse at center, #e8ecf2 0%, #dde3ec 100%);
+            --graph-grid-line: rgba(71, 85, 105, 0.06);
+            --graph-grid-tick: rgba(71, 85, 105, 0.12);
+            --graph-container-border: rgba(71, 85, 105, 0.2);
+            --graph-container-inset: rgba(71, 85, 105, 0.04);
+            --graph-edge-conf-high: rgba(5, 150, 105, 0.55);
+            --graph-edge-conf-medium: rgba(37, 99, 235, 0.45);
+            --graph-edge-conf-low: rgba(217, 119, 6, 0.5);
+            --graph-arrow-default: rgba(71, 85, 105, 0.45);
+            --graph-arrow-high: rgba(5, 150, 105, 0.6);
+            --graph-arrow-medium: rgba(37, 99, 235, 0.6);
+            --graph-arrow-low: rgba(217, 119, 6, 0.6);
         }
 
         /* === DARK MODE === */
@@ -108,6 +120,18 @@
             --graph-panel-glow: rgba(148, 163, 184, 0.08);
             --graph-node-shadow: rgba(0, 0, 0, 0.6);
             --graph-label-outline: rgba(15, 23, 42, 0.9);
+            --graph-canvas-bg: radial-gradient(ellipse at center, rgba(15,23,42,0.95) 0%, rgba(2,6,23,1) 100%);
+            --graph-grid-line: rgba(100, 116, 139, 0.08);
+            --graph-grid-tick: rgba(100, 116, 139, 0.15);
+            --graph-container-border: rgba(51, 65, 85, 0.3);
+            --graph-container-inset: rgba(148, 163, 184, 0.05);
+            --graph-edge-conf-high: rgba(16, 185, 129, 0.5);
+            --graph-edge-conf-medium: rgba(59, 130, 246, 0.4);
+            --graph-edge-conf-low: rgba(245, 158, 11, 0.4);
+            --graph-arrow-default: rgba(148, 163, 184, 0.45);
+            --graph-arrow-high: rgba(16, 185, 129, 0.6);
+            --graph-arrow-medium: rgba(59, 130, 246, 0.6);
+            --graph-arrow-low: rgba(245, 158, 11, 0.6);
 
             /* Border Colors */
             --border-subtle: #2a3346;    /* Subtle dividers */
@@ -1220,23 +1244,23 @@
         /* Graph visualization - v11: CSP-safe SVG rendering */
         .graph-container {
             background:
-                linear-gradient(rgba(100,116,139,0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(100,116,139,0.04) 1px, transparent 1px),
-                radial-gradient(ellipse at center, rgba(15,23,42,0.95) 0%, rgba(2,6,23,1) 100%);
+                linear-gradient(var(--graph-grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--graph-grid-line) 1px, transparent 1px),
+                var(--graph-canvas-bg);
             background-size: 20px 20px, 20px 20px, 100% 100%;
-            border: 1px solid rgba(51,65,85,0.3);
+            border: 1px solid var(--graph-container-border);
             border-radius: var(--radius-md);
             min-height: 420px;
             height: clamp(420px, 60vh, 800px);
             position: relative;
             margin-bottom: 12px;
-            overflow: visible;
+            overflow: hidden;
             flex-shrink: 0;
             padding: 6px 10px 0 10px;
             transition: all 0.25s ease;
             display: flex;
             flex-direction: column;
-            box-shadow: inset 0 0 0 1px rgba(148,163,184,0.05);
+            box-shadow: inset 0 0 0 1px var(--graph-container-inset);
         }
 
         .graph-container.hidden {
@@ -1266,7 +1290,7 @@
         }
 
         .graph-edge {
-            stroke: rgba(148,163,184,0.25);
+            stroke: var(--graph-edge-primary);
             stroke-width: 1;
             stroke-linecap: round;
             vector-effect: non-scaling-stroke;
@@ -1277,17 +1301,17 @@
         }
 
         .graph-edge--conf-high {
-            stroke: rgba(16,185,129,0.5);
+            stroke: var(--graph-edge-conf-high);
             stroke-width: 1.5;
         }
 
         .graph-edge--conf-medium {
-            stroke: rgba(59,130,246,0.4);
+            stroke: var(--graph-edge-conf-medium);
             stroke-width: 1.2;
         }
 
         .graph-edge--conf-low {
-            stroke: rgba(245,158,11,0.4);
+            stroke: var(--graph-edge-conf-low);
             stroke-width: 1;
         }
 
@@ -1567,10 +1591,10 @@
             align-items: center;
             gap: 24px;
             padding: 6px 16px;
-            border-top: 1px solid rgba(51,65,85,0.3);
+            border-top: 1px solid var(--graph-container-border);
             margin-top: 4px;
             margin-bottom: 8px;
-            background: rgba(2,6,23,0.9);
+            background: var(--graph-panel-bg);
             position: relative;
             z-index: 5;
             overflow: hidden;
@@ -1923,7 +1947,7 @@
             flex: 1;
             min-height: 450px;
             position: relative;
-            background: radial-gradient(ellipse at center, rgba(15,23,42,0.95) 0%, rgba(2,6,23,1) 100%);
+            background: var(--graph-canvas-bg);
             overflow: visible;
         }
 
@@ -4717,6 +4741,7 @@
         .sidebar-content {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 16px;
         }
 
