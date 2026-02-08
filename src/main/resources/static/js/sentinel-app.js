@@ -655,13 +655,34 @@
             }
 
             const classificationBanner = document.getElementById('classification-banner');
+            const classificationBannerBottom = document.getElementById('classification-banner-bottom');
             if (classificationBanner) {
-                const classification = config.features?.classificationLevel || 'unclassified';
-                const showBanner = config.features?.showClassificationBanner;
+                const isGovernment = sector === 'GOVERNMENT';
+                const classification = config.features?.classificationLevel || (isGovernment ? 'unclassified' : '');
+                const showBanner = config.features?.showClassificationBanner ?? isGovernment;
                 classificationBanner.className = `classification-banner ${classification}${showBanner ? '' : ' hidden'}`;
                 classificationBanner.textContent = classification.toUpperCase();
                 document.body.classList.toggle('has-classification-banner', showBanner);
+
+                // Mirror to bottom classification banner
+                if (classificationBannerBottom) {
+                    classificationBannerBottom.className = `classification-banner classification-banner-bottom ${classification}${showBanner ? '' : ' hidden'}`;
+                    classificationBannerBottom.textContent = classification.toUpperCase();
+                }
+
+                // Update command bar classification (only visible for government/regulated editions)
+                const cmdClassification = document.getElementById('cmd-classification');
+                if (cmdClassification) cmdClassification.textContent = classification.toUpperCase();
+
+                const cmdClassGroup = document.getElementById('cmd-classification-group');
+                const cmdClassDivider = document.getElementById('cmd-classification-divider');
+                if (cmdClassGroup) setHidden(cmdClassGroup, !showBanner);
+                if (cmdClassDivider) setHidden(cmdClassDivider, !showBanner);
             }
+
+            // Update command bar sector (hidden element for JS compatibility)
+            const cmdSector = document.getElementById('cmd-sector');
+            if (cmdSector) cmdSector.textContent = sector;
 
             localStorage.setItem('sentinel-sector', sector);
 
@@ -721,6 +742,9 @@
 
             const statsUser = document.getElementById('stats-user');
             if (statsUser) statsUser.textContent = operatorId;
+
+            const cmdOperator = document.getElementById('cmd-operator');
+            if (cmdOperator) cmdOperator.textContent = operatorId;
         }
 
         function initKeyboardShortcuts() {
@@ -1006,13 +1030,31 @@
             }
 
             const classificationBanner = document.getElementById('classification-banner');
+            const classificationBannerBottom2 = document.getElementById('classification-banner-bottom');
             if (classificationBanner) {
-                const showBanner = config.features?.showClassificationBanner;
-                const classification = config.features?.classificationLevel || 'unclassified';
+                const isGovernment2 = sector === 'GOVERNMENT';
+                const showBanner = config.features?.showClassificationBanner ?? isGovernment2;
+                const classification = config.features?.classificationLevel || (isGovernment2 ? 'unclassified' : '');
                 classificationBanner.className = `classification-banner ${classification}${showBanner ? '' : ' hidden'}`;
                 classificationBanner.textContent = classification.toUpperCase();
                 document.body.classList.toggle('has-classification-banner', showBanner);
+
+                if (classificationBannerBottom2) {
+                    classificationBannerBottom2.className = `classification-banner classification-banner-bottom ${classification}${showBanner ? '' : ' hidden'}`;
+                    classificationBannerBottom2.textContent = classification.toUpperCase();
+                }
+
+                const cmdClassification2 = document.getElementById('cmd-classification');
+                if (cmdClassification2) cmdClassification2.textContent = classification.toUpperCase();
+
+                const cmdClassGroup2 = document.getElementById('cmd-classification-group');
+                const cmdClassDivider2 = document.getElementById('cmd-classification-divider');
+                if (cmdClassGroup2) setHidden(cmdClassGroup2, !showBanner);
+                if (cmdClassDivider2) setHidden(cmdClassDivider2, !showBanner);
             }
+
+            const cmdSector2 = document.getElementById('cmd-sector');
+            if (cmdSector2) cmdSector2.textContent = sector;
 
             localStorage.setItem('sentinel-sector', sector);
 
@@ -2903,8 +2945,8 @@
             const div = document.createElement('div');
             div.className = 'message user';
             div.innerHTML = `
+            <div class="message-sender"><span class="message-timestamp">RESTORED</span> OPERATOR</div>
             <div class="message-bubble">${escapeHtml(text)}</div>
-            <div class="message-meta">Restored</div>
         `;
             chatMessages.appendChild(div);
         }
@@ -2917,13 +2959,13 @@
             div.id = msgId;
             const processedText = processCitations(text);
             div.innerHTML = `
+            <div class="message-sender"><span class="message-timestamp">RESTORED</span> SENTINEL</div>
             <div class="message-bubble">${processedText}</div>
             <div class="message-actions">
                 <button class="message-action-btn" data-action="openMessageSources" data-msg-id="${msgId}" title="Open sources">Sources</button>
                 <button class="message-action-btn" data-action="openMessageGraph" data-msg-id="${msgId}" title="Open entity graph">Graph</button>
                 <button class="message-action-btn" data-action="addMessageToCase" data-msg-id="${msgId}" title="Add to case timeline">Add to Case</button>
             </div>
-            <div class="message-meta">Restored</div>
         `;
             chatMessages.appendChild(div);
             state.messageIndex.set(msgId, {
@@ -3402,7 +3444,7 @@
         // Get current node limit from slider
         function getEntityNodeLimit() {
             const slider = document.getElementById('entity-limit-slider');
-            return slider ? parseInt(slider.value, 10) : 50;
+            return slider ? parseInt(slider.value, 10) : 20;
         }
 
         // Prepare graph data from entity state with node limiting
@@ -3457,15 +3499,26 @@
                 name: e.value,
                 type: e.entityType || 'default',
                 val: Math.max(1, e.referenceCount || 1),
-                color: entityTypeColors[e.entityType] || entityTypeColors.default
+                color: entityTypeColors[e.entityType] || entityTypeColors.default,
+                sourceDoc: e.sourceDoc || null
             }));
 
             const nodeIdSet = new Set(nodes.map(n => n.id));
             const links = [];
             const edges = activeState.edges || [];
 
+            // Format relation label for display (co_occurrence -> co-occurrence)
+            function formatRelation(rel) {
+                if (!rel) return '';
+                return rel.replace(/_/g, '-').toLowerCase();
+            }
+
             for (const edge of edges) {
                 const nodeIds = (edge.nodeIds || []).filter(id => nodeIdSet.has(id));
+                const relation = formatRelation(edge.relation);
+                const sourceDoc = edge.sourceDoc || null;
+                const weight = edge.weight || 1;
+
                 // For large hyperedges (>4 nodes), use star topology from first node
                 // For small hyperedges, use full pairwise connections
                 if (nodeIds.length > 4) {
@@ -3475,7 +3528,10 @@
                         links.push({
                             source: hubId,
                             target: nodeIds[i],
-                            edgeId: edge.id
+                            edgeId: edge.id,
+                            type: relation,
+                            sourceDoc,
+                            weight
                         });
                     }
                 } else {
@@ -3485,21 +3541,26 @@
                             links.push({
                                 source: nodeIds[i],
                                 target: nodeIds[j],
-                                edgeId: edge.id
+                                edgeId: edge.id,
+                                type: relation,
+                                sourceDoc,
+                                weight
                             });
                         }
                     }
                 }
             }
 
-            // Deduplicate links
-            const linkSet = new Set();
-            const uniqueLinks = links.filter(link => {
+            // Deduplicate links, keeping highest weight
+            const linkMap = new Map();
+            for (const link of links) {
                 const key = [link.source, link.target].sort().join('|');
-                if (linkSet.has(key)) return false;
-                linkSet.add(key);
-                return true;
-            });
+                const existing = linkMap.get(key);
+                if (!existing || link.weight > existing.weight) {
+                    linkMap.set(key, link);
+                }
+            }
+            const uniqueLinks = Array.from(linkMap.values());
 
             return { nodes, links: uniqueLinks };
         }
@@ -3540,6 +3601,31 @@
                 (edge.nodeIds || []).includes(node.id)
             ).length;
 
+            // Find connected edge relations for this node
+            const connectedRelations = new Set();
+            const connectedSources = new Set();
+            (activeState.edges || []).forEach(edge => {
+                if ((edge.nodeIds || []).includes(node.id)) {
+                    if (edge.relation) connectedRelations.add(edge.relation.replace(/_/g, '-'));
+                    if (edge.sourceDoc) connectedSources.add(edge.sourceDoc);
+                }
+            });
+
+            const relationsHtml = connectedRelations.size > 0
+                ? `<div style="color: #94a3b8; font-size: 11px; display: flex; justify-content: space-between; gap: 8px;">
+                        <span>Relations:</span><span style="color: #e2e8f0; font-weight: 500;">${[...connectedRelations].slice(0, 3).join(', ')}</span>
+                   </div>` : '';
+
+            const sourceHtml = connectedSources.size > 0
+                ? `<div style="border-top: 1px solid rgba(100,116,139,0.2); padding-top: 5px; margin-top: 5px;">
+                        <div style="color: #64748b; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Sources</div>
+                        ${[...connectedSources].slice(0, 3).map(s => {
+                            const name = s.split('/').pop().split('\\\\').pop();
+                            return `<div style="color: #94a3b8; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(name)}</div>`;
+                        }).join('')}
+                        ${connectedSources.size > 3 ? `<div style="color: #64748b; font-size: 10px;">+${connectedSources.size - 3} more</div>` : ''}
+                   </div>` : '';
+
             tooltip.innerHTML = `
                 <div style="font-weight: 600; margin-bottom: 6px; color: #f1f5f9; font-size: 13px;">${escapeHtml(node.name)}</div>
                 <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
@@ -3553,11 +3639,37 @@
                     <div style="color: #94a3b8; font-size: 11px; display: flex; justify-content: space-between;">
                         <span>Connections:</span><span style="color: #e2e8f0; font-weight: 500;">${connections}</span>
                     </div>
+                    ${relationsHtml}
                 </div>
+                ${sourceHtml}
                 <div style="color: #64748b; font-size: 10px; margin-top: 6px; font-style: italic;">Click to explore relationships</div>
             `;
-            tooltip.style.left = (x + 12) + 'px';
-            tooltip.style.top = (y + 12) + 'px';
+            // Position tooltip, then clamp to viewport
+            tooltip.style.opacity = '0';
+            tooltip.style.left = '0px';
+            tooltip.style.top = '0px';
+            tooltip.offsetHeight; // force layout so we can measure
+            const ttRect = tooltip.getBoundingClientRect();
+            const ttW = ttRect.width;
+            const ttH = ttRect.height;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const pad = 8;
+            let left = x + 12;
+            let top = y + 12;
+            // Flip left if clipping right edge
+            if (left + ttW + pad > vw) {
+                left = x - ttW - 12;
+            }
+            // Flip up if clipping bottom edge
+            if (top + ttH + pad > vh) {
+                top = y - ttH - 12;
+            }
+            // Final clamp to stay within viewport
+            left = Math.max(pad, Math.min(left, vw - ttW - pad));
+            top = Math.max(pad, Math.min(top, vh - ttH - pad));
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
             tooltip.style.opacity = '1';
         }
 
@@ -3969,17 +4081,14 @@
 
                     // Semantic zoom: only show labels at reasonable zoom levels
                     if (showLabel) {
-                        // Label background pill - KeyLines style: semi-transparent
-                        const labelBgOpacity = 0.75 - (dimAmount * 0.5);
-                        ctx.fillStyle = `rgba(15,23,42,${labelBgOpacity})`;
-                        ctx.beginPath();
-                        ctx.roundRect(labelX - labelWidth/2, labelY - 1, labelWidth, labelHeight, 3);
-                        ctx.fill();
-
-                        // Label text - slightly smaller weight
+                        // Clean text rendering with subtle shadow for readability — no background box
                         const labelTextOpacity = 0.9 - (dimAmount * 0.5);
-                        ctx.fillStyle = `rgba(226,232,240,${labelTextOpacity})`;  // Slightly dimmer white
+                        ctx.save();
+                        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                        ctx.shadowBlur = 3;
+                        ctx.fillStyle = `rgba(226,232,240,${labelTextOpacity})`;
                         ctx.fillText(label, labelX, labelY);
+                        ctx.restore();
                     }
 
                     // Store dimensions for collision detection - tighter for compact layout
@@ -3987,66 +4096,94 @@
                     node.__bHeight = nodeSize + (showLabel ? labelHeight + 4 : 0);
                 })
                 .nodeCanvasObjectMode(() => 'replace')
-                // KeyLines style links - colored to match source node, very thin default
+                // Links: visible by default with source-tinted color, prominent on highlight
                 .linkColor(link => {
                     const sourceNode = typeof link.source === 'object' ? link.source :
                         graphData.nodes.find(n => n.id === link.source);
 
                     if (highlightLinks.size > 0) {
                         if (highlightLinks.has(link) && sourceNode) {
-                            // Highlighted: vibrant source color
-                            return sourceNode.color + 'dd';  // 87% opacity
+                            return sourceNode.color + 'cc';  // 80% opacity
                         }
-                        return 'rgba(70,80,90,0.04)';  // Nearly invisible
+                        return 'rgba(70,80,90,0.06)';  // Faded but not invisible
                     }
-                    // Default: very subtle source color tint
+                    // Default: visible source color tint
                     if (sourceNode) {
-                        return sourceNode.color + '20';  // 12% opacity - more subtle
+                        return sourceNode.color + '35';  // 21% opacity - visible
                     }
-                    return 'rgba(100,116,139,0.08)';
+                    return 'rgba(100,116,139,0.15)';
                 })
-                .linkWidth(link => highlightLinks.has(link) ? 1.5 : 0.5)  // KeyLines: thin links
-                .linkDirectionalArrowLength(link => highlightLinks.has(link) ? 3 : 0)
+                .linkWidth(link => {
+                    const w = link.weight || 1;
+                    if (highlightLinks.has(link)) return 1.5 + Math.min(w * 0.5, 2);
+                    return 0.6 + Math.min(w * 0.3, 1);
+                })
+                .linkDirectionalArrowLength(link => highlightLinks.has(link) ? 4 : 0)
                 .linkDirectionalArrowRelPos(1)
-                .linkCurvature(0.05)  // Very subtle curve for cleaner look
-                // Relationship labels on highlighted links - KeyLines style
+                .linkCurvature(0.08)  // Slight curve to separate parallel edges
+                // Relationship labels visible at sufficient zoom
                 .linkCanvasObjectMode(() => 'after')
                 .linkCanvasObject((link, ctx, globalScale) => {
-                    // Only show relationship labels on highlighted links
-                    if (!highlightLinks.has(link)) return;
-                    if (!link.type) return;  // No relationship type defined
+                    if (!link.type) return;
 
                     const source = link.source;
                     const target = link.target;
                     if (!source || !target || typeof source !== 'object') return;
 
+                    // Progressive disclosure: show labels based on zoom and highlight
+                    const isHighlighted = highlightLinks.has(link);
+                    const showAtZoom = globalScale > 0.9;
+                    if (!isHighlighted && !showAtZoom) return;
+
                     // Position label at midpoint of link
                     const midX = (source.x + target.x) / 2;
                     const midY = (source.y + target.y) / 2;
 
-                    // Style: small, semi-transparent pill
-                    const fontSize = 8;
-                    const labelText = link.type.length > 12 ? link.type.substring(0, 12) + '…' : link.type;
-                    ctx.font = `400 ${fontSize}px Inter, system-ui, sans-serif`;
+                    // Label opacity: full on highlight, subtle otherwise
+                    const labelOpacity = isHighlighted ? 0.95 : Math.min(0.6, (globalScale - 0.9) * 3);
+                    if (labelOpacity < 0.1) return;
+
+                    const fontSize = isHighlighted ? 9 : 8;
+                    const labelText = link.type.length > 14 ? link.type.substring(0, 14) + '…' : link.type;
+                    ctx.font = `${isHighlighted ? '500' : '400'} ${fontSize}px Inter, system-ui, sans-serif`;
                     const textWidth = ctx.measureText(labelText).width;
                     const padding = 4;
 
+                    // Rotate label to follow link angle
+                    const dx = target.x - source.x;
+                    const dy = target.y - source.y;
+                    let angle = Math.atan2(dy, dx);
+                    // Keep text readable (not upside-down)
+                    if (angle > Math.PI / 2) angle -= Math.PI;
+                    if (angle < -Math.PI / 2) angle += Math.PI;
+
+                    ctx.save();
+                    ctx.translate(midX, midY);
+                    ctx.rotate(angle);
+
                     // Background pill
-                    ctx.fillStyle = 'rgba(30,41,59,0.85)';
+                    ctx.globalAlpha = labelOpacity;
+                    ctx.fillStyle = isHighlighted ? 'rgba(15,23,42,0.92)' : 'rgba(15,23,42,0.75)';
                     ctx.beginPath();
-                    ctx.roundRect(midX - textWidth/2 - padding, midY - fontSize/2 - 2, textWidth + padding*2, fontSize + 4, 3);
+                    ctx.roundRect(-textWidth/2 - padding, -fontSize/2 - 2, textWidth + padding*2, fontSize + 4, 3);
                     ctx.fill();
 
-                    // Border
-                    ctx.strokeStyle = 'rgba(148,163,184,0.3)';
-                    ctx.lineWidth = 0.5;
-                    ctx.stroke();
+                    // Subtle border on highlight
+                    if (isHighlighted) {
+                        const sourceNode = typeof link.source === 'object' ? link.source : null;
+                        ctx.strokeStyle = (sourceNode?.color || 'rgba(148,163,184,0.4)') + '60';
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
 
                     // Text
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillStyle = 'rgba(203,213,225,0.9)';
-                    ctx.fillText(labelText, midX, midY);
+                    ctx.fillStyle = isHighlighted ? 'rgba(226,232,240,0.95)' : 'rgba(203,213,225,0.8)';
+                    ctx.fillText(labelText, 0, 0);
+
+                    ctx.globalAlpha = 1;
+                    ctx.restore();
                 })
                 .onNodeClick(node => {
                     // Toggle selection - click to lock highlight, click again to deselect
@@ -4125,27 +4262,26 @@
                     highlightNodes.clear();
                     highlightLinks.clear();
                 })
-                // Smooth animation parameters - KeyLines-inspired fluidity
-                .cooldownTicks(300)  // More ticks for smoother settling
-                .cooldownTime(4000)  // Longer settling time
-                .warmupTicks(100)    // Initial warmup for smooth start
+                // Simulation: settle quickly into a stable, professional layout
+                .cooldownTicks(200)  // Enough for convergence
+                .cooldownTime(3000)  // Reasonable settling time
+                .warmupTicks(80)     // Pre-compute initial layout
                 .onEngineStop(() => {
-                    // Fix all node positions once simulation stabilizes
+                    // Pin all node positions once layout stabilizes — no jitter
                     simulationStable = true;
                     graphData.nodes.forEach(node => {
                         node.fx = node.x;
                         node.fy = node.y;
                     });
                 })
-                .enableNodeDrag(true)  // Allow manual repositioning
+                .enableNodeDrag(true)
                 .onNodeDragEnd(node => {
-                    // Keep node at dragged position
                     node.fx = node.x;
                     node.fy = node.y;
                 })
-                // Gentle physics for fluid motion
-                .d3AlphaDecay(0.015)      // Slower decay = smoother settling
-                .d3VelocityDecay(0.25)    // Lower friction = more fluid movement
+                // Physics: balance between fast convergence and smooth motion
+                .d3AlphaDecay(0.025)      // Moderate decay for stability
+                .d3VelocityDecay(0.35)    // More damping = less oscillation
                 .graphData(graphData);
 
             // Expose graph instance for QA automation + keep placeholder hidden when data is present.
@@ -4153,53 +4289,54 @@
             const livePlaceholder = graphEl.querySelector('#entity-placeholder');
             setHidden(livePlaceholder || placeholder, true);
 
-            // Configure forces for smooth, professional layout - KeyLines style
+            // Force configuration: clean spacing, importance-based hierarchy
             const nodeCount = graphData.nodes.length;
 
-            // Charge force: balanced repulsion for cluster separation
-            const chargeStrength = Math.max(-3500, -700 - (nodeCount * 35));
+            // Charge: adaptive repulsion — stronger with fewer nodes for breathing room
+            const chargeStrength = nodeCount <= 15
+                ? Math.max(-2500, -800 - (nodeCount * 50))
+                : Math.max(-3500, -600 - (nodeCount * 30));
             entity2DGraph.d3Force('charge')
                 .strength(chargeStrength)
-                .distanceMax(600)        // Moderate repulsion range
-                .distanceMin(15);        // Compact for smaller nodes
+                .distanceMax(500)
+                .distanceMin(20);
 
-            // Link force: variable distance based on connection count (star hubs get longer links)
+            // Links: hub nodes get longer spokes for radial clarity
             entity2DGraph.d3Force('link')
                 .distance(link => {
-                    // Hub nodes (high degree) get longer links for cleaner radial spread
                     const sourceNode = typeof link.source === 'object' ? link.source :
                         graphData.nodes.find(n => n.id === link.source);
                     const targetNode = typeof link.target === 'object' ? link.target :
                         graphData.nodes.find(n => n.id === link.target);
                     const maxVal = Math.max(sourceNode?.val || 1, targetNode?.val || 1);
-                    return 180 + (maxVal * 15);  // Scale distance with hub importance
+                    // More space for important nodes — creates natural hierarchy
+                    return 140 + (maxVal * 20);
                 })
-                .strength(0.2);          // Soft springs for fluidity
+                .strength(0.25);
 
-            // Remove center force for organic spread
+            // No center force — use x/y forces for gentle containment
             entity2DGraph.d3Force('center', null);
+            entity2DGraph.d3Force('x', d3.forceX(width / 2).strength(0.02));
+            entity2DGraph.d3Force('y', d3.forceY(height / 2).strength(0.02));
 
-            // Gentle centering to keep graph visible
-            entity2DGraph.d3Force('x', d3.forceX(width / 2).strength(0.015));
-            entity2DGraph.d3Force('y', d3.forceY(height / 2).strength(0.015));
-
-            // Collision detection - tighter for smaller nodes
+            // Collision: prevent label overlap
             entity2DGraph.d3Force('collide', d3.forceCollide()
                 .radius(node => {
                     const w = node.__bWidth || 30;
                     const h = node.__bHeight || 20;
-                    return Math.max(w, h) / 2 + 8;  // Less padding for compact nodes
+                    return Math.max(w, h) / 2 + 10;
                 })
-                .strength(0.9)           // Firmer collisions to prevent overlap
+                .strength(0.85)
                 .iterations(3)
             );
 
-            // Smooth animated zoom to fit after layout settles
+            // Zoom to fit after layout converges — smooth entrance
+            // Use generous padding to prevent edge/bottom clipping of labels
             setTimeout(() => {
                 if (entity2DGraph) {
-                    entity2DGraph.zoomToFit(800, 80);  // 800ms animation, 80px padding
+                    entity2DGraph.zoomToFit(600, 80);
                 }
-            }, 1500);
+            }, 1200);
         }
 
         // Initialize node limit slider and entity type filters
@@ -4878,14 +5015,20 @@
             // Calculate source count early (needed for viewBox scaling)
             const sourceCount = Math.min(sources.length, 4);
 
-            const viewBoxMin = -14.0;
-            const viewBoxMax = 14.0;
+            // Adaptive viewBox: scale based on total node count for proportional sizing
+            const totalNodeEstimate = sourceCount + Math.min(entities.length, 2) + 1;
+            // Small graphs (3-4 nodes) use a tighter viewBox; large (7-8) use wider
+            const viewBoxExtent = totalNodeEstimate <= 4 ? 11.0
+                : totalNodeEstimate <= 6 ? 12.5
+                : 14.0;
+            const viewBoxMin = -viewBoxExtent;
+            const viewBoxMax = viewBoxExtent;
             const viewBoxSize = viewBoxMax - viewBoxMin;
             const labelBounds = {
                 min: viewBoxMin + 0.3,
                 max: viewBoxMax - 0.3
             };
-            const labelOverflowX = 6.0;
+            const labelOverflowX = viewBoxExtent * 0.43;
             const labelBoundsX = {
                 min: labelBounds.min - labelOverflowX,
                 max: labelBounds.max + labelOverflowX
@@ -4896,14 +5039,14 @@
             const queryMeta = (lastQueryMeta && lastQueryMeta.queryText)
                 ? lastQueryMeta
                 : buildQueryMeta(queryText, null, []);
-            const tooltipState = { activeNodeId: null, clientX: null, clientY: null, anchorEl: null, placementHint: '' };
+            const tooltipState = { activeNodeId: null, clientX: null, clientY: null, anchorEl: null, placementHint: '', hideTimeout: null, overTooltip: false };
 
-            function shortLabel(text, max = 40) {
+            function shortLabel(text, max = 28) {
                 const clean = text
                     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
                     .replace(/[\[\]]/g, '')
-                    .replace(/\.(pdf|txt|md)$/i, '')
-                    .replace(/-/g, ' ')
+                    .replace(/\.(pdf|txt|md|docx?)$/i, '')
+                    .replace(/[-_]/g, ' ')
                     .trim();
                 if (clean.length <= max) return clean;
                 const words = clean.split(' ');
@@ -4918,12 +5061,23 @@
                 return result || clean.substring(0, max - 1);
             }
 
-            const fixedPositions = [
-                { x: 0, y: 8.5, textPos: 'top center' },
-                { x: 8.5, y: 0, textPos: 'right center' },
-                { x: 0, y: -8.5, textPos: 'bottom center' },
-                { x: -8.5, y: 0, textPos: 'left center' }
+            // Scale source positions proportionally to the adaptive viewBox
+            const sourceRadius = viewBoxExtent * 0.55;
+            // Arrange sources evenly around the query, adapting to count
+            const allPositions = [
+                { x: 0, y: -sourceRadius, textPos: 'top center' },      // top
+                { x: sourceRadius, y: 0, textPos: 'middle right' },     // right
+                { x: 0, y: sourceRadius, textPos: 'bottom center' },    // bottom
+                { x: -sourceRadius, y: 0, textPos: 'middle left' }      // left
             ];
+            const positionLayouts = {
+                1: [0],             // top only
+                2: [0, 2],          // top + bottom (opposite sides)
+                3: [0, 1, 3],       // top + right + left (no bottom, leaves room for entities)
+                4: [0, 1, 2, 3]     // all four
+            };
+            const selectedIndices = positionLayouts[sourceCount] || positionLayouts[4];
+            const fixedPositions = selectedIndices.map(i => allPositions[i]);
 
             const nodes = [];
             const queryRows = [];
@@ -4951,6 +5105,16 @@
             addRow(queryRows, 'Sources shown', sourceCount);
             addRow(queryRows, 'Sub-queries', queryMeta.subQueries);
 
+            // Scale node radii with viewBox for proportional sizing
+            const queryRadius = viewBoxExtent * 0.09;         // ~1.26 at 14, ~0.99 at 11
+            const minSourceRadius = viewBoxExtent * 0.050;    // min source radius (low similarity)
+            const maxSourceRadius = viewBoxExtent * 0.080;    // max source radius (high similarity)
+            const entityNodeRadius = viewBoxExtent * 0.04;    // ~0.56 at 14, ~0.44 at 11
+
+            // Pick query label position that avoids source positions
+            const queryLabelPos = sourceCount === 2 ? 'middle right'
+                : sourceCount === 1 ? 'bottom center'
+                : 'middle left';
             nodes.push({
                 id: 'query',
                 type: 'query',
@@ -4959,8 +5123,8 @@
                 tooltipRows: queryRows,
                 x: 0,
                 y: 0,
-                radius: 1.0,
-                textPos: 'bottom center'
+                radius: queryRadius,
+                textPos: queryLabelPos
             });
 
             for (let i = 0; i < sourceCount; i++) {
@@ -4991,8 +5155,13 @@
                     ? `${queryMeta.documentsRetrieved} docs`
                     : '');
                 addRow(sourceRows, 'Top passage', 'Loading...', { valueClass: 'graph-tooltip-value--snippet' });
-                addRow(sourceRows, 'Action', 'Click node to open source', { valueClass: 'graph-tooltip-value--action' });
+                addRow(sourceRows, 'Action', 'Open source', { valueClass: 'graph-tooltip-value--action' });
 
+                // Variable source radius: linearly interpolate by similarity score
+                const simVal = (similarityRaw !== null && similarityRaw !== undefined && !Number.isNaN(Number(similarityRaw)))
+                    ? Math.max(0, Math.min(1, Number(similarityRaw)))
+                    : 0.5;
+                const sourceRadius = minSourceRadius + (maxSourceRadius - minSourceRadius) * simVal;
                 nodes.push({
                     id: `source-${i}`,
                     type: 'source',
@@ -5000,17 +5169,26 @@
                     tooltipTitle: 'Source Node',
                     tooltipRows: sourceRows,
                     filename,
+                    similarity: similarityRaw,
+                    rank: i + 1,
                     x: pos.x,
                     y: pos.y,
-                    radius: 0.65,
+                    radius: sourceRadius,
                     textPos: pos.textPos
                 });
             }
 
-            const entityPositions = [
-                { x: 5.5, y: 5.5, textPos: 'top right' },
-                { x: -5.5, y: -5.5, textPos: 'bottom left' }
-            ];
+            // Place entities at diagonal corners that avoid source positions
+            const entityOffset = viewBoxExtent * 0.39;
+            const entityPositions = sourceCount <= 2
+                ? [
+                    { x: entityOffset, y: -entityOffset, textPos: 'top right' },
+                    { x: -entityOffset, y: entityOffset, textPos: 'bottom left' }
+                  ]
+                : [
+                    { x: entityOffset, y: entityOffset, textPos: 'bottom right' },
+                    { x: -entityOffset, y: -entityOffset, textPos: 'top left' }
+                  ];
 
             const preferredEntities = entities.filter(e =>
                 e.type === 'person' || e.type === 'organization'
@@ -5022,7 +5200,7 @@
 
             goodEntities.forEach((entity, i) => {
                 const pos = entityPositions[i];
-                const label = shortLabel(entity.name, 12);
+                const label = shortLabel(entity.name, 22);
                 const entityType = entity.type || 'entity';
                 const entityDefinition = entity.description && entity.description !== entityType
                     ? entity.description
@@ -5037,7 +5215,7 @@
                 addRow(entityRows, 'Sources', (queryMeta.documentsRetrieved !== null && queryMeta.documentsRetrieved !== undefined)
                     ? `${queryMeta.documentsRetrieved} docs`
                     : 'Answer text');
-                addRow(entityRows, 'Action', 'Click node to ask about entity', { valueClass: 'graph-tooltip-value--action' });
+                addRow(entityRows, 'Action', 'Ask about entity', { valueClass: 'graph-tooltip-value--action' });
 
                 nodes.push({
                     id: `entity-${i}`,
@@ -5048,7 +5226,7 @@
                     entityName: entity.name,
                     x: pos.x,
                     y: pos.y,
-                    radius: 0.35,
+                    radius: entityNodeRadius,
                     textPos: pos.textPos
                 });
             });
@@ -5065,13 +5243,98 @@
 
             graphDiv.innerHTML = '';
 
+            // Scale font and metadata sizes proportionally to the viewBox
+            const labelFontSize = viewBoxExtent * 0.052;  // ~0.73px at extent=14, ~0.57px at extent=11
+            const metaFontSize = viewBoxExtent * 0.028;   // ~0.39px at extent=14, ~0.31px at extent=11
+
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('class', 'graph-svg');
             svg.setAttribute('viewBox', `${viewBoxMin} ${viewBoxMin} ${viewBoxSize} ${viewBoxSize}`);
             svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
             svg.setAttribute('role', 'img');
             svg.setAttribute('aria-label', 'Knowledge graph');
+            svg.style.setProperty('--graph-label-size', `${labelFontSize.toFixed(2)}px`);
+            svg.style.setProperty('--graph-meta-size', `${metaFontSize.toFixed(2)}px`);
             graphDiv.appendChild(svg);
+
+            // Tactical radial grid overlay (rendered behind edges/nodes)
+            const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gridGroup.setAttribute('class', 'graph-radial-grid');
+            gridGroup.setAttribute('aria-hidden', 'true');
+            const gridStroke = 'rgba(100,116,139,0.08)';
+            const gridStrokeWidth = '0.5';
+            const gridDash = '0.8 1.2';
+            // Concentric range rings
+            [0.25, 0.50, 0.72].forEach(fraction => {
+                const r = viewBoxExtent * fraction;
+                const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                ring.setAttribute('cx', '0');
+                ring.setAttribute('cy', '0');
+                ring.setAttribute('r', r);
+                ring.setAttribute('fill', 'none');
+                ring.setAttribute('stroke', gridStroke);
+                ring.setAttribute('stroke-width', gridStrokeWidth);
+                ring.setAttribute('stroke-dasharray', gridDash);
+                gridGroup.appendChild(ring);
+            });
+
+            // Small tick marks at cardinal points on each ring
+            [0.25, 0.50, 0.72].forEach(fraction => {
+                const r = viewBoxExtent * fraction;
+                const tickLen = viewBoxExtent * 0.015;
+                [[r, 0], [-r, 0], [0, r], [0, -r]].forEach(([cx, cy]) => {
+                    const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    const isHoriz = cy === 0;
+                    tick.setAttribute('x1', isHoriz ? cx : cx - tickLen);
+                    tick.setAttribute('y1', isHoriz ? cy - tickLen : cy);
+                    tick.setAttribute('x2', isHoriz ? cx : cx + tickLen);
+                    tick.setAttribute('y2', isHoriz ? cy + tickLen : cy);
+                    tick.setAttribute('stroke', 'rgba(100,116,139,0.15)');
+                    tick.setAttribute('stroke-width', '0.3');
+                    gridGroup.appendChild(tick);
+                });
+            });
+            svg.appendChild(gridGroup);
+
+            // SVG arrow marker for directional edges
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const arrowMarker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            arrowMarker.setAttribute('id', 'graph-arrow');
+            arrowMarker.setAttribute('viewBox', '0 0 10 8');
+            arrowMarker.setAttribute('refX', '10');
+            arrowMarker.setAttribute('refY', '4');
+            arrowMarker.setAttribute('markerWidth', '8');
+            arrowMarker.setAttribute('markerHeight', '7');
+            arrowMarker.setAttribute('orient', 'auto-start-reverse');
+            const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            arrowPath.setAttribute('d', 'M 0 0.5 L 10 4 L 0 7.5 Z');
+            arrowPath.setAttribute('fill', 'rgba(148,163,184,0.45)');
+            arrowMarker.appendChild(arrowPath);
+            defs.appendChild(arrowMarker);
+
+            // Confidence-colored arrow markers for source edges
+            const confColors = {
+                high:   { fill: 'rgba(16,185,129,0.6)',  cls: 'high' },
+                medium: { fill: 'rgba(59,130,246,0.6)',  cls: 'medium' },
+                low:    { fill: 'rgba(245,158,11,0.6)',  cls: 'low' },
+                none:   { fill: 'rgba(148,163,184,0.45)', cls: 'none' }
+            };
+            Object.entries(confColors).forEach(([key, { fill }]) => {
+                const m = arrowMarker.cloneNode(true);
+                m.setAttribute('id', `graph-arrow-${key}`);
+                m.querySelector('path').setAttribute('fill', fill);
+                defs.appendChild(m);
+            });
+            svg.appendChild(defs);
+
+            // Helper: classify similarity score into confidence tier
+            function getConfidenceTier(similarity) {
+                if (similarity === null || similarity === undefined || Number.isNaN(Number(similarity))) return 'none';
+                const val = Number(similarity);
+                if (val >= 0.85) return 'high';
+                if (val >= 0.70) return 'medium';
+                return 'low';
+            }
 
             const edgesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             edgesGroup.setAttribute('class', 'graph-edges');
@@ -5079,48 +5342,78 @@
                 const from = nodes[fromIdx];
                 const to = nodes[toIdx];
                 if (!from || !to) return;
+
+                // Shorten line so arrow tip stops at the node edge, not at the center
+                const dx = to.x - from.x;
+                const dy = to.y - from.y;
+                const dist = Math.hypot(dx, dy);
+                const ux = dx / dist;
+                const uy = dy / dist;
+                const startPad = from.radius + 0.15;
+                const endPad = to.radius + 0.15;
+                const x1 = from.x + ux * startPad;
+                const y1 = from.y + uy * startPad;
+                const x2 = to.x - ux * endPad;
+                const y2 = to.y - uy * endPad;
+
+                // Determine confidence tier for source edges
+                const isSourceEdge = from.type === 'query' && to.type === 'source';
+                const isEntityEdge = from.type === 'source' && to.type === 'entity';
+                const tier = isSourceEdge ? getConfidenceTier(to.similarity) : 'none';
+
                 const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', from.x);
-                line.setAttribute('y1', from.y);
-                line.setAttribute('x2', to.x);
-                line.setAttribute('y2', to.y);
-                line.setAttribute('class', 'graph-edge');
-                const length = Math.hypot(to.x - from.x, to.y - from.y);
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                line.setAttribute('marker-end', `url(#graph-arrow-${tier})`);
+
+                let edgeClass = 'graph-edge';
+                if (isSourceEdge) edgeClass += ` graph-edge--conf-${tier}`;
+                if (isEntityEdge) edgeClass += ' graph-edge--entity';
+                line.setAttribute('class', edgeClass);
+
+                const length = Math.hypot(x2 - x1, y2 - y1);
                 line.style.setProperty('--edge-length', length.toFixed(3));
                 line.style.setProperty('--edge-delay', `${Math.min(edgeIndex, 6) * 0.06}s`);
-                line.addEventListener('animationend', () => {
-                    line.style.setProperty('--edge-dash', '0.5 0.5');
-                }, { once: true });
                 edgesGroup.appendChild(line);
             });
             svg.appendChild(edgesGroup);
 
+            // Scale label offsets proportionally to viewBox extent
+            const labelGap = viewBoxExtent * 0.09;     // ~1.26 at 14, ~0.9 at 10
+            const labelGapY = viewBoxExtent * 0.096;    // ~1.34 at 14, ~0.96 at 10
+            const diagGap = viewBoxExtent * 0.079;      // ~1.1 at 14, ~0.79 at 10
+            const diagGapY = viewBoxExtent * 0.075;     // ~1.05 at 14, ~0.75 at 10
             const textOffsets = {
-                // Label offsets are in the SVG viewBox coordinate system.
-                // Keep labels outside node hitboxes for readability at larger font sizes.
-                'top center': { dx: 0, dy: -1.25, anchor: 'middle', baseline: 'baseline' },
-                'bottom center': { dx: 0, dy: 1.35, anchor: 'middle', baseline: 'hanging' },
-                'middle right': { dx: 1.25, dy: 0, anchor: 'start', baseline: 'middle' },
-                'middle left': { dx: -1.25, dy: 0, anchor: 'end', baseline: 'middle' },
-                'top right': { dx: 1.1, dy: -1.05, anchor: 'start', baseline: 'baseline' },
-                'top left': { dx: -1.1, dy: -1.05, anchor: 'end', baseline: 'baseline' },
-                'bottom right': { dx: 1.1, dy: 1.05, anchor: 'start', baseline: 'hanging' },
-                'bottom left': { dx: -1.1, dy: 1.05, anchor: 'end', baseline: 'hanging' }
+                'top center': { dx: 0, dy: -labelGap, anchor: 'middle', baseline: 'baseline' },
+                'bottom center': { dx: 0, dy: labelGapY, anchor: 'middle', baseline: 'hanging' },
+                'middle right': { dx: labelGap, dy: 0, anchor: 'start', baseline: 'middle' },
+                'middle left': { dx: -labelGap, dy: 0, anchor: 'end', baseline: 'middle' },
+                'top right': { dx: diagGap, dy: -diagGapY, anchor: 'start', baseline: 'baseline' },
+                'top left': { dx: -diagGap, dy: -diagGapY, anchor: 'end', baseline: 'baseline' },
+                'bottom right': { dx: diagGap, dy: diagGapY, anchor: 'start', baseline: 'hanging' },
+                'bottom left': { dx: -diagGap, dy: diagGapY, anchor: 'end', baseline: 'hanging' }
             };
 
             const nodesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             nodesGroup.setAttribute('class', 'graph-nodes');
             svg.appendChild(nodesGroup);
 
-            const nodeBoxes = nodes.map(node => ({
-                x: node.x - node.radius - 0.25,
-                y: node.y - node.radius - 0.25,
-                width: (node.radius + 0.25) * 2,
-                height: (node.radius + 0.25) * 2
-            }));
+            // Use inner element radius for collision (outer ring is a thin stroke, not solid fill)
+            const innerRadiusFactor = { query: 0.35, source: 0.72, entity: 0.55 };
+            const nodeBoxes = nodes.map(node => {
+                const effectiveR = node.radius * (innerRadiusFactor[node.type] || 0.72);
+                return {
+                    x: node.x - effectiveR - 0.08,
+                    y: node.y - effectiveR - 0.08,
+                    width: (effectiveR + 0.08) * 2,
+                    height: (effectiveR + 0.08) * 2
+                };
+            });
             const labelBoxes = [];
 
-            function boxesOverlap(a, b, padding = 0.15) {
+            function boxesOverlap(a, b, padding = 0.08) {
                 return !(
                     (a.x + a.width + padding) < b.x ||
                     (b.x + b.width + padding) < a.x ||
@@ -5330,6 +5623,8 @@
 
             function showNodeTooltip(event, node, group) {
                 if (!container) return;
+                if (tooltipState.hideTimeout) { clearTimeout(tooltipState.hideTimeout); tooltipState.hideTimeout = null; }
+                tooltipState.overTooltip = false;
                 const anchorElement = group?.querySelector('.graph-node-dot') || null;
                 tooltipState.activeNodeId = node.id;
                 tooltipState.clientX = event?.clientX ?? null;
@@ -5374,9 +5669,13 @@
             }
 
             function hideNodeTooltip() {
-                tooltipState.activeNodeId = null;
-                tooltipState.anchorEl = null;
-                hideGraphTooltip(container);
+                if (tooltipState.hideTimeout) clearTimeout(tooltipState.hideTimeout);
+                tooltipState.hideTimeout = setTimeout(() => {
+                    if (tooltipState.overTooltip) return;
+                    tooltipState.activeNodeId = null;
+                    tooltipState.anchorEl = null;
+                    hideGraphTooltip(container);
+                }, 200);
             }
 
             const typeOrder = { source: 0, entity: 1, query: 2 };
@@ -5384,24 +5683,79 @@
 
             renderNodes.forEach((node, nodeIndex) => {
                 const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                group.setAttribute('class', `graph-node graph-node--${node.type}${node.type !== 'query' ? ' is-clickable' : ''}`);
+                const confTier = node.type === 'source' ? getConfidenceTier(node.similarity) : '';
+                const confClass = confTier ? ` graph-node--conf-${confTier}` : '';
+                group.setAttribute('class', `graph-node graph-node--${node.type}${confClass}${node.type !== 'query' ? ' is-clickable' : ''}`);
                 group.style.setProperty('--graph-node-delay', `${0.12 + Math.min(nodeIndex, 6) * 0.06}s`);
 
-                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('cx', node.x);
-                circle.setAttribute('cy', node.y);
-                circle.setAttribute('r', node.radius);
-                circle.setAttribute('class', 'graph-node-dot');
-                group.appendChild(circle);
+                // Tactical node rendering (type-specific inner detail)
+                let hitTarget; // element that receives mouse events
+                if (node.type === 'source') {
+                    // Source: outer ring + inner filled circle + score text
+                    const outerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    outerRing.setAttribute('cx', node.x);
+                    outerRing.setAttribute('cy', node.y);
+                    outerRing.setAttribute('r', node.radius);
+                    outerRing.setAttribute('class', 'graph-node-ring');
+                    group.appendChild(outerRing);
+                    const innerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    innerCircle.setAttribute('cx', node.x);
+                    innerCircle.setAttribute('cy', node.y);
+                    innerCircle.setAttribute('r', node.radius * 0.72);
+                    innerCircle.setAttribute('class', 'graph-node-dot');
+                    group.appendChild(innerCircle);
+                    // Score text inside node
+                    if (node.similarity !== null && node.similarity !== undefined) {
+                        const scoreText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        scoreText.setAttribute('x', node.x);
+                        scoreText.setAttribute('y', node.y);
+                        scoreText.setAttribute('class', 'graph-node-score');
+                        scoreText.setAttribute('text-anchor', 'middle');
+                        scoreText.setAttribute('dominant-baseline', 'central');
+                        scoreText.textContent = formatConfidence(Number(node.similarity));
+                        group.appendChild(scoreText);
+                    }
+                    hitTarget = innerCircle;
+                } else if (node.type === 'query') {
+                    // Query: outer ring + inner filled circle
+                    const outerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    outerRing.setAttribute('cx', node.x);
+                    outerRing.setAttribute('cy', node.y);
+                    outerRing.setAttribute('r', node.radius);
+                    outerRing.setAttribute('class', 'graph-node-ring');
+                    group.appendChild(outerRing);
+                    const innerDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    innerDot.setAttribute('cx', node.x);
+                    innerDot.setAttribute('cy', node.y);
+                    innerDot.setAttribute('r', node.radius * 0.35);
+                    innerDot.setAttribute('class', 'graph-node-dot');
+                    group.appendChild(innerDot);
+                    hitTarget = outerRing;
+                } else {
+                    // Entity: dashed outer ring + inner diamond
+                    const outerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    outerRing.setAttribute('cx', node.x);
+                    outerRing.setAttribute('cy', node.y);
+                    outerRing.setAttribute('r', node.radius);
+                    outerRing.setAttribute('class', 'graph-node-ring graph-node-ring--dashed');
+                    group.appendChild(outerRing);
+                    const d = node.radius * 0.55;
+                    const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    diamond.setAttribute('points',
+                        `${node.x},${node.y - d} ${node.x + d},${node.y} ${node.x},${node.y + d} ${node.x - d},${node.y}`);
+                    diamond.setAttribute('class', 'graph-node-dot');
+                    group.appendChild(diamond);
+                    hitTarget = diamond;
+                }
 
                 const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 label.setAttribute('class', 'graph-label');
                 label.textContent = node.label;
                 group.appendChild(label);
 
-                circle.addEventListener('mouseenter', (event) => showNodeTooltip(event, node, group));
-                circle.addEventListener('mousemove', moveNodeTooltip);
-                circle.addEventListener('mouseleave', hideNodeTooltip);
+                hitTarget.addEventListener('mouseenter', (event) => showNodeTooltip(event, node, group));
+                hitTarget.addEventListener('mousemove', moveNodeTooltip);
+                hitTarget.addEventListener('mouseleave', hideNodeTooltip);
                 group.addEventListener('focus', () => showNodeTooltip(null, node, group));
                 group.addEventListener('blur', hideNodeTooltip);
 
@@ -5442,6 +5796,34 @@
             });
 
             svg.querySelectorAll('title').forEach(el => el.remove());
+
+            // Allow cursor to move from node to tooltip without the tooltip vanishing
+            const tooltipEl = getGraphTooltip(container);
+            if (tooltipEl) {
+                tooltipEl.addEventListener('mouseenter', () => {
+                    tooltipState.overTooltip = true;
+                    if (tooltipState.hideTimeout) { clearTimeout(tooltipState.hideTimeout); tooltipState.hideTimeout = null; }
+                });
+                tooltipEl.addEventListener('mouseleave', () => {
+                    tooltipState.overTooltip = false;
+                    hideNodeTooltip();
+                });
+                // Make the action text in the tooltip clickable
+                tooltipEl.addEventListener('click', (e) => {
+                    const actionEl = e.target.closest('.graph-tooltip-value--action');
+                    if (!actionEl || !tooltipState.activeNodeId) return;
+                    const activeNode = nodes.find(n => n.id === tooltipState.activeNodeId);
+                    if (!activeNode) return;
+                    if (activeNode.type === 'source' && activeNode.filename) {
+                        openSource(activeNode.filename, true);
+                        highlightSourceInList(activeNode.filename);
+                    } else if (activeNode.type === 'entity') {
+                        runEntityQuery(activeNode.entityName || activeNode.label);
+                    }
+                    hideNodeTooltip();
+                });
+            }
+
             renderGraphLegend(container);
         }
 
@@ -5465,6 +5847,7 @@
 
                 const dot = document.createElement('span');
                 dot.className = item.dotClass;
+                dot.style.borderRadius = '3px'; // rounded square to match nodes
 
                 const text = document.createElement('span');
                 text.textContent = item.label;
@@ -6812,8 +7195,8 @@
             const div = document.createElement('div');
             div.className = 'message user';
             div.innerHTML = `
+            <div class="message-sender"><span class="message-timestamp">${getTimestamp()}</span> OPERATOR</div>
             <div class="message-bubble">${escapeHtml(text)}</div>
-            <div class="message-meta">${getTimestamp()}</div>
         `;
             chatMessages.appendChild(div);
             if (appSettings.autoScroll) {
@@ -6966,6 +7349,7 @@
             }
 
             div.innerHTML = `
+            <div class="message-sender"><span class="message-timestamp">${getTimestamp()}</span> SENTINEL</div>
             ${reasoningHtml}
             <div class="message-bubble">
                 ${processedText}
@@ -6985,7 +7369,6 @@
                     </svg>
                 </button>
             </div>
-            <div class="message-meta">${getTimestamp()}</div>
         `;
 
             chatMessages.appendChild(div);

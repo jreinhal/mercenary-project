@@ -94,6 +94,29 @@
         UNCLASSIFIED
     </div>
 
+    <!-- Command Bar - persistent operational context strip -->
+    <div class="command-bar" id="command-bar" role="status" aria-label="Operational context">
+        <div class="command-bar-group">
+            <span class="command-bar-label">OPERATOR</span>
+            <span class="command-bar-value" id="cmd-operator">DEMO_USER</span>
+        </div>
+        <span class="command-bar-divider"></span>
+        <div class="command-bar-group">
+            <span class="command-bar-indicator local-only" id="cmd-local-indicator">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10" aria-hidden="true">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                LOCAL-ONLY
+            </span>
+        </div>
+    </div>
+    <!-- Hidden elements for JS compatibility -->
+    <span class="hidden" id="cmd-sector"></span>
+    <span class="hidden" id="cmd-classification"></span>
+    <span class="hidden" id="cmd-classification-group"></span>
+    <span class="hidden" id="cmd-classification-divider"></span>
+
     <div class="auth-modal hidden" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <div class="auth-modal-content">
             <div class="auth-modal-header">
@@ -112,9 +135,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Skip Link for 508 Accessibility -->
-    <a href="#query-input" class="skip-link">Skip to main content</a>
 
     <!-- Settings Sidebar -->
     <aside class="sidebar" id="sidebar" role="complementary" aria-label="Settings">
@@ -326,7 +346,7 @@
 
     <!-- Simple Menu Bar (Kotaemon-style) -->
     <nav class="menu-bar" role="navigation">
-        <a href="#" class="menu-item" data-tab="files" data-action="switchMainTab" data-tab="files">Files</a>
+        <a href="#" class="menu-item" data-action="switchMainTab" data-tab="files">Files</a>
         <div class="menu-dropdown">
             <a href="#" class="menu-item" data-tab="resources" data-action="toggleResourcesMenu">Resources</a>
             <div class="menu-dropdown-content" id="resources-dropdown">
@@ -363,7 +383,7 @@
             </div>
             <div class="left-sidebar-content">
                 <!-- Pinned Conversations -->
-                <div class="pinned-section" id="pinned-section" class="hidden">
+                <div class="pinned-section hidden" id="pinned-section">
                     <div class="pinned-section-title">Pinned</div>
                     <div class="conversation-list" id="pinned-list" role="list">
                         <!-- Dynamically populated -->
@@ -455,18 +475,13 @@
                             <span class="stats-value" id="stats-status">Online</span>
                         </div>
                         <div class="stats-item">
-                            <span class="stats-label">User</span>
-                            <span class="stats-value" id="stats-user">-</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">Context</span>
-                            <span class="stats-value" id="stats-context">-</span>
-                        </div>
-                        <div class="stats-item">
                             <span class="stats-label">Documents</span>
                             <span class="stats-value" id="stats-docs">-</span>
                         </div>
                     </div>
+                    <!-- User and Context moved to Command Bar -->
+                    <span class="hidden" id="stats-user"></span>
+                    <span class="hidden" id="stats-context"></span>
                 </div>
             </div>
         </aside>
@@ -619,16 +634,16 @@
         <!-- RIGHT PANEL: Information Panel (Kotaemon-style) -->
         <aside class="right-panel" role="complementary" aria-label="Information panel">
             <div class="right-panel-header">
-                <span class="right-panel-title">Information panel</span>
+                <span class="right-panel-title">Intelligence Panel</span>
                 <div class="right-panel-tabs">
-                    <button class="right-panel-tab active" data-action="switchRightTab" data-tab="plot" data-tab="plot">Plot</button>
-                    <button class="right-panel-tab" data-action="switchRightTab" data-tab="source" data-tab="source">Source</button>
+                    <button class="right-panel-tab active" data-action="switchRightTab" data-tab="plot">Graph</button>
+                    <button class="right-panel-tab" data-action="switchRightTab" data-tab="source">Source</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="eval">Eval</button>
                     <button class="right-panel-tab" data-action="switchRightTab" data-tab="case">Case</button>
                 </div>
             </div>
 
-            <!-- Plot Tab (Graph Visualization) -->
+            <!-- Graph Tab (Knowledge Graph Visualization) -->
             <div class="right-panel-content" id="right-tab-plot">
                 <!-- Graph Sub-Tabs -->
                 <div class="graph-subtabs">
@@ -670,11 +685,21 @@
                         </div>
                         <div class="entity-limit-control">
                             <label for="entity-limit-slider" title="Max nodes to display">Nodes:</label>
-                            <input type="range" id="entity-limit-slider" min="10" max="100" value="30" step="5">
-                            <span id="entity-limit-value">30</span>
+                            <input type="range" id="entity-limit-slider" min="5" max="100" value="20" step="5">
+                            <span id="entity-limit-value">20</span>
                         </div>
-                        <button class="entity-refresh-btn" data-action="refreshEntityGraph" title="Refresh">⟳</button>
-                        <button class="entity-collapse-btn" data-action="collapseEntityExplorer" title="Collapse view">◀ Collapse</button>
+                        <button class="entity-refresh-btn" data-action="refreshEntityGraph" title="Refresh">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                        </button>
+                        <button class="entity-collapse-btn" data-action="collapseEntityExplorer" title="Collapse view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" aria-hidden="true">
+                                <polyline points="15 18 9 12 15 6"/>
+                            </svg>
+                            Collapse
+                        </button>
                     </div>
                     <div class="entity-explorer-stats" id="entity-explorer-stats">
                         <span class="stat-item"><strong id="entity-node-count">0</strong> entities</span>
@@ -684,27 +709,27 @@
                     <div class="entity-type-filters" id="entity-type-filters">
                         <label class="type-filter" data-type="PERSON">
                             <input type="checkbox" checked data-entity-type="PERSON">
-                            <span class="filter-dot" style="background: #0077bb;"></span>Person
+                            <span class="filter-dot" style="background: #5b8fa8;"></span>Person
                         </label>
                         <label class="type-filter" data-type="ORGANIZATION">
                             <input type="checkbox" checked data-entity-type="ORGANIZATION">
-                            <span class="filter-dot" style="background: #ee7733;"></span>Organization
+                            <span class="filter-dot" style="background: #b8976a;"></span>Organization
                         </label>
                         <label class="type-filter" data-type="LOCATION">
                             <input type="checkbox" checked data-entity-type="LOCATION">
-                            <span class="filter-dot" style="background: #009988;"></span>Location
+                            <span class="filter-dot" style="background: #6b9e7a;"></span>Location
                         </label>
                         <label class="type-filter" data-type="TECHNICAL">
                             <input type="checkbox" checked data-entity-type="TECHNICAL">
-                            <span class="filter-dot" style="background: #D55E00;"></span>Technical
+                            <span class="filter-dot" style="background: #8b7eb8;"></span>Technical
                         </label>
                         <label class="type-filter" data-type="DATE">
                             <input type="checkbox" checked data-entity-type="DATE">
-                            <span class="filter-dot" style="background: #33bbee;"></span>Date
+                            <span class="filter-dot" style="background: #6b9aad;"></span>Date
                         </label>
                         <label class="type-filter" data-type="REFERENCE">
                             <input type="checkbox" checked data-entity-type="REFERENCE">
-                            <span class="filter-dot" style="background: #F0E442;"></span>Reference
+                            <span class="filter-dot" style="background: #94a3b8;"></span>Document
                         </label>
                     </div>
                     <div id="entity-graph" class="entity-graph">
@@ -729,7 +754,11 @@
                 <!-- Collapsible Sources Section -->
                 <div class="info-section">
                     <button class="info-section-header" data-action="toggleInfoSection" aria-expanded="true">
-                        <span class="info-section-toggle">▼</span>
+                        <span class="info-section-toggle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" aria-hidden="true">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </span>
                         <span><strong>Sources</strong></span>
                         <span class="info-section-score hidden" id="source-score-badge"></span>
                     </button>
@@ -745,7 +774,11 @@
                 <!-- Collapsible Entity Section -->
                 <div class="info-section">
                     <button class="info-section-header" data-action="toggleInfoSection" aria-expanded="true">
-                        <span class="info-section-toggle">▼</span>
+                        <span class="info-section-toggle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" aria-hidden="true">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </span>
                         <span><strong>Entities</strong></span>
                         <span class="info-section-score hidden" id="entity-score-badge"></span>
                     </button>
@@ -814,7 +847,7 @@
                         </button>
                         <span id="highlight-position" class="ml-auto">-</span>
                     </div>
-                    <div class="source-viewer" id="source-viewer" class="source-viewer-constrained">
+                    <div class="source-viewer source-viewer-constrained" id="source-viewer">
                         Loading document content...
                     </div>
                 </div>
@@ -912,8 +945,12 @@
     <!-- Footer -->
     <footer class="footer">
         <div>SENTINEL Intelligence Platform v1.0.0 | &copy; 2026 Project Mercenary</div>
-        <div>Powered by AdaptiveRAG &amp; HGMem</div>
     </footer>
+
+    <!-- Bottom Classification Banner (mirrors top banner per DoD standard) -->
+    <div id="classification-banner-bottom" class="classification-banner classification-banner-bottom unclassified hidden" role="banner" aria-live="polite">
+        UNCLASSIFIED
+    </div>
 
     <script src="js/sentinel-app.js?v=20260128a" defer></script>
 </body>
