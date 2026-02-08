@@ -52,12 +52,18 @@ const EXPECTED_DARK_CSS = {
   '--graph-center-node': '#475569',               // Slate steel - command node
   '--graph-source-node': '#4a7c59',               // Muted olive-sage - source docs
   '--graph-entity-node': '#92754c',               // Dim amber-tan - entities
+  '--graph-canvas-bg': true,                      // Must exist (theme-aware graph background)
+  '--graph-grid-line': true,                      // Must exist (grid line color)
+  '--graph-container-border': true,               // Must exist (container border)
 };
 
 const EXPECTED_LIGHT_CSS = {
   '--graph-center-node': '#64748b',               // Slate steel - command node
   '--graph-source-node': '#6b9e7a',               // Muted olive-sage - source docs
   '--graph-entity-node': '#b8976a',               // Dim amber-tan - entities
+  '--graph-canvas-bg': true,                      // Must exist (theme-aware graph background)
+  '--graph-grid-line': true,                      // Must exist (grid line color)
+  '--graph-container-border': true,               // Must exist (container border)
 };
 
 // Unified entity type colors (Okabe-Ito, single source of truth)
