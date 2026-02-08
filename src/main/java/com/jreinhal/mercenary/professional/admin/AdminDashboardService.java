@@ -133,7 +133,7 @@ public class AdminDashboardService {
     }
 
     private Map<String, Long> getQueriesByDay(int days) {
-        LinkedHashMap<String, Long> result = new LinkedHashMap<String, Long>();
+        Map<String, Long> result = new LinkedHashMap<>();
         for (int i = days - 1; i >= 0; --i) {
             Instant dayStart = Instant.now().minus(i, ChronoUnit.DAYS).truncatedTo(ChronoUnit.DAYS);
             Instant dayEnd = dayStart.plus(1L, ChronoUnit.DAYS);
