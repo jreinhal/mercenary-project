@@ -229,6 +229,9 @@ public class RagOrchestrationService {
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
+        // Fix #3: Redact PII from user query BEFORE any pipeline processing.
+        // All downstream stages (guardrail, routing, retrieval, LLM, audit) use the redacted query.
+        query = this.piiRedactionService.redact(query, hipaaStrict ? Boolean.TRUE : null).getRedactedContent();
         try {
             String rescued;
             String response;
@@ -484,7 +487,23 @@ public class RagOrchestrationService {
             throw e;
         }
     }
+    /**
+     * Fix #9: Accept per-request RAG engine overrides from frontend settings toggles.
+     * When null, the server-side default (from application.yaml / env vars) is used.
+     */
+    public record RetrievalOverrides(Boolean useHyde, Boolean useGraphRag, Boolean useReranking) {
+        static final RetrievalOverrides DEFAULTS = new RetrievalOverrides(null, null, null);
+    }
+
+    public EnhancedAskResponse askEnhanced(String query, String dept, List<String> fileParams, String filesParam, String sessionId, boolean deepAnalysis, Boolean useHyde, Boolean useGraphRag, Boolean useReranking, HttpServletRequest request) {
+        return askEnhanced(query, dept, fileParams, filesParam, sessionId, deepAnalysis, new RetrievalOverrides(useHyde, useGraphRag, useReranking), request);
+    }
+
     public EnhancedAskResponse askEnhanced(String query, String dept, List<String> fileParams, String filesParam, String sessionId, boolean deepAnalysis, HttpServletRequest request) {
+        return askEnhanced(query, dept, fileParams, filesParam, sessionId, deepAnalysis, RetrievalOverrides.DEFAULTS, request);
+    }
+
+    private EnhancedAskResponse askEnhanced(String query, String dept, List<String> fileParams, String filesParam, String sessionId, boolean deepAnalysis, RetrievalOverrides overrides, HttpServletRequest request) {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
@@ -519,6 +538,8 @@ public class RagOrchestrationService {
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
+        // Fix #3: Redact PII from user query BEFORE any pipeline processing.
+        query = this.piiRedactionService.redact(query, hipaaStrict ? Boolean.TRUE : null).getRedactedContent();
         String effectiveSessionId = sessionId;
         String effectiveQuery = query;
         if (sessionId != null && !sessionId.isBlank()) {
@@ -622,12 +643,12 @@ public class RagOrchestrationService {
             for (int i = 0; i < subQueries.size(); ++i) {
                 String subQuery = subQueries.get(i);
                 stepStart = System.currentTimeMillis();
-                RetrievalContext context = this.retrieveContext(subQuery, dept, activeFiles, routingResult, highUncertainty, deepAnalysis);
+                RetrievalContext context = this.retrieveContext(subQuery, dept, activeFiles, routingResult, highUncertainty, deepAnalysis, overrides);
                 if (context.textDocuments().isEmpty() && context.visualDocuments().isEmpty()) {
                     log.info("CRAG: Retrieval failed for '{}'. Initiating Corrective Loop.", subQuery);
                     String rewritten = this.rewriteService.rewriteQuery(subQuery);
                     if (!rewritten.equals(subQuery)) {
-                        context = this.retrieveContext(rewritten, dept, activeFiles, routingResult, highUncertainty, deepAnalysis);
+                        context = this.retrieveContext(rewritten, dept, activeFiles, routingResult, highUncertainty, deepAnalysis, overrides);
                     }
                 }
                 allDocs.addAll(context.textDocuments());
@@ -897,6 +918,22 @@ public class RagOrchestrationService {
                 metrics.put("editionAppendEvidenceOnNoCitations", responsePolicy.appendEvidenceWhenNoCitations());
             }
             metrics.put("retrievalStrategies", retrievalStrategies);
+            // Fix #8: Persist conversation memory (assistant response, message count, reasoning trace)
+            if (effectiveSessionId != null && !this.hipaaPolicy.shouldDisableSessionMemory(department)
+                    && this.conversationMemoryService != null
+                    && this.sessionPersistenceService != null) {
+                try {
+                    List<String> responseSources = sources;
+                    this.conversationMemoryService.saveAssistantMessage(user.getId(), effectiveSessionId, response, responseSources);
+                    this.sessionPersistenceService.incrementMessageCount(effectiveSessionId);
+                    this.sessionPersistenceService.incrementMessageCount(effectiveSessionId);
+                    if (completedTrace != null) {
+                        this.sessionPersistenceService.persistTrace(completedTrace, effectiveSessionId);
+                    }
+                } catch (Exception memEx) {
+                    log.warn("Session persistence failed (non-fatal): {}", memEx.getMessage());
+                }
+            }
             return new EnhancedAskResponse(response, completedTrace != null ? completedTrace.getStepsAsMaps() : List.of(), sources, metrics, completedTrace != null ? completedTrace.getTraceId() : null);
         }
         catch (Exception e) {
@@ -2382,6 +2419,14 @@ public class RagOrchestrationService {
     }
 
     private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty, boolean deepAnalysis) {
+        return retrieveContext(query, dept, activeFiles, routing, highUncertainty, deepAnalysis, RetrievalOverrides.DEFAULTS);
+    }
+
+    // Fix #9: Overloaded method accepting per-request RAG engine overrides from frontend settings.
+    // Per-request overrides can only DISABLE engines; they cannot force-enable server-disabled engines.
+    private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty, boolean deepAnalysis, RetrievalOverrides overrides) {
+        boolean graphRagAllowed = overrides.useGraphRag() == null || overrides.useGraphRag();
+        boolean rerankingAllowed = overrides.useReranking() == null || overrides.useReranking();
         boolean complexQuery = routing != null && routing.decision() == AdaptiveRagService.RoutingDecision.DOCUMENT;
         boolean relationshipQuery = RELATIONSHIP_PATTERN.matcher(query).find();
         boolean longQuery = query.split("\\s+").length > 15;
@@ -2442,15 +2487,16 @@ public class RagOrchestrationService {
             }
         }
 
-        if (textDocs.isEmpty()) {
+        if (textDocs.isEmpty() && rerankingAllowed) {
             textDocs.addAll(this.performHybridRerankingTracked(query, dept, activeFiles));
             if (!textDocs.isEmpty()) {
                 strategies.add("FallbackRerank");
             }
         }
 
-        // HGMem: use deepAnalysis param or fallback to advancedNeeded heuristic
-        if (this.hgMemQueryEngine != null && (deepAnalysis || advancedNeeded)) {
+        // HGMem (GraphRAG): use deepAnalysis param or fallback to advancedNeeded heuristic
+        // Fix #9: respect per-request graphRagAllowed override from frontend toggle
+        if (graphRagAllowed && this.hgMemQueryEngine != null && (deepAnalysis || advancedNeeded)) {
             HGMemQueryEngine.HGMemResult hgResult = this.hgMemQueryEngine.query(query, dept, deepAnalysis);
             if (!hgResult.documents().isEmpty()) {
                 textDocs.addAll(hgResult.documents());

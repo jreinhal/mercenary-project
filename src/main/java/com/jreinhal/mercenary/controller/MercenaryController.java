@@ -435,8 +435,8 @@ public class MercenaryController {
     }
 
     @RequestMapping(value={"/ask/enhanced"}, method={RequestMethod.GET, RequestMethod.POST})
-    public EnhancedAskResponse askEnhanced(@RequestParam(value="q") String query, @RequestParam(value="dept") String dept, @RequestParam(value="file", required=false) List<String> fileParams, @RequestParam(value="files", required=false) String filesParam, @RequestParam(value="sessionId", required=false) String sessionId, @RequestParam(value="deepAnalysis", defaultValue="false") boolean deepAnalysis, HttpServletRequest request) {
-        return this.ragOrchestrationService.askEnhanced(query, dept, fileParams, filesParam, sessionId, deepAnalysis, request);
+    public EnhancedAskResponse askEnhanced(@RequestParam(value="q") String query, @RequestParam(value="dept") String dept, @RequestParam(value="file", required=false) List<String> fileParams, @RequestParam(value="files", required=false) String filesParam, @RequestParam(value="sessionId", required=false) String sessionId, @RequestParam(value="deepAnalysis", defaultValue="false") boolean deepAnalysis, @RequestParam(value="useHyde", required=false) Boolean useHyde, @RequestParam(value="useGraphRag", required=false) Boolean useGraphRag, @RequestParam(value="useReranking", required=false) Boolean useReranking, HttpServletRequest request) {
+        return this.ragOrchestrationService.askEnhanced(query, dept, fileParams, filesParam, sessionId, deepAnalysis, useHyde, useGraphRag, useReranking, request);
     }
 
     @GetMapping(value={"/reasoning/{traceId}"})

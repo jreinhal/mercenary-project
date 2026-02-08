@@ -53,7 +53,16 @@ public class SecureIngestionService {
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final Tika tika;
-    private static final Set<String> BLOCKED_MIME_TYPES = Set.of("application/x-executable", "application/x-msdos-program", "application/x-msdownload", "application/x-sh", "application/x-shellscript", "application/java-archive", "application/x-httpd-php");
+    private static final Set<String> BLOCKED_MIME_TYPES = Set.of(
+        "application/x-executable", "application/x-msdos-program", "application/x-msdownload",
+        "application/x-sh", "application/x-shellscript", "text/x-shellscript",
+        "application/java-archive", "application/x-httpd-php",
+        // Fix #4: Block archive/container formats that can smuggle malicious content
+        "application/zip", "application/java-vm", "application/x-java-applet",
+        "application/x-rar-compressed", "application/x-7z-compressed",
+        "application/vnd.rar", "application/x-tar", "application/gzip",
+        "application/x-bzip2", "application/x-xz"
+    );
     @Value(value="${sentinel.miarag.min-chunks-for-mindscape:10}")
     private int minChunksForMindscape;
     @Value(value="${sentinel.megarag.extract-images-from-pdf:true}")
@@ -242,6 +251,11 @@ public class SecureIngestionService {
         if (extension.equals("pdf") && !detectedMimeType.equals("application/pdf")) {
             log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", detectedMimeType, filename);
         }
+        // Fix #4: Block content-type/extension mismatch — PDF content with non-PDF extension
+        if (detectedMimeType.equals("application/pdf") && !extension.equals("pdf")) {
+            log.error("SECURITY: PDF content disguised as .{} file: {}", extension, filename);
+            throw new SecurityException("Content type mismatch: file contains PDF data but has ." + extension + " extension.");
+        }
         if (Set.of("exe", "dll", "bat", "sh", "cmd", "ps1", "jar").contains(extension)) {
             log.error("SECURITY: Executable extension blocked: {}", filename);
             throw new SecurityException("Executable files are not allowed: " + filename);
@@ -258,6 +272,30 @@ public class SecureIngestionService {
         }
         // ELF: 0x7F 'E' 'L' 'F'
         if (bytes.length >= 4 && bytes[0] == 0x7F && bytes[1] == 0x45 && bytes[2] == 0x4C && bytes[3] == 0x46) {
+            return true;
+        }
+        // Fix #4: Detect archive/container magic bytes
+        // ZIP / JAR: 'PK\x03\x04'
+        if (bytes.length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
+            return true;
+        }
+        // Java class: 0xCAFEBABE
+        if (bytes.length >= 4 && bytes[0] == (byte) 0xCA && bytes[1] == (byte) 0xFE
+                && bytes[2] == (byte) 0xBA && bytes[3] == (byte) 0xBE) {
+            return true;
+        }
+        // RAR: 'Rar!\x1A\x07'
+        if (bytes.length >= 6 && bytes[0] == 0x52 && bytes[1] == 0x61 && bytes[2] == 0x72
+                && bytes[3] == 0x21 && bytes[4] == 0x1A && bytes[5] == 0x07) {
+            return true;
+        }
+        // 7-Zip: '7z\xBC\xAF\x27\x1C'
+        if (bytes.length >= 6 && bytes[0] == 0x37 && bytes[1] == 0x7A && bytes[2] == (byte) 0xBC
+                && bytes[3] == (byte) 0xAF && bytes[4] == 0x27 && bytes[5] == 0x1C) {
+            return true;
+        }
+        // Shell script shebang: '#!'
+        if (bytes.length >= 2 && bytes[0] == 0x23 && bytes[1] == 0x21) {
             return true;
         }
         return false;

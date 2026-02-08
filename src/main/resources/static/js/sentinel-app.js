@@ -2127,6 +2127,11 @@
                 params.append('deepAnalysis', 'true');
             }
 
+            // Fix #9: Send RAG engine toggle overrides from Settings panel
+            if (appSettings.hyde === false) params.append('useHyde', 'false');
+            if (appSettings.graphrag === false) params.append('useGraphRag', 'false');
+            if (appSettings.reranking === false) params.append('useReranking', 'false');
+
             const startTime = Date.now();
             const response = await guardedFetch(`${API_BASE}/ask/enhanced?${params.toString()}`);
             if (!response.ok) {
@@ -7742,6 +7747,11 @@
             if (state.deepAnalysisEnabled) {
                 params.append('deepAnalysis', 'true');
             }
+
+            // Fix #9: Send RAG engine toggle overrides from Settings panel
+            if (appSettings.hyde === false) params.append('useHyde', 'false');
+            if (appSettings.graphrag === false) params.append('useGraphRag', 'false');
+            if (appSettings.reranking === false) params.append('useReranking', 'false');
 
             // Show complexity warning for DOCUMENT routing queries
             const isDocumentRoute = /summary|overview|comprehensive|all|compare|analyze|relationship|entire|full/i.test(query);

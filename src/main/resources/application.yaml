@@ -648,5 +648,6 @@ app:
 
 sentinel:
   bootstrap:
-    enabled: false
-    admin-password: ${SENTINEL_ADMIN_PASSWORD:}
+    enabled: ${SENTINEL_BOOTSTRAP_ENABLED:false}
+    reset-admin: ${SENTINEL_BOOTSTRAP_RESET_ADMIN:false}
+    admin-password: ${SENTINEL_BOOTSTRAP_ADMIN_PASSWORD:${SENTINEL_ADMIN_PASSWORD:}}
