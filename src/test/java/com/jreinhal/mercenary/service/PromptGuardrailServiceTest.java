@@ -145,16 +145,13 @@ class PromptGuardrailServiceTest {
     @DisplayName("Layer 3 LLM Classification Parsing")
     class LlmClassificationParsingTest {
 
-        private ChatClient.Builder mockBuilder;
-        private ChatClient mockChatClient;
-        private ChatClient.ChatClientRequestSpec mockRequest;
         private ChatClient.CallResponseSpec mockCallResponse;
 
         @BeforeEach
         void setUpLlmMocks() {
-            mockBuilder = mock(ChatClient.Builder.class);
-            mockChatClient = mock(ChatClient.class);
-            mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
+            ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
+            ChatClient mockChatClient = mock(ChatClient.class);
+            ChatClient.ChatClientRequestSpec mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
             mockCallResponse = mock(ChatClient.CallResponseSpec.class);
 
             when(mockBuilder.build()).thenReturn(mockChatClient);

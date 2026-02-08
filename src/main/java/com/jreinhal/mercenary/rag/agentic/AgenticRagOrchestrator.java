@@ -33,15 +33,15 @@ public class AgenticRagOrchestrator {
     private final SelfRagService selfRag;
     private final VectorStore vectorStore;
     private final ReasoningTracer reasoningTracer;
-    @Value(value="${sentinel.agentic.enabled:false}")
+    @Value("${sentinel.agentic.enabled:false}")
     private boolean enabled;
-    @Value(value="${sentinel.agentic.max-iterations:3}")
+    @Value("${sentinel.agentic.max-iterations:3}")
     private int maxIterations;
-    @Value(value="${sentinel.agentic.use-hyde:true}")
+    @Value("${sentinel.agentic.use-hyde:true}")
     private boolean useHyde;
-    @Value(value="${sentinel.agentic.use-selfrag:true}")
+    @Value("${sentinel.agentic.use-selfrag:true}")
     private boolean useSelfRag;
-    @Value(value="${sentinel.agentic.confidence-threshold:0.6}")
+    @Value("${sentinel.agentic.confidence-threshold:0.6}")
     private double confidenceThreshold;
 
     public AgenticRagOrchestrator(AdaptiveRagService adaptiveRag, CragGraderService cragGrader, RewriteService rewriteService, HydeService hydeService, SelfRagService selfRag, VectorStore vectorStore, ReasoningTracer reasoningTracer) {
@@ -60,6 +60,10 @@ public class AgenticRagOrchestrator {
     }
 
     public AgenticResult process(String query, String department) {
+        return process(query, department, true);
+    }
+
+    public AgenticResult process(String query, String department, boolean hydeAllowed) {
         double confidence;
         String response;
         long startTime = System.currentTimeMillis();
@@ -81,7 +85,7 @@ public class AgenticRagOrchestrator {
         for (int iteration = 0; iteration < this.maxIterations; ++iteration) {
             boolean shouldUseHyde;
             metrics.put("iteration", iteration + 1);
-            boolean bl = shouldUseHyde = this.useHyde && (this.hydeService.shouldUseHyde(routing.signals()) || this.hydeService.isSuitableForHyde(currentQuery));
+            boolean bl = shouldUseHyde = this.useHyde && hydeAllowed && (this.hydeService.shouldUseHyde(routing.signals()) || this.hydeService.isSuitableForHyde(currentQuery));
             if (shouldUseHyde) {
                 executedSteps.add("HYDE_RETRIEVAL");
                 HydeService.HydeResult hydeResult = this.hydeService.retrieve(currentQuery, department);

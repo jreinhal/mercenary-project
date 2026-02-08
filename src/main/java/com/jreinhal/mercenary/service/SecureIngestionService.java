@@ -299,10 +299,7 @@ public class SecureIngestionService {
             return true;
         }
         // Shell script shebang: '#!'
-        if (bytes.length >= 2 && bytes[0] == 0x23 && bytes[1] == 0x21) {
-            return true;
-        }
-        return false;
+        return bytes.length >= 2 && bytes[0] == 0x23 && bytes[1] == 0x21;
     }
 
     private String getExtension(String filename) {

@@ -2425,6 +2425,7 @@ public class RagOrchestrationService {
     // Fix #9: Overloaded method accepting per-request RAG engine overrides from frontend settings.
     // Per-request overrides can only DISABLE engines; they cannot force-enable server-disabled engines.
     private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty, boolean deepAnalysis, RetrievalOverrides overrides) {
+        boolean hydeAllowed = overrides.useHyde() == null || overrides.useHyde();
         boolean graphRagAllowed = overrides.useGraphRag() == null || overrides.useGraphRag();
         boolean rerankingAllowed = overrides.useReranking() == null || overrides.useReranking();
         boolean complexQuery = routing != null && routing.decision() == AdaptiveRagService.RoutingDecision.DOCUMENT;
@@ -2505,7 +2506,7 @@ public class RagOrchestrationService {
         }
 
         if (this.agenticRagOrchestrator != null && this.agenticRagOrchestrator.isEnabled() && advancedNeeded) {
-            AgenticRagOrchestrator.AgenticResult agenticResult = this.agenticRagOrchestrator.process(query, dept);
+            AgenticRagOrchestrator.AgenticResult agenticResult = this.agenticRagOrchestrator.process(query, dept, hydeAllowed);
             if (agenticResult.sources() != null && !agenticResult.sources().isEmpty()) {
                 textDocs.addAll(agenticResult.sources());
                 strategies.add("Agentic");
