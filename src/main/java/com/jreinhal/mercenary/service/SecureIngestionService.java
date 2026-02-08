@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.PiiRedactionService;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
@@ -240,24 +241,24 @@ public class SecureIngestionService {
 
     private void validateFileType(String filename, String detectedMimeType, byte[] bytes) {
         if (BLOCKED_MIME_TYPES.contains(detectedMimeType)) {
-            log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", filename, detectedMimeType);
+            log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", LogSanitizer.sanitize(filename), LogSanitizer.sanitize(detectedMimeType));
             throw new SecurityException("File type not allowed: " + detectedMimeType + ". Executable and script files are blocked.");
         }
         if (this.hasExecutableMagic(bytes)) {
-            log.error("SECURITY: Blocked executable magic bytes. File: {}", filename);
+            log.error("SECURITY: Blocked executable magic bytes. File: {}", LogSanitizer.sanitize(filename));
             throw new SecurityException("File content appears to be an executable and is not allowed: " + filename);
         }
         String extension = this.getExtension(filename).toLowerCase();
         if ("pdf".equals(extension) && !"application/pdf".equals(detectedMimeType)) {
-            log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", detectedMimeType, filename);
+            log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", LogSanitizer.sanitize(detectedMimeType), LogSanitizer.sanitize(filename));
         }
         // Fix #4: Block content-type/extension mismatch — PDF content with non-PDF extension
         if ("application/pdf".equals(detectedMimeType) && !"pdf".equals(extension)) {
-            log.error("SECURITY: PDF content disguised as .{} file: {}", extension, filename);
+            log.error("SECURITY: PDF content disguised as .{} file: {}", LogSanitizer.sanitize(extension), LogSanitizer.sanitize(filename));
             throw new SecurityException("Content type mismatch: file contains PDF data but has ." + extension + " extension.");
         }
         if (Set.of("exe", "dll", "bat", "sh", "cmd", "ps1", "jar").contains(extension)) {
-            log.error("SECURITY: Executable extension blocked: {}", filename);
+            log.error("SECURITY: Executable extension blocked: {}", LogSanitizer.sanitize(filename));
             throw new SecurityException("Executable files are not allowed: " + filename);
         }
     }
