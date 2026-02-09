@@ -226,6 +226,8 @@ sentinel:
   connectors:
     enabled: ${SENTINEL_CONNECTORS_ENABLED:true}
     allow-regulated: ${SENTINEL_CONNECTORS_ALLOW_REGULATED:false}
+    sync-enabled: ${CONNECTOR_SYNC_ENABLED:false}
+    sync-cron: ${CONNECTOR_SYNC_CRON:0 0 2 * * ?}
     sharepoint:
       enabled: ${SENTINEL_SHAREPOINT_ENABLED:false}
       graph-base: ${SENTINEL_SHAREPOINT_GRAPH:https://graph.microsoft.com/v1.0}
@@ -253,6 +255,8 @@ sentinel:
       secret-key: ${SENTINEL_S3_SECRET_KEY:}
       max-files: ${SENTINEL_S3_MAX_FILES:100}
       department: ${SENTINEL_S3_DEPT:ENTERPRISE}
+      # Additional trusted S3-compatible endpoint domains (beyond built-in AWS, R2, DigitalOcean, Backblaze)
+      allowed-domains: ${SENTINEL_S3_ALLOWED_DOMAINS:}
 
   # HiFi-RAG Pipeline (arXiv:2512.22442v1)
   # Hierarchical filtering + two-pass generation
