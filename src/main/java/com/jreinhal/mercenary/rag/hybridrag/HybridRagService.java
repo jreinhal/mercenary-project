@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -82,7 +83,12 @@ public class HybridRagService {
         LinkedHashMap<String, List<RankedDoc>> semanticResults = new LinkedHashMap<String, List<RankedDoc>>();
         LinkedHashMap<String, CompletableFuture<List<RankedDoc>>> futures = new LinkedHashMap<>();
         for (String variant : queryVariants) {
-            futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept, workspaceId), this.ragExecutor));
+            try {
+                futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept, workspaceId), this.ragExecutor));
+            } catch (RejectedExecutionException e) {
+                log.warn("RAG thread pool overloaded; skipping variant '{}': {}", variant, e.getMessage());
+                futures.put(variant, CompletableFuture.completedFuture(List.of()));
+            }
         }
         long semanticDeadlineMs = startTime + TimeUnit.SECONDS.toMillis(this.futureTimeoutSeconds);
         for (Map.Entry<String, CompletableFuture<List<RankedDoc>>> entry : futures.entrySet()) {

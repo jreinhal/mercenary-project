@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -120,8 +121,20 @@ public class MegaRagService {
         }
         String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         long startTime = System.currentTimeMillis();
-        CompletableFuture<List<Document>> textFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceExcludingType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
-        CompletableFuture<List<Document>> visualFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceAndType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
+        CompletableFuture<List<Document>> textFuture;
+        CompletableFuture<List<Document>> visualFuture;
+        try {
+            textFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceExcludingType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
+        } catch (RejectedExecutionException e) {
+            log.warn("RAG thread pool overloaded; text retrieval rejected: {}", e.getMessage());
+            textFuture = CompletableFuture.completedFuture(List.of());
+        }
+        try {
+            visualFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceAndType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
+        } catch (RejectedExecutionException e) {
+            log.warn("RAG thread pool overloaded; visual retrieval rejected: {}", e.getMessage());
+            visualFuture = CompletableFuture.completedFuture(List.of());
+        }
         List<Document> textDocs;
         List<Document> visualDocs;
         try {

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
@@ -77,7 +78,12 @@ public class CrossEncoderReranker {
             List<Document> batch = documents.subList(i, end);
             ArrayList<Future<HiFiRagService.ScoredDocument>> futures = new ArrayList<Future<HiFiRagService.ScoredDocument>>();
             for (Document document : batch) {
-                futures.add(this.executor.submit(() -> this.scoreDocument(query, document)));
+                try {
+                    futures.add(this.executor.submit(() -> this.scoreDocument(query, document)));
+                } catch (RejectedExecutionException e) {
+                    log.warn("Reranker thread pool overloaded; skipping document scoring: {}", e.getMessage());
+                    break;
+                }
             }
             for (Future<HiFiRagService.ScoredDocument> future : futures) {
                 try {
