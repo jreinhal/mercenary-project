@@ -199,7 +199,7 @@ public class RagOrchestrationService {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
-            department = Department.valueOf(dept.toUpperCase());
+            department = Department.fromString(dept.toUpperCase());
         }
         catch (IllegalArgumentException e) {
             return "INVALID SECTOR: unrecognized department value";
@@ -513,7 +513,7 @@ public class RagOrchestrationService {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
-            department = Department.valueOf(dept.toUpperCase());
+            department = Department.fromString(dept.toUpperCase());
         }
         catch (IllegalArgumentException e) {
             return new EnhancedAskResponse("INVALID SECTOR: unrecognized department value", List.of(), List.of(), Map.of(), null);
@@ -2475,7 +2475,7 @@ public class RagOrchestrationService {
         Set<ModalityRouter.ModalityTarget> modalities = this.modalityRouter != null ? this.modalityRouter.route(query) : Set.of(ModalityRouter.ModalityTarget.TEXT);
         boolean allowVisual = true;
         try {
-            Department department = Department.valueOf(dept.toUpperCase());
+            Department department = Department.fromString(dept.toUpperCase());
             allowVisual = !this.hipaaPolicy.shouldDisableVisual(department);
         } catch (IllegalArgumentException ignored) {
         }

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class LicenseControllerTest {
 
@@ -59,6 +60,18 @@ class LicenseControllerTest {
         assertEquals("RAG", res.getBody().feature());
         assertTrue(res.getBody().available());
         assertEquals("ENTERPRISE", res.getBody().edition());
+    }
+
+    @Test
+    void legacyProfessionalEditionMapsToEnterprise() {
+        LicenseService licenseService = new LicenseService();
+        ReflectionTestUtils.setField(licenseService, "editionString", "PROFESSIONAL");
+        ReflectionTestUtils.setField(licenseService, "licenseKey", "");
+        ReflectionTestUtils.setField(licenseService, "trialStartDate", "");
+        ReflectionTestUtils.setField(licenseService, "trialDays", 30);
+        licenseService.initialize();
+
+        assertEquals(LicenseService.Edition.ENTERPRISE, licenseService.getEdition());
     }
 }
 

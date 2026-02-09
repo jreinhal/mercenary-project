@@ -275,7 +275,7 @@ public class MercenaryController {
             }
             return new InspectResponse("ERROR: Invalid sector.", List.of(), false, 0);
         }
-        Department department = Department.valueOf(dept);
+        Department department = Department.fromString(dept);
         if (this.sectorConfig.requiresElevatedClearance(department) && !user.canAccessClassification(department.getRequiredClearance())) {
             this.auditService.logAccessDenied(user, "/api/inspect", "Insufficient clearance for " + dept, null);
             return new InspectResponse("ACCESS DENIED: Insufficient clearance for " + dept, List.of(), false, 0);
@@ -361,7 +361,7 @@ public class MercenaryController {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
-            department = Department.valueOf(dept.toUpperCase(Locale.ROOT));
+            department = Department.fromString(dept.toUpperCase(Locale.ROOT));
         }
         catch (IllegalArgumentException e) {
             // H-05: Do not reflect unsanitized user input in error responses
@@ -489,7 +489,7 @@ public class MercenaryController {
 
         Department department;
         try {
-            department = Department.valueOf(dept.toUpperCase(Locale.ROOT));
+            department = Department.fromString(dept.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             sendSseError(emitter, "INVALID SECTOR: unrecognized department value");
             return emitter;

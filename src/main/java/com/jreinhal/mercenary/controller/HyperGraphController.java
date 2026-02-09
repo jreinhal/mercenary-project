@@ -98,7 +98,7 @@ public class HyperGraphController {
         }
 
         // Security: Check sector access
-        Department department = Department.valueOf(dept);
+        Department department = Department.fromString(dept);
         if (sectorConfig.requiresElevatedClearance(department) &&
             !user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/graph/entities", "Insufficient clearance for " + dept, null);
@@ -178,7 +178,7 @@ public class HyperGraphController {
         }
 
         // Security: Check sector access
-        Department department = Department.valueOf(dept);
+        Department department = Department.fromString(dept);
         if (sectorConfig.requiresElevatedClearance(department) &&
             !user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/graph/neighbors", "Insufficient clearance for " + dept, null);
@@ -303,7 +303,7 @@ public class HyperGraphController {
         }
 
         // Security: Check sector access
-        Department department = Department.valueOf(dept);
+        Department department = Department.fromString(dept);
         if (sectorConfig.requiresElevatedClearance(department) &&
             !user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/graph/search", "Insufficient clearance for " + dept, null);
@@ -376,7 +376,7 @@ public class HyperGraphController {
         }
 
         // Security: Check sector access
-        Department department = Department.valueOf(dept);
+        Department department = Department.fromString(dept);
         if (sectorConfig.requiresElevatedClearance(department) &&
             !user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/graph/stats", "Insufficient clearance for " + dept, null);
@@ -454,7 +454,7 @@ public class HyperGraphController {
         }
 
         // Security: Check sector access
-        Department department = Department.valueOf(dept);
+        Department department = Department.fromString(dept);
         if (sectorConfig.requiresElevatedClearance(department) &&
             !user.canAccessClassification(department.getRequiredClearance())) {
             auditService.logAccessDenied(user, "/api/graph/edges", "Insufficient clearance for " + dept, null);

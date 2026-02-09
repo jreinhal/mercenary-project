@@ -364,7 +364,7 @@ public class CaseService {
             return true;
         }
         try {
-            Department dept = Department.valueOf(sector.toUpperCase(Locale.ROOT));
+            Department dept = Department.fromString(sector.toUpperCase(Locale.ROOT));
             boolean hasClearance = user.getClearance().ordinal() >= dept.getRequiredClearance().ordinal();
             java.util.Set<Department> allowedSectors = user.getAllowedSectors();
             boolean isAllowed = allowedSectors == null || allowedSectors.isEmpty() || allowedSectors.contains(dept);

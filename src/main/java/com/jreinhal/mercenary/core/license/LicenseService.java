@@ -37,8 +37,14 @@ public class LicenseService {
     }
 
     private Edition parseEdition(String value) {
+        String normalized = value.toUpperCase().trim();
+        // Backward compatibility: PROFESSIONAL was renamed to ENTERPRISE
+        if ("PROFESSIONAL".equals(normalized)) {
+            log.info("Mapping legacy edition PROFESSIONAL to ENTERPRISE");
+            return Edition.ENTERPRISE;
+        }
         try {
-            return Edition.valueOf(value.toUpperCase());
+            return Edition.valueOf(normalized);
         }
         catch (IllegalArgumentException e) {
             log.warn("Unknown edition '{}', defaulting to TRIAL", value);

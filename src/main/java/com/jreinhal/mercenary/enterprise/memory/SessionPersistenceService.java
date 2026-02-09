@@ -365,7 +365,7 @@ public class SessionPersistenceService implements SessionPersistenceProvider {
             return null;
         }
         try {
-            return Department.valueOf(dept.toUpperCase());
+            return Department.fromString(dept.toUpperCase());
         } catch (IllegalArgumentException e) {
             return null;
         }

@@ -167,4 +167,33 @@ class SectorIsolationTest {
         assertNotNull(Department.MEDICAL.getRequiredClearance());
         assertNotNull(Department.ENTERPRISE.getRequiredClearance());
     }
+
+    @Test
+    @DisplayName("Legacy FINANCE alias resolves to ENTERPRISE")
+    void legacyFinanceResolvesToEnterprise() {
+        assertEquals(Department.ENTERPRISE, Department.fromString("FINANCE"));
+        assertEquals(Department.ENTERPRISE, Department.fromString("finance"));
+        assertEquals(Department.ENTERPRISE, Department.fromString("Finance"));
+    }
+
+    @Test
+    @DisplayName("Legacy ACADEMIC alias resolves to ENTERPRISE")
+    void legacyAcademicResolvesToEnterprise() {
+        assertEquals(Department.ENTERPRISE, Department.fromString("ACADEMIC"));
+        assertEquals(Department.ENTERPRISE, Department.fromString("academic"));
+    }
+
+    @Test
+    @DisplayName("fromString resolves current department names")
+    void fromStringResolvesCurrentNames() {
+        assertEquals(Department.GOVERNMENT, Department.fromString("GOVERNMENT"));
+        assertEquals(Department.MEDICAL, Department.fromString("medical"));
+        assertEquals(Department.ENTERPRISE, Department.fromString("Enterprise"));
+    }
+
+    @Test
+    @DisplayName("fromString throws on unknown department")
+    void fromStringThrowsOnUnknown() {
+        assertThrows(IllegalArgumentException.class, () -> Department.fromString("UNKNOWN"));
+    }
 }

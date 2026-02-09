@@ -271,7 +271,7 @@ public class HybridRagService {
             return null;
         }
         try {
-            return Department.valueOf(department.trim().toUpperCase()).name();
+            return Department.fromString(department.trim().toUpperCase()).name();
         }
         catch (IllegalArgumentException e) {
             return null;
