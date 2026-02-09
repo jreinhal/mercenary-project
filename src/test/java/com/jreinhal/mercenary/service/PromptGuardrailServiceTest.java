@@ -1,14 +1,16 @@
 package com.jreinhal.mercenary.service;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
 class PromptGuardrailServiceTest {
 
@@ -128,5 +130,159 @@ class PromptGuardrailServiceTest {
         assertTrue(result.blocked(), "Should be blocked");
         assertNotNull(result.reason(), "Should have a reason");
         assertEquals("MALICIOUS", result.classification(), "Should be classified as malicious");
+    }
+
+    /**
+     * Tests for Layer 3 (LLM) classification parsing.
+     * Finding #2: The .contains("MALICIOUS") anti-pattern causes false positives
+     * when LLM responses contain explanatory text like "This is safe, not malicious".
+     *
+     * These tests mock the ChatClient to simulate various LLM response formats and
+     * verify that the parser correctly extracts the classification from the first word
+     * or JSON field, not from substring matching across the full response.
+     */
+    @Nested
+    @DisplayName("Layer 3 LLM Classification Parsing")
+    class LlmClassificationParsingTest {
+
+        private ChatClient.CallResponseSpec mockCallResponse;
+
+        @BeforeEach
+        void setUpLlmMocks() {
+            ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
+            ChatClient mockChatClient = mock(ChatClient.class);
+            ChatClient.ChatClientRequestSpec mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
+            mockCallResponse = mock(ChatClient.CallResponseSpec.class);
+
+            when(mockBuilder.build()).thenReturn(mockChatClient);
+            when(mockChatClient.prompt()).thenReturn(mockRequest);
+            when(mockRequest.system(anyString())).thenReturn(mockRequest);
+            when(mockRequest.user(anyString())).thenReturn(mockRequest);
+            when(mockRequest.options(any())).thenReturn(mockRequest);
+            when(mockRequest.call()).thenReturn(mockCallResponse);
+
+            guardrailService = new PromptGuardrailService(mockBuilder);
+            ReflectionTestUtils.setField(guardrailService, "enabled", true);
+            ReflectionTestUtils.setField(guardrailService, "llmEnabled", true);
+            ReflectionTestUtils.setField(guardrailService, "strictMode", false);
+            ReflectionTestUtils.setField(guardrailService, "llmTimeoutMs", 5000L);
+            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerEnabled", false);
+        }
+
+        @Test
+        @DisplayName("Should NOT block when LLM says 'This is safe, not malicious'")
+        void shouldNotBlockWhenLlmExplainsNotMalicious() {
+            // This is the core false positive bug: LLM returns explanatory text
+            // containing the word "malicious" in a negation context
+            when(mockCallResponse.content()).thenReturn("This query is safe, not malicious in any way.");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("Hello");
+
+            assertFalse(result.blocked(),
+                "Query should NOT be blocked when LLM explanation contains 'malicious' in negation");
+        }
+
+        @Test
+        @DisplayName("Should NOT block when LLM says 'SAFE - not a malicious query'")
+        void shouldNotBlockWhenLlmSafeWithExplanation() {
+            when(mockCallResponse.content()).thenReturn("SAFE - the query appears benign, not malicious");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("What is the budget?");
+
+            assertFalse(result.blocked(),
+                "Query should NOT be blocked when LLM starts with SAFE");
+        }
+
+        @Test
+        @DisplayName("Should block when LLM returns single-word MALICIOUS")
+        void shouldBlockWhenLlmReturnsMalicious() {
+            when(mockCallResponse.content()).thenReturn("MALICIOUS");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("test query");
+
+            assertTrue(result.blocked(),
+                "Query should be blocked when LLM returns MALICIOUS");
+            assertEquals("MALICIOUS", result.classification());
+        }
+
+        @Test
+        @DisplayName("Should NOT block when LLM returns single-word SAFE")
+        void shouldNotBlockWhenLlmReturnsSafe() {
+            when(mockCallResponse.content()).thenReturn("SAFE");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("Hello");
+
+            assertFalse(result.blocked(),
+                "Query should NOT be blocked when LLM returns SAFE");
+        }
+
+        @Test
+        @DisplayName("Should block when LLM returns JSON with MALICIOUS classification")
+        void shouldBlockWhenLlmReturnsJsonMalicious() {
+            when(mockCallResponse.content()).thenReturn("{\"classification\":\"MALICIOUS\"}");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("test query");
+
+            assertTrue(result.blocked(),
+                "Query should be blocked when JSON classification is MALICIOUS");
+        }
+
+        @Test
+        @DisplayName("Should NOT block when LLM returns JSON with SAFE classification")
+        void shouldNotBlockWhenLlmReturnsJsonSafe() {
+            when(mockCallResponse.content()).thenReturn("{\"classification\":\"SAFE\"}");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("What is 2 plus 2?");
+
+            assertFalse(result.blocked(),
+                "Query should NOT be blocked when JSON classification is SAFE");
+        }
+
+        @Test
+        @DisplayName("Should block SUSPICIOUS in strict mode when LLM returns SUSPICIOUS")
+        void shouldBlockSuspiciousInStrictMode() {
+            ReflectionTestUtils.setField(guardrailService, "strictMode", true);
+            when(mockCallResponse.content()).thenReturn("SUSPICIOUS");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("test query");
+
+            assertTrue(result.blocked(),
+                "Query should be blocked when LLM returns SUSPICIOUS and strict mode is on");
+        }
+
+        @Test
+        @DisplayName("Should NOT block SUSPICIOUS when strict mode is off")
+        void shouldNotBlockSuspiciousWhenStrictModeOff() {
+            ReflectionTestUtils.setField(guardrailService, "strictMode", false);
+            when(mockCallResponse.content()).thenReturn("SUSPICIOUS");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("test query");
+
+            assertFalse(result.blocked(),
+                "SUSPICIOUS should not be blocked when strict mode is off");
+        }
+
+        @Test
+        @DisplayName("Should default to SAFE for unrecognized LLM responses")
+        void shouldDefaultToSafeForUnrecognizedResponse() {
+            when(mockCallResponse.content()).thenReturn(
+                "I cannot determine the classification of this query. It seems ambiguous.");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("Hello world");
+
+            assertFalse(result.blocked(),
+                "Unrecognized LLM response should default to SAFE");
+        }
+
+        @Test
+        @DisplayName("Should handle LLM response with leading/trailing whitespace")
+        void shouldHandleWhitespaceInResponse() {
+            when(mockCallResponse.content()).thenReturn("  SAFE  \n");
+
+            PromptGuardrailService.GuardrailResult result = guardrailService.analyze("What is the status?");
+
+            assertFalse(result.blocked(),
+                "Whitespace-padded SAFE response should not be blocked");
+        }
     }
 }

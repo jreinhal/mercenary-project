@@ -223,4 +223,105 @@ class SecureIngestionServiceTest {
         // Verify vector store was called (documents were added)
         verify(vectorStore, atLeastOnce()).add(anyList());
     }
+
+    // ─── Fix #4: Magic byte detection for archive/container formats ───
+
+    @Test
+    @DisplayName("Fix #4: Should block ZIP archives disguised as .txt")
+    void shouldBlockZipDisguisedAsTxt() {
+        // ZIP magic bytes: PK\x03\x04
+        byte[] zipMagic = new byte[]{0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "fake_zip.txt", "text/plain", zipMagic);
+
+        assertThrows(SecurityException.class,
+            () -> ingestionService.ingest(file, Department.ENTERPRISE),
+            "ZIP archive disguised as .txt should be blocked");
+    }
+
+    @Test
+    @DisplayName("Fix #4: Should block Java class files disguised as .txt")
+    void shouldBlockJavaClassDisguisedAsTxt() {
+        // Java class magic bytes: 0xCAFEBABE
+        byte[] classMagic = new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE,
+            0x00, 0x00, 0x00, 0x34, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "fake_class.txt", "text/plain", classMagic);
+
+        assertThrows(SecurityException.class,
+            () -> ingestionService.ingest(file, Department.ENTERPRISE),
+            "Java class file disguised as .txt should be blocked");
+    }
+
+    @Test
+    @DisplayName("Fix #4: Should block PDF files disguised as .txt")
+    void shouldBlockPdfDisguisedAsTxt() {
+        // PDF magic bytes: %PDF-1.4
+        byte[] pdfMagic = "%PDF-1.4 fake content that is not actually a pdf".getBytes();
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "fake_pdf.txt", "text/plain", pdfMagic);
+
+        assertThrows(SecurityException.class,
+            () -> ingestionService.ingest(file, Department.ENTERPRISE),
+            "PDF file disguised as .txt should be blocked");
+    }
+
+    @Test
+    @DisplayName("Fix #4: Should block RAR archives disguised as .txt")
+    void shouldBlockRarDisguisedAsTxt() {
+        // RAR magic bytes: Rar!\x1a\x07\x00
+        byte[] rarMagic = new byte[]{0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "fake_rar.txt", "text/plain", rarMagic);
+
+        assertThrows(SecurityException.class,
+            () -> ingestionService.ingest(file, Department.ENTERPRISE),
+            "RAR archive disguised as .txt should be blocked");
+    }
+
+    @Test
+    @DisplayName("Fix #4: Should block shell scripts disguised as .txt")
+    void shouldBlockShellScriptDisguisedAsTxt() {
+        byte[] shebang = "#!/bin/bash\nrm -rf /\n".getBytes();
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "fake_sh.txt", "text/plain", shebang);
+
+        assertThrows(SecurityException.class,
+            () -> ingestionService.ingest(file, Department.ENTERPRISE),
+            "Shell script disguised as .txt should be blocked");
+    }
+
+    @Test
+    @DisplayName("Fix #4: Should block 7-Zip archives")
+    void shouldBlock7ZipArchives() {
+        // 7z magic bytes: 7z\xBC\xAF\x27\x1C
+        byte[] sevenZMagic = new byte[]{0x37, 0x7A, (byte) 0xBC, (byte) 0xAF, 0x27, 0x1C,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "archive.7z", "application/octet-stream", sevenZMagic);
+
+        assertThrows(SecurityException.class,
+            () -> ingestionService.ingest(file, Department.ENTERPRISE),
+            "7-Zip archive should be blocked");
+    }
+
+    @Test
+    @DisplayName("Fix #4: Should still accept legitimate text files")
+    void shouldStillAcceptLegitimateTextFiles() {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "report.txt", "text/plain",
+            "This is a legitimate text report with normal ASCII content.".getBytes());
+
+        when(piiRedactionService.redact(anyString(), any()))
+            .thenReturn(new PiiRedactionService.RedactionResult(
+                "This is a legitimate text report with normal ASCII content.",
+                java.util.Collections.emptyMap()));
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE),
+            "Legitimate text files should still be accepted after blocklist expansion");
+    }
 }

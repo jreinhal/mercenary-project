@@ -229,6 +229,9 @@ public class RagOrchestrationService {
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
+        // Fix #3: Redact PII from user query BEFORE any pipeline processing.
+        // All downstream stages (guardrail, routing, retrieval, LLM, audit) use the redacted query.
+        query = this.piiRedactionService.redact(query, hipaaStrict ? Boolean.TRUE : null).getRedactedContent();
         try {
             String rescued;
             String response;
@@ -330,7 +333,9 @@ public class RagOrchestrationService {
              }
             catch (TimeoutException te) {
                 llmSuccess = false;
-                log.warn("LLM response timed out after {}s for query {}", llmTimeoutSeconds, LogSanitizer.querySummary(query));
+                if (log.isWarnEnabled()) {
+                    log.warn("LLM response timed out after {}s for query {}", llmTimeoutSeconds, LogSanitizer.querySummary(query));
+                }
                 response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try:\n- Simplifying your question\n- Asking about a more specific topic\n- Trying again in a moment";
             }
             catch (Exception llmError) {
@@ -437,7 +442,9 @@ public class RagOrchestrationService {
             if (!skipHallucinationCheckAsk) {
                 QuCoRagService.HallucinationResult hallucinationResult = this.quCoRagService.detectHallucinationRisk(response, query);
                 if (hallucinationResult.isHighRisk()) {
-                    log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}", hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
+                    if (log.isWarnEnabled()) {
+                        log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}", hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
+                    }
                     RetrievalContext retryContext = this.retrieveContext(query, dept, activeFiles, routing, true, false);
                     if (!retryContext.textDocuments().isEmpty()) {
                         String retryInfo = this.buildInformation(retryContext.textDocuments(), retryContext.globalContext());
@@ -455,7 +462,9 @@ public class RagOrchestrationService {
                             }
                         }
                         catch (Exception retryError) {
-                            log.warn("QuCo-RAG retry generation failed: {}", retryError.getMessage());
+                            if (log.isWarnEnabled()) {
+                                log.warn("QuCo-RAG retry generation failed: {}", retryError.getMessage());
+                            }
                         }
                     } else {
                         response = NO_RELEVANT_RECORDS;
@@ -484,7 +493,23 @@ public class RagOrchestrationService {
             throw e;
         }
     }
+    /**
+     * Fix #9: Accept per-request RAG engine overrides from frontend settings toggles.
+     * When null, the server-side default (from application.yaml / env vars) is used.
+     */
+    public record RetrievalOverrides(Boolean useHyde, Boolean useGraphRag, Boolean useReranking) {
+        static final RetrievalOverrides DEFAULTS = new RetrievalOverrides(null, null, null);
+    }
+
+    public EnhancedAskResponse askEnhanced(String query, String dept, List<String> fileParams, String filesParam, String sessionId, boolean deepAnalysis, Boolean useHyde, Boolean useGraphRag, Boolean useReranking, HttpServletRequest request) {
+        return askEnhanced(query, dept, fileParams, filesParam, sessionId, deepAnalysis, new RetrievalOverrides(useHyde, useGraphRag, useReranking), request);
+    }
+
     public EnhancedAskResponse askEnhanced(String query, String dept, List<String> fileParams, String filesParam, String sessionId, boolean deepAnalysis, HttpServletRequest request) {
+        return askEnhanced(query, dept, fileParams, filesParam, sessionId, deepAnalysis, RetrievalOverrides.DEFAULTS, request);
+    }
+
+    private EnhancedAskResponse askEnhanced(String query, String dept, List<String> fileParams, String filesParam, String sessionId, boolean deepAnalysis, RetrievalOverrides overrides, HttpServletRequest request) {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
@@ -519,8 +544,9 @@ public class RagOrchestrationService {
         }
         boolean hipaaStrict = this.hipaaPolicy.isStrict(department);
         List<String> activeFiles = this.parseActiveFiles(fileParams, filesParam);
+        // Fix #3: Redact PII from user query BEFORE any pipeline processing.
+        query = this.piiRedactionService.redact(query, hipaaStrict ? Boolean.TRUE : null).getRedactedContent();
         String effectiveSessionId = sessionId;
-        String effectiveQuery = query;
         if (sessionId != null && !sessionId.isBlank()) {
             try {
                 if (!this.hipaaPolicy.shouldDisableSessionMemory(department)
@@ -530,7 +556,7 @@ public class RagOrchestrationService {
                     this.conversationMemoryService.saveUserMessage(user.getId(), sessionId, query);
                     if (this.conversationMemoryService.isFollowUp(query)) {
                         ConversationMemoryProvider.ConversationContext context = this.conversationMemoryService.getContext(user.getId(), sessionId);
-                        effectiveQuery = this.conversationMemoryService.expandFollowUp(query, context);
+                        query = this.conversationMemoryService.expandFollowUp(query, context);
                         log.debug("Expanded follow-up query for session {}", sessionId);
                     }
                 } else if (this.conversationMemoryService == null || this.sessionPersistenceService == null) {
@@ -540,7 +566,9 @@ public class RagOrchestrationService {
                 }
             }
             catch (Exception e) {
-                log.warn("Session operation failed, continuing without session: {}", e.getMessage());
+                if (log.isWarnEnabled()) {
+                    log.warn("Session operation failed, continuing without session: {}", e.getMessage());
+                }
                 effectiveSessionId = null;
             }
         }
@@ -584,7 +612,9 @@ public class RagOrchestrationService {
                     directResponse = cleanLlmResponse(rawResponse);
                 }
                 catch (TimeoutException te) {
-                    log.warn("LLM response timed out after {}s for ZeroHop query {}", llmTimeoutSeconds, LogSanitizer.querySummary(query));
+                    if (log.isWarnEnabled()) {
+                        log.warn("LLM response timed out after {}s for ZeroHop query {}", llmTimeoutSeconds, LogSanitizer.querySummary(query));
+                    }
                     directResponse = "**Response Timeout**\n\nThe system is taking longer than expected. Please try again.";
                 }
                 catch (Exception llmError) {
@@ -622,12 +652,12 @@ public class RagOrchestrationService {
             for (int i = 0; i < subQueries.size(); ++i) {
                 String subQuery = subQueries.get(i);
                 stepStart = System.currentTimeMillis();
-                RetrievalContext context = this.retrieveContext(subQuery, dept, activeFiles, routingResult, highUncertainty, deepAnalysis);
+                RetrievalContext context = this.retrieveContext(subQuery, dept, activeFiles, routingResult, highUncertainty, deepAnalysis, overrides);
                 if (context.textDocuments().isEmpty() && context.visualDocuments().isEmpty()) {
                     log.info("CRAG: Retrieval failed for '{}'. Initiating Corrective Loop.", subQuery);
                     String rewritten = this.rewriteService.rewriteQuery(subQuery);
                     if (!rewritten.equals(subQuery)) {
-                        context = this.retrieveContext(rewritten, dept, activeFiles, routingResult, highUncertainty, deepAnalysis);
+                        context = this.retrieveContext(rewritten, dept, activeFiles, routingResult, highUncertainty, deepAnalysis, overrides);
                     }
                 }
                 allDocs.addAll(context.textDocuments());
@@ -693,7 +723,9 @@ public class RagOrchestrationService {
             }
             catch (TimeoutException te) {
                 llmSuccess = false;
-                log.warn("LLM response timed out after {}s", llmTimeoutSeconds);
+                if (log.isWarnEnabled()) {
+                    log.warn("LLM response timed out after {}s", llmTimeoutSeconds);
+                }
                 response = "**Response Timeout**\n\nThe system is taking longer than expected. Please try:\n- Simplifying your question\n- Asking about a more specific topic\n- Trying again in a moment";
             }
             catch (Exception llmError) {
@@ -806,7 +838,9 @@ public class RagOrchestrationService {
                 : this.quCoRagService.detectHallucinationRisk(response, query);
             boolean hasHallucinationRisk = hallucinationResult.isHighRisk();
             if (hasHallucinationRisk) {
-                log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}", hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
+                if (log.isWarnEnabled()) {
+                    log.warn("QuCo-RAG: High hallucination risk detected (risk={:.3f}). Flagged entities: {}", hallucinationResult.riskScore(), hallucinationResult.flaggedEntities());
+                }
                 response = NO_RELEVANT_RECORDS;
                 answerable = false;
                 citationCount = 0;
@@ -897,6 +931,23 @@ public class RagOrchestrationService {
                 metrics.put("editionAppendEvidenceOnNoCitations", responsePolicy.appendEvidenceWhenNoCitations());
             }
             metrics.put("retrievalStrategies", retrievalStrategies);
+            // Fix #8: Persist conversation memory (assistant response, message count, reasoning trace)
+            if (effectiveSessionId != null && !this.hipaaPolicy.shouldDisableSessionMemory(department)
+                    && this.conversationMemoryService != null
+                    && this.sessionPersistenceService != null) {
+                try {
+                    List<String> responseSources = sources;
+                    this.conversationMemoryService.saveAssistantMessage(user.getId(), effectiveSessionId, response, responseSources);
+                    this.sessionPersistenceService.incrementMessageCount(effectiveSessionId);
+                    if (completedTrace != null) {
+                        this.sessionPersistenceService.persistTrace(completedTrace, effectiveSessionId);
+                    }
+                } catch (Exception memEx) {
+                    if (log.isWarnEnabled()) {
+                        log.warn("Session persistence failed (non-fatal): {}", memEx.getMessage());
+                    }
+                }
+            }
             return new EnhancedAskResponse(response, completedTrace != null ? completedTrace.getStepsAsMaps() : List.of(), sources, metrics, completedTrace != null ? completedTrace.getTraceId() : null);
         }
         catch (Exception e) {
@@ -1000,12 +1051,16 @@ public class RagOrchestrationService {
             }
             if (!allowedSources.isEmpty() && !RagOrchestrationService.citationsWithinScope(repaired, allowedSources)) {
                 // Fail closed: if the model cited unknown sources, do not accept the repaired answer.
-                log.warn("Citation repair produced out-of-scope citations; falling back to extractive evidence");
+                if (log.isWarnEnabled()) {
+                    log.warn("Citation repair produced out-of-scope citations; falling back to extractive evidence");
+                }
                 return draft;
             }
             return repaired;
         } catch (Exception e) {
-            log.warn("Citation repair failed; falling back to extractive evidence: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Citation repair failed; falling back to extractive evidence: {}", e.getMessage());
+            }
             return draft;
         }
     }
@@ -1155,11 +1210,15 @@ public class RagOrchestrationService {
             if (lines.length > 1) {
                 String remainder = String.join("\n", Arrays.copyOfRange(lines, 1, lines.length)).trim();
                 if (!remainder.isBlank()) {
-                    log.warn("Stripped malformed tool-call placeholder from LLM response (kept remainder)");
+                    if (log.isWarnEnabled()) {
+                        log.warn("Stripped malformed tool-call placeholder from LLM response (kept remainder)");
+                    }
                     return remainder;
                 }
             }
-            log.warn("Stripped malformed tool-call placeholder from LLM response (no remainder)");
+            if (log.isWarnEnabled()) {
+                log.warn("Stripped malformed tool-call placeholder from LLM response (no remainder)");
+            }
             return "";
         }
 
@@ -1188,8 +1247,10 @@ public class RagOrchestrationService {
                                 extracted = extracted.replace("\\\"", "\"")
                                                    .replace("\\n", "\n")
                                                    .replace("\\t", "\t");
-                                log.warn("Cleaned malformed function call response, extracted: {}...",
-                                    extracted.substring(0, Math.min(100, extracted.length())));
+                                if (log.isWarnEnabled()) {
+                                    log.warn("Cleaned malformed function call response, extracted: {}...",
+                                        extracted.substring(0, Math.min(100, extracted.length())));
+                                }
                                 return extracted;
                             }
                         }
@@ -1208,7 +1269,9 @@ public class RagOrchestrationService {
 
         // Also handle array of function calls: [{"name": ...}]
         if (normalized.startsWith("[{\"name\"")) {
-            log.warn("Detected array function call response, returning fallback");
+            if (log.isWarnEnabled()) {
+                log.warn("Detected array function call response, returning fallback");
+            }
             return "The system encountered a formatting issue. Please try rephrasing your question.";
         }
 
@@ -2196,7 +2259,9 @@ public class RagOrchestrationService {
 
     private List<Document> performHybridReranking(String query, String dept, double threshold, List<String> activeFiles) {
         if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
-            log.warn("SECURITY: Invalid department value in filter: {}", dept);
+            if (log.isWarnEnabled()) {
+                log.warn("SECURITY: Invalid department value in filter: {}", dept);
+            }
             return List.of();
         }
         String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
@@ -2210,7 +2275,9 @@ public class RagOrchestrationService {
                 }
             }
             catch (Exception e) {
-                log.warn("HybridRAG failed, falling back to local reranking: {}", e.getMessage());
+                if (log.isWarnEnabled()) {
+                    log.warn("HybridRAG failed, falling back to local reranking: {}", e.getMessage());
+                }
             }
         }
         List<Document> semanticResults = new ArrayList<>();
@@ -2234,7 +2301,9 @@ public class RagOrchestrationService {
             }).collect(Collectors.toList());
         }
         catch (Exception e) {
-            log.warn("Vector/Keyword search FAILED (DB/Embedding Offline). Engaging RAM Cache Fallback.", (Throwable)e);
+            if (log.isWarnEnabled()) {
+                log.warn("Vector/Keyword search FAILED (DB/Embedding Offline). Engaging RAM Cache Fallback.", (Throwable)e);
+            }
             return this.searchInMemoryCache(query, dept, activeFiles);
         }
         LinkedHashSet<Document> merged = new LinkedHashSet<>(semanticResults);
@@ -2259,7 +2328,9 @@ public class RagOrchestrationService {
             if (!keywordSweep.isEmpty()) {
                 return keywordSweep;
             }
-            log.warn("Vector/Keyword search yielded 0 results. Engaging RAM Cache Fallback.");
+            if (log.isWarnEnabled()) {
+                log.warn("Vector/Keyword search yielded 0 results. Engaging RAM Cache Fallback.");
+            }
             return this.searchInMemoryCache(query, dept, activeFiles);
         }
         // Boost documents with exact phrase matches from query
@@ -2345,14 +2416,18 @@ public class RagOrchestrationService {
                     .withSimilarityThreshold(-1.0)
                     .withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
         } catch (Exception e) {
-            log.warn("Keyword sweep with negative threshold failed: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Keyword sweep with negative threshold failed: {}", e.getMessage());
+            }
             try {
                 sweepResults = this.vectorStore.similaritySearch(SearchRequest.query(query)
                         .withTopK(100)
                         .withSimilarityThreshold(0.0)
                         .withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
             } catch (Exception retry) {
-                log.warn("Keyword sweep fallback failed: {}", retry.getMessage());
+                if (log.isWarnEnabled()) {
+                    log.warn("Keyword sweep fallback failed: {}", retry.getMessage());
+                }
                 return List.of();
             }
         }
@@ -2377,11 +2452,22 @@ public class RagOrchestrationService {
             doc.getMetadata().put("score", (double)Math.max(hits, 1));
         }
         boostKeywordMatches(filtered, query);
-        log.warn("Keyword sweep recovered {} documents for query {}", filtered.size(), LogSanitizer.querySummary(query));
+        if (log.isWarnEnabled()) {
+            log.warn("Keyword sweep recovered {} documents for query {}", filtered.size(), LogSanitizer.querySummary(query));
+        }
         return this.sortDocumentsDeterministically(filtered);
     }
 
     private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty, boolean deepAnalysis) {
+        return retrieveContext(query, dept, activeFiles, routing, highUncertainty, deepAnalysis, RetrievalOverrides.DEFAULTS);
+    }
+
+    // Fix #9: Overloaded method accepting per-request RAG engine overrides from frontend settings.
+    // Per-request overrides can only DISABLE engines; they cannot force-enable server-disabled engines.
+    private RetrievalContext retrieveContext(String query, String dept, List<String> activeFiles, AdaptiveRagService.RoutingResult routing, boolean highUncertainty, boolean deepAnalysis, RetrievalOverrides overrides) {
+        boolean hydeAllowed = overrides.useHyde() == null || overrides.useHyde();
+        boolean graphRagAllowed = overrides.useGraphRag() == null || overrides.useGraphRag();
+        boolean rerankingAllowed = overrides.useReranking() == null || overrides.useReranking();
         boolean complexQuery = routing != null && routing.decision() == AdaptiveRagService.RoutingDecision.DOCUMENT;
         boolean relationshipQuery = RELATIONSHIP_PATTERN.matcher(query).find();
         boolean longQuery = query.split("\\s+").length > 15;
@@ -2442,15 +2528,16 @@ public class RagOrchestrationService {
             }
         }
 
-        if (textDocs.isEmpty()) {
+        if (textDocs.isEmpty() && rerankingAllowed) {
             textDocs.addAll(this.performHybridRerankingTracked(query, dept, activeFiles));
             if (!textDocs.isEmpty()) {
                 strategies.add("FallbackRerank");
             }
         }
 
-        // HGMem: use deepAnalysis param or fallback to advancedNeeded heuristic
-        if (this.hgMemQueryEngine != null && (deepAnalysis || advancedNeeded)) {
+        // HGMem (GraphRAG): use deepAnalysis param or fallback to advancedNeeded heuristic
+        // Fix #9: respect per-request graphRagAllowed override from frontend toggle
+        if (graphRagAllowed && this.hgMemQueryEngine != null && (deepAnalysis || advancedNeeded)) {
             HGMemQueryEngine.HGMemResult hgResult = this.hgMemQueryEngine.query(query, dept, deepAnalysis);
             if (!hgResult.documents().isEmpty()) {
                 textDocs.addAll(hgResult.documents());
@@ -2459,7 +2546,7 @@ public class RagOrchestrationService {
         }
 
         if (this.agenticRagOrchestrator != null && this.agenticRagOrchestrator.isEnabled() && advancedNeeded) {
-            AgenticRagOrchestrator.AgenticResult agenticResult = this.agenticRagOrchestrator.process(query, dept);
+            AgenticRagOrchestrator.AgenticResult agenticResult = this.agenticRagOrchestrator.process(query, dept, hydeAllowed);
             if (agenticResult.sources() != null && !agenticResult.sources().isEmpty()) {
                 textDocs.addAll(agenticResult.sources());
                 strategies.add("Agentic");

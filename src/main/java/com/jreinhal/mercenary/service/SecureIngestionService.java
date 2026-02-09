@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.PiiRedactionService;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
@@ -53,12 +54,22 @@ public class SecureIngestionService {
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final Tika tika;
-    private static final Set<String> BLOCKED_MIME_TYPES = Set.of("application/x-executable", "application/x-msdos-program", "application/x-msdownload", "application/x-sh", "application/x-shellscript", "application/java-archive", "application/x-httpd-php");
-    @Value(value="${sentinel.miarag.min-chunks-for-mindscape:10}")
+    private static final String PDF_MIME_TYPE = "application/pdf";
+    private static final Set<String> BLOCKED_MIME_TYPES = Set.of(
+        "application/x-executable", "application/x-msdos-program", "application/x-msdownload",
+        "application/x-sh", "application/x-shellscript", "text/x-shellscript",
+        "application/java-archive", "application/x-httpd-php",
+        // Fix #4: Block archive/container formats that can smuggle malicious content
+        "application/zip", "application/java-vm", "application/x-java-applet",
+        "application/x-rar-compressed", "application/x-7z-compressed",
+        "application/vnd.rar", "application/x-tar", "application/gzip",
+        "application/x-bzip2", "application/x-xz"
+    );
+    @Value("${sentinel.miarag.min-chunks-for-mindscape:10}")
     private int minChunksForMindscape;
-    @Value(value="${sentinel.megarag.extract-images-from-pdf:true}")
+    @Value("${sentinel.megarag.extract-images-from-pdf:true}")
     private boolean extractImagesFromPdf;
-    @Value(value="${sentinel.ocr.fallback-for-scanned-pdf:true}")
+    @Value("${sentinel.ocr.fallback-for-scanned-pdf:true}")
     private boolean ocrFallbackForScannedPdf;
 
     public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
@@ -100,7 +111,7 @@ public class SecureIngestionService {
                 return;
             }
             InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(fileBytes));
-            if (detectedMimeType.equals("application/pdf")) {
+            if (PDF_MIME_TYPE.equals(detectedMimeType)) {
                 log.info(">> DETECTED PDF: Engaging Optical Character Recognition / PDF Stream...");
                 PagePdfDocumentReader pdfReader = new PagePdfDocumentReader((Resource)resource);
                 rawDocuments = pdfReader.get();
@@ -230,20 +241,27 @@ public class SecureIngestionService {
     }
 
     private void validateFileType(String filename, String detectedMimeType, byte[] bytes) {
+        String safeFilename = LogSanitizer.sanitize(filename);
+        String safeMimeType = LogSanitizer.sanitize(detectedMimeType);
         if (BLOCKED_MIME_TYPES.contains(detectedMimeType)) {
-            log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", filename, detectedMimeType);
+            log.error("SECURITY: Blocked dangerous file type. File: {}, Detected: {}", safeFilename, safeMimeType);
             throw new SecurityException("File type not allowed: " + detectedMimeType + ". Executable and script files are blocked.");
         }
         if (this.hasExecutableMagic(bytes)) {
-            log.error("SECURITY: Blocked executable magic bytes. File: {}", filename);
+            log.error("SECURITY: Blocked executable magic bytes. File: {}", safeFilename);
             throw new SecurityException("File content appears to be an executable and is not allowed: " + filename);
         }
         String extension = this.getExtension(filename).toLowerCase();
-        if (extension.equals("pdf") && !detectedMimeType.equals("application/pdf")) {
-            log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", detectedMimeType, filename);
+        if ("pdf".equals(extension) && !PDF_MIME_TYPE.equals(detectedMimeType)) {
+            log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", safeMimeType, safeFilename);
+        }
+        // Fix #4: Block content-type/extension mismatch — PDF content with non-PDF extension
+        if (PDF_MIME_TYPE.equals(detectedMimeType) && !"pdf".equals(extension)) {
+            log.error("SECURITY: PDF content disguised as .{} file: {}", LogSanitizer.sanitize(extension), safeFilename);
+            throw new SecurityException("Content type mismatch: file contains PDF data but has ." + extension + " extension.");
         }
         if (Set.of("exe", "dll", "bat", "sh", "cmd", "ps1", "jar").contains(extension)) {
-            log.error("SECURITY: Executable extension blocked: {}", filename);
+            log.error("SECURITY: Executable extension blocked: {}", safeFilename);
             throw new SecurityException("Executable files are not allowed: " + filename);
         }
     }
@@ -260,7 +278,28 @@ public class SecureIngestionService {
         if (bytes.length >= 4 && bytes[0] == 0x7F && bytes[1] == 0x45 && bytes[2] == 0x4C && bytes[3] == 0x46) {
             return true;
         }
-        return false;
+        // Fix #4: Detect archive/container magic bytes
+        // ZIP / JAR: 'PK\x03\x04'
+        if (bytes.length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
+            return true;
+        }
+        // Java class: 0xCAFEBABE
+        if (bytes.length >= 4 && bytes[0] == (byte) 0xCA && bytes[1] == (byte) 0xFE
+                && bytes[2] == (byte) 0xBA && bytes[3] == (byte) 0xBE) {
+            return true;
+        }
+        // RAR: 'Rar!\x1A\x07'
+        if (bytes.length >= 6 && bytes[0] == 0x52 && bytes[1] == 0x61 && bytes[2] == 0x72
+                && bytes[3] == 0x21 && bytes[4] == 0x1A && bytes[5] == 0x07) {
+            return true;
+        }
+        // 7-Zip: '7z\xBC\xAF\x27\x1C'
+        if (bytes.length >= 6 && bytes[0] == 0x37 && bytes[1] == 0x7A && bytes[2] == (byte) 0xBC
+                && bytes[3] == (byte) 0xAF && bytes[4] == 0x27 && bytes[5] == 0x1C) {
+            return true;
+        }
+        // Shell script shebang: '#!'
+        return bytes.length >= 2 && bytes[0] == 0x23 && bytes[1] == 0x21;
     }
 
     private String getExtension(String filename) {

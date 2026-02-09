@@ -290,6 +290,39 @@ class PiiRedactionServiceTest {
     }
 
     @Test
+    @DisplayName("Fix #3: Should redact PII embedded in user queries before LLM processing")
+    void shouldRedactPiiInUserQueries() {
+        // Simulates a user query containing PII that should be redacted before
+        // reaching the LLM pipeline (guardrail, routing, retrieval, generation)
+        String queryWithPii = "What documents mention patient SSN 123-45-6789 or email john.doe@example.com?";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(queryWithPii);
+
+        assertFalse(result.getRedactedContent().contains("123-45-6789"),
+            "SSN should be redacted from user query before LLM processing");
+        assertFalse(result.getRedactedContent().contains("john.doe@example.com"),
+            "Email should be redacted from user query before LLM processing");
+        assertTrue(result.getRedactedContent().contains("[REDACTED-SSN]"));
+        assertTrue(result.getRedactedContent().contains("[REDACTED-EMAIL]"));
+        // The query structure should remain intact for retrieval purposes
+        assertTrue(result.getRedactedContent().contains("What documents mention patient"));
+        assertTrue(result.getTotalRedactions() >= 2);
+    }
+
+    @Test
+    @DisplayName("Fix #3: Should redact PII in queries with HIPAA strict override")
+    void shouldRedactPiiInQueriesWithHipaaStrict() {
+        // When hipaaStrict=true, names override is enabled for extra PHI protection
+        String queryWithName = "Show records for Patient: John Smith with MRN: ABC123456";
+
+        PiiRedactionService.RedactionResult result = redactionService.redact(queryWithName, Boolean.TRUE);
+
+        assertFalse(result.getRedactedContent().contains("ABC123456"),
+            "Medical Record Number should be redacted in HIPAA strict mode");
+        assertTrue(result.getRedactedContent().contains("[REDACTED-MEDICAL_ID]"));
+    }
+
+    @Test
     @DisplayName("Should validate credit card with Luhn algorithm")
     void shouldValidateCreditCardWithLuhn() {
         // Valid test card number
