@@ -584,6 +584,11 @@ app:
     mfa-acr-values: ${OIDC_MFA_ACR:}
     default-role: ${OIDC_DEFAULT_ROLE:VIEWER}
     default-clearance: ${OIDC_DEFAULT_CLEARANCE:UNCLASSIFIED}
+    # Browser OIDC flow (Authorization Code + PKCE)
+    authorization-uri: ${OIDC_AUTHORIZATION_URI:}
+    token-uri: ${OIDC_TOKEN_URI:}
+    redirect-uri: ${OIDC_REDIRECT_URI:}
+    scopes: ${OIDC_SCOPES:openid profile email}
 
 ---
 # GOVERNMENT/GOVCLOUD PROFILE (CAC/PIV)

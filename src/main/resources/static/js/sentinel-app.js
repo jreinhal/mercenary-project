@@ -119,7 +119,7 @@
         ];
 
         const API_BASE = window.location.origin + '/api';
-        const authState = { authenticated: true, pending: false };
+        const authState = { authenticated: true, pending: false, ssoEnabled: false, authorizeUrl: '' };
         let csrfTokenCache = '';
         let csrfTokenUnavailable = false;
 
@@ -253,10 +253,33 @@
             const modal = document.getElementById('auth-modal');
             if (!modal) return;
             setAuthError(message || '');
+
+            const ssoSection = document.getElementById('auth-sso-section');
+            const credsSection = document.getElementById('auth-credentials-section');
+            const divider = document.getElementById('auth-divider');
+            const submitBtn = document.getElementById('auth-submit');
+
+            if (authState.ssoEnabled) {
+                // SSO mode: show SSO button, hide credentials form
+                if (ssoSection) ssoSection.classList.remove('hidden');
+                if (credsSection) credsSection.classList.add('hidden');
+                if (divider) divider.classList.add('hidden');
+                if (submitBtn) submitBtn.classList.add('hidden');
+            } else {
+                // Standard mode: show credentials form, hide SSO
+                if (ssoSection) ssoSection.classList.add('hidden');
+                if (credsSection) credsSection.classList.remove('hidden');
+                if (submitBtn) submitBtn.classList.remove('hidden');
+            }
+
             modal.classList.remove('hidden');
-            const usernameInput = document.getElementById('auth-username');
-            if (usernameInput) {
-                usernameInput.focus();
+
+            if (authState.ssoEnabled) {
+                const ssoBtn = document.getElementById('auth-sso-btn');
+                if (ssoBtn) ssoBtn.focus();
+            } else {
+                const usernameInput = document.getElementById('auth-username');
+                if (usernameInput) usernameInput.focus();
             }
         }
 
@@ -348,6 +371,51 @@
             }
         }
 
+        async function detectAuthMode() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/mode`, { credentials: 'same-origin' });
+                if (response.ok) {
+                    const data = await response.json();
+                    authState.ssoEnabled = data.ssoEnabled === true;
+                    authState.authorizeUrl = data.authorizeUrl || '';
+                }
+            } catch (e) {
+                // Auth mode detection failed — default to standard credentials
+            }
+        }
+
+        function handleAuthErrorParam() {
+            const params = new URLSearchParams(window.location.search);
+            const authError = params.get('auth_error');
+            if (authError) {
+                const messages = {
+                    'invalid_state': 'Login session expired. Please try again.',
+                    'missing_code': 'Authentication was incomplete. Please try again.',
+                    'missing_verifier': 'Login session expired. Please try again.',
+                    'no_id_token': 'Identity provider did not return required information.',
+                    'user_denied': 'Account not authorized. Contact your administrator.',
+                    'token_exchange': 'Authentication failed. Please try again.',
+                    'configuration': 'SSO is not configured properly. Contact your administrator.'
+                };
+                const message = messages[authError] || 'Authentication failed: ' + authError;
+                showAuthModal(message);
+                // Clean up URL
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+
+        function initSsoButton() {
+            const ssoBtn = document.getElementById('auth-sso-btn');
+            if (ssoBtn) {
+                ssoBtn.addEventListener('click', () => {
+                    if (authState.authorizeUrl) {
+                        window.location.href = authState.authorizeUrl;
+                    }
+                });
+            }
+        }
+
         function setHidden(el, hidden) {
             if (!el) return;
             el.classList.toggle('hidden', hidden);
@@ -391,13 +459,16 @@
         let SECTOR_DATA = {};
         const DEFAULT_SECTOR = 'ENTERPRISE';
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             chatMessages = document.getElementById('chat-messages');
             queryInput = document.getElementById('query-input');
             sectorSelect = document.getElementById('sector-select');
 
             enableDomIdLookupWarnings();
             initEventDelegation();
+            initSsoButton();
+            await detectAuthMode();
+            handleAuthErrorParam();
             initSectorsFromAPI();
             initOperator();
             initKeyboardShortcuts();
