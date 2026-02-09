@@ -41,7 +41,7 @@ public class PromptGuardrailService {
     private boolean enabled;
     @Value("${app.guardrails.llm-enabled:false}")
     private boolean llmEnabled;
-    @Value("${app.guardrails.llm-schema-enabled:true}")
+    @Value("${app.guardrails.llm-schema-enabled:false}")
     private boolean llmSchemaEnabled;
     @Value("${app.guardrails.strict-mode:false}")
     private boolean strictMode;
