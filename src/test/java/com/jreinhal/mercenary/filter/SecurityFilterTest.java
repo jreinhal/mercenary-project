@@ -86,6 +86,9 @@ class SecurityFilterTest {
     @Test
     void shouldNotBypassFilterForNonGetStaticRequests() {
         when(request.getMethod()).thenReturn("POST");
+        // URI is set but never reached — POST fails the GET/HEAD check first.
+        // Use lenient to document intent: this tests method-based rejection for static paths.
+        lenient().when(request.getRequestURI()).thenReturn("/css/style.css");
 
         assertFalse(securityFilter.shouldNotFilter(request));
     }

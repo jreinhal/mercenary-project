@@ -39,7 +39,7 @@ STANDARD profile bootstrap:
 - government
 
 Edition-based response policy:
-- Professional/Trial: longer synthesized responses, evidence appended if citations are missing
+- Enterprise/Trial: longer synthesized responses, evidence appended if citations are missing
 - Medical: HIPAA-aligned redaction + strict citations + evidence excerpts
 - Government: classified-environment posture with strict citations + evidence excerpts
 

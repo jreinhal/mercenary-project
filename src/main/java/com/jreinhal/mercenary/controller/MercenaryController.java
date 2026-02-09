@@ -31,7 +31,7 @@ import com.jreinhal.mercenary.service.PromptGuardrailService;
 import com.jreinhal.mercenary.service.QueryDecompositionService;
 import com.jreinhal.mercenary.service.RagOrchestrationService;
 import com.jreinhal.mercenary.service.SecureIngestionService;
-import com.jreinhal.mercenary.security.PromptInjectionPatterns;
+import com.jreinhal.mercenary.security.ContentSanitizer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
@@ -39,7 +39,7 @@ import com.jreinhal.mercenary.util.DocumentMetadataUtils;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
-import java.text.Normalizer;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -970,7 +970,7 @@ public class MercenaryController {
             if (header.length() < remaining) {
                 sb.append(header);
                 remaining -= header.length();
-                String overview = this.sanitizeRetrievedContent(globalContext.trim());
+                String overview = ContentSanitizer.sanitize(globalContext.trim());
                 overview = this.truncateContent(overview, Math.min(this.maxOverviewChars, remaining));
                 sb.append(overview);
                 remaining -= overview.length();
@@ -1005,7 +1005,7 @@ public class MercenaryController {
                 break;
             }
             String content = doc.getContent() != null ? doc.getContent() : "";
-            content = this.sanitizeRetrievedContent(content);
+            content = ContentSanitizer.sanitize(content);
             content = content.replace("{", "[").replace("}", "]");
             String trimmed = this.truncateContent(content, allowedContent);
             sb.append(header).append(trimmed);
@@ -1019,25 +1019,6 @@ public class MercenaryController {
         return sb.toString().trim();
     }
 
-    private String sanitizeRetrievedContent(String content) {
-        if (content == null || content.isBlank()) {
-            return "";
-        }
-        String[] lines = content.split("\\r?\\n", -1);
-        StringBuilder sb = new StringBuilder(content.length());
-        for (String line : lines) {
-            String normalized = Normalizer.normalize(line, Normalizer.Form.NFKC);
-            boolean hit = false;
-            for (Pattern pattern : PromptInjectionPatterns.getPatterns()) {
-                if (pattern.matcher(normalized).find()) {
-                    hit = true;
-                    break;
-                }
-            }
-            sb.append(hit ? "[REDACTED-PROMPT-INJECTION]" : line).append('\n');
-        }
-        return sb.toString();
-    }
 
     private String buildVisualInformation(List<Document> visualDocs) {
         if (visualDocs == null || visualDocs.isEmpty()) {
