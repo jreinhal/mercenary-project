@@ -97,15 +97,39 @@ async function runQuery(page, query) {
 }
 
 async function uploadFile(page, filePath) {
+  const respPromise = page.waitForResponse((r) => {
+    try {
+      const req = r.request();
+      const u = new URL(r.url());
+      return req.method() === 'POST' && u.pathname.endsWith('/api/ingest/file');
+    } catch {
+      return false;
+    }
+  }, { timeout: 180000 }).catch(() => null);
+
   await page.setInputFiles('#file-input', filePath);
-  await page.waitForFunction(() => {
-    const el = document.getElementById('upload-status');
-    if (!el) return false;
-    const text = el.innerText || '';
-    return /ingested|Upload failed|files ingested|failed/i.test(text);
-  }, { timeout: 60000 });
+
+  const resp = await respPromise;
+  let respText = '';
+  let respStatus = null;
+  if (resp) {
+    respStatus = resp.status();
+    try { respText = await resp.text(); } catch { /* ignore */ }
+  }
+
+  // Best-effort UI status (can clear quickly in some flows).
+  try {
+    await page.waitForFunction(() => {
+      const el = document.getElementById('upload-status');
+      if (!el) return false;
+      const text = el.innerText || '';
+      return /ingested|Upload failed|files ingested|failed/i.test(text);
+    }, { timeout: 15000 });
+  } catch {
+    // ignore
+  }
   const statusText = (await page.locator('#upload-status').innerText()).trim();
-  return statusText;
+  return statusText || (respStatus != null ? `HTTP ${respStatus}: ${respText}`.trim() : 'NO_RESPONSE');
 }
 
 function textIncludes(haystack, needle) {
@@ -135,6 +159,14 @@ async function run() {
   results.login = loginResult;
   if (loginResult.attempted && !loginResult.success) {
     throw new Error(`Login failed: ${loginResult.error || 'Unknown error'}`);
+  }
+
+  // Repro the suite issue: upload after a full page reload.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForLoaded(page);
+  const relogin = await loginIfNeeded(page, adminUser, adminPass);
+  if (relogin.attempted && !relogin.success) {
+    throw new Error(`Re-login failed after reload: ${relogin.error || 'Unknown error'}`);
   }
 
   await selectSector(page, 'ENTERPRISE');

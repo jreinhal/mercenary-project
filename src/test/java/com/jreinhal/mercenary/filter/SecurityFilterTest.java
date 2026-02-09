@@ -16,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -63,6 +65,29 @@ class SecurityFilterTest {
         securityFilter.doFilterInternal(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void shouldBypassFilterForStaticVendorAssetsOnGet() {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/vendor/d3.v7.min.js");
+
+        assertTrue(securityFilter.shouldNotFilter(request));
+    }
+
+    @Test
+    void shouldNotBypassFilterForApiRequests() {
+        when(request.getMethod()).thenReturn("GET");
+        when(request.getRequestURI()).thenReturn("/api/ask");
+
+        assertFalse(securityFilter.shouldNotFilter(request));
+    }
+
+    @Test
+    void shouldNotBypassFilterForNonGetStaticRequests() {
+        when(request.getMethod()).thenReturn("POST");
+
+        assertFalse(securityFilter.shouldNotFilter(request));
     }
 
     @Test

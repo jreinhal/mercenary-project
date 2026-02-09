@@ -31,6 +31,7 @@ import com.jreinhal.mercenary.service.PromptGuardrailService;
 import com.jreinhal.mercenary.service.QueryDecompositionService;
 import com.jreinhal.mercenary.service.RagOrchestrationService;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import com.jreinhal.mercenary.security.PromptInjectionPatterns;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
@@ -38,6 +39,7 @@ import com.jreinhal.mercenary.util.DocumentMetadataUtils;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -138,7 +140,8 @@ public class MercenaryController {
                                @Value("${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
                                @Value("${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
                                @Value("${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
-        this.chatClient = builder.defaultFunctions(new String[]{"calculator", "currentDate"}).build();
+        // Avoid tool/function-call JSON leaking into end-user responses. (Ollama doesn't reliably execute tool calls.)
+        this.chatClient = builder.build();
         this.vectorStore = vectorStore;
         this.ingestionService = ingestionService;
         this.sectorConfig = sectorConfig;
@@ -967,7 +970,8 @@ public class MercenaryController {
             if (header.length() < remaining) {
                 sb.append(header);
                 remaining -= header.length();
-                String overview = this.truncateContent(globalContext.trim(), Math.min(this.maxOverviewChars, remaining));
+                String overview = this.sanitizeRetrievedContent(globalContext.trim());
+                overview = this.truncateContent(overview, Math.min(this.maxOverviewChars, remaining));
                 sb.append(overview);
                 remaining -= overview.length();
                 if (docs != null && !docs.isEmpty() && remaining >= DOC_SEPARATOR.length()) {
@@ -1001,6 +1005,7 @@ public class MercenaryController {
                 break;
             }
             String content = doc.getContent() != null ? doc.getContent() : "";
+            content = this.sanitizeRetrievedContent(content);
             content = content.replace("{", "[").replace("}", "]");
             String trimmed = this.truncateContent(content, allowedContent);
             sb.append(header).append(trimmed);
@@ -1012,6 +1017,26 @@ public class MercenaryController {
             }
         }
         return sb.toString().trim();
+    }
+
+    private String sanitizeRetrievedContent(String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        String[] lines = content.split("\\r?\\n", -1);
+        StringBuilder sb = new StringBuilder(content.length());
+        for (String line : lines) {
+            String normalized = Normalizer.normalize(line, Normalizer.Form.NFKC);
+            boolean hit = false;
+            for (Pattern pattern : PromptInjectionPatterns.getPatterns()) {
+                if (pattern.matcher(normalized).find()) {
+                    hit = true;
+                    break;
+                }
+            }
+            sb.append(hit ? "[REDACTED-PROMPT-INJECTION]" : line).append('\n');
+        }
+        return sb.toString();
     }
 
     private String buildVisualInformation(List<Document> visualDocs) {

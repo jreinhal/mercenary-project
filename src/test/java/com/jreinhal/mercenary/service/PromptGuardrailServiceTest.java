@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,7 +24,7 @@ class PromptGuardrailServiceTest {
         ChatClient mockClient = mock(ChatClient.class);
         org.mockito.Mockito.when(mockBuilder.build()).thenReturn(mockClient);
 
-        guardrailService = new PromptGuardrailService(mockBuilder);
+        guardrailService = new PromptGuardrailService(mockBuilder, new ObjectMapper());
         ReflectionTestUtils.setField(guardrailService, "enabled", true);
         ReflectionTestUtils.setField(guardrailService, "llmEnabled", false);
         ReflectionTestUtils.setField(guardrailService, "strictMode", false);
@@ -161,9 +162,10 @@ class PromptGuardrailServiceTest {
             when(mockRequest.options(any())).thenReturn(mockRequest);
             when(mockRequest.call()).thenReturn(mockCallResponse);
 
-            guardrailService = new PromptGuardrailService(mockBuilder);
+            guardrailService = new PromptGuardrailService(mockBuilder, new ObjectMapper());
             ReflectionTestUtils.setField(guardrailService, "enabled", true);
             ReflectionTestUtils.setField(guardrailService, "llmEnabled", true);
+            ReflectionTestUtils.setField(guardrailService, "llmSchemaEnabled", false);
             ReflectionTestUtils.setField(guardrailService, "strictMode", false);
             ReflectionTestUtils.setField(guardrailService, "llmTimeoutMs", 5000L);
             ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerEnabled", false);

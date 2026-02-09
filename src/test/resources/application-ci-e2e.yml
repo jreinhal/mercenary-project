@@ -31,6 +31,9 @@ server:
 
 app:
   auth-mode: DEV
+  guardrails:
+    # Unit/integration tests must not depend on a running Ollama daemon.
+    llm-enabled: false
 
 ALLOW_DEV_AUTH: true
 
