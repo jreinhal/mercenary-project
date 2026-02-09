@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
@@ -52,16 +53,20 @@ public class LicenseService {
         } else {
             this.validateLicenseKey();
         }
-        log.info("SENTINEL License: Edition={}, Valid={}, Expires={}",
-                new Object[]{this.edition, this.licenseValid,
-                this.trialExpiration != null ? this.trialExpiration : "Never"});
+        if (log.isInfoEnabled()) {
+            log.info("SENTINEL License: Edition={}, Valid={}, Expires={}",
+                    new Object[]{this.edition, this.licenseValid,
+                    this.trialExpiration != null ? this.trialExpiration : "Never"});
+        }
     }
 
     private Edition parseEdition(String value) {
-        String normalized = value.toUpperCase().trim();
+        String normalized = value.toUpperCase(Locale.ROOT).trim();
         // Backward compatibility: PROFESSIONAL was renamed to ENTERPRISE
         if ("PROFESSIONAL".equals(normalized)) {
-            log.info("Mapping legacy edition PROFESSIONAL to ENTERPRISE");
+            if (log.isInfoEnabled()) {
+                log.info("Mapping legacy edition PROFESSIONAL to ENTERPRISE");
+            }
             return Edition.ENTERPRISE;
         }
         try {
@@ -78,7 +83,9 @@ public class LicenseService {
             startDate = LocalDate.parse(this.trialStartDate);
         } else {
             startDate = LocalDate.now();
-            log.info("Trial started: {}", startDate);
+            if (log.isInfoEnabled()) {
+                log.info("Trial started: {}", startDate);
+            }
         }
         LocalDate expirationDate = startDate.plusDays(this.trialDays);
         this.trialExpiration = expirationDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
@@ -87,7 +94,9 @@ public class LicenseService {
             log.warn("Trial expired on {}. Contact sales for licensing.", expirationDate);
         } else {
             long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(), expirationDate);
-            log.info("Trial active: {} days remaining", daysRemaining);
+            if (log.isInfoEnabled()) {
+                log.info("Trial active: {} days remaining", daysRemaining);
+            }
         }
     }
 
@@ -98,9 +107,9 @@ public class LicenseService {
      *
      * <p>Behavior matrix:</p>
      * <ul>
-     *   <li>No key + no secret → unlicensed mode (valid, backward compatible)</li>
-     *   <li>Key present + no secret → invalid (cannot verify signature)</li>
-     *   <li>Key present + secret → HMAC validation (checks signature, edition, expiry)</li>
+     *   <li>No key + no secret: unlicensed mode (valid, backward compatible)</li>
+     *   <li>Key present + no secret: invalid (cannot verify signature)</li>
+     *   <li>Key present + secret: HMAC validation (checks signature, edition, expiry)</li>
      * </ul>
      */
     void validateLicenseKey() {
@@ -118,7 +127,9 @@ public class LicenseService {
         }
 
         if (this.signingSecret == null || this.signingSecret.isBlank()) {
-            log.error("License key provided but no signing secret configured. Cannot validate.");
+            if (log.isErrorEnabled()) {
+                log.error("License key provided but no signing secret configured. Cannot validate.");
+            }
             this.licenseValid = false;
             return;
         }
@@ -126,7 +137,7 @@ public class LicenseService {
         try {
             this.licenseValid = this.verifyAndParseLicenseKey(this.licenseKey, this.signingSecret);
         } catch (Exception e) {
-            log.error("License key validation failed: {}", e.getMessage());
+            log.error("License key validation failed", e);
             this.licenseValid = false;
         }
     }
@@ -170,7 +181,7 @@ public class LicenseService {
             return false;
         }
 
-        String keyEdition = parts[0].toUpperCase().trim();
+        String keyEdition = parts[0].toUpperCase(Locale.ROOT).trim();
         String keyExpiry = parts[1].trim();
         this.customerId = parts[2].trim();
 
@@ -188,17 +199,19 @@ public class LicenseService {
             return false;
         }
 
-        // Validate expiry
+        // Validate expiry (inclusive of expiry date)
         try {
             LocalDate expiryDate = LocalDate.parse(keyExpiry);
-            this.trialExpiration = expiryDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
+            this.trialExpiration = expiryDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
             if (Instant.now().isAfter(this.trialExpiration)) {
                 log.error("License key expired on {}", expiryDate);
                 return false;
             }
             long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(), expiryDate);
-            log.info("License validated: edition={}, customer={}, expires in {} days",
-                    keyEditionEnum, this.customerId, daysRemaining);
+            if (log.isInfoEnabled()) {
+                log.info("License validated: edition={}, customer={}, expires in {} days",
+                        keyEditionEnum, this.customerId, daysRemaining);
+            }
         } catch (Exception e) {
             log.error("Invalid expiry date in license key: {}", keyExpiry);
             return false;
@@ -219,7 +232,9 @@ public class LicenseService {
             byte[] hmacBytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             return bytesToHex(hmacBytes);
         } catch (Exception e) {
-            log.error("HMAC computation failed: {}", e.getMessage());
+            if (log.isErrorEnabled()) {
+                log.error("HMAC computation failed: {}", e.getMessage());
+            }
             return null;
         }
     }
@@ -229,10 +244,16 @@ public class LicenseService {
      * This method is exposed for the license generation tool.
      */
     public static String generateLicenseKey(String edition, String expiryDate, String customerId, String secret) {
+        if (secret == null || secret.trim().isEmpty()) {
+            throw new IllegalArgumentException("License signing secret must not be null or blank");
+        }
         String payload = edition + ":" + expiryDate + ":" + customerId;
         String payloadBase64 = Base64.getEncoder().encodeToString(
                 payload.getBytes(StandardCharsets.UTF_8));
         String signature = computeHmac(payloadBase64, secret);
+        if (signature == null) {
+            throw new IllegalStateException("Failed to compute HMAC for license key generation");
+        }
         return payloadBase64 + ":" + signature;
     }
 
@@ -262,8 +283,8 @@ public class LicenseService {
     }
 
     public boolean isValid() {
-        if (this.edition == Edition.TRIAL) {
-            return Instant.now().isBefore(this.trialExpiration);
+        if (this.trialExpiration != null && Instant.now().isAfter(this.trialExpiration)) {
+            return false;
         }
         return this.licenseValid;
     }
@@ -280,12 +301,12 @@ public class LicenseService {
         if (!this.isValid()) {
             return false;
         }
-        return switch (feature.toUpperCase()) {
+        return switch (feature.toUpperCase(Locale.ROOT)) {
             case "RAG", "DOCUMENT_UPLOAD", "SEARCH" -> true;
             case "ADAPTIVE_RAG", "CITATION_VERIFICATION", "SELF_REFLECTIVE_RAG",
                  "QUERY_DECOMPOSITION", "HYBRID_SEARCH", "CONVERSATION_MEMORY",
                  "MULTI_USER", "ADMIN_DASHBOARD", "ANALYTICS" -> {
-                if (this.edition != Edition.TRIAL || this.isValid()) {
+                if (this.edition != Edition.TRIAL) {
                     yield true;
                 }
                 yield false;

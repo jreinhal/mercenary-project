@@ -105,7 +105,7 @@ def main():
 
         print(f"\nVerification:")
         print(f"  Payload (decoded): {payload}")
-        print(f"  Signature match:   {sig == expected_sig}")
+        print(f"  Signature match:   {hmac.compare_digest(sig, expected_sig)}")
         print(f"  Edition:           {parts[0]}")
         print(f"  Expiry:            {parts[1]}")
         print(f"  Customer:          {parts[2]}")

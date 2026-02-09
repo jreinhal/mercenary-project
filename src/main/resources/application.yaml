@@ -169,6 +169,7 @@ sentinel:
   # When no key and no signing secret are set, runs in unlicensed mode (backward compatible).
   # To enforce licensing, set both LICENSE_KEY and LICENSE_SIGNING_SECRET.
   license:
+    key: ${LICENSE_KEY:}
     signing-secret: ${LICENSE_SIGNING_SECRET:}
 
   # Vector store selection (local vs Atlas)
