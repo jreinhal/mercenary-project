@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.admin;
+package com.jreinhal.mercenary.enterprise.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jreinhal.mercenary.Department;

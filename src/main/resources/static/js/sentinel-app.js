@@ -6,7 +6,7 @@
             messageIndex: new Map(),
             deepAnalysisEnabled: false
         };
-        let currentEdition = 'PROFESSIONAL';
+        let currentEdition = 'ENTERPRISE';
         let currentClearance = 'UNCLASSIFIED';
         let currentIsAdmin = false;
         const regulatedEditions = new Set(['MEDICAL', 'GOVERNMENT']);
@@ -48,18 +48,6 @@
                         'Identify PHI handling or privacy requirements.',
                         'Provide the study timeline and key milestones.'
                     ],
-                    FINANCE: [
-                        'Summarize the earnings report highlights and guidance.',
-                        'List key risk factors and mitigation strategies.',
-                        'Identify major initiatives or investments.',
-                        'Provide the liquidity and capital position summary.'
-                    ],
-                    ACADEMIC: [
-                        'Summarize the research objectives and key findings.',
-                        'List datasets or methods used.',
-                        'Identify funding sources and collaborators.',
-                        'Provide limitations and future work.'
-                    ],
                     ENTERPRISE: [
                         'Summarize the transformation roadmap and objectives.',
                         'List top dependencies and risks.',
@@ -89,16 +77,6 @@
                         'List required safety monitoring or audit controls.',
                         'Summarize governance and disclosure requirements.'
                     ],
-                    FINANCE: [
-                        'Extract regulatory obligations and reporting timelines.',
-                        'List required controls for risk and compliance.',
-                        'Summarize audit, governance, or oversight requirements.'
-                    ],
-                    ACADEMIC: [
-                        'Extract compliance obligations and reporting timelines.',
-                        'List required data handling or ethics controls.',
-                        'Summarize governance or audit requirements.'
-                    ],
                     ENTERPRISE: [
                         'Extract compliance obligations and reporting timelines.',
                         'List required controls or policy requirements.',
@@ -124,16 +102,6 @@
                     MEDICAL: [
                         'Recommend next steps based on protocol and outcomes.',
                         'Identify clinical or operational tradeoffs.',
-                        'Summarize near-term risks requiring leadership action.'
-                    ],
-                    FINANCE: [
-                        'Recommend next steps based on performance and guidance.',
-                        'Identify decision tradeoffs and financial impacts.',
-                        'Summarize near-term risks requiring leadership action.'
-                    ],
-                    ACADEMIC: [
-                        'Recommend next steps based on findings.',
-                        'Identify research tradeoffs or open questions.',
                         'Summarize near-term risks requiring leadership action.'
                     ],
                     ENTERPRISE: [
@@ -595,10 +563,9 @@
         }
 
         function initSectorsFallback() {
-            SECTORS = ['ENTERPRISE', 'ACADEMIC'];
+            SECTORS = ['ENTERPRISE'];
             SECTOR_DATA = {
-                'ENTERPRISE': { label: 'Enterprise', icon: 'briefcase', description: 'General Business' },
-                'ACADEMIC': { label: 'Academic', icon: 'book', description: 'Research' }
+                'ENTERPRISE': { label: 'Enterprise', icon: 'briefcase', description: 'General Business' }
             };
 
             const sectorSelect = document.getElementById('sector-select');
@@ -1012,8 +979,6 @@
                 const titles = {
                     'GOVERNMENT': 'SENTINEL // INTELLIGENCE PLATFORM',
                     'MEDICAL': 'SENTINEL // CLINICAL ASSISTANT',
-                    'FINANCE': 'SENTINEL // FINANCE PLATFORM',
-                    'ACADEMIC': 'SENTINEL // RESEARCH ASSISTANT',
                     'ENTERPRISE': 'SENTINEL // KNOWLEDGE PLATFORM'
                 };
                 brandName.textContent = titles[sector] || 'SENTINEL // INTELLIGENCE PLATFORM';
@@ -6491,22 +6456,6 @@
                 graphrag: true,
                 rerank: true
             },
-            FINANCE: {
-                label: 'Finance',
-                topK: 6,
-                similarity: 0.74,
-                hyde: false,
-                graphrag: false,
-                rerank: true
-            },
-            ACADEMIC: {
-                label: 'Academic',
-                topK: 8,
-                similarity: 0.68,
-                hyde: true,
-                graphrag: true,
-                rerank: true
-            }
         };
 
         function applyPipelinePreset(presetId) {

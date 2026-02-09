@@ -63,8 +63,6 @@ Users must meet or exceed a sector's required clearance.
 ## Sectors (departments)
 - GOVERNMENT
 - MEDICAL
-- FINANCE
-- ACADEMIC
 - ENTERPRISE
 
 ## Audit logging

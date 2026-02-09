@@ -24,14 +24,14 @@
 
 ## Repository Structure
 
-**Single repo, multiple build editions.** All development happens in `mercenary/`. The old sentinel-community, sentinel-professional, sentinel-research repos are deprecated.
+**Single repo, multiple build editions.** All development happens in `mercenary/`. The old sentinel-community, sentinel-enterprise, sentinel-research repos are deprecated.
 
 ## Package Organization
 
 ```
 src/main/java/com/jreinhal/mercenary/
 ├── core/           ← All editions (shared functionality)
-├── professional/   ← Paid features (trial, professional, medical, government)
+├── enterprise/    ← Paid features (trial, enterprise, medical, government)
 ├── medical/        ← HIPAA compliance (medical + government only)
 └── government/     ← SCIF/CAC/clearance (government only)
 ```
@@ -40,9 +40,9 @@ src/main/java/com/jreinhal/mercenary/
 
 | Edition | Packages Included | Notes |
 |---------|-------------------|-------|
-| Trial | core + professional | 30-day time limit, full features |
-| Professional | core + professional | Commercial/academic customers |
-| Medical | core + professional + medical | HIPAA-compliant deployments |
+| Trial | core + enterprise | 30-day time limit, full features |
+| Enterprise | core + enterprise | Commercial customers |
+| Medical | core + enterprise + medical | HIPAA-compliant deployments |
 | Government | all packages | SCIF/air-gapped, CAC auth, clearance levels |
 
 Build command: `./gradlew build -Pedition=government`
@@ -90,7 +90,7 @@ For EVERY `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`:
 
 2. **Edition Isolation**
    - Government code must NEVER appear in non-government builds
-   - Medical/HIPAA code must NEVER appear in trial/professional builds
+   - Medical/HIPAA code must NEVER appear in trial/enterprise builds
    - Use Gradle source exclusions, not runtime feature flags for sensitive code
 
 3. **Security Standards**

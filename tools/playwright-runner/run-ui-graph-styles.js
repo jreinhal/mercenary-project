@@ -90,16 +90,12 @@ const sectorUploads = {
   ENTERPRISE: ['enterprise_compliance_audit.txt', 'enterprise_transformation.txt'],
   GOVERNMENT: ['defense_diamond_shield.txt', 'defense_cybersecurity.txt'],
   MEDICAL: ['medical_clinical_trial.txt', 'medical_patient_outcomes.txt'],
-  FINANCE: ['finance_earnings_q4.txt', 'finance_portfolio_analysis.txt'],
-  ACADEMIC: ['academic_research_program.txt', 'academic_publications_review.txt'],
 };
 
 const sectorQueries = {
   ENTERPRISE: 'Summarize the Enterprise Compliance Audit report.',
   GOVERNMENT: 'Summarize Operation Diamond Shield.',
   MEDICAL: 'Summarize the clinical trial findings.',
-  FINANCE: 'Summarize the Q4 earnings report.',
-  ACADEMIC: 'Summarize the research program goals.',
 };
 
 // ---------- Helpers ----------

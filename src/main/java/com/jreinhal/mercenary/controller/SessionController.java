@@ -60,7 +60,7 @@ public class SessionController {
         // S2-03: Validate department enum and sector access before creating session
         Department sector;
         try {
-            sector = Department.valueOf(dept.toUpperCase(java.util.Locale.ROOT));
+            sector = Department.fromString(dept.toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -127,7 +127,7 @@ public class SessionController {
         // S4-01: Validate department enum and sector access — parity with createSession
         Department sector;
         try {
-            sector = Department.valueOf(dept.toUpperCase(java.util.Locale.ROOT));
+            sector = Department.fromString(dept.toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
@@ -333,7 +333,7 @@ public class SessionController {
             return null;
         }
         try {
-            return Department.valueOf(dept.toUpperCase());
+            return Department.fromString(dept.toUpperCase());
         } catch (IllegalArgumentException e) {
             return null;
         }

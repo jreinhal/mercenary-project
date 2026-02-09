@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.memory;
+package com.jreinhal.mercenary.enterprise.memory;
 
 import com.jreinhal.mercenary.service.ConversationMemoryProvider;
 import com.mongodb.client.result.DeleteResult;
@@ -165,7 +165,7 @@ public class ConversationMemoryService implements ConversationMemoryProvider {
         query.addCriteria((CriteriaDefinition)Criteria.where((String)"workspaceId").is(WorkspaceContext.getCurrentWorkspaceId()));
         try {
             this.mongoTemplate.remove(query, COLLECTION_NAME);
-            log.info("Cleared conversation history for user {} session {}", userId, sessionId);
+            log.info("Cleared conversation history for user {} session {}", sanitizeLogParam(userId), sanitizeLogParam(sessionId));
         }
         catch (Exception e) {
             log.error("Failed to clear conversation history: {}", e.getMessage());
@@ -186,6 +186,13 @@ public class ConversationMemoryService implements ConversationMemoryProvider {
             log.error("Failed to purge old conversations: {}", e.getMessage());
             return 0L;
         }
+    }
+
+    private static String sanitizeLogParam(String value) {
+        if (value == null) {
+            return "null";
+        }
+        return value.replaceAll("[\\r\\n\\t]", "_");
     }
 
     private String truncate(String str, int maxLen) {

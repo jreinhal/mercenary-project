@@ -18,7 +18,7 @@ Client
 - service: orchestration, ingestion, audit, guardrails
 - rag: RAG pipelines and routing services
 - vector: LocalMongoVectorStore and embedding logic
-- professional/medical/government: edition-specific features
+- enterprise/medical/government: edition-specific features
 
 ## Edition-based response policy
 - Response formatting and citation strictness are tuned by license edition.

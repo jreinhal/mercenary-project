@@ -14,7 +14,7 @@ Linux/macOS:
 
 ## Run a specific edition
 ```
-./gradlew -Pedition=professional bootRun
+./gradlew -Pedition=enterprise bootRun
 ```
 
 ## Build a distributable jar

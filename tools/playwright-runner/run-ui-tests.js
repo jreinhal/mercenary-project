@@ -67,16 +67,6 @@ const sectorUploads = {
     'medical_clinical_trial.txt',
     'medical_patient_outcomes.txt'
   ],
-  FINANCE: [
-    'finance_earnings_q4.txt',
-    'finance_portfolio_analysis.txt'
-  ],
-  ACADEMIC: [
-    'academic_research_program.txt',
-    'academic_publications_review.txt',
-    'academic_funding_partnerships.txt',
-    'academic_compliance_irb.txt'
-  ]
 };
 
 const sectors = [
@@ -131,40 +121,6 @@ const sectors = [
       expectSources: false
     }
   },
-  {
-    id: 'FINANCE',
-    discovery: {
-      query: 'Summarize the Q4 2025 earnings report.',
-      expectText: 'Q4 2025 EARNINGS REPORT',
-      expectSources: true
-    },
-    factual: {
-      query: 'Provide the DOC ID and TITLE for the Q4 2025 earnings report.',
-      expectText: 'DOC_ID',
-      expectSources: true
-    },
-    noRetrieval: {
-      query: 'Hello',
-      expectSources: false
-    }
-  },
-  {
-    id: 'ACADEMIC',
-    discovery: {
-      query: 'Summarize the NAISR-2024 research program overview.',
-      expectText: 'NAISR-2024',
-      expectSources: true
-    },
-    factual: {
-      query: 'Provide the DOC ID and TITLE for the NAISR-2024 program overview.',
-      expectText: 'DOC_ID',
-      expectSources: true
-    },
-    noRetrieval: {
-      query: 'Hello',
-      expectSources: false
-    }
-  }
 ];
 
 function ensureDir(dir) {

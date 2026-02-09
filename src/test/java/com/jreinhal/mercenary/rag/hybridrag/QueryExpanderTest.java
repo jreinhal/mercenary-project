@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.rag.hybridrag;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
@@ -32,19 +33,19 @@ class QueryExpanderTest {
     void cacheShouldBeIsolatedByDepartment() {
         String query = "Find system metrics";
 
-        queryExpander.expand(query, 2, "FINANCE");
+        queryExpander.expand(query, 2, "ENTERPRISE");
         queryExpander.expand(query, 2, "MEDICAL");
 
         @SuppressWarnings("unchecked")
         Cache<String, List<String>> cache = (Cache<String, List<String>>) ReflectionTestUtils.getField(queryExpander, "expansionCache");
         assertNotNull(cache);
 
-        String normalizedKey = query.trim().toLowerCase();
-        String keyFinance = "FINANCE|" + normalizedKey + "|2";
+        String normalizedKey = query.trim().toLowerCase(Locale.ROOT);
+        String keyEnterprise = "ENTERPRISE|" + normalizedKey + "|2";
         String keyMedical = "MEDICAL|" + normalizedKey + "|2";
 
-        assertNotEquals(keyFinance, keyMedical);
-        assertNotNull(cache.getIfPresent(keyFinance));
+        assertNotEquals(keyEnterprise, keyMedical);
+        assertNotNull(cache.getIfPresent(keyEnterprise));
         assertNotNull(cache.getIfPresent(keyMedical));
     }
 }

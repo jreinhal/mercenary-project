@@ -44,14 +44,14 @@ You can override the auth mode with AUTH_MODE if needed (DEV, STANDARD, OIDC, CA
 Build a specific edition with the Gradle property:
 ```
 ./gradlew build -Pedition=trial
-./gradlew build -Pedition=professional
+./gradlew build -Pedition=enterprise
 ./gradlew build -Pedition=medical
 ./gradlew build -Pedition=government
 ```
 
 Run a specific edition:
 ```
-./gradlew -Pedition=professional bootRun
+./gradlew -Pedition=enterprise bootRun
 ```
 
 ## Standard auth bootstrap

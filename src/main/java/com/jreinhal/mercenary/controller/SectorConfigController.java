@@ -53,22 +53,16 @@ public class SectorConfigController {
 
     private String getIcon(Department dept) {
         return switch (dept) {
-            default -> throw new IllegalArgumentException("Unknown department: " + dept);
             case Department.GOVERNMENT -> "shield";
             case Department.MEDICAL -> "heart";
-            case Department.FINANCE -> "dollar-sign";
-            case Department.ACADEMIC -> "book";
             case Department.ENTERPRISE -> "briefcase";
         };
     }
 
     private String getDescription(Department dept) {
         return switch (dept) {
-            default -> throw new IllegalArgumentException("Unknown department: " + dept);
             case Department.GOVERNMENT -> "Defense and Intelligence";
             case Department.MEDICAL -> "Healthcare and Clinical";
-            case Department.FINANCE -> "Financial Services";
-            case Department.ACADEMIC -> "Research and Academia";
             case Department.ENTERPRISE -> "General Business";
         };
     }

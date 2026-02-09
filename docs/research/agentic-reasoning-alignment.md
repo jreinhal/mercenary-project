@@ -35,12 +35,12 @@ The referenced paper identifies key components for effective agentic LLM systems
 **Research Requirement:** Agents should decompose complex tasks into sub-problems with defined dependencies.
 
 **SENTINEL Implementation:**
-- `QueryDecompositionService` (professional edition)
+- `QueryDecompositionService` (enterprise edition)
 - Five decomposition strategies: SEQUENTIAL, PARALLEL, COMPARATIVE, TEMPORAL, HIERARCHICAL
 - Sub-query extraction with purpose, dependencies, and required entities
 - Strategy-specific synthesis prompts for answer combination
 
-**Code Reference:** `src/main/java/com/jreinhal/mercenary/professional/rag/QueryDecompositionService.java`
+**Code Reference:** `src/main/java/com/jreinhal/mercenary/enterprise/rag/QueryDecompositionService.java`
 
 ---
 
@@ -115,8 +115,8 @@ The referenced paper identifies key components for effective agentic LLM systems
   - Configurable retention (default 24 hours)
 
 **Code References:**
-- `src/main/java/com/jreinhal/mercenary/professional/memory/ConversationMemoryService.java`
-- `src/main/java/com/jreinhal/mercenary/professional/memory/SessionPersistenceService.java`
+- `src/main/java/com/jreinhal/mercenary/enterprise/memory/ConversationMemoryService.java`
+- `src/main/java/com/jreinhal/mercenary/enterprise/memory/SessionPersistenceService.java`
 
 ---
 

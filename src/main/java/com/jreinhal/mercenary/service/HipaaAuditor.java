@@ -11,7 +11,7 @@ import java.util.Optional;
  * The concrete implementation (HipaaAuditService) lives in the medical
  * package and is only available in medical and government editions.
  * Shared code should depend on this interface (injected as @Nullable)
- * so that trial and professional editions compile without the medical package.
+ * so that trial and enterprise editions compile without the medical package.
  */
 public interface HipaaAuditor {
 

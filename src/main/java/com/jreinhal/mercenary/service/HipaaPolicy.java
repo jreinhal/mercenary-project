@@ -54,7 +54,7 @@ public class HipaaPolicy {
             return false;
         }
         try {
-            return this.isStrict(Department.valueOf(sector.toUpperCase()));
+            return this.isStrict(Department.fromString(sector.toUpperCase()));
         } catch (IllegalArgumentException e) {
             return false;
         }

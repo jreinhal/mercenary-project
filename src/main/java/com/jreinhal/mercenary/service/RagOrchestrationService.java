@@ -199,7 +199,7 @@ public class RagOrchestrationService {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
-            department = Department.valueOf(dept.toUpperCase());
+            department = Department.fromString(dept.toUpperCase());
         }
         catch (IllegalArgumentException e) {
             return "INVALID SECTOR: unrecognized department value";
@@ -513,7 +513,7 @@ public class RagOrchestrationService {
         Department department;
         User user = SecurityContext.getCurrentUser();
         try {
-            department = Department.valueOf(dept.toUpperCase());
+            department = Department.fromString(dept.toUpperCase());
         }
         catch (IllegalArgumentException e) {
             return new EnhancedAskResponse("INVALID SECTOR: unrecognized department value", List.of(), List.of(), Map.of(), null);
@@ -560,7 +560,7 @@ public class RagOrchestrationService {
                         log.debug("Expanded follow-up query for session {}", sessionId);
                     }
                 } else if (this.conversationMemoryService == null || this.sessionPersistenceService == null) {
-                    log.debug("Session memory unavailable (edition does not include professional features)");
+                    log.debug("Session memory unavailable (edition does not include enterprise features)");
                 } else {
                     log.info("HIPAA strict: conversation memory disabled for medical session {}", sessionId);
                 }
@@ -970,7 +970,7 @@ public class RagOrchestrationService {
         return switch (resolved) {
             case GOVERNMENT -> new ResponsePolicy(resolved, Math.max(baseTokens, 768), true, true, false);
             case MEDICAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 768), true, true, false);
-            case PROFESSIONAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 640), false, false, true);
+            case ENTERPRISE -> new ResponsePolicy(resolved, Math.max(baseTokens, 640), false, false, true);
             case TRIAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 512), false, false, true);
         };
     }
@@ -1128,7 +1128,7 @@ public class RagOrchestrationService {
                 - Evidence Excerpts (3-6 short excerpts with citations)
                 - If evidence is insufficient, state \"No relevant records found.\"
                 """;
-            case PROFESSIONAL, TRIAL -> """
+            case ENTERPRISE, TRIAL -> """
                 FORMAT:
                 - Executive Summary (6-10 sentences, fully cited where possible)
                 - Key Findings (5-8 bullets with citations)
@@ -2258,7 +2258,8 @@ public class RagOrchestrationService {
     }
 
     private List<Document> performHybridReranking(String query, String dept, double threshold, List<String> activeFiles) {
-        if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
+        String normalizedDept = dept != null ? dept.toUpperCase(java.util.Locale.ROOT) : "";
+        if (!Set.of("GOVERNMENT", "MEDICAL", "ENTERPRISE").contains(normalizedDept)) {
             if (log.isWarnEnabled()) {
                 log.warn("SECURITY: Invalid department value in filter: {}", dept);
             }
@@ -2475,7 +2476,7 @@ public class RagOrchestrationService {
         Set<ModalityRouter.ModalityTarget> modalities = this.modalityRouter != null ? this.modalityRouter.route(query) : Set.of(ModalityRouter.ModalityTarget.TEXT);
         boolean allowVisual = true;
         try {
-            Department department = Department.valueOf(dept.toUpperCase());
+            Department department = Department.fromString(dept.toUpperCase());
             allowVisual = !this.hipaaPolicy.shouldDisableVisual(department);
         } catch (IllegalArgumentException ignored) {
         }

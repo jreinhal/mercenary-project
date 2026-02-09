@@ -13,13 +13,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class LicenseService {
     private static final Logger log = LoggerFactory.getLogger(LicenseService.class);
-    @Value(value="${sentinel.license.edition:PROFESSIONAL}")
+    @Value("${sentinel.license.edition:ENTERPRISE}")
     private String editionString;
-    @Value(value="${sentinel.license.key:}")
+    @Value("${sentinel.license.key:}")
     private String licenseKey;
-    @Value(value="${sentinel.license.trial-start:}")
+    @Value("${sentinel.license.trial-start:}")
     private String trialStartDate;
-    @Value(value="${sentinel.license.trial-days:30}")
+    @Value("${sentinel.license.trial-days:30}")
     private int trialDays;
     private Edition edition;
     private Instant trialExpiration;
@@ -37,8 +37,14 @@ public class LicenseService {
     }
 
     private Edition parseEdition(String value) {
+        String normalized = value.toUpperCase().trim();
+        // Backward compatibility: PROFESSIONAL was renamed to ENTERPRISE
+        if ("PROFESSIONAL".equals(normalized)) {
+            log.info("Mapping legacy edition PROFESSIONAL to ENTERPRISE");
+            return Edition.ENTERPRISE;
+        }
         try {
-            return Edition.valueOf(value.toUpperCase());
+            return Edition.valueOf(normalized);
         }
         catch (IllegalArgumentException e) {
             log.warn("Unknown edition '{}', defaulting to TRIAL", value);
@@ -128,9 +134,9 @@ public class LicenseService {
         return new LicenseStatus(this.edition, this.isValid(), this.getTrialDaysRemaining(), this.trialExpiration);
     }
 
-    public static enum Edition {
+    public enum Edition {
         TRIAL,
-        PROFESSIONAL,
+        ENTERPRISE,
         MEDICAL,
         GOVERNMENT;
 

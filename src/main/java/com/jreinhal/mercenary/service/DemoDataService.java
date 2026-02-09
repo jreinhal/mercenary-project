@@ -80,13 +80,13 @@ public class DemoDataService {
         if (lower.startsWith("enterprise_") || lower.startsWith("ent_")) {
             return Department.ENTERPRISE;
         } else if (lower.startsWith("finance_") || lower.startsWith("fin_")) {
-            return Department.FINANCE;
+            return Department.ENTERPRISE;
         } else if (lower.startsWith("medical_") || lower.startsWith("med_")) {
             return Department.MEDICAL;
         } else if (lower.startsWith("government_") || lower.startsWith("gov_") || lower.startsWith("defense_") || lower.startsWith("def_")) {
             return Department.GOVERNMENT;
         } else if (lower.startsWith("academic_") || lower.startsWith("acad_")) {
-            return Department.ACADEMIC;
+            return Department.ENTERPRISE;
         }
         return Department.ENTERPRISE;
     }

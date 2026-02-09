@@ -151,7 +151,7 @@ public class ConfluenceConnector implements Connector {
 
     private Department resolveDepartment() {
         try {
-            return Department.valueOf(department.toUpperCase(Locale.ROOT));
+            return Department.fromString(department.toUpperCase(Locale.ROOT));
         } catch (Exception e) {
             return Department.ENTERPRISE;
         }

@@ -9,8 +9,6 @@ param(
 $sectorMap = @{
     Government = 'GOVERNMENT'
     Medical    = 'MEDICAL'
-    Finance    = 'FINANCE'
-    Academic   = 'ACADEMIC'
     Enterprise = 'ENTERPRISE'
 }
 

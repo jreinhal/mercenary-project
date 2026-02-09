@@ -141,7 +141,7 @@ app:
 
 # ============================================
 # SENTINEL Configuration
-# Single-product with 5 sectors: GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
+# Single-product with 3 sectors: GOVERNMENT, MEDICAL, ENTERPRISE
 # ============================================
 sentinel:
   # LLM timeout for complex queries
@@ -466,13 +466,13 @@ sentinel:
     trace-retention-hours: ${REASONING_RETENTION:24}
 
   # UI Theming Configuration
-  # Sector-aware theming: GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
+  # Sector-aware theming: GOVERNMENT, MEDICAL, ENTERPRISE
   ui:
-    # Default sector theme (matches the 5 sectors)
+    # Default sector theme (matches the 3 sectors)
     default-sector: ${SENTINEL_DEFAULT_SECTOR:ENTERPRISE}
     # Custom branding (optional)
     brand-name: ${SENTINEL_BRAND_NAME:SENTINEL}
-    # Show classification banners (high-security sectors: GOVERNMENT, MEDICAL, FINANCE)
+    # Show classification banners (high-security sectors: GOVERNMENT, MEDICAL)
     show-classification: ${SENTINEL_SHOW_CLASSIFICATION:true}
     # Allow users to switch sectors
     allow-sector-switching: ${SENTINEL_ALLOW_SECTOR_SWITCH:true}

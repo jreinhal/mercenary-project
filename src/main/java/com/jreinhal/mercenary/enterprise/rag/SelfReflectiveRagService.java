@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.rag;
+package com.jreinhal.mercenary.enterprise.rag;
 
 import com.jreinhal.mercenary.util.LogSanitizer;
 import java.util.ArrayList;

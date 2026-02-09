@@ -9,8 +9,8 @@ plugins {
 group = 'com.jreinhal'
 version = '2.2.0'
 
-// Edition selection via -Pedition=xxx (default: professional)
-def edition = project.hasProperty('edition') ? project.property('edition') : 'professional'
+// Edition selection via -Pedition=xxx (default: enterprise)
+def edition = project.hasProperty('edition') ? project.property('edition') : 'enterprise'
 ext.edition = edition
 
 // Log the edition being built
@@ -101,11 +101,11 @@ dependencyLocking {
 
 // Edition-specific source sets with actual exclusion logic
 def editionExcludes = { ->
-    if (!(edition in ['trial', 'professional', 'medical', 'government'])) {
-        exclude '**/professional/**'
+    if (!(edition in ['trial', 'enterprise', 'medical', 'government'])) {
+        exclude '**/enterprise/**'
         exclude '**/medical/**'
         exclude '**/government/**'
-    } else if (edition in ['trial', 'professional']) {
+    } else if (edition in ['trial', 'enterprise']) {
         exclude '**/medical/**'
         exclude '**/government/**'
     } else if (edition == 'medical') {

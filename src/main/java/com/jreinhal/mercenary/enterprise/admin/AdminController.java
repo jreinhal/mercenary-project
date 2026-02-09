@@ -1,7 +1,7 @@
-package com.jreinhal.mercenary.professional.admin;
+package com.jreinhal.mercenary.enterprise.admin;
 
 import com.jreinhal.mercenary.model.UserRole;
-import com.jreinhal.mercenary.professional.admin.AdminDashboardService;
+import com.jreinhal.mercenary.enterprise.admin.AdminDashboardService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
