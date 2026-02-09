@@ -165,6 +165,12 @@ sentinel:
     max-docs: ${RAG_MAX_DOCS:12}
     max-visual-docs: ${RAG_MAX_VISUAL_DOCS:6}
 
+  # License validation
+  # When no key and no signing secret are set, runs in unlicensed mode (backward compatible).
+  # To enforce licensing, set both LICENSE_KEY and LICENSE_SIGNING_SECRET.
+  license:
+    signing-secret: ${LICENSE_SIGNING_SECRET:}
+
   # Vector store selection (local vs Atlas)
   vectorstore:
     force-local: ${SENTINEL_FORCE_LOCAL_VECTOR_STORE:false}
