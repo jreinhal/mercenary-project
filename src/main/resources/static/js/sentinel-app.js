@@ -1096,7 +1096,8 @@
 
         function getScopedStorageKey(baseKey) {
             const userId = localStorage.getItem('sentinel_operator') || 'DEMO_USER';
-            const sector = sectorSelect?.value || localStorage.getItem('sentinel-sector') || 'ENTERPRISE';
+            // Prefer persisted sector over the initial DOM default so refresh restores history for the last-used sector.
+            const sector = localStorage.getItem('sentinel-sector') || sectorSelect?.value || 'ENTERPRISE';
             const workspace = getWorkspaceId();
             return `${baseKey}_${userId}_${sector}_${workspace}`;
         }
@@ -2974,6 +2975,21 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             loadConversationHistory();
+            // If history persistence is enabled, restore the most recent session so refresh doesn't wipe the chat.
+            // This aligns with the RAG_DEV_TEST_PLAN "Session continuity" expectation.
+            try {
+                const sessions = Array.isArray(conversationHistory) ? conversationHistory.slice() : [];
+                sessions.sort((a, b) => (a?.timestamp || 0) - (b?.timestamp || 0));
+                const last = sessions.length ? sessions[sessions.length - 1] : null;
+                const hasMessages = last && Array.isArray(last.messages) && last.messages.length > 0;
+                if (hasMessages && canPersistCaseData()) {
+                    loadSession(last.id);
+                    return;
+                }
+            } catch (e) {
+                console.warn('Failed to restore last session:', e);
+            }
+
             currentSessionId = generateSessionId();
             currentCase = createCaseForSession(currentSessionId);
             renderConversationList();
@@ -4585,12 +4601,20 @@
             const metricsIndicateNoInfo = metrics && (metrics.errorCode ||
                 (metrics.answerable === false && !metrics.excerptFallbackApplied));
 
+            // NO_RETRIEVAL is a valid routing decision for queries like "Hello".
+            // In this case, the right panel should remain visible with cleared/empty states,
+            // not collapse into a "no info" mode that can leave stale graphs behind.
+            const routingDecision = metrics?.routingDecision || '';
+            const isNoRetrievalRoute = routingDecision === 'NO_RETRIEVAL' || routingDecision === 'SYSTEM_TIME';
+
             lastResponseText = safeResponse;
 
             const hasSources = sources && sources.length > 0;
-            if ((responseIndicatesNoInfo || metricsIndicateNoInfo) && !hasSources) {
+            if ((responseIndicatesNoInfo || metricsIndicateNoInfo) && !hasSources && !isNoRetrievalRoute) {
                 setRightPanelNoInfo(true);
                 clearInfoPanel();
+                // Clear context graph state to avoid stale nodes if the user later opens the Entity Network tab.
+                updateContextEntityGraph([]);
                 return;
             }
             setRightPanelNoInfo(false);

@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -32,12 +33,46 @@ extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(SecurityFilter.class);
     private final AuthenticationService authService;
     private final AuditService auditService;
-    private static final String[] PUBLIC_PATHS = new String[]{"/", "/index.html", "/manual.html", "/readme.html", "/css/", "/js/", "/favicon.ico", "/api/auth/", "/api/health"};
+
+    // Public pages and static assets. APIs remain authenticated (except /api/health and /api/auth/**).
+    // Keep this list path-based and pair it with method checks in shouldNotFilter() for safety.
+    private static final String[] PUBLIC_PATHS = new String[]{
+            "/",
+            "/index.html",
+            "/manual.html",
+            "/readme.html",
+            "/docs-index.html",
+            "/docs-index.md",
+            "/favicon.ico",
+            "/css/",
+            "/js/",
+            "/vendor/",
+            "/fonts/",
+            "/images/",
+            "/api/auth/",
+            "/api/health"
+    };
 
     public SecurityFilter(AuthenticationService authService, AuditService auditService) {
         this.authService = authService;
         this.auditService = auditService;
         log.info("Security filter initialized with auth mode: {}", authService.getAuthMode());
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        // Only bypass the filter for safe static reads. Never bypass for non-idempotent methods.
+        String method = request.getMethod();
+        if (method == null) {
+            return false;
+        }
+        String m = method.toUpperCase(Locale.ROOT);
+        if (!("GET".equals(m) || "HEAD".equals(m))) {
+            return false;
+        }
+
+        String path = request.getRequestURI();
+        return path != null && this.isPublicPath(path);
     }
 
     /*
