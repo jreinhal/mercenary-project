@@ -106,8 +106,9 @@ class ThreadPoolStatsControllerTest {
 
         // Fill pool and queue
         CountDownLatch latch = new CountDownLatch(1);
-        ragExecutor.submit(() -> { try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
-        Thread.sleep(50);
+        CountDownLatch startedLatch = new CountDownLatch(1);
+        ragExecutor.submit(() -> { startedLatch.countDown(); try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+        assertTrue(startedLatch.await(5, TimeUnit.SECONDS), "First task should have started");
         ragExecutor.submit(() -> { try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
 
         // Force a rejection

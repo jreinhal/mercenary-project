@@ -1,6 +1,5 @@
 package com.jreinhal.mercenary.config;
 
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
@@ -65,8 +64,8 @@ public class RagPerformanceConfig {
      * blocked by slow RAG operations when the queue is full, which would otherwise freeze
      * the UI for all users.</p>
      *
-     * <p>Callers should catch {@link RejectedExecutionException} and return HTTP 503
-     * (Service Unavailable) to the client.</p>
+     * <p>Callers should catch {@link RejectedExecutionException} and degrade gracefully
+     * by returning empty or partial results to the client.</p>
      */
     public static final class MonitoredRejectionHandler implements RejectedExecutionHandler {
         private final String poolName;
@@ -79,10 +78,12 @@ public class RagPerformanceConfig {
         @Override
         public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
             long count = this.rejectionCount.incrementAndGet();
-            log.warn("Task rejected from pool '{}' — queue full. "
-                    + "active={}, poolSize={}, queueSize={}, totalRejections={}",
-                    this.poolName, executor.getActiveCount(), executor.getPoolSize(),
-                    executor.getQueue().size(), count);
+            if (log.isWarnEnabled()) {
+                log.warn("Task rejected from pool '{}' — queue full. "
+                        + "active={}, poolSize={}, queueSize={}, totalRejections={}",
+                        this.poolName, executor.getActiveCount(), executor.getPoolSize(),
+                        executor.getQueue().size(), count);
+            }
             throw new RejectedExecutionException(
                     "Thread pool '" + this.poolName + "' overloaded (rejected " + count + " tasks). "
                     + "Consider increasing pool size or queue capacity.");

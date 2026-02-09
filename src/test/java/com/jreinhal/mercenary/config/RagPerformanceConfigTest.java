@@ -80,10 +80,12 @@ class RagPerformanceConfigTest {
         CountDownLatch blockLatch = new CountDownLatch(1);
 
         // Fill the single thread
+        CountDownLatch startedLatch = new CountDownLatch(1);
         executor.submit(() -> {
+            startedLatch.countDown();
             try { blockLatch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         });
-        Thread.sleep(50);
+        assertTrue(startedLatch.await(5, TimeUnit.SECONDS), "First task should have started");
 
         // Fill the single queue slot
         executor.submit(() -> {
@@ -109,10 +111,12 @@ class RagPerformanceConfigTest {
         CountDownLatch blockLatch = new CountDownLatch(1);
 
         // Fill pool and queue
+        CountDownLatch startedLatch = new CountDownLatch(1);
         executor.submit(() -> {
+            startedLatch.countDown();
             try { blockLatch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         });
-        Thread.sleep(50);
+        assertTrue(startedLatch.await(5, TimeUnit.SECONDS), "First task should have started");
         executor.submit(() -> {
             try { blockLatch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         });
