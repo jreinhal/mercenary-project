@@ -78,8 +78,6 @@ function applySectorFilter() {
     const sectorNames = {
         'GOVERNMENT': 'Government & Defense',
         'MEDICAL': 'Healthcare & Medical',
-        'FINANCE': 'Financial Services',
-        'ACADEMIC': 'Academic & Research',
         'ENTERPRISE': 'Enterprise'
     };
 

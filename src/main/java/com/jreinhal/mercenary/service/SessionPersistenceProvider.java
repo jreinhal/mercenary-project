@@ -11,7 +11,7 @@ import java.util.Optional;
 
 /**
  * Core interface for session persistence operations.
- * Implementations live in edition-specific packages (e.g., professional.memory).
+ * Implementations live in edition-specific packages (e.g., enterprise.memory).
  * Controllers and services in core/ depend on this interface, not the concrete class,
  * to preserve edition isolation.
  */

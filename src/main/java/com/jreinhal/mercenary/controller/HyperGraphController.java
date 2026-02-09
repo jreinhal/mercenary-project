@@ -44,7 +44,7 @@ public class HyperGraphController {
     private static final String NODES_COLLECTION = "hypergraph_nodes";
     private static final String EDGES_COLLECTION = "hypergraph_edges";
     private static final Set<String> VALID_DEPARTMENTS = Set.of(
-        "GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE"
+        "GOVERNMENT", "MEDICAL", "ENTERPRISE"
     );
     private static final int MAX_NODES = 200;
     private static final int MAX_NEIGHBORS = 50;

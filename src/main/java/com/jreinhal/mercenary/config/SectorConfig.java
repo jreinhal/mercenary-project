@@ -28,7 +28,7 @@ public class SectorConfig {
     }
 
     public Set<Department> getHighSecuritySectors() {
-        return Set.of(Department.GOVERNMENT, Department.MEDICAL, Department.FINANCE);
+        return Set.of(Department.GOVERNMENT, Department.MEDICAL);
     }
 
     public boolean requiresElevatedClearance(Department dept) {

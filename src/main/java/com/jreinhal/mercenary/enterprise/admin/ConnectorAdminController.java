@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.admin;
+package com.jreinhal.mercenary.enterprise.admin;
 
 import com.jreinhal.mercenary.connectors.ConnectorService;
 import com.jreinhal.mercenary.connectors.ConnectorStatus;

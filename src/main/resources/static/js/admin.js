@@ -411,9 +411,7 @@
     const pipelinePresets = {
         ENTERPRISE: { label: 'Enterprise', topK: 6, similarity: 0.72, hyde: false, graphrag: true, rerank: true },
         GOVERNMENT: { label: 'Government', topK: 5, similarity: 0.78, hyde: false, graphrag: true, rerank: true },
-        MEDICAL:    { label: 'Medical',    topK: 5, similarity: 0.80, hyde: false, graphrag: true, rerank: true },
-        FINANCE:    { label: 'Finance',    topK: 6, similarity: 0.74, hyde: false, graphrag: false, rerank: true },
-        ACADEMIC:   { label: 'Academic',   topK: 8, similarity: 0.68, hyde: true,  graphrag: true, rerank: true }
+        MEDICAL:    { label: 'Medical',    topK: 5, similarity: 0.80, hyde: false, graphrag: true, rerank: true }
     };
 
     async function loadSectors() {

@@ -46,9 +46,9 @@ class LicenseControllerTest {
     void featureReturnsAvailabilityAndEdition() {
         LicenseService licenseService = mock(LicenseService.class);
         when(licenseService.hasFeature("RAG")).thenReturn(true);
-        when(licenseService.getEdition()).thenReturn(LicenseService.Edition.PROFESSIONAL);
+        when(licenseService.getEdition()).thenReturn(LicenseService.Edition.ENTERPRISE);
         when(licenseService.getStatus()).thenReturn(new LicenseService.LicenseStatus(
-                LicenseService.Edition.PROFESSIONAL, true, -1, (Instant) null));
+                LicenseService.Edition.ENTERPRISE, true, -1, (Instant) null));
 
         LicenseController controller = new LicenseController(licenseService);
         SecurityContext.setCurrentUser(User.devUser("test"));
@@ -58,7 +58,7 @@ class LicenseControllerTest {
         assertNotNull(res.getBody());
         assertEquals("RAG", res.getBody().feature());
         assertTrue(res.getBody().available());
-        assertEquals("PROFESSIONAL", res.getBody().edition());
+        assertEquals("ENTERPRISE", res.getBody().edition());
     }
 }
 

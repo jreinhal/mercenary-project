@@ -34,7 +34,7 @@ STANDARD profile bootstrap:
 
 ## Editions
 - trial
-- professional
+- enterprise
 - medical
 - government
 

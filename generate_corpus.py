@@ -16,18 +16,6 @@ SECTORS = {
         "safety_incident", "compliance_audit", "patient_outcomes_aggregate", "utilization_review",
         "research_overview", "risk_assessment", "vendor_assessment"
     ],
-    "FINANCE": [
-        "earnings_report", "portfolio_review", "risk_assessment", "compliance_audit",
-        "fraud_investigation", "credit_memo", "treasury_update", "liquidity_report",
-        "market_outlook", "stress_test", "regulatory_update", "vendor_assessment",
-        "investment_policy", "pricing_model", "operational_incident"
-    ],
-    "ACADEMIC": [
-        "research_summary", "grant_report", "publication_review", "lab_protocol",
-        "data_management_plan", "IRB_report", "compliance_audit", "equipment_request",
-        "faculty_activity", "student_outcomes", "project_update", "literature_review",
-        "risk_assessment", "vendor_assessment", "collaboration_memo"
-    ],
     "ENTERPRISE": [
         "strategy_memo", "transformation_plan", "operational_review", "security_incident",
         "compliance_audit", "vendor_assessment", "product_brief", "customer_insights",

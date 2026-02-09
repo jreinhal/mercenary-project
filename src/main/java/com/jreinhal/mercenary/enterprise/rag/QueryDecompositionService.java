@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.rag;
+package com.jreinhal.mercenary.enterprise.rag;
 
 import com.jreinhal.mercenary.util.LogSanitizer;
 import java.util.ArrayList;
@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
-@Service(value="professionalQueryDecompositionService")
+@Service(value="enterpriseQueryDecompositionService")
 public class QueryDecompositionService {
     private static final Logger log = LoggerFactory.getLogger(QueryDecompositionService.class);
     private final ChatClient chatClient;

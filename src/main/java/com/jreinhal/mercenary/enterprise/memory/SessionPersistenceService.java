@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.memory;
+package com.jreinhal.mercenary.enterprise.memory;
 
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;

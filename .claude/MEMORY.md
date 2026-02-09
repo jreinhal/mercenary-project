@@ -17,6 +17,6 @@ This applies to EVERY session, EVERY commit, no exceptions.
 
 ## Project Context
 - Spring Boot 3.4.2 + Java 21
-- Multi-edition build (trial, professional, medical, government)
+- Multi-edition build (trial, enterprise, medical, government)
 - Air-gap compatible RAG platform
 - See CLAUDE.md for full development guidelines

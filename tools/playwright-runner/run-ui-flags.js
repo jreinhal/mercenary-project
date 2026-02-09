@@ -31,16 +31,6 @@ const sectorUploads = {
     'medical_clinical_trial.txt',
     'medical_patient_outcomes.txt'
   ],
-  FINANCE: [
-    'finance_earnings_q4.txt',
-    'finance_portfolio_analysis.txt'
-  ],
-  ACADEMIC: [
-    'academic_research_program.txt',
-    'academic_publications_review.txt',
-    'academic_funding_partnerships.txt',
-    'academic_compliance_irb.txt'
-  ]
 };
 
 const scenarios = {
@@ -56,8 +46,8 @@ const scenarios = {
     label: 'SelfRAG enabled',
     tests: [
       { sector: 'ENTERPRISE', query: 'What is the total program budget?', expectText: '$150 Million' },
-      { sector: 'FINANCE', query: 'What was total revenue for Q4 2025?', expectText: '$850 Million' },
-      { sector: 'ACADEMIC', query: 'What is the total program budget?', expectText: '$18.7M' }
+      { sector: 'ENTERPRISE', query: 'What was total revenue for Q4 2025?', expectText: '$850 Million' },
+      { sector: 'ENTERPRISE', query: 'What is the total program budget?', expectText: '$18.7M' }
     ]
   },
   AGENTIC: {
@@ -70,14 +60,14 @@ const scenarios = {
   QUCORAG: {
     label: 'QuCoRAG enabled',
     tests: [
-      { sector: 'ACADEMIC', query: 'Summarize the NAISR-2024 program, key publications, and funding sources.', expectText: 'NAISR-2024' },
+      { sector: 'ENTERPRISE', query: 'Summarize the NAISR-2024 program, key publications, and funding sources.', expectText: 'NAISR-2024' },
       { sector: 'ENTERPRISE', query: 'What is the total program budget?', expectText: '$150 Million' }
     ]
   },
   CRAG: {
     label: 'CRAG enabled',
     tests: [
-      { sector: 'FINANCE', query: 'What was total revenue for Q4 2025?', expectText: '$850 Million' },
+      { sector: 'ENTERPRISE', query: 'What was total revenue for Q4 2025?', expectText: '$850 Million' },
       { sector: 'GOVERNMENT', query: 'Who was the Exercise Director?', expectText: 'Colonel James Morrison' }
     ]
   },
@@ -85,14 +75,14 @@ const scenarios = {
     label: 'HyDE + QuCoRAG enabled',
     tests: [
       { sector: 'ENTERPRISE', query: 'Remember the document about technology initiatives', expectSources: true },
-      { sector: 'ACADEMIC', query: 'Summarize the NAISR-2024 program, key publications, and funding sources.', expectText: 'NAISR-2024' }
+      { sector: 'ENTERPRISE', query: 'Summarize the NAISR-2024 program, key publications, and funding sources.', expectText: 'NAISR-2024' }
     ]
   },
   CRAG_SELFRAG: {
     label: 'CRAG + SelfRAG enabled',
     tests: [
       { sector: 'ENTERPRISE', query: 'What is the total program budget?', expectText: '$150 Million' },
-      { sector: 'FINANCE', query: 'What was total revenue for Q4 2025?', expectText: '$850 Million' }
+      { sector: 'ENTERPRISE', query: 'What was total revenue for Q4 2025?', expectText: '$850 Million' }
     ]
   },
   AGENTIC_HYDE: {
@@ -105,8 +95,8 @@ const scenarios = {
   CRAG_QUCORAG: {
     label: 'CRAG + QuCoRAG enabled',
     tests: [
-      { sector: 'FINANCE', query: 'What was total revenue for Q4 2025?', expectText: '$850 Million' },
-      { sector: 'ACADEMIC', query: 'What is the total program budget?', expectText: '$18.7M' }
+      { sector: 'ENTERPRISE', query: 'What was total revenue for Q4 2025?', expectText: '$850 Million' },
+      { sector: 'ENTERPRISE', query: 'What is the total program budget?', expectText: '$18.7M' }
     ]
   }
 };

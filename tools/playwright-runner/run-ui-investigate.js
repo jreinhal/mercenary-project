@@ -13,16 +13,6 @@ const queries = [
     sector: 'ENTERPRISE',
     query: 'What is the total program budget?',
     expected: '$150 Million'
-  },
-  {
-    sector: 'FINANCE',
-    query: 'What was total revenue for Q4 2025?',
-    expected: '$850 Million'
-  },
-  {
-    sector: 'ACADEMIC',
-    query: 'What is the total program budget?',
-    expected: '$18.7M'
   }
 ];
 

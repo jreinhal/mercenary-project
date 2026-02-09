@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.admin;
+package com.jreinhal.mercenary.enterprise.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -155,12 +155,12 @@ class AdminDashboardServiceTest {
         void shouldNotReturnHardcodedDocumentsBySector() {
             AdminDashboardService.DocumentStats docs = service.getDocumentStats();
 
-            // The hardcoded values were {"GOVERNMENT": 80, "FINANCE": 60, "MEDICAL": 40}
+            // The hardcoded values were {"GOVERNMENT": 80, "ENTERPRISE": 60, "MEDICAL": 40}
             Map<String, Long> bySector = docs.documentsBySector();
             boolean isHardcoded = bySector.getOrDefault("GOVERNMENT", 0L) == 80L
-                    && bySector.getOrDefault("FINANCE", 0L) == 60L
+                    && bySector.getOrDefault("ENTERPRISE", 0L) == 60L
                     && bySector.getOrDefault("MEDICAL", 0L) == 40L;
-            assertThat(isHardcoded).as("documentsBySector should not be hardcoded {GOVERNMENT:80, FINANCE:60, MEDICAL:40}").isFalse();
+            assertThat(isHardcoded).as("documentsBySector should not be hardcoded {GOVERNMENT:80, ENTERPRISE:60, MEDICAL:40}").isFalse();
         }
 
         @Test

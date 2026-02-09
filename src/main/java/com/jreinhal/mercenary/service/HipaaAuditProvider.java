@@ -10,8 +10,8 @@ import java.util.Optional;
  * Edition-safe abstraction over HIPAA audit logging.
  * <p>
  * The concrete implementation ({@code HipaaAuditService}) lives in the
- * {@code medical} package, which is excluded from Trial and Professional
- * builds.  Code in {@code core}, {@code service}, or {@code professional}
+ * {@code medical} package, which is excluded from Trial and Enterprise
+ * builds.  Code in {@code core}, {@code service}, or {@code enterprise}
  * that needs HIPAA audit capabilities should depend on this interface
  * (injected with {@code @Autowired(required = false)}) so it compiles
  * cleanly in every edition.

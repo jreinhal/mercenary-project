@@ -77,7 +77,6 @@ class SectorIsolationTest {
         assertTrue(viewerUser.canAccessSector(Department.ENTERPRISE));
         assertFalse(viewerUser.canAccessSector(Department.GOVERNMENT));
         assertFalse(viewerUser.canAccessSector(Department.MEDICAL));
-        assertFalse(viewerUser.canAccessSector(Department.FINANCE));
     }
 
     @Test

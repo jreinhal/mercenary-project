@@ -81,12 +81,10 @@ if (-not (Ensure-Ollama $OllamaUrl)) {
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
-$sectors = @("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE")
+$sectors = @("GOVERNMENT", "MEDICAL", "ENTERPRISE")
 $sectorFiles = @{
     GOVERNMENT = "src/test/resources/test_docs/defense_cybersecurity.txt"
     MEDICAL    = "src/test/resources/test_docs/medical_clinical_trial.txt"
-    FINANCE    = "src/test/resources/test_docs/finance_earnings_q4.txt"
-    ACADEMIC   = "src/test/resources/test_docs/legal_ip_brief.txt"
     ENTERPRISE = "src/test/resources/test_docs/enterprise_transformation.txt"
 }
 
@@ -163,7 +161,7 @@ db.users.updateOne(
       authProvider: 'CAC',
       roles: ['ADMIN'],
       clearance: 'TOP_SECRET',
-      allowedSectors: ['GOVERNMENT','MEDICAL','FINANCE','ACADEMIC','ENTERPRISE'],
+      allowedSectors: ['GOVERNMENT','MEDICAL','ENTERPRISE'],
       active: true,
       pendingApproval: false
     },

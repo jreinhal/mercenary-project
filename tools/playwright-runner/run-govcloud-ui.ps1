@@ -66,7 +66,7 @@ db.users.updateOne(
       authProvider: 'CAC',
       roles: ['ADMIN'],
       clearance: 'TOP_SECRET',
-      allowedSectors: ['GOVERNMENT','MEDICAL','FINANCE','ACADEMIC','ENTERPRISE'],
+      allowedSectors: ['GOVERNMENT','MEDICAL','ENTERPRISE'],
       active: true,
       pendingApproval: false
     },

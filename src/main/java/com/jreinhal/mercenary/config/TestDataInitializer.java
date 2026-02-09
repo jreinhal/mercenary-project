@@ -37,22 +37,22 @@ public class TestDataInitializer {
             log.warn(">>> Creating test users for authorization testing <<<");
             log.warn("==========================================================");
 
-            // 1. Unclassified user - can only access ENTERPRISE and ACADEMIC
+            // 1. Unclassified user - can only access ENTERPRISE
             createTestUser(userRepository, passwordEncoder,
                 "viewer_unclass",
                 "Unclassified Viewer",
                 ClearanceLevel.UNCLASSIFIED,
                 Set.of(UserRole.VIEWER),
-                Set.of(Department.ENTERPRISE, Department.ACADEMIC)
+                Set.of(Department.ENTERPRISE)
             );
 
-            // 2. CUI user - can access FINANCE
+            // 2. CUI user - can access ENTERPRISE
             createTestUser(userRepository, passwordEncoder,
                 "analyst_cui",
                 "CUI Analyst",
                 ClearanceLevel.CUI,
                 Set.of(UserRole.ANALYST),
-                Set.of(Department.ENTERPRISE, Department.ACADEMIC, Department.FINANCE)
+                Set.of(Department.ENTERPRISE)
             );
 
             // 3. SECRET user - can access MEDICAL and GOVERNMENT

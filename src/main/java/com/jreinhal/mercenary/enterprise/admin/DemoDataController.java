@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.admin;
+package com.jreinhal.mercenary.enterprise.admin;
 
 import com.jreinhal.mercenary.service.DemoDataService;
 import org.springframework.http.HttpStatus;

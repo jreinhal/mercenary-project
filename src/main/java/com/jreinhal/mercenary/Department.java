@@ -5,8 +5,6 @@ import com.jreinhal.mercenary.model.ClearanceLevel;
 public enum Department {
     GOVERNMENT(ClearanceLevel.SECRET, "Defense / Intelligence", "Classified", "dark"),
     MEDICAL(ClearanceLevel.SECRET, "Medical / Clinical", "HIPAA", "dark"),
-    FINANCE(ClearanceLevel.CUI, "Financial Services", "PCI-DSS", "dark"),
-    ACADEMIC(ClearanceLevel.UNCLASSIFIED, "Academic / Research", "Research Data", "light"),
     ENTERPRISE(ClearanceLevel.UNCLASSIFIED, "Enterprise / Corporate", "General Business", "light");
 
     private final ClearanceLevel requiredClearance;

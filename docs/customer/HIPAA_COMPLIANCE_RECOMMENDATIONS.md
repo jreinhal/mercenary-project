@@ -48,8 +48,8 @@ The gaps and checklist below still apply and should be validated in deployment (
 - src/main/java/com/jreinhal/mercenary/service/TokenizationVault.java
 - src/main/java/com/jreinhal/mercenary/service/SecureIngestionService.java
 - src/main/java/com/jreinhal/mercenary/service/RagOrchestrationService.java
-- src/main/java/com/jreinhal/mercenary/professional/memory/ConversationMemoryService.java
-- src/main/java/com/jreinhal/mercenary/professional/memory/SessionPersistenceService.java
+- src/main/java/com/jreinhal/mercenary/enterprise/memory/ConversationMemoryService.java
+- src/main/java/com/jreinhal/mercenary/enterprise/memory/SessionPersistenceService.java
 - src/main/java/com/jreinhal/mercenary/controller/SessionController.java
 - src/main/java/com/jreinhal/mercenary/service/FeedbackService.java
 - src/main/java/com/jreinhal/mercenary/rag/birag/BidirectionalRagService.java

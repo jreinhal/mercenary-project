@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class LicenseService {
     private static final Logger log = LoggerFactory.getLogger(LicenseService.class);
-    @Value(value="${sentinel.license.edition:PROFESSIONAL}")
+    @Value(value="${sentinel.license.edition:ENTERPRISE}")
     private String editionString;
     @Value(value="${sentinel.license.key:}")
     private String licenseKey;
@@ -130,7 +130,7 @@ public class LicenseService {
 
     public static enum Edition {
         TRIAL,
-        PROFESSIONAL,
+        ENTERPRISE,
         MEDICAL,
         GOVERNMENT;
 

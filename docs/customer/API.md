@@ -12,7 +12,7 @@ Optional query parameters:
 - sessionId for session-aware retrieval
 - deepAnalysis=true|false - Enable multi-hop entity graph traversal (slower but finds related documents through shared entities)
 
-Sectors (dept): GOVERNMENT, MEDICAL, FINANCE, ACADEMIC, ENTERPRISE
+Sectors (dept): GOVERNMENT, MEDICAL, ENTERPRISE
 
 ## Ingestion
 - POST /api/ingest/file (multipart)

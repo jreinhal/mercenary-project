@@ -32,7 +32,7 @@ class QueryExpanderTest {
     void cacheShouldBeIsolatedByDepartment() {
         String query = "Find system metrics";
 
-        queryExpander.expand(query, 2, "FINANCE");
+        queryExpander.expand(query, 2, "ENTERPRISE");
         queryExpander.expand(query, 2, "MEDICAL");
 
         @SuppressWarnings("unchecked")
@@ -40,11 +40,11 @@ class QueryExpanderTest {
         assertNotNull(cache);
 
         String normalizedKey = query.trim().toLowerCase();
-        String keyFinance = "FINANCE|" + normalizedKey + "|2";
+        String keyEnterprise = "ENTERPRISE|" + normalizedKey + "|2";
         String keyMedical = "MEDICAL|" + normalizedKey + "|2";
 
-        assertNotEquals(keyFinance, keyMedical);
-        assertNotNull(cache.getIfPresent(keyFinance));
+        assertNotEquals(keyEnterprise, keyMedical);
+        assertNotNull(cache.getIfPresent(keyEnterprise));
         assertNotNull(cache.getIfPresent(keyMedical));
     }
 }

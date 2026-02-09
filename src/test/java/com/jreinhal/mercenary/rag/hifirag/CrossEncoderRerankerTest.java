@@ -47,20 +47,20 @@ class CrossEncoderRerankerTest {
     @Test
     void cacheShouldBeIsolatedByDepartment() {
         String query = "system metrics";
-        Document financeDoc = new Document("Metrics content", Map.of("dept", "FINANCE", "source", "report.pdf"));
+        Document enterpriseDoc = new Document("Metrics content", Map.of("dept", "ENTERPRISE", "source", "report.pdf"));
         Document medicalDoc = new Document("Metrics content", Map.of("dept", "MEDICAL", "source", "report.pdf"));
 
-        reranker.rerank(query, List.of(financeDoc, medicalDoc));
+        reranker.rerank(query, List.of(enterpriseDoc, medicalDoc));
 
         @SuppressWarnings("unchecked")
         Cache<String, Double> cache = (Cache<String, Double>) ReflectionTestUtils.getField(reranker, "scoreCache");
         assertNotNull(cache);
 
-        String financeKey = ReflectionTestUtils.invokeMethod(reranker, "buildCacheKey", query, financeDoc);
+        String enterpriseKey = ReflectionTestUtils.invokeMethod(reranker, "buildCacheKey", query, enterpriseDoc);
         String medicalKey = ReflectionTestUtils.invokeMethod(reranker, "buildCacheKey", query, medicalDoc);
 
-        assertNotEquals(financeKey, medicalKey);
-        assertNotNull(cache.getIfPresent(financeKey));
+        assertNotEquals(enterpriseKey, medicalKey);
+        assertNotNull(cache.getIfPresent(enterpriseKey));
         assertNotNull(cache.getIfPresent(medicalKey));
     }
 }

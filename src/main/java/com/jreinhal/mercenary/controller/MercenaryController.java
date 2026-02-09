@@ -269,7 +269,7 @@ public class MercenaryController {
             return new InspectResponse("ACCESS DENIED: Insufficient permissions.", List.of(), false, 0);
         }
         String dept = deptParam.toUpperCase(Locale.ROOT);
-        if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
+        if (!Set.of("GOVERNMENT", "MEDICAL", "ENTERPRISE").contains(dept)) {
             if (log.isWarnEnabled()) {
                 log.warn("SECURITY: Invalid department in inspect request: {}", deptParam);
             }
@@ -795,7 +795,7 @@ public class MercenaryController {
     }
 
     private List<Document> performHybridReranking(String query, String dept, double threshold, List<String> activeFiles) {
-        if (!Set.of("GOVERNMENT", "MEDICAL", "FINANCE", "ACADEMIC", "ENTERPRISE").contains(dept)) {
+        if (!Set.of("GOVERNMENT", "MEDICAL", "ENTERPRISE").contains(dept)) {
             log.warn("SECURITY: Invalid department value in filter: {}", dept);
             return List.of();
         }

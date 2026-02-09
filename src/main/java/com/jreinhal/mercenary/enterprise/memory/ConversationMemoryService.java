@@ -1,4 +1,4 @@
-package com.jreinhal.mercenary.professional.memory;
+package com.jreinhal.mercenary.enterprise.memory;
 
 import com.jreinhal.mercenary.service.ConversationMemoryProvider;
 import com.mongodb.client.result.DeleteResult;
