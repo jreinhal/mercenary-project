@@ -23,7 +23,7 @@ import com.jreinhal.mercenary.rag.ragpart.RagPartService;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTrace;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
-import com.jreinhal.mercenary.security.PromptInjectionPatterns;
+import com.jreinhal.mercenary.security.ContentSanitizer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
@@ -2687,7 +2687,7 @@ public class RagOrchestrationService {
             if (header.length() < remaining) {
                 sb.append(header);
                 remaining -= header.length();
-                String overview = this.sanitizeRetrievedContent(globalContext.trim());
+                String overview = ContentSanitizer.sanitize(globalContext.trim());
                 overview = this.truncateContent(overview, Math.min(this.maxOverviewChars, remaining));
                 sb.append(overview);
                 remaining -= overview.length();
@@ -2722,7 +2722,7 @@ public class RagOrchestrationService {
                 break;
             }
             String content = doc.getContent() != null ? doc.getContent() : "";
-            content = this.sanitizeRetrievedContent(content);
+            content = ContentSanitizer.sanitize(content);
             content = content.replace("{", "[").replace("}", "]");
             String trimmed = this.truncateContent(content, allowedContent);
             sb.append(header).append(trimmed);
@@ -2736,27 +2736,6 @@ public class RagOrchestrationService {
         return sb.toString().trim();
     }
 
-    private String sanitizeRetrievedContent(String content) {
-        if (content == null || content.isBlank()) {
-            return "";
-        }
-        // Defend against indirect prompt injection in retrieved documents by scrubbing any lines that
-        // match known injection patterns before they reach the synthesis model.
-        String[] lines = content.split("\\r?\\n", -1);
-        StringBuilder sb = new StringBuilder(content.length());
-        for (String line : lines) {
-            String normalized = Normalizer.normalize(line, Normalizer.Form.NFKC);
-            boolean hit = false;
-            for (Pattern pattern : PromptInjectionPatterns.getPatterns()) {
-                if (pattern.matcher(normalized).find()) {
-                    hit = true;
-                    break;
-                }
-            }
-            sb.append(hit ? "[REDACTED-PROMPT-INJECTION]" : line).append('\n');
-        }
-        return sb.toString();
-    }
 
     private String truncateContent(String text, int maxChars) {
         if (text == null || maxChars <= 0) {

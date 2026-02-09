@@ -1549,7 +1549,7 @@ sentinel:
 #### Configuration Guide Updates
 - [ ] Complete reference for all new `sentinel.*` properties
 - [ ] Recommended configurations by edition:
-  - Trial/Professional: Balanced defaults
+  - Trial/Enterprise: Balanced defaults
   - Medical: Higher grounding thresholds
   - Government: Strictest verification, mandatory abstention
 - [ ] Performance tuning guide:

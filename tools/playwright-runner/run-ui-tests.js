@@ -672,7 +672,6 @@ async function uploadFile(page, filePath, timeoutMs = 120000) {
         const stage = document.getElementById('upload-stage');
         const status = document.getElementById('upload-status');
         const progressVisible = progress ? !progress.classList.contains('hidden') : false;
-        const stageText = stage ? (stage.textContent || '') : '';
         const statusText = status ? (status.innerText || '') : '';
         // NOTE: #upload-stage is initialized to "Uploading..." even when idle.
         // Only treat as "running" if the progress UI is actually visible.

@@ -34,9 +34,14 @@ extends OncePerRequestFilter {
     private final AuthenticationService authService;
     private final AuditService auditService;
 
-    // Public pages and static assets. APIs remain authenticated (except /api/health and /api/auth/**).
-    // Keep this list path-based and pair it with method checks in shouldNotFilter() for safety.
-    private static final String[] PUBLIC_PATHS = new String[]{
+    // API paths that are publicly accessible regardless of HTTP method.
+    private static final String[] PUBLIC_API_PATHS = new String[]{
+            "/api/auth/",
+            "/api/health"
+    };
+
+    // Static asset paths — only accessible via GET/HEAD (non-idempotent methods are rejected).
+    private static final String[] STATIC_ASSET_PATHS = new String[]{
             "/",
             "/index.html",
             "/manual.html",
@@ -48,9 +53,7 @@ extends OncePerRequestFilter {
             "/js/",
             "/vendor/",
             "/fonts/",
-            "/images/",
-            "/api/auth/",
-            "/api/health"
+            "/images/"
     };
 
     public SecurityFilter(AuthenticationService authService, AuditService auditService) {
@@ -61,26 +64,23 @@ extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        // Only bypass the filter for safe static reads. Never bypass for non-idempotent methods.
-        String method = request.getMethod();
-        if (method == null) {
+        // Bypass the filter only for idempotent (GET/HEAD) requests to static assets or public API paths.
+        if (!this.isIdempotentMethod(request)) {
             return false;
         }
-        String m = method.toUpperCase(Locale.ROOT);
-        if (!("GET".equals(m) || "HEAD".equals(m))) {
-            return false;
-        }
-
         String path = request.getRequestURI();
-        return path != null && this.isPublicPath(path);
+        return path != null && (this.isStaticAssetPath(path) || this.isPublicApiPath(path));
     }
 
-    /*
-     * WARNING - Removed try catching itself - possible behaviour change.
-     */
     protected void doFilterInternal(HttpServletRequest httpRequest, HttpServletResponse httpResponse, FilterChain chain) throws IOException, ServletException {
         String path = httpRequest.getRequestURI();
-        if (this.isPublicPath(path)) {
+        // Public API paths (e.g., /api/health, /api/auth/**) are accessible for any HTTP method.
+        if (this.isPublicApiPath(path)) {
+            chain.doFilter((ServletRequest)httpRequest, (ServletResponse)httpResponse);
+            return;
+        }
+        // Static asset paths are only accessible unauthenticated for GET/HEAD — other methods fall through to auth.
+        if (this.isStaticAssetPath(path) && this.isIdempotentMethod(httpRequest)) {
             chain.doFilter((ServletRequest)httpRequest, (ServletResponse)httpResponse);
             return;
         }
@@ -108,12 +108,44 @@ extends OncePerRequestFilter {
         }
     }
 
-    private boolean isPublicPath(String path) {
-        for (String publicPath : PUBLIC_PATHS) {
-            if (!(publicPath.equals("/") ? path.equals("/") : path.equals(publicPath) || path.startsWith(publicPath))) continue;
-            return true;
+    private boolean isPublicApiPath(String path) {
+        for (String apiPath : PUBLIC_API_PATHS) {
+            // Entries ending with "/" are path prefixes; others require exact match.
+            if (apiPath.endsWith("/") ? path.startsWith(apiPath) : apiPath.equals(path)) {
+                return true;
+            }
         }
         return false;
+    }
+
+    private boolean isStaticAssetPath(String path) {
+        for (String staticPath : STATIC_ASSET_PATHS) {
+            // "/" is exact-match only (root page); directory prefixes like "/css/" use startsWith;
+            // file entries like "/index.html" use exact match.
+            if ("/".equals(staticPath)) {
+                if ("/".equals(path)) {
+                    return true;
+                }
+            } else if (staticPath.endsWith("/")) {
+                if (path.startsWith(staticPath)) {
+                    return true;
+                }
+            } else {
+                if (staticPath.equals(path)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isIdempotentMethod(HttpServletRequest request) {
+        String method = request.getMethod();
+        if (method == null) {
+            return false;
+        }
+        String m = method.toUpperCase(Locale.ROOT);
+        return "GET".equals(m) || "HEAD".equals(m);
     }
 
     private void setSpringSecurityContext(User user) {

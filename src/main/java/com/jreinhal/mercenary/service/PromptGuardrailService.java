@@ -260,7 +260,17 @@ public class PromptGuardrailService {
             .build();
 
         CompletableFuture<HttpResponse<String>> future = this.httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString());
-        HttpResponse<String> resp = future.get(this.llmTimeoutMs, TimeUnit.MILLISECONDS);
+        HttpResponse<String> resp;
+        try {
+            resp = future.get(this.llmTimeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            future.cancel(true);
+            throw te;
+        } catch (InterruptedException ie) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw ie;
+        }
         if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
             if (this.llmCircuitBreakerEnabled && this.llmCircuitBreaker != null) {
                 this.llmCircuitBreaker.recordFailure(new IllegalStateException("HTTP " + resp.statusCode()));
@@ -279,14 +289,24 @@ public class PromptGuardrailService {
 
         JsonNode classificationJson = this.objectMapper.readTree(content);
         String classification = classificationJson.path("classification").asText("").trim().toUpperCase(Locale.ROOT);
+
+        // Validate classification against known values — fail-closed on unrecognized response.
+        if (!VALID_CLASSIFICATIONS.contains(classification)) {
+            log.warn("LLM schema guardrail returned invalid classification '{}'; failing closed", classification);
+            if (this.llmCircuitBreakerEnabled && this.llmCircuitBreaker != null) {
+                this.llmCircuitBreaker.recordFailure(new IllegalStateException("invalid_classification: " + classification));
+            }
+            return GuardrailResult.blocked("LLM guardrail returned invalid classification", "UNKNOWN", 0.5, Map.of("layer", "llm", "schema", true, "error", "invalid_classification", "raw", classification));
+        }
+
         if (this.llmCircuitBreakerEnabled && this.llmCircuitBreaker != null) {
             this.llmCircuitBreaker.recordSuccess();
         }
-        if ("MALICIOUS".equals(classification)) {
-            return GuardrailResult.blocked("LLM classifier detected prompt injection", "MALICIOUS", 0.9, Map.of("layer", "llm", "schema", true));
+        if (CLASSIFICATION_MALICIOUS.equals(classification)) {
+            return GuardrailResult.blocked("LLM classifier detected prompt injection", CLASSIFICATION_MALICIOUS, 0.9, Map.of("layer", "llm", "schema", true));
         }
-        if ("SUSPICIOUS".equals(classification) && this.strictMode) {
-            return GuardrailResult.blocked("LLM classifier flagged query as suspicious (strict mode)", "SUSPICIOUS", 0.7, Map.of("layer", "llm", "schema", true, "strictMode", true));
+        if (CLASSIFICATION_SUSPICIOUS.equals(classification) && this.strictMode) {
+            return GuardrailResult.blocked("LLM classifier flagged query as suspicious (strict mode)", CLASSIFICATION_SUSPICIOUS, 0.7, Map.of("layer", "llm", "schema", true, "strictMode", true));
         }
         return GuardrailResult.safe();
     }
