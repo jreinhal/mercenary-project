@@ -99,7 +99,7 @@ public class SessionPersistenceService implements SessionPersistenceProvider {
         ActiveSession existing = (ActiveSession)this.mongoTemplate.findOne(query, ActiveSession.class, SESSIONS_COLLECTION);
         if (existing == null) {
             session = new ActiveSession(sessionId, userId, workspaceId, department, Instant.now(), Instant.now(), 0, 0, new ArrayList<String>(), new HashMap<String, Object>());
-            log.info("Created new session: {} for user: {}", sessionId, userId);
+            log.info("Created new session: {} for user: {}", sanitizeLogParam(sessionId), sanitizeLogParam(userId));
         } else {
             session = new ActiveSession(existing.sessionId(), existing.userId(), existing.workspaceId(), existing.department(), existing.createdAt(), Instant.now(), existing.messageCount(), existing.traceCount(), existing.traceIds(), existing.metadata());
         }
@@ -218,7 +218,7 @@ public class SessionPersistenceService implements SessionPersistenceProvider {
         Path exportPath = Paths.get(this.sessionDataDir, "exports", filename);
         String json = this.objectMapper.writeValueAsString(export);
         Files.writeString(exportPath, (CharSequence)json, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        log.info("Exported session {} to {}", sessionId, exportPath);
+        log.info("Exported session {} to {}", sanitizeLogParam(sessionId), sanitizeLogParam(exportPath.toString()));
         return exportPath;
     }
 
@@ -358,6 +358,13 @@ public class SessionPersistenceService implements SessionPersistenceProvider {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to sign session export integrity payload", e);
         }
+    }
+
+    private static String sanitizeLogParam(String value) {
+        if (value == null) {
+            return "null";
+        }
+        return value.replaceAll("[\\r\\n\\t]", "_");
     }
 
     private Department safeDepartment(String dept) {
