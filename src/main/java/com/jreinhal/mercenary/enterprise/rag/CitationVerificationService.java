@@ -15,7 +15,9 @@ import org.springframework.stereotype.Service;
 public class CitationVerificationService {
     private static final Logger log = LoggerFactory.getLogger(CitationVerificationService.class);
     private final ChatClient chatClient;
-    private static final Pattern CITATION_PATTERN = Pattern.compile("\\[(?:Doc(?:ument)?\\s*)?(\\d+)\\]|\\[Source:\\s*([^\\]]+)\\]", 2);
+    private static final Pattern CITATION_PATTERN = Pattern.compile("\\[(?:Doc(?:ument)?\\s*+)?(\\d+)\\]|\\[Source:\\s*+([^\\]]+)\\]", 2);
+    private static final Pattern CONTAINS_DIGIT = Pattern.compile("\\d");
+    private static final Pattern CONTAINS_PROPER_NOUN_PAIR = Pattern.compile("[A-Z][a-z]+\\s+[A-Z][a-z]+");
 
     public CitationVerificationService(ChatClient.Builder chatClientBuilder) {
         this.chatClient = chatClientBuilder.build();
@@ -127,7 +129,7 @@ public class CitationVerificationService {
     }
 
     private boolean looksLikeFactualClaim(String sentence) {
-        return sentence.matches(".*\\d+.*") || sentence.matches(".*[A-Z][a-z]+\\s+[A-Z][a-z]+.*") || sentence.contains(" is ") || sentence.contains(" was ") || sentence.contains(" are ") || sentence.contains(" were ");
+        return CONTAINS_DIGIT.matcher(sentence).find() || CONTAINS_PROPER_NOUN_PAIR.matcher(sentence).find() || sentence.contains(" is ") || sentence.contains(" was ") || sentence.contains(" are ") || sentence.contains(" were ");
     }
 
     private String extractSurroundingText(String text, int citationPos, int chars) {
