@@ -2258,7 +2258,8 @@ public class RagOrchestrationService {
     }
 
     private List<Document> performHybridReranking(String query, String dept, double threshold, List<String> activeFiles) {
-        if (!Set.of("GOVERNMENT", "MEDICAL", "ENTERPRISE").contains(dept)) {
+        String normalizedDept = dept != null ? dept.toUpperCase(java.util.Locale.ROOT) : "";
+        if (!Set.of("GOVERNMENT", "MEDICAL", "ENTERPRISE").contains(normalizedDept)) {
             if (log.isWarnEnabled()) {
                 log.warn("SECURITY: Invalid department value in filter: {}", dept);
             }

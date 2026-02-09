@@ -13,13 +13,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class LicenseService {
     private static final Logger log = LoggerFactory.getLogger(LicenseService.class);
-    @Value(value="${sentinel.license.edition:ENTERPRISE}")
+    @Value("${sentinel.license.edition:ENTERPRISE}")
     private String editionString;
-    @Value(value="${sentinel.license.key:}")
+    @Value("${sentinel.license.key:}")
     private String licenseKey;
-    @Value(value="${sentinel.license.trial-start:}")
+    @Value("${sentinel.license.trial-start:}")
     private String trialStartDate;
-    @Value(value="${sentinel.license.trial-days:30}")
+    @Value("${sentinel.license.trial-days:30}")
     private int trialDays;
     private Edition edition;
     private Instant trialExpiration;
@@ -134,7 +134,7 @@ public class LicenseService {
         return new LicenseStatus(this.edition, this.isValid(), this.getTrialDaysRemaining(), this.trialExpiration);
     }
 
-    public static enum Edition {
+    public enum Edition {
         TRIAL,
         ENTERPRISE,
         MEDICAL,

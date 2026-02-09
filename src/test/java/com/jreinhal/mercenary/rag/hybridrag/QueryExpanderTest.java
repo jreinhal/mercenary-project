@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.rag.hybridrag;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
@@ -39,7 +40,7 @@ class QueryExpanderTest {
         Cache<String, List<String>> cache = (Cache<String, List<String>>) ReflectionTestUtils.getField(queryExpander, "expansionCache");
         assertNotNull(cache);
 
-        String normalizedKey = query.trim().toLowerCase();
+        String normalizedKey = query.trim().toLowerCase(Locale.ROOT);
         String keyEnterprise = "ENTERPRISE|" + normalizedKey + "|2";
         String keyMedical = "MEDICAL|" + normalizedKey + "|2";
 
