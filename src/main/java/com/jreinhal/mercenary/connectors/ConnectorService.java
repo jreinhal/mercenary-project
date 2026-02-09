@@ -52,6 +52,24 @@ public class ConnectorService {
     }
 
     /**
+     * Syncs only enabled connectors. Used by scheduled sync to avoid
+     * wasting resources on connectors that are explicitly disabled.
+     */
+    public List<ConnectorSyncResult> syncEnabled() {
+        List<ConnectorSyncResult> results = new ArrayList<>();
+        for (Connector connector : connectors) {
+            if (!connector.isEnabled()) {
+                continue;
+            }
+            ConnectorSyncResult result = connector.sync();
+            results.add(result);
+            ConnectorStatus status = new ConnectorStatus(connector.getName(), connector.isEnabled(), Instant.now(), result);
+            statusMap.put(connector.getName(), status);
+        }
+        return results;
+    }
+
+    /**
      * Scheduled connector sync. Disabled by default; enable via
      * {@code sentinel.connectors.sync-enabled=true}. Cron expression
      * controlled by {@code sentinel.connectors.sync-cron} (default: 2 AM daily).
@@ -63,7 +81,7 @@ public class ConnectorService {
         }
         log.info("Scheduled connector sync starting");
         long startTime = System.currentTimeMillis();
-        List<ConnectorSyncResult> results = syncAll();
+        List<ConnectorSyncResult> results = syncEnabled();
         long duration = System.currentTimeMillis() - startTime;
 
         int totalLoaded = 0;
@@ -76,8 +94,10 @@ public class ConnectorService {
                 successCount++;
             }
         }
-        log.info("Scheduled connector sync completed in {}ms: {}/{} connectors succeeded, {} documents loaded, {} skipped",
-                duration, successCount, results.size(), totalLoaded, totalSkipped);
+        if (log.isInfoEnabled()) {
+            log.info("Scheduled connector sync completed in {}ms: {}/{} connectors succeeded, {} documents loaded, {} skipped",
+                    duration, successCount, results.size(), totalLoaded, totalSkipped);
+        }
     }
 
     public boolean isSyncEnabled() {

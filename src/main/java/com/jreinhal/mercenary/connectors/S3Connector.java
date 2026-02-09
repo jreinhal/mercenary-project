@@ -90,7 +90,10 @@ public class S3Connector implements Connector {
             return new ConnectorSyncResult(getName(), false, 0, 0, "Missing S3 bucket configuration");
         }
         if (endpoint != null && !endpoint.isBlank() && !isTrustedEndpoint(endpoint)) {
-            log.error("S3 endpoint blocked (untrusted domain or private IP): {}", endpoint);
+            URI parsed = URI.create(endpoint);
+            if (log.isWarnEnabled()) {
+                log.warn("S3 endpoint blocked (untrusted domain or private IP): host={}", parsed.getHost());
+            }
             return new ConnectorSyncResult(getName(), false, 0, 0,
                     "S3 endpoint not in trusted domain allowlist");
         }
@@ -120,12 +123,16 @@ public class S3Connector implements Connector {
                     loaded++;
                 } catch (Exception e) {
                     skipped++;
-                    log.warn("S3 ingestion failed for {}: {}", key, e.getMessage());
+                    if (log.isWarnEnabled()) {
+                        log.warn("S3 ingestion failed for {}: {}", key, e.getMessage());
+                    }
                 }
             }
             return new ConnectorSyncResult(getName(), true, loaded, skipped, "S3 sync complete");
         } catch (Exception e) {
-            log.warn("S3 connector failed: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("S3 connector failed: {}", e.getMessage());
+            }
             return new ConnectorSyncResult(getName(), false, loaded, skipped, "S3 sync failed: " + e.getMessage());
         }
     }
@@ -136,9 +143,10 @@ public class S3Connector implements Connector {
      * <p>Checks performed:</p>
      * <ol>
      *   <li>HTTPS scheme required</li>
+     *   <li>Host matches configured {@code allowed-domains} list (permits private IPs
+     *       for on-prem MinIO/Ceph)</li>
+     *   <li>Host matches a built-in trusted S3-compatible domain suffix</li>
      *   <li>Host must not resolve to a private/loopback/link-local IP address</li>
-     *   <li>Host must match a trusted S3-compatible domain suffix or be in the
-     *       configured {@code allowed-domains} list</li>
      * </ol>
      */
     boolean isTrustedEndpoint(String endpointUrl) {
@@ -152,24 +160,13 @@ public class S3Connector implements Connector {
 
             // Enforce HTTPS
             if (!"https".equalsIgnoreCase(uri.getScheme())) {
-                log.warn("S3 endpoint rejected: HTTPS required, got scheme '{}'", uri.getScheme());
-                return false;
-            }
-
-            // Block private/loopback/link-local IP addresses (SSRF prevention)
-            if (isPrivateOrReservedAddress(lowerHost)) {
-                log.warn("S3 endpoint rejected: private/reserved IP address detected");
-                return false;
-            }
-
-            // Check built-in trusted domains
-            for (String trusted : TRUSTED_S3_DOMAINS) {
-                if (lowerHost.endsWith(trusted)) {
-                    return true;
+                if (log.isWarnEnabled()) {
+                    log.warn("S3 endpoint rejected: HTTPS required, got scheme '{}'", uri.getScheme());
                 }
+                return false;
             }
 
-            // Check configurable additional allowed domains
+            // Check configurable allowed domains first — permits on-prem (private IP) endpoints
             if (allowedDomains != null) {
                 for (String allowed : allowedDomains) {
                     if (allowed != null && !allowed.isBlank()) {
@@ -182,6 +179,21 @@ public class S3Connector implements Connector {
                         }
                     }
                 }
+            }
+
+            // Check built-in trusted domains
+            for (String trusted : TRUSTED_S3_DOMAINS) {
+                if (lowerHost.endsWith(trusted)) {
+                    return true;
+                }
+            }
+
+            // Block private/loopback/link-local IP addresses (SSRF prevention)
+            if (isPrivateOrReservedAddress(lowerHost)) {
+                if (log.isWarnEnabled()) {
+                    log.warn("S3 endpoint rejected: private/reserved IP address detected");
+                }
+                return false;
             }
 
             return false;
@@ -214,9 +226,8 @@ public class S3Connector implements Connector {
             }
             return false;
         } catch (UnknownHostException e) {
-            // If we can't resolve the host, it's not a private IP
-            // but it might still be invalid — let the S3 SDK handle it
-            return false;
+            // Fail closed: if we can't resolve the host, treat it as potentially private
+            return true;
         }
     }
 

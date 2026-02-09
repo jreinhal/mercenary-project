@@ -9,6 +9,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 class S3ConnectorTest {
 
+    private static final String LOOPBACK_IP = "127.0.0.1";
+    private static final String PRIVATE_10_IP = "10.0.0.1";
+    private static final String PRIVATE_172_IP = "172.16.0.1";
+    private static final String PRIVATE_192_IP = "192.168.1.1";
+    private static final String METADATA_IP = "169.254.169.254";
+
     private S3Connector connector;
 
     @BeforeEach
@@ -78,37 +84,37 @@ class S3ConnectorTest {
 
     @Test
     void shouldBlockLoopbackIp() {
-        assertTrue(S3Connector.isPrivateOrReservedAddress("127.0.0.1"));
+        assertTrue(S3Connector.isPrivateOrReservedAddress(LOOPBACK_IP));
     }
 
     @Test
     void shouldBlockPrivate10Network() {
-        assertTrue(S3Connector.isPrivateOrReservedAddress("10.0.0.1"));
+        assertTrue(S3Connector.isPrivateOrReservedAddress(PRIVATE_10_IP));
     }
 
     @Test
     void shouldBlockPrivate172Network() {
-        assertTrue(S3Connector.isPrivateOrReservedAddress("172.16.0.1"));
+        assertTrue(S3Connector.isPrivateOrReservedAddress(PRIVATE_172_IP));
     }
 
     @Test
     void shouldBlockPrivate192Network() {
-        assertTrue(S3Connector.isPrivateOrReservedAddress("192.168.1.1"));
+        assertTrue(S3Connector.isPrivateOrReservedAddress(PRIVATE_192_IP));
     }
 
     @Test
     void shouldBlockLinkLocalMetadata() {
-        assertTrue(S3Connector.isPrivateOrReservedAddress("169.254.169.254"));
+        assertTrue(S3Connector.isPrivateOrReservedAddress(METADATA_IP));
     }
 
     @Test
     void shouldRejectEndpointWithPrivateIp() {
-        assertFalse(connector.isTrustedEndpoint("https://127.0.0.1:9000"));
+        assertFalse(connector.isTrustedEndpoint("https://" + LOOPBACK_IP + ":9000"));
     }
 
     @Test
     void shouldRejectEndpointWithMetadataIp() {
-        assertFalse(connector.isTrustedEndpoint("https://169.254.169.254"));
+        assertFalse(connector.isTrustedEndpoint("https://" + METADATA_IP));
     }
 
     // ===== Custom allowed domains =====
@@ -151,6 +157,7 @@ class S3ConnectorTest {
         // This is validated in sync() before calling buildClient()
         // Empty endpoint means "use default" — no validation needed
         ReflectionTestUtils.setField(connector, "endpoint", "");
-        // No assertion on isTrustedEndpoint — it's only called when endpoint is non-empty
+        String ep = (String) ReflectionTestUtils.getField(connector, "endpoint");
+        assertTrue(ep != null && ep.isBlank(), "endpoint field should be blank");
     }
 }
