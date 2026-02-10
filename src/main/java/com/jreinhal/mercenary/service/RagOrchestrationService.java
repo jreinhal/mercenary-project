@@ -27,6 +27,7 @@ import com.jreinhal.mercenary.security.ContentSanitizer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
+import com.jreinhal.mercenary.util.RagEvidenceFormatter;
 import com.jreinhal.mercenary.util.DocumentMetadataUtils;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -1024,7 +1025,7 @@ public class RagOrchestrationService {
                 "TASK: Rewrite the DRAFT ANSWER so that it is fully supported by the DOCUMENTS.\n\n" +
                 "RULES:\n" +
                 "- Use ONLY facts found in the DOCUMENTS section.\n" +
-                "- After every sentence or bullet that contains a factual claim, append one or more citations in the exact format [filename].\n" +
+                "- After every sentence or bullet that contains a factual claim, append one or more citations in the exact format [filename]. If a \"Page: N\" line is present for that document chunk, include it as: [filename] p. N\n" +
                 "- Only cite filenames that appear as document headers in the DOCUMENTS section.\n" +
                 "- Do NOT invent citations. If a claim cannot be supported, remove it or rewrite it as uncertainty.\n" +
                 "- Keep the answer informative and roughly the same structure.\n\n" +
@@ -1157,8 +1158,14 @@ public class RagOrchestrationService {
             "2. If an OVERVIEW section is present, use it for background only and do NOT cite it\n" +
             "3. Answer the question using ONLY information from the DOCUMENTS section\n" +
             "4. Include the exact numbers, names, dates, or facts as written in the documents\n" +
-            "5. Cite sources using [filename] after each fact\n" +
+            "5. Cite sources using [filename] after each fact. If the document chunk includes a \"Page: N\" line, include it right after the citation like: [filename] p. N\n" +
             "6. If the answer is not in the documents, say \"No relevant records found.\"\n\n" +
+            "VERIFICATION (internal; do not output this checklist):\n" +
+            "- If the context contains tables: identify column headers before extracting values. Do not report a value without stating which column it belongs to.\n" +
+            "- If the context contains aggregate rows (Total, Average, All): distinguish them from sub-category rows. Never report a sub-category value as a total.\n" +
+            "- Verify numerical precision: check decimal places, units, and likely OCR artifacts (0 vs O, 1 vs l, 5 vs S).\n" +
+            "- If a time period is specified in the question: confirm the data matches that period.\n" +
+            "- If multiple sources contain the same data point: note agreement or conflict.\n\n" +
             "%s\n" +
             "DOCUMENTS:\n%s\n\n" +
             "Answer the user's question based on the documents above.",
@@ -1361,7 +1368,8 @@ public class RagOrchestrationService {
                 snippet = RagOrchestrationService.augmentSnippetForSummary(doc.getContent(), keywords, snippet);
             }
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
-            summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]\n");
+            String pageSuffix = RagEvidenceFormatter.buildCitationPageSuffix(doc.getMetadata());
+            summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]").append(pageSuffix).append("\n");
             if (++added < 5) continue;
             break;
         }
@@ -1432,7 +1440,8 @@ public class RagOrchestrationService {
                 snippet = RagOrchestrationService.augmentSnippetForSummary(doc.getContent(), keywords, snippet);
             }
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
-            summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]\n");
+            String pageSuffix = RagEvidenceFormatter.buildCitationPageSuffix(doc.getMetadata());
+            summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]").append(pageSuffix).append("\n");
             if (++added < 5) continue;
             break;
         }
@@ -1441,7 +1450,8 @@ public class RagOrchestrationService {
                 source = String.valueOf(doc.getMetadata().getOrDefault("source", "Unknown_Document.txt"));
                 snippet = RagOrchestrationService.extractAnySnippet(doc.getContent());
                 if (snippet.isBlank()) continue;
-                summary.append("1. ").append(snippet).append(" [").append(source).append("]\n");
+                String pageSuffix = RagEvidenceFormatter.buildCitationPageSuffix(doc.getMetadata());
+                summary.append("1. ").append(snippet).append(" [").append(source).append("]").append(pageSuffix).append("\n");
                 added = 1;
                 break;
             }
@@ -2706,14 +2716,7 @@ public class RagOrchestrationService {
                 break;
             }
             Map<String, Object> meta = doc.getMetadata();
-            String filename = (String) meta.get("source");
-            if (filename == null) {
-                filename = (String) meta.get("filename");
-            }
-            if (filename == null) {
-                filename = "Unknown_Document.txt";
-            }
-            String header = "[" + filename + "]\n";
+            String header = RagEvidenceFormatter.buildDocumentHeader(meta);
             if (header.length() >= remaining) {
                 break;
             }
