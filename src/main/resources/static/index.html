@@ -123,15 +123,33 @@
                 <span class="auth-modal-title" id="auth-title">Sign In</span>
             </div>
             <div class="auth-modal-body">
-                <p class="auth-modal-subtitle">Enter your credentials to continue.</p>
-                <label class="auth-label" for="auth-username">Username</label>
-                <input class="auth-input" id="auth-username" type="text" autocomplete="username">
-                <label class="auth-label" for="auth-password">Password</label>
-                <input class="auth-input" id="auth-password" type="password" autocomplete="current-password">
+                <!-- SSO login (shown when OIDC mode detected) -->
+                <div class="auth-sso-section hidden" id="auth-sso-section">
+                    <p class="auth-modal-subtitle">Use your organization's identity provider.</p>
+                    <button class="btn btn-primary auth-sso-btn" id="auth-sso-btn" type="button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                            <polyline points="10 17 15 12 10 7"/>
+                            <line x1="15" y1="12" x2="3" y2="12"/>
+                        </svg>
+                        Sign in with SSO
+                    </button>
+                    <div class="auth-divider hidden" id="auth-divider">
+                        <span>or</span>
+                    </div>
+                </div>
+                <!-- Standard credentials login -->
+                <div id="auth-credentials-section">
+                    <p class="auth-modal-subtitle">Enter your credentials to continue.</p>
+                    <label class="auth-label" for="auth-username">Username</label>
+                    <input class="auth-input" id="auth-username" type="text" autocomplete="username">
+                    <label class="auth-label" for="auth-password">Password</label>
+                    <input class="auth-input" id="auth-password" type="password" autocomplete="current-password">
+                </div>
                 <div class="auth-error hidden" id="auth-error" role="alert"></div>
             </div>
             <div class="auth-modal-footer">
-                <button class="btn btn-primary" data-action="authSubmit" id="auth-submit">Sign In</button>
+                <button class="btn btn-primary hidden" data-action="authSubmit" id="auth-submit">Sign In</button>
             </div>
         </div>
     </div>

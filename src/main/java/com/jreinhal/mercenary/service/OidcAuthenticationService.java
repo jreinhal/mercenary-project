@@ -9,7 +9,9 @@ import com.jreinhal.mercenary.security.JwtValidator;
 import com.jreinhal.mercenary.service.AuthenticationService;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -132,11 +134,20 @@ implements AuthenticationService {
         }
     }
 
+    private static final String SESSION_USER_ID = "mercenary.auth.userId";
+
     @Override
     public User authenticate(HttpServletRequest request) {
+        // Check session first (for browser-based OIDC flow)
+        User sessionUser = authenticateSession(request);
+        if (sessionUser != null) {
+            return sessionUser;
+        }
+
+        // Fall back to Bearer token (for API clients)
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.debug("No Bearer token in request");
+            log.debug("No Bearer token or session in request");
             return null;
         }
         String token = authHeader.substring(7);
@@ -222,6 +233,32 @@ implements AuthenticationService {
             log.error("OIDC authentication failed: {}", e.getMessage(), e);
             return null;
         }
+    }
+
+    /**
+     * Authenticate via session cookie (for browser-based OIDC flow).
+     * The OIDC callback stores the user ID in the session after a successful
+     * Authorization Code + PKCE exchange.
+     */
+    private User authenticateSession(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return null;
+        }
+        Object userIdObj = session.getAttribute(SESSION_USER_ID);
+        if (!(userIdObj instanceof String userId) || userId.isBlank()) {
+            return null;
+        }
+        Optional<User> userOpt = this.userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            session.removeAttribute(SESSION_USER_ID);
+            return null;
+        }
+        User user = userOpt.get();
+        if (!user.isActive() || user.isPendingApproval()) {
+            return null;
+        }
+        return user;
     }
 
     @Override
