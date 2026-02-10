@@ -164,4 +164,50 @@ class ImageAnalyzerTest {
         assertTrue(chatModel.callCount > 0);
         assertEquals(chatModel.callCount, chatModel.callsWithMedia);
     }
+
+    @Test
+    void analyzeDetectsBigEndianTiffMimeType() {
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/tiff");
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] fakeTiff = new byte[]{
+                0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00
+        };
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(fakeTiff, "test_be.tiff");
+        assertNotNull(analysis);
+        assertTrue(chatModel.callCount > 0);
+        assertEquals(chatModel.callCount, chatModel.callsWithMedia);
+    }
+
+    @Test
+    void analyzeFallsBackToJpegForUnknownMagicBytes() {
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/jpeg");
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] unknown = new byte[]{
+                0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
+        };
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(unknown, "unknown.bin");
+        assertNotNull(analysis);
+        assertTrue(chatModel.callCount > 0);
+        assertEquals(chatModel.callCount, chatModel.callsWithMedia);
+    }
+
+    @Test
+    void analyzeFallsBackToJpegForShortByteArrays() {
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/jpeg");
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] shortBytes = new byte[]{0x01, 0x02, 0x03, 0x04};
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(shortBytes, "short.bin");
+        assertNotNull(analysis);
+        assertTrue(chatModel.callCount > 0);
+        assertEquals(chatModel.callCount, chatModel.callsWithMedia);
+    }
 }
