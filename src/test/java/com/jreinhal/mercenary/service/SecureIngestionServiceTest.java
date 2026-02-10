@@ -5,11 +5,15 @@ import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -222,6 +226,42 @@ class SecureIngestionServiceTest {
 
         // Verify vector store was called (documents were added)
         verify(vectorStore, atLeastOnce()).add(anyList());
+    }
+
+    @Test
+    @DisplayName("Should assign chunk indices to ingested documents")
+    void shouldAssignChunkIndices() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 2500; i++) {
+            sb.append("word").append(i).append(' ');
+        }
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "long.txt",
+                "text/plain",
+                sb.toString().getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        ArgumentCaptor<List<Document>> captor = ArgumentCaptor.forClass(List.class);
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+
+        verify(vectorStore, atLeastOnce()).add(captor.capture());
+        List<Document> added = captor.getValue();
+        assertNotNull(added);
+        assertTrue(added.size() > 0);
+
+        for (Document doc : added) {
+            assertNotNull(doc.getMetadata());
+            assertTrue(doc.getMetadata().containsKey("chunk_index"));
+            assertTrue(doc.getMetadata().containsKey("page_chunk_index"));
+        }
     }
 
     // ─── Fix #4: Magic byte detection for archive/container formats ───
