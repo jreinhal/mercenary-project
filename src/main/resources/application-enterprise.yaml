@@ -1,0 +1,48 @@
+# ============================================
+# Enterprise Production Performance Overrides
+# ============================================
+# Activate via: APP_PROFILE=enterprise (already sets OIDC auth)
+# Or use environment variables directly in docker-compose.enterprise.yml
+#
+# These settings are designed for enterprise deployments with 500+ users
+# on servers with 16+ CPU cores. Tune based on your hardware:
+#   - I/O-bound tasks (RAG retrieval): 2x core count
+#   - CPU-bound tasks (reranking): 1x core count
+#   - Queue capacity: absorb traffic spikes without rejecting requests
+
+sentinel:
+  performance:
+    # RAG thread pool (I/O-bound: vector store queries, LLM calls)
+    # For a 16-core server, 32 core / 64 max handles ~64 concurrent RAG queries
+    rag-core-threads: ${RAG_CORE_THREADS:32}
+    rag-max-threads: ${RAG_MAX_THREADS:64}
+    rag-queue-capacity: ${RAG_QUEUE_CAPACITY:2000}
+    # Reranker thread pool (CPU-intensive: LLM-based cross-encoder scoring)
+    reranker-threads: ${RERANKER_THREADS:16}
+    # RAG future timeout (fail fast if LLM is overloaded)
+    rag-future-timeout-seconds: ${RAG_FUTURE_TIMEOUT_SECONDS:15}
+
+server:
+  tomcat:
+    threads:
+      # Match Tomcat threads to RAG thread pool capacity
+      max: ${TOMCAT_MAX_THREADS:400}
+    max-connections: ${TOMCAT_MAX_CONNECTIONS:400}
+    accept-count: ${TOMCAT_ACCEPT_COUNT:200}
+
+# ============================================
+# MongoDB Connection Pool Tuning
+# ============================================
+# Spring Data MongoDB does not expose dedicated connection pool properties.
+# Configure pool settings via URI query parameters:
+#
+# Example enterprise MongoDB URI:
+#   MONGODB_URI=mongodb://host:27017/sentinel?maxPoolSize=100&minPoolSize=10&maxIdleTimeMS=30000&waitQueueTimeoutMS=5000
+#
+# Recommended settings for 500+ users:
+#   maxPoolSize=100       - Max connections (match RAG thread count)
+#   minPoolSize=10        - Keep warm connections for burst handling
+#   maxIdleTimeMS=30000   - Close idle connections after 30s
+#   waitQueueTimeoutMS=5000 - Fail fast if pool exhausted (avoids cascading timeouts)
+#   connectTimeoutMS=5000 - Connection establishment timeout
+#   socketTimeoutMS=30000 - Socket read timeout

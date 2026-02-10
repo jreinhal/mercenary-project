@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -120,8 +121,24 @@ public class MegaRagService {
         }
         String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         long startTime = System.currentTimeMillis();
-        CompletableFuture<List<Document>> textFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceExcludingType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
-        CompletableFuture<List<Document>> visualFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceAndType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
+        CompletableFuture<List<Document>> textFuture;
+        CompletableFuture<List<Document>> visualFuture;
+        try {
+            textFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(15).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceExcludingType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
+        } catch (RejectedExecutionException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("RAG thread pool overloaded; text retrieval rejected: {}", e.getMessage());
+            }
+            textFuture = CompletableFuture.completedFuture(List.of());
+        }
+        try {
+            visualFuture = CompletableFuture.supplyAsync(() -> this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspaceAndType(normalizedDept, workspaceId, "visual"))), this.ragExecutor);
+        } catch (RejectedExecutionException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("RAG thread pool overloaded; visual retrieval rejected: {}", e.getMessage());
+            }
+            visualFuture = CompletableFuture.completedFuture(List.of());
+        }
         List<Document> textDocs;
         List<Document> visualDocs;
         try {
@@ -129,16 +146,22 @@ public class MegaRagService {
         }
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("MegaRAG: Text retrieval interrupted");
+            if (log.isWarnEnabled()) {
+                log.warn("MegaRAG: Text retrieval interrupted");
+            }
             textDocs = List.of();
         }
         catch (TimeoutException e) {
-            log.warn("MegaRAG: Text retrieval timed out");
+            if (log.isWarnEnabled()) {
+                log.warn("MegaRAG: Text retrieval timed out");
+            }
             textFuture.cancel(true);
             textDocs = List.of();
         }
         catch (Exception e) {
-            log.warn("MegaRAG: Text retrieval failed: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("MegaRAG: Text retrieval failed: {}", e.getMessage());
+            }
             textDocs = List.of();
         }
         try {
@@ -146,16 +169,22 @@ public class MegaRagService {
         }
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("MegaRAG: Visual retrieval interrupted");
+            if (log.isWarnEnabled()) {
+                log.warn("MegaRAG: Visual retrieval interrupted");
+            }
             visualDocs = List.of();
         }
         catch (TimeoutException e) {
-            log.warn("MegaRAG: Visual retrieval timed out");
+            if (log.isWarnEnabled()) {
+                log.warn("MegaRAG: Visual retrieval timed out");
+            }
             visualFuture.cancel(true);
             visualDocs = List.of();
         }
         catch (Exception e) {
-            log.warn("MegaRAG: Visual retrieval failed: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("MegaRAG: Visual retrieval failed: {}", e.getMessage());
+            }
             visualDocs = List.of();
         }
         Set<String> visualNodeIds = visualDocs.stream().map(d -> (String)d.getMetadata().get("visualNodeId")).filter(Objects::nonNull).collect(Collectors.toSet());
