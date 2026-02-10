@@ -4,32 +4,32 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.service.OidcAuthenticationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.lang.reflect.Field;
 import java.net.URI;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
 
 class OidcBrowserFlowControllerTest {
 
-    private OidcAuthenticationService oidcAuthService;
     private OidcBrowserFlowController controller;
 
     @BeforeEach
-    void setUp() throws Exception {
-        oidcAuthService = mock(OidcAuthenticationService.class);
-        controller = new OidcBrowserFlowController(oidcAuthService);
-        setField("clientId", "test-client-id");
-        setField("authorizationUri", "https://idp.example.com/authorize");
-        setField("tokenUri", "https://idp.example.com/oauth/token");
-        setField("redirectUri", "https://app.example.com/api/auth/oidc/callback");
-        setField("scopes", "openid profile email");
-        setField("issuer", "");
+    void setUp() {
+        OidcAuthenticationService oidcAuthService = mock(OidcAuthenticationService.class);
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        controller = new OidcBrowserFlowController(oidcAuthService, restTemplate);
+        ReflectionTestUtils.setField(controller, "clientId", "test-client-id");
+        ReflectionTestUtils.setField(controller, "authorizationUri", "https://idp.example.com/authorize");
+        ReflectionTestUtils.setField(controller, "tokenUri", "https://idp.example.com/oauth/token");
+        ReflectionTestUtils.setField(controller, "redirectUri", "https://app.example.com/api/auth/oidc/callback");
+        ReflectionTestUtils.setField(controller, "scopes", "openid profile email");
+        ReflectionTestUtils.setField(controller, "issuer", "");
     }
 
     // ===== Authorize Endpoint Tests =====
@@ -61,8 +61,8 @@ class OidcBrowserFlowControllerTest {
 
     @Test
     void authorizeReturns503WhenNoAuthUriConfigured() throws Exception {
-        setField("authorizationUri", "");
-        setField("issuer", "");
+        ReflectionTestUtils.setField(controller, "authorizationUri", "");
+        ReflectionTestUtils.setField(controller, "issuer", "");
         HttpServletRequest request = mockRequest();
 
         ResponseEntity<Void> response = controller.authorize(request);
@@ -72,8 +72,8 @@ class OidcBrowserFlowControllerTest {
 
     @Test
     void authorizeFallsBackToIssuerForAuthUri() throws Exception {
-        setField("authorizationUri", "");
-        setField("issuer", "https://idp.example.com");
+        ReflectionTestUtils.setField(controller, "authorizationUri", "");
+        ReflectionTestUtils.setField(controller, "issuer", "https://idp.example.com");
         HttpServletRequest request = mockRequest();
         HttpSession session = mock(HttpSession.class);
         when(request.getSession(true)).thenReturn(session);
@@ -88,7 +88,7 @@ class OidcBrowserFlowControllerTest {
 
     @Test
     void authorizeAutoDetectsRedirectUriWhenNotConfigured() throws Exception {
-        setField("redirectUri", "");
+        ReflectionTestUtils.setField(controller, "redirectUri", "");
         HttpServletRequest request = mockRequest();
         when(request.getScheme()).thenReturn("https");
         when(request.getServerName()).thenReturn("sentinel.example.com");
@@ -290,9 +290,4 @@ class OidcBrowserFlowControllerTest {
         return request;
     }
 
-    private void setField(String name, Object value) throws Exception {
-        Field field = OidcBrowserFlowController.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(controller, value);
-    }
 }

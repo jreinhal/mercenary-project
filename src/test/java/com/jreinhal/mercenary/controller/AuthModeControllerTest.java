@@ -2,18 +2,18 @@ package com.jreinhal.mercenary.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.lang.reflect.Field;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class AuthModeControllerTest {
 
     @Test
-    void returnsSsoEnabledForOidcMode() throws Exception {
+    void returnsSsoEnabledForOidcMode() {
         AuthModeController controller = new AuthModeController();
-        setField(controller, "authMode", "OIDC");
+        ReflectionTestUtils.setField(controller, "authMode", "OIDC");
 
         ResponseEntity<Map<String, Object>> response = controller.getMode();
 
@@ -26,9 +26,9 @@ class AuthModeControllerTest {
     }
 
     @Test
-    void returnsSsoDisabledForStandardMode() throws Exception {
+    void returnsSsoDisabledForStandardMode() {
         AuthModeController controller = new AuthModeController();
-        setField(controller, "authMode", "STANDARD");
+        ReflectionTestUtils.setField(controller, "authMode", "STANDARD");
 
         ResponseEntity<Map<String, Object>> response = controller.getMode();
 
@@ -41,9 +41,9 @@ class AuthModeControllerTest {
     }
 
     @Test
-    void returnsSsoDisabledForDevMode() throws Exception {
+    void returnsSsoDisabledForDevMode() {
         AuthModeController controller = new AuthModeController();
-        setField(controller, "authMode", "DEV");
+        ReflectionTestUtils.setField(controller, "authMode", "DEV");
 
         ResponseEntity<Map<String, Object>> response = controller.getMode();
 
@@ -56,22 +56,23 @@ class AuthModeControllerTest {
     }
 
     @Test
-    void oidcDetectionIsCaseInsensitive() throws Exception {
+    void oidcDetectionIsCaseSensitive() {
         AuthModeController controller = new AuthModeController();
-        setField(controller, "authMode", "oidc");
+        ReflectionTestUtils.setField(controller, "authMode", "oidc");
 
         ResponseEntity<Map<String, Object>> response = controller.getMode();
 
         Map<String, Object> body = response.getBody();
         assertNotNull(body);
-        assertEquals(true, body.get("ssoEnabled"));
-        assertEquals("/api/auth/oidc/authorize", body.get("authorizeUrl"));
+        // Lowercase "oidc" should NOT match — @ConditionalOnProperty uses exact "OIDC"
+        assertEquals(false, body.get("ssoEnabled"));
+        assertEquals("", body.get("authorizeUrl"));
     }
 
     @Test
-    void returnsSsoDisabledForCacMode() throws Exception {
+    void returnsSsoDisabledForCacMode() {
         AuthModeController controller = new AuthModeController();
-        setField(controller, "authMode", "CAC");
+        ReflectionTestUtils.setField(controller, "authMode", "CAC");
 
         ResponseEntity<Map<String, Object>> response = controller.getMode();
 
@@ -80,11 +81,5 @@ class AuthModeControllerTest {
         assertEquals("CAC", body.get("mode"));
         assertEquals(false, body.get("ssoEnabled"));
         assertEquals("", body.get("authorizeUrl"));
-    }
-
-    private void setField(Object target, String name, Object value) throws Exception {
-        Field field = target.getClass().getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
     }
 }

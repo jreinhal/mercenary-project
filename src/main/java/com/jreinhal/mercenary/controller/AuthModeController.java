@@ -21,7 +21,7 @@ public class AuthModeController {
 
     @GetMapping("/mode")
     public ResponseEntity<Map<String, Object>> getMode() {
-        boolean ssoEnabled = "OIDC".equalsIgnoreCase(authMode);
+        boolean ssoEnabled = "OIDC".equals(authMode);
         return ResponseEntity.ok(Map.of(
                 "mode", authMode,
                 "ssoEnabled", ssoEnabled,

@@ -72,8 +72,13 @@ public class OidcBrowserFlowController {
     private String scopes;
 
     public OidcBrowserFlowController(OidcAuthenticationService oidcAuthenticationService) {
+        this(oidcAuthenticationService, new RestTemplate());
+    }
+
+    OidcBrowserFlowController(OidcAuthenticationService oidcAuthenticationService,
+                              RestTemplate restTemplate) {
         this.oidcAuthenticationService = oidcAuthenticationService;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = restTemplate;
     }
 
     /**
@@ -157,6 +162,8 @@ public class OidcBrowserFlowController {
         String expectedState = (String) session.getAttribute(SESSION_OAUTH_STATE);
         if (expectedState == null || !expectedState.equals(state)) {
             log.warn("OIDC callback: state mismatch (CSRF protection)");
+            session.removeAttribute(SESSION_PKCE_VERIFIER);
+            session.removeAttribute(SESSION_OAUTH_STATE);
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(URI.create("/?auth_error=invalid_state"))
                     .build();
@@ -165,6 +172,7 @@ public class OidcBrowserFlowController {
         String codeVerifier = (String) session.getAttribute(SESSION_PKCE_VERIFIER);
         if (codeVerifier == null) {
             log.warn("OIDC callback: PKCE code verifier not found in session");
+            session.removeAttribute(SESSION_OAUTH_STATE);
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(URI.create("/?auth_error=missing_verifier"))
                     .build();
@@ -213,13 +221,15 @@ public class OidcBrowserFlowController {
             HttpSession newSession = request.getSession(true);
             newSession.setAttribute("mercenary.auth.userId", user.getId());
 
-            log.info("OIDC browser login successful for user: {}", user.getUsername());
+            if (log.isInfoEnabled()) {
+                log.info("OIDC browser login successful for user: {}", user.getUsername());
+            }
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(URI.create("/"))
                     .build();
 
         } catch (Exception e) {
-            log.error("OIDC token exchange failed: {}", e.getMessage());
+            log.error("OIDC token exchange failed", e);
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(URI.create("/?auth_error=token_exchange"))
                     .build();
@@ -314,13 +324,20 @@ public class OidcBrowserFlowController {
         if (redirectUri != null && !redirectUri.isBlank()) {
             return redirectUri;
         }
-        // Auto-detect from request
-        String scheme = request.getScheme();
-        String host = request.getServerName();
-        int port = request.getServerPort();
-        String portSuffix = ((port == 80 && "http".equals(scheme))
-                || (port == 443 && "https".equals(scheme))) ? "" : ":" + port;
-        return scheme + "://" + host + portSuffix + "/api/auth/oidc/callback";
+        // Auto-detect from request, honoring X-Forwarded-* headers for reverse proxy
+        String scheme = request.getHeader("X-Forwarded-Proto");
+        if (scheme == null || scheme.isBlank()) {
+            scheme = request.getScheme();
+        }
+        String host = request.getHeader("X-Forwarded-Host");
+        if (host == null || host.isBlank()) {
+            host = request.getServerName();
+            int port = request.getServerPort();
+            String portSuffix = ((port == 80 && "http".equals(scheme))
+                    || (port == 443 && "https".equals(scheme))) ? "" : ":" + port;
+            host = host + portSuffix;
+        }
+        return scheme + "://" + host + "/api/auth/oidc/callback";
     }
 
     /**

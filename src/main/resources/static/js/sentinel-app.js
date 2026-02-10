@@ -399,8 +399,10 @@
                 };
                 const message = messages[authError] || 'Authentication failed: ' + authError;
                 showAuthModal(message);
-                // Clean up URL
-                const cleanUrl = window.location.pathname;
+                // Clean up URL: remove only auth_error param, preserve others
+                const url = new URL(window.location.href);
+                url.searchParams.delete('auth_error');
+                const cleanUrl = url.pathname + url.search + url.hash;
                 window.history.replaceState({}, document.title, cleanUrl);
             }
         }
