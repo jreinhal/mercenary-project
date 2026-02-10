@@ -67,6 +67,7 @@ class LicenseControllerTest {
         LicenseService licenseService = new LicenseService();
         ReflectionTestUtils.setField(licenseService, "editionString", "PROFESSIONAL");
         ReflectionTestUtils.setField(licenseService, "licenseKey", "");
+        ReflectionTestUtils.setField(licenseService, "signingSecret", "");
         ReflectionTestUtils.setField(licenseService, "trialStartDate", "");
         ReflectionTestUtils.setField(licenseService, "trialDays", 30);
         licenseService.initialize();
