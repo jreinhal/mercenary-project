@@ -4,7 +4,7 @@ This guide covers performance tuning for high-concurrency SENTINEL deployments.
 
 ## Activating the Enterprise Profile
 
-Set `APP_PROFILE=enterprise` to load `application-enterprise.yaml`, which provides production-tuned defaults. All values can be overridden via environment variables.
+Set `APP_PROFILE=enterprise` to activate the enterprise profile defined under `on-profile: enterprise` in `application.yaml`. This profile currently configures default OIDC authentication settings. The performance tuning values described below must be set explicitly via environment variables or additional configuration overrides.
 
 ## Thread Pool Configuration
 
@@ -12,43 +12,40 @@ SENTINEL uses dedicated thread pools for RAG retrieval and reranking operations.
 
 ### RAG Executor
 
-| Setting | Env Variable | Default | Enterprise Default |
-|---------|-------------|---------|-------------------|
+| Setting | Env Variable | Default | Recommended (Production) |
+|---------|-------------|---------|--------------------------|
 | Core threads | RAG_CORE_THREADS | 8 | 32 |
 | Max threads | RAG_MAX_THREADS | 16 | 64 |
-| Queue capacity | RAG_QUEUE_CAPACITY | 500 | 2000 |
-| Future timeout (seconds) | RAG_FUTURE_TIMEOUT_SECONDS | 10 | 15 |
+| Queue capacity | RAG_QUEUE_CAPACITY | 400 | 2000 |
+| Future timeout (seconds) | RAG_FUTURE_TIMEOUT_SECONDS | 8 | 15 |
 
 ### Reranker Executor
 
-| Setting | Env Variable | Default | Enterprise Default |
-|---------|-------------|---------|-------------------|
-| Thread count | RERANKER_THREADS | 8 | 16 |
+| Setting | Env Variable | Default | Recommended (Production) |
+|---------|-------------|---------|--------------------------|
+| Thread count | RERANKER_THREADS | 4 | 16 |
 
 ### Sizing Guidance
 
 | Concurrent Users | RAG Core | RAG Max | Queue | Reranker |
 |-----------------|----------|---------|-------|----------|
-| 1-10 | 8 | 16 | 500 | 8 |
+| 1-10 | 8 | 16 | 400 | 4 |
 | 10-50 | 16 | 32 | 1000 | 12 |
 | 50-200 | 32 | 64 | 2000 | 16 |
 | 200+ | 48 | 96 | 4000 | 24 |
 
 ### Rejection Handling
 
-When thread pools are saturated, tasks are rejected with a logged warning rather than blocking the HTTP thread. The rejection counter is exposed via the admin stats endpoint. Services degrade gracefully by returning partial results.
+When thread pools are saturated, new tasks are executed on the calling thread (using `CallerRunsPolicy`) rather than being enqueued indefinitely. This avoids unbounded queue growth but can increase latency for the originating HTTP request. Services degrade gracefully by returning partial results when the pool is under heavy load.
 
 ### Monitoring
 
-Thread pool stats are available at `/api/admin/thread-pool-stats` (ADMIN role required):
-- Active threads, pool size, queue size
-- Completed task count, rejection count
-- Available for both RAG and reranker executors
+Thread pool behavior can be monitored via application logs. Rejection events are logged at WARN level with pool name, active thread count, pool size, queue size, and cumulative rejection count.
 
 ## Tomcat (HTTP Server)
 
-| Setting | Default | Enterprise Default |
-|---------|---------|-------------------|
+| Setting | Default | Recommended (Production) |
+|---------|---------|--------------------------|
 | Max threads | 200 | 400 |
 | Max connections | 200 | 400 |
 | Accept count | 100 | 200 |
@@ -98,22 +95,18 @@ services:
 
 ## License Configuration
 
-For licensed deployments, configure the signing secret:
+For licensed deployments, configure the license key:
 
 ```
-LICENSE_SIGNING_SECRET=<provided-by-vendor>
 sentinel.license.key=<license-key>
 ```
 
 See SECURITY.md for the license validation behavior matrix.
 
-## Connector Sync Schedule
+## Connector Sync
 
-Enable automatic document synchronization from external sources:
+Connectors are synchronized via an authenticated admin API endpoint:
 
-```
-CONNECTOR_SYNC_ENABLED=true
-CONNECTOR_SYNC_CRON=0 0 2 * * ?
-```
+- `POST /api/admin/connectors/sync`: Triggers a sync for all configured connectors and writes summary logs.
 
-For high-volume connectors, consider off-peak scheduling and monitoring the sync duration in application logs.
+To run syncs on a schedule, invoke this endpoint from your scheduling system (e.g., cron, Kubernetes CronJob) using appropriate admin credentials.

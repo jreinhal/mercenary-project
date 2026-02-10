@@ -68,17 +68,14 @@ SENTINEL_ADMIN_PASSWORD=<value>
 
 ### Enterprise Performance Tuning
 
-For high-concurrency deployments, activate the enterprise performance profile:
-```
-APP_PROFILE=enterprise
-```
+For high-concurrency deployments, set `APP_PROFILE=enterprise` to activate the enterprise profile (OIDC auth defaults). Performance tuning values must be set explicitly via environment variables:
 
-This loads `application-enterprise.yaml` with production-tuned defaults:
-- RAG thread pool: 32 core / 64 max threads, 2000 queue capacity
-- Reranker: 16 threads
-- Tomcat: 400 max threads, 400 max connections
+Recommended production overrides:
+- `RAG_CORE_THREADS=32` / `RAG_MAX_THREADS=64` / `RAG_QUEUE_CAPACITY=2000`
+- `RERANKER_THREADS=16`
+- Tomcat: configured via `server.tomcat.threads.max` and `server.tomcat.max-connections`
 
-See ENTERPRISE_TUNING.md for detailed sizing guidance.
+See ENTERPRISE_TUNING.md for detailed sizing guidance and the full list of tuning parameters.
 
 ## 3) Air-gap / SCIF (govcloud)
 
@@ -115,15 +112,15 @@ SENTINEL_CONNECTORS_ALLOW_REGULATED=true
 For S3-compatible storage (MinIO, Ceph, etc.), set a custom endpoint:
 ```
 SENTINEL_S3_ENDPOINT=https://minio.internal.corp.com
-SENTINEL_S3_ALLOWED_DOMAINS=minio.internal.corp.com
 ```
 
-Only HTTPS endpoints matching trusted domains are allowed. See SECURITY.md for the full SSRF protection details.
+Exercise caution when configuring custom S3 endpoints. See SECURITY.md for SSRF protection details on other connectors (SharePoint, Confluence).
 
-### Scheduled Sync
+### Connector Sync
 
-Enable automatic connector synchronization:
+Connectors are synchronized via the admin API:
 ```
-CONNECTOR_SYNC_ENABLED=true
-CONNECTOR_SYNC_CRON=0 0 2 * * ?  # 2 AM daily (default)
+POST /api/admin/connectors/sync
 ```
+
+To automate syncs, use an external scheduler (cron, Kubernetes CronJob) to call this endpoint with admin credentials on the desired schedule.

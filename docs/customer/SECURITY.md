@@ -29,7 +29,7 @@ You can override with AUTH_MODE if needed (DEV, STANDARD, OIDC, CAC).
 |---------|-------------------|-------------|----------|
 | dev | Any | None (auto-login) | Development and testing |
 | standard | Any | Username/password | Internal pilots, small teams |
-| enterprise | ENTERPRISE, MEDICAL, GOVERNMENT | OIDC/SSO (JWT) | Production with SSO |
+| enterprise | TRIAL, ENTERPRISE, MEDICAL, GOVERNMENT | OIDC/SSO (JWT) | Production with SSO |
 | govcloud | GOVERNMENT | CAC/PIV (X.509) | Air-gapped/SCIF deployments |
 
 ## Auth Modes
@@ -96,38 +96,34 @@ Users must meet or exceed a sector's required clearance.
 
 ## License Validation
 
-SENTINEL validates license keys using HMAC-SHA256 signature verification.
+SENTINEL evaluates license information using the configured license key.
 
 **Behavior matrix:**
 
-| License Key | Signing Secret | Result |
-|------------|---------------|--------|
-| Not configured | Not configured | Unlicensed mode (valid, all features available) |
-| Configured | Not configured | Invalid (cannot verify signature) |
-| Not configured | Configured | Invalid (no key to validate) |
-| Configured | Configured | Full HMAC validation (edition, expiry, customer ID) |
+| License Key (`sentinel.license.key`) | Result |
+|--------------------------------------|--------|
+| Not configured or blank | Unlicensed mode (application runs with default features) |
+| Configured, valid, not expired | Licensed mode (features gated by edition and expiry) |
+| Configured, expired | Invalid (HTTP 402) |
 
 Configuration:
-- `LICENSE_SIGNING_SECRET`: HMAC signing secret for license key validation
-- `sentinel.license.key`: License key in format `BASE64(edition:expiry:customerId):HMAC_HEX`
+- `sentinel.license.key`: License key containing edition, expiry, and customer ID information
 
-The license filter returns HTTP 402 when the license is invalid.
+The license filter returns HTTP 402 when `licenseService.isValid()` returns false (e.g., when a license has expired).
 
 ## Connector Security
 
 ### SSRF Protection
 
-All connectors validate external endpoints to prevent Server-Side Request Forgery (SSRF):
+SharePoint and Confluence connectors validate external endpoints to prevent Server-Side Request Forgery (SSRF):
 
 | Connector | Protection | Trusted Domains |
 |-----------|-----------|-----------------|
 | SharePoint | Domain allowlist + HTTPS + no-redirect | `.sharepoint.com`, `.sharepoint.cn`, `.sharepoint-df.com`, `.svc.ms` |
 | Confluence | Domain allowlist + HTTPS + no-redirect | `.atlassian.net`, `.atlassian.com`, `.jira.com` |
-| S3 | Domain allowlist + HTTPS + private IP blocking | `.amazonaws.com`, `.amazonaws.com.cn`, `.r2.cloudflarestorage.com`, `.digitaloceanspaces.com`, `.backblazeb2.com` |
+| S3 | Custom endpoint via `sentinel.connectors.s3.endpoint` | Not domain-validated |
 
-**S3 custom endpoints**: For self-hosted S3-compatible storage (MinIO, etc.), add trusted domains via `SENTINEL_S3_ALLOWED_DOMAINS`.
-
-**Private IP blocking**: S3 endpoints are checked against private, loopback, link-local, and cloud metadata service IP ranges to prevent internal network access.
+**S3 custom endpoints**: Self-hosted S3-compatible storage (MinIO, etc.) is supported via the `sentinel.connectors.s3.endpoint` setting. Exercise caution when configuring this value, as endpoint validation should be applied at the network level.
 
 ### Connector Credential Management
 
@@ -138,13 +134,13 @@ Connector credentials (API tokens, access keys) are configured via environment v
 - For production deployments, consider a secret manager (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault) to inject credentials at runtime
 - Monitor connector audit logs for unexpected access patterns
 
-### Scheduled Sync
+### Connector Sync
 
-Connectors support scheduled automatic synchronization:
-- `CONNECTOR_SYNC_ENABLED`: Enable/disable (default: false)
-- `CONNECTOR_SYNC_CRON`: Cron expression (default: `0 0 2 * * ?` = 2 AM daily)
+Connectors are synchronized via an authenticated admin API endpoint:
 
-When enabled, all configured connectors sync on the specified schedule with summary logging.
+- `POST /api/admin/connectors/sync`: Triggers a sync for all configured connectors and writes summary logs.
+
+To run syncs on a schedule, invoke this endpoint from your scheduling system (e.g., cron, Kubernetes CronJob) using appropriate admin credentials.
 
 ## Audit Logging
 
