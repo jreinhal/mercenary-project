@@ -2,30 +2,27 @@
 
 Secure, air-gap compatible RAG platform for enterprise and government deployments.
 
-## Capabilities
+## Capabilities (Current)
+
+Note: Capabilities are edition/profile dependent; some features are optional or disabled by default.
 
 ### Retrieval & Orchestration
-- **9 RAG Strategies** — HybridRAG, HiFi-RAG, MegaRAG, MiA-RAG, QuCo-RAG, RAGPart, AdaptiveRAG, CRAG, and BidirectionalRAG working in concert. Queries are routed, decomposed, rewritten, and cross-validated automatically.
+- **Multiple RAG Strategies (Feature-Flagged)** — HybridRAG, HiFi-RAG, MegaRAG, MiA-RAG, QuCo-RAG, RAGPart, AdaptiveRAG, CRAG, and BidirectionalRAG are implemented and can be enabled/combined per deployment.
 - **Adaptive Query Routing** — AdaptiveRAG classifies each query and routes to chunk-level or document-level retrieval based on complexity.
 - **Corrective Retrieval** — CRAG detects low-confidence results and rewrites the query before re-searching.
 - **Corpus Poisoning Defense** — RAGPart partitions the corpus to detect and isolate adversarial injections.
-- **Uncertainty Quantification** — QuCo-RAG uses entity co-occurrence analysis to flag answers the system is uncertain about.
+- **Uncertainty Quantification** — QuCo-RAG performs corpus-grounded uncertainty checks to flag potentially hallucinated or weakly supported answers.
 
 ### Document Processing
-- **Intelligent Table Extraction** — Tables in PDFs are detected, cropped at high resolution, and extracted as structured markdown via vision language models. Dense tables with merged cells, spanning headers, and visual groupings are preserved accurately instead of being flattened to text.
-- **Visual Source Evidence** — Extracted tables are stored alongside their original rendered images. When extraction confidence is low, the raw image is served as a fallback so users always have access to the ground truth.
-- **Multimodal Visual Analysis** — MegaRAG classifies images across 11 types (charts, diagrams, flowcharts, architecture diagrams, tables, maps, photos, screenshots) and extracts structured data from each.
-- **Numeric & Tabular Verification** — Generation prompts include structured verification checklists that validate column attribution, aggregate vs. detail row distinction, decimal precision, and unit consistency before producing answers from tabular data.
+- **Metadata-Preserving Ingestion** — Upstream extractor metadata (e.g., PDF `page_number`) is preserved where available, and each ingested chunk is tagged with deterministic `chunk_index` / `page_chunk_index` for traceability.
+- **Multimodal Visual Analysis** — MegaRAG classifies images into common visual types (charts/diagrams/tables/etc) and extracts text, entities, and descriptions for retrieval.
 
 ### Citations & Trust
-- **Page-Level Citation Traceability** — Every answer cites the source document and exact page number. Audit trails track which page and chunk produced each claim.
-- **Source Page Verification** — Click any citation to view the original PDF page rendered on demand. The bridge between automated extraction and human-verifiable trust.
-- **Citation Verification Service** — A dedicated post-generation pass validates that cited sources actually support the claims made in the response.
+- **Evidence Metadata** — Retrieved chunks carry `source` and (when available) `page_number` metadata to support page-level traceability and audits.
 
 ### Search Intelligence
-- **Domain-Aware Query Expansion** — Configurable per-edition thesaurus automatically expands abbreviations, synonyms, and unit conversions. "LOX" finds "Liquid Oxygen." "2000 PSI" finds "13.9 MPa." Medical edition maps drug brand names to generics. Government edition maps program designations to common names.
-- **Temporal Document Filtering** — Documents are indexed with extracted dates. Queries like "failures in the last 5 years" filter by time range before semantic search, reducing noise and compute on large historical archives.
-- **Hybrid Semantic + Keyword Search** — HybridRAG fuses dense vector similarity with BM25 keyword matching via Reciprocal Rank Fusion, with built-in OCR tolerance for degraded scans.
+- **Query Expansion** — HybridRAG can expand queries via deterministic reformulations/synonyms, with optional LLM-assisted expansion.
+- **Hybrid Semantic + Keyword Retrieval** — HybridRAG fuses dense vector similarity with keyword-based heuristics via Reciprocal Rank Fusion, with OCR-tolerance heuristics for degraded scans.
 
 ### Security & Compliance
 - **PII Redaction** — Automatic detection and redaction aligned to NIST, GDPR, HIPAA, and PCI-DSS standards.
@@ -35,6 +32,16 @@ Secure, air-gap compatible RAG platform for enterprise and government deployment
 - **Air-Gap Compatible** — Runs entirely on-premise with local LLM inference via Ollama. No outbound network calls required.
 - **License Validation** — HMAC-based license keys with edition, expiry, and org binding. Tamper-evident and offline-verifiable.
 - **Authentication Modes** — DEV, STANDARD (username/password with admin bootstrap), OIDC (browser-based Auth Code + PKCE flow), and CAC (smart card / certificate-based).
+
+## Roadmap (Planned / In Progress)
+
+- **PDF Table Extraction** — Route text-layer PDFs through a deterministic table extractor (e.g., Tabula) and scanned PDFs through PDF rendering + vision extraction for high-fidelity tables.
+- **Visual Source Evidence for Tables** — Store table crops as evidence (or render on demand from source PDFs in strict environments) and use them as a fallback when extraction is uncertain.
+- **Source Page Verification UI** — Click a citation to render the original PDF page on demand from the stored source document.
+- **Decoupled Citation Verification** — Add an optional post-generation citation verification pass to validate that cited sources support claims.
+- **Domain-Aware Query Expansion** — Per-edition thesaurus for abbreviations, synonyms, and unit normalization (e.g., LOX, PSI/MPa; medical brand to generic).
+- **Temporal Filtering & Scoring** — Extract and index document dates to support time-range queries and temporal decay scoring.
+- **Numeric/Tabular Answer Verification** — Add table-aware verification checklists (especially for MEDICAL/GOVERNMENT editions) before finalizing numeric claims.
 
 ## Quick start
 
