@@ -21,7 +21,7 @@ class ImageAnalyzerTest {
 
     @Test
     void analyzeAttachesImageMediaToVisionCalls() {
-        CapturingVisionChatModel chatModel = new CapturingVisionChatModel();
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/jpeg");
         ChatClient.Builder builder = ChatClient.builder(chatModel);
         ImageAnalyzer analyzer = new ImageAnalyzer(builder);
 
@@ -37,8 +37,13 @@ class ImageAnalyzerTest {
     }
 
     private static final class CapturingVisionChatModel implements ChatModel {
+        private final String expectedMimeType;
         private int callCount = 0;
         private int callsWithMedia = 0;
+
+        private CapturingVisionChatModel(String expectedMimeType) {
+            this.expectedMimeType = expectedMimeType;
+        }
 
         @Override
         public ChatResponse call(Prompt prompt) {
@@ -52,6 +57,9 @@ class ImageAnalyzerTest {
             for (Message msg : prompt.getInstructions()) {
                 if (msg instanceof UserMessage userMessage) {
                     hasMedia = userMessage.getMedia() != null && !userMessage.getMedia().isEmpty();
+                    if (hasMedia) {
+                        assertEquals(this.expectedMimeType, userMessage.getMedia().iterator().next().getMimeType().toString());
+                    }
                     break;
                 }
             }
@@ -76,5 +84,20 @@ class ImageAnalyzerTest {
             return ChatOptionsBuilder.builder().build();
         }
     }
-}
 
+    @Test
+    void analyzeDetectsPngMimeType() {
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/png");
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] fakePng = new byte[]{
+                (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01, 0x02, 0x03
+        };
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(fakePng, "test.png");
+        assertNotNull(analysis);
+        assertTrue(chatModel.callCount > 0);
+        assertEquals(chatModel.callCount, chatModel.callsWithMedia);
+    }
+}
