@@ -1,144 +1,112 @@
-# Enterprise Performance Tuning Guide
+# Enterprise Tuning Guide
 
-This guide covers production-grade configuration for SENTINEL deployments serving 500+ concurrent users on dedicated server hardware (16+ CPU cores, 32GB+ RAM).
+This guide covers performance tuning for high-concurrency SENTINEL deployments.
 
-## Quick Start
+## Activating the Enterprise Profile
 
-The `enterprise` Spring profile automatically loads production-tuned defaults from `application-enterprise.yaml`. You can further override any setting via environment variables.
-
-```bash
-# Activate enterprise profile (also enables OIDC authentication)
-APP_PROFILE=enterprise
-```
+Set `APP_PROFILE=enterprise` to activate the enterprise profile defined under `on-profile: enterprise` in `application.yaml`. This profile currently configures default OIDC authentication settings. The performance tuning values described below must be set explicitly via environment variables or additional configuration overrides.
 
 ## Thread Pool Configuration
 
-SENTINEL uses dedicated thread pools for RAG retrieval and document reranking. Default settings are tuned for local development (4-8 threads). Enterprise deployments should scale these based on CPU core count.
+SENTINEL uses dedicated thread pools for RAG retrieval and reranking operations.
 
-### RAG Thread Pool
+### RAG Executor
 
-The RAG executor handles parallel vector store queries and LLM calls (I/O-bound). Recommended: **2x CPU cores**.
+| Setting | Env Variable | Default | Recommended (Production) |
+|---------|-------------|---------|--------------------------|
+| Core threads | RAG_CORE_THREADS | 8 | 32 |
+| Max threads | RAG_MAX_THREADS | 16 | 64 |
+| Queue capacity | RAG_QUEUE_CAPACITY | 400 | 2000 |
+| Future timeout (seconds) | RAG_FUTURE_TIMEOUT_SECONDS | 8 | 15 |
 
-| Variable | Default (Dev) | Enterprise Default | Description |
-|----------|---------------|-------------------|-------------|
-| `RAG_CORE_THREADS` | 4 | 32 | Minimum threads kept alive |
-| `RAG_MAX_THREADS` | 8 | 64 | Maximum threads under load |
-| `RAG_QUEUE_CAPACITY` | 200 | 2000 | Pending tasks before rejection |
-| `RAG_FUTURE_TIMEOUT_SECONDS` | 8 | 15 | Per-query timeout (fail fast) |
+### Reranker Executor
 
-### Reranker Thread Pool
+| Setting | Env Variable | Default | Recommended (Production) |
+|---------|-------------|---------|--------------------------|
+| Thread count | RERANKER_THREADS | 4 | 16 |
 
-The reranker executor handles LLM-based cross-encoder scoring (CPU-intensive). Recommended: **1x CPU cores**.
+### Sizing Guidance
 
-| Variable | Default (Dev) | Enterprise Default | Description |
-|----------|---------------|-------------------|-------------|
-| `RERANKER_THREADS` | 4 | 16 | Core and max threads (fixed pool) |
+| Concurrent Users | RAG Core | RAG Max | Queue | Reranker |
+|-----------------|----------|---------|-------|----------|
+| 1-10 | 8 | 16 | 400 | 4 |
+| 10-50 | 16 | 32 | 1000 | 12 |
+| 50-200 | 32 | 64 | 2000 | 16 |
+| 200+ | 48 | 96 | 4000 | 24 |
 
-### Overload Protection
+### Rejection Handling
 
-When the thread pool queue is full, new tasks are **rejected** (not run on the caller thread). This prevents HTTP request threads from being blocked by slow RAG operations, which would otherwise freeze the UI for all users.
+When thread pools are saturated, new tasks are executed on the calling thread (using `CallerRunsPolicy`) rather than being enqueued indefinitely. This avoids unbounded queue growth but can increase latency for the originating HTTP request. Services degrade gracefully by returning partial results when the pool is under heavy load.
 
-Rejected tasks return degraded results (fewer search variants or skipped reranking) rather than hanging the request. Monitor rejection counts via the admin endpoint.
+### Monitoring
 
-## Tomcat Configuration
+Thread pool behavior can be monitored via application logs. Rejection events are logged at WARN level with pool name, active thread count, pool size, queue size, and cumulative rejection count.
 
-Match Tomcat thread capacity to your RAG thread pool to avoid bottlenecks at the HTTP layer.
+## Tomcat (HTTP Server)
 
-| Variable | Default | Enterprise Default | Description |
-|----------|---------|-------------------|-------------|
-| `TOMCAT_MAX_THREADS` | 200 | 400 | Max HTTP request threads |
-| `TOMCAT_MAX_CONNECTIONS` | 200 | 400 | Max TCP connections |
-| `TOMCAT_ACCEPT_COUNT` | 100 | 200 | TCP backlog queue size |
+| Setting | Default | Recommended (Production) |
+|---------|---------|--------------------------|
+| Max threads | 200 | 400 |
+| Max connections | 200 | 400 |
+| Accept count | 100 | 200 |
 
 ## MongoDB Connection Pool
 
-Spring Data MongoDB configures connection pool settings via the MongoDB URI. Add query parameters to your `MONGODB_URI` for enterprise deployments:
+MongoDB connection pool is configured via URI query parameters. Recommended production URI:
 
-```bash
-MONGODB_URI=mongodb://host:27017/sentinel?maxPoolSize=100&minPoolSize=10&maxIdleTimeMS=30000&waitQueueTimeoutMS=5000&connectTimeoutMS=5000&socketTimeoutMS=30000
+```
+MONGODB_URI=mongodb://user:pass@host:27017/sentinel?maxPoolSize=100&minPoolSize=10&maxIdleTimeMS=30000&waitQueueTimeoutMS=5000
 ```
 
 | Parameter | Recommended | Description |
-|-----------|-------------|-------------|
-| `maxPoolSize` | 100 | Max connections (match RAG thread count) |
-| `minPoolSize` | 10 | Keep warm connections for burst handling |
-| `maxIdleTimeMS` | 30000 | Close idle connections after 30s |
-| `waitQueueTimeoutMS` | 5000 | Fail fast if pool exhausted |
-| `connectTimeoutMS` | 5000 | Connection establishment timeout |
-| `socketTimeoutMS` | 30000 | Socket read timeout |
+|-----------|------------|-------------|
+| maxPoolSize | 100 | Maximum connections |
+| minPoolSize | 10 | Minimum idle connections |
+| maxIdleTimeMS | 30000 | Close idle connections after 30s |
+| waitQueueTimeoutMS | 5000 | Fail fast if pool exhausted |
 
-## Docker Compose Reference
+## Docker Resource Limits
+
+For containerized deployments, set appropriate resource limits:
 
 ```yaml
 services:
-  sentinel-app:
-    environment:
-      APP_PROFILE: enterprise
-      # RAG Thread Pool (2x core count for I/O bound tasks)
-      RAG_CORE_THREADS: 32
-      RAG_MAX_THREADS: 64
-      RAG_QUEUE_CAPACITY: 2000
-      RAG_FUTURE_TIMEOUT_SECONDS: 15
-      # Reranker (1x core count for CPU-intensive tasks)
-      RERANKER_THREADS: 16
-      # Tomcat
-      TOMCAT_MAX_THREADS: 400
-      TOMCAT_MAX_CONNECTIONS: 400
-      TOMCAT_ACCEPT_COUNT: 200
-      # MongoDB with pool settings
-      MONGODB_URI: mongodb://mongo:27017/sentinel?maxPoolSize=100&minPoolSize=10&maxIdleTimeMS=30000&waitQueueTimeoutMS=5000
-      # Vector Store (use Atlas for scale)
-      SENTINEL_FORCE_ATLAS_VECTOR_STORE: "true"
+  sentinel:
     deploy:
       resources:
         limits:
-          cpus: "16"
-          memory: 32G
+          cpus: '4'
+          memory: 4G
         reservations:
-          cpus: "8"
-          memory: 16G
+          cpus: '2'
+          memory: 2G
+    environment:
+      - JAVA_OPTS=-Xmx3g -Xms2g
 ```
 
-## Monitoring
+### Sizing by Deployment Scale
 
-### Thread Pool Stats Endpoint
+| Scale | CPUs | Memory | Java Heap | MongoDB |
+|-------|------|--------|-----------|---------|
+| Small (1-10 users) | 2 | 2G | -Xmx1500m | 2G RAM |
+| Medium (10-50 users) | 4 | 4G | -Xmx3g | 4G RAM |
+| Large (50-200 users) | 8 | 8G | -Xmx6g | 8G RAM |
+| XL (200+ users) | 16 | 16G | -Xmx12g | 16G RAM |
+
+## License Configuration
+
+For licensed deployments, configure the license key:
 
 ```
-GET /api/admin/thread-pool-stats
-Authorization: (ADMIN role required)
+sentinel.license.key=<license-key>
 ```
 
-Returns real-time pool metrics for both executors:
+See SECURITY.md for the license validation behavior matrix.
 
-```json
-{
-  "ragExecutor": {
-    "corePoolSize": 32,
-    "maxPoolSize": 64,
-    "activeThreads": 12,
-    "currentPoolSize": 32,
-    "largestPoolSize": 48,
-    "queueSize": 3,
-    "queueRemainingCapacity": 1997,
-    "completedTaskCount": 15420,
-    "totalTaskCount": 15435,
-    "rejectionCount": 0
-  },
-  "rerankerExecutor": { ... }
-}
-```
+## Connector Sync
 
-**Key metrics to watch:**
-- `rejectionCount > 0` — Pool is overloaded; increase `MAX_THREADS` or `QUEUE_CAPACITY`
-- `queueSize` approaching `queueRemainingCapacity` — Near saturation
-- `activeThreads == maxPoolSize` — All threads busy; queries may queue
-- `largestPoolSize < maxPoolSize` — Pool has headroom; consider reducing `maxPoolSize` to save resources
+Connectors are synchronized via an authenticated admin API endpoint:
 
-## Sizing Guide
+- `POST /api/admin/connectors/sync`: Triggers a sync for all configured connectors and writes summary logs.
 
-| Deployment Size | Users | CPU Cores | RAG Threads | Queue | Reranker |
-|----------------|-------|-----------|-------------|-------|----------|
-| Development | 1-5 | 2-4 | 4/8 | 200 | 4 |
-| Small Team | 10-50 | 8 | 16/32 | 500 | 8 |
-| Department | 50-200 | 16 | 32/64 | 2000 | 16 |
-| Enterprise | 500+ | 32+ | 64/128 | 4000 | 32 |
+To run syncs on a schedule, invoke this endpoint from your scheduling system (e.g., cron, Kubernetes CronJob) using appropriate admin credentials.
