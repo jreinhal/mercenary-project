@@ -100,4 +100,36 @@ class ImageAnalyzerTest {
         assertTrue(chatModel.callCount > 0);
         assertEquals(chatModel.callCount, chatModel.callsWithMedia);
     }
+
+    @Test
+    void analyzeDetectsGifMimeType() {
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/gif");
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] fakeGif = new byte[]{
+                0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00, 0x00
+        };
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(fakeGif, "test.gif");
+        assertNotNull(analysis);
+        assertTrue(chatModel.callCount > 0);
+        assertEquals(chatModel.callCount, chatModel.callsWithMedia);
+    }
+
+    @Test
+    void analyzeDetectsWebpMimeType() {
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/webp");
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] fakeWebp = new byte[]{
+                0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50
+        };
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(fakeWebp, "test.webp");
+        assertNotNull(analysis);
+        assertTrue(chatModel.callCount > 0);
+        assertEquals(chatModel.callCount, chatModel.callsWithMedia);
+    }
 }

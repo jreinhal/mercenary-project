@@ -1,6 +1,5 @@
 package com.jreinhal.mercenary.rag.megarag;
 
-import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -171,6 +170,16 @@ public class ImageAnalyzer {
         if (imageBytes == null || imageBytes.length < 8) {
             return MimeTypeUtils.IMAGE_JPEG;
         }
+        // GIF: "GIF87a" / "GIF89a"
+        if (imageBytes.length >= 6
+                && imageBytes[0] == 0x47
+                && imageBytes[1] == 0x49
+                && imageBytes[2] == 0x46
+                && imageBytes[3] == 0x38
+                && (imageBytes[4] == 0x37 || imageBytes[4] == 0x39)
+                && imageBytes[5] == 0x61) {
+            return MimeTypeUtils.IMAGE_GIF;
+        }
         // PNG: 89 50 4E 47 0D 0A 1A 0A
         if ((imageBytes[0] & 0xFF) == 0x89
                 && imageBytes[1] == 0x50
@@ -185,6 +194,28 @@ public class ImageAnalyzer {
         // JPEG: FF D8
         if ((imageBytes[0] & 0xFF) == 0xFF && (imageBytes[1] & 0xFF) == 0xD8) {
             return MimeTypeUtils.IMAGE_JPEG;
+        }
+        // WEBP: "RIFF" .... "WEBP"
+        if (imageBytes.length >= 12
+                && imageBytes[0] == 0x52
+                && imageBytes[1] == 0x49
+                && imageBytes[2] == 0x46
+                && imageBytes[3] == 0x46
+                && imageBytes[8] == 0x57
+                && imageBytes[9] == 0x45
+                && imageBytes[10] == 0x42
+                && imageBytes[11] == 0x50) {
+            return MimeTypeUtils.parseMimeType("image/webp");
+        }
+        // BMP: "BM"
+        if (imageBytes.length >= 2 && imageBytes[0] == 0x42 && imageBytes[1] == 0x4D) {
+            return MimeTypeUtils.parseMimeType("image/bmp");
+        }
+        // TIFF: "II*\\0" or "MM\\0*"
+        if (imageBytes.length >= 4
+                && ((imageBytes[0] == 0x49 && imageBytes[1] == 0x49 && imageBytes[2] == 0x2A && imageBytes[3] == 0x00)
+                || (imageBytes[0] == 0x4D && imageBytes[1] == 0x4D && imageBytes[2] == 0x00 && imageBytes[3] == 0x2A))) {
+            return MimeTypeUtils.parseMimeType("image/tiff");
         }
         return MimeTypeUtils.IMAGE_JPEG;
     }
