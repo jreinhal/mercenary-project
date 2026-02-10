@@ -7,10 +7,10 @@ import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.document.Document;
@@ -248,12 +248,16 @@ class SecureIngestionServiceTest {
                         java.util.Collections.emptyMap()
                 ));
 
-        ArgumentCaptor<List<Document>> captor = ArgumentCaptor.forClass(List.class);
+        AtomicReference<List<Document>> captured = new AtomicReference<>();
+        doAnswer(invocation -> {
+            List<Document> docs = invocation.getArgument(0);
+            captured.set(docs);
+            return null;
+        }).when(vectorStore).add(anyList());
 
         assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
 
-        verify(vectorStore, atLeastOnce()).add(captor.capture());
-        List<Document> added = captor.getValue();
+        List<Document> added = captured.get();
         assertNotNull(added);
         assertTrue(added.size() > 0);
 
