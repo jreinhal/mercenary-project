@@ -132,4 +132,36 @@ class ImageAnalyzerTest {
         assertTrue(chatModel.callCount > 0);
         assertEquals(chatModel.callCount, chatModel.callsWithMedia);
     }
+
+    @Test
+    void analyzeDetectsBmpMimeType() {
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/bmp");
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] fakeBmp = new byte[]{
+                0x42, 0x4D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(fakeBmp, "test.bmp");
+        assertNotNull(analysis);
+        assertTrue(chatModel.callCount > 0);
+        assertEquals(chatModel.callCount, chatModel.callsWithMedia);
+    }
+
+    @Test
+    void analyzeDetectsTiffMimeType() {
+        CapturingVisionChatModel chatModel = new CapturingVisionChatModel("image/tiff");
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] fakeTiff = new byte[]{
+                0x49, 0x49, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(fakeTiff, "test.tiff");
+        assertNotNull(analysis);
+        assertTrue(chatModel.callCount > 0);
+        assertEquals(chatModel.callCount, chatModel.callsWithMedia);
+    }
 }
