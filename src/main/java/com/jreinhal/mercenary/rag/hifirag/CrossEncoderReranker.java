@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
@@ -71,13 +72,25 @@ public class CrossEncoderReranker {
     }
 
     private List<HiFiRagService.ScoredDocument> rerankWithLlm(String query, List<Document> documents) {
-        ArrayList<HiFiRagService.ScoredDocument> results = new ArrayList<HiFiRagService.ScoredDocument>();
+        List<HiFiRagService.ScoredDocument> results = new ArrayList<HiFiRagService.ScoredDocument>();
+        boolean poolExhausted = false;
         for (int i = 0; i < documents.size(); i += this.batchSize) {
+            if (poolExhausted) {
+                break;
+            }
             int end = Math.min(i + this.batchSize, documents.size());
             List<Document> batch = documents.subList(i, end);
-            ArrayList<Future<HiFiRagService.ScoredDocument>> futures = new ArrayList<Future<HiFiRagService.ScoredDocument>>();
+            List<Future<HiFiRagService.ScoredDocument>> futures = new ArrayList<Future<HiFiRagService.ScoredDocument>>();
             for (Document document : batch) {
-                futures.add(this.executor.submit(() -> this.scoreDocument(query, document)));
+                try {
+                    futures.add(this.executor.submit(() -> this.scoreDocument(query, document)));
+                } catch (RejectedExecutionException e) {
+                    if (log.isWarnEnabled()) {
+                        log.warn("Reranker thread pool overloaded; skipping document scoring: {}", e.getMessage());
+                    }
+                    poolExhausted = true;
+                    break;
+                }
             }
             for (Future<HiFiRagService.ScoredDocument> future : futures) {
                 try {
@@ -86,10 +99,14 @@ public class CrossEncoderReranker {
                     results.add(sd);
                 }
                 catch (TimeoutException e) {
-                    log.warn("Cross-encoder scoring timed out");
+                    if (log.isWarnEnabled()) {
+                        log.warn("Cross-encoder scoring timed out");
+                    }
                 }
                 catch (Exception e) {
-                    log.warn("Cross-encoder scoring failed: {}", e.getMessage());
+                    if (log.isWarnEnabled()) {
+                        log.warn("Cross-encoder scoring failed: {}", e.getMessage());
+                    }
                 }
             }
         }

@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -79,16 +80,25 @@ public class HybridRagService {
         }
         long startTime = System.currentTimeMillis();
         List<String> queryVariants = this.generateQueryVariants(query, normalizedDept);
-        LinkedHashMap<String, List<RankedDoc>> semanticResults = new LinkedHashMap<String, List<RankedDoc>>();
-        LinkedHashMap<String, CompletableFuture<List<RankedDoc>>> futures = new LinkedHashMap<>();
+        Map<String, List<RankedDoc>> semanticResults = new LinkedHashMap<String, List<RankedDoc>>();
+        Map<String, CompletableFuture<List<RankedDoc>>> futures = new LinkedHashMap<>();
         for (String variant : queryVariants) {
-            futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept, workspaceId), this.ragExecutor));
+            try {
+                futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept, workspaceId), this.ragExecutor));
+            } catch (RejectedExecutionException e) {
+                if (log.isDebugEnabled()) {
+                    log.debug("RAG thread pool overloaded; skipping variant '{}': {}", variant, e.getMessage());
+                }
+                futures.put(variant, CompletableFuture.completedFuture(List.of()));
+            }
         }
         long semanticDeadlineMs = startTime + TimeUnit.SECONDS.toMillis(this.futureTimeoutSeconds);
         for (Map.Entry<String, CompletableFuture<List<RankedDoc>>> entry : futures.entrySet()) {
             long remainingMs = semanticDeadlineMs - System.currentTimeMillis();
             if (remainingMs <= 0L) {
-                log.warn("HybridRAG semantic retrieval exceeded global timeout ({}s); canceling remaining variants", this.futureTimeoutSeconds);
+                if (log.isWarnEnabled()) {
+                    log.warn("HybridRAG semantic retrieval exceeded global timeout ({}s); canceling remaining variants", this.futureTimeoutSeconds);
+                }
                 entry.getValue().cancel(true);
                 semanticResults.put(entry.getKey(), List.of());
                 continue;
@@ -98,16 +108,22 @@ public class HybridRagService {
             }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.warn("HybridRAG semantic retrieval interrupted for variant '{}'", entry.getKey());
+                if (log.isWarnEnabled()) {
+                    log.warn("HybridRAG semantic retrieval interrupted for variant '{}'", entry.getKey());
+                }
                 semanticResults.put(entry.getKey(), List.of());
             }
             catch (TimeoutException e) {
-                log.warn("HybridRAG semantic retrieval timed out for variant '{}' (remaining {}ms)", entry.getKey(), remainingMs);
+                if (log.isWarnEnabled()) {
+                    log.warn("HybridRAG semantic retrieval timed out for variant '{}' (remaining {}ms)", entry.getKey(), remainingMs);
+                }
                 entry.getValue().cancel(true);
                 semanticResults.put(entry.getKey(), List.of());
             }
             catch (Exception e) {
-                log.warn("HybridRAG semantic retrieval failed for variant '{}': {}", entry.getKey(), e.getMessage());
+                if (log.isWarnEnabled()) {
+                    log.warn("HybridRAG semantic retrieval failed for variant '{}': {}", entry.getKey(), e.getMessage());
+                }
                 semanticResults.put(entry.getKey(), List.of());
             }
         }
