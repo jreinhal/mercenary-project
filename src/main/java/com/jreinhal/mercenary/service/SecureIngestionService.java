@@ -162,7 +162,7 @@ public class SecureIngestionService {
                 log.info(">> DETECTED DOCUMENT: Engaging Tika text extraction...");
                 rawDocuments = this.extractTextDocuments(fileBytes, filename);
             }
-            ArrayList<Document> cleanDocs = new ArrayList<Document>();
+            List<Document> cleanDocs = new ArrayList<>();
             for (Document doc : rawDocuments) {
                 Map<String, Object> mergedMeta = new HashMap<>();
                 if (doc.getMetadata() != null) {
@@ -181,7 +181,7 @@ public class SecureIngestionService {
                 splitDocuments = this.mergeSmallChunks(splitDocuments, this.chunkMergeMinTokens, this.chunkMergeMaxTokens);
             }
             this.assignChunkIndices(splitDocuments);
-            ArrayList<Document> finalDocuments = new ArrayList<Document>();
+            List<Document> finalDocuments = new ArrayList<>();
             int totalRedactions = 0;
             for (Document doc : splitDocuments) {
                 PiiRedactionService.RedactionResult result = this.piiRedactionService.redact(doc.getContent(), hipaaStrict ? Boolean.TRUE : null);
@@ -216,7 +216,7 @@ public class SecureIngestionService {
             tokenCounts.add(this.countTokens(doc.getContent()));
         }
 
-        ArrayList<Document> merged = new ArrayList<>();
+        List<Document> merged = new ArrayList<>();
         int i = 0;
         while (i < docs.size()) {
             Document base = docs.get(i);

@@ -260,7 +260,7 @@ class SecureIngestionServiceTest {
 
         List<Document> added = captured.get();
         assertNotNull(added);
-        assertTrue(added.size() > 0);
+        assertFalse(added.isEmpty());
 
         for (Document doc : added) {
             assertNotNull(doc.getMetadata());
@@ -275,8 +275,9 @@ class SecureIngestionServiceTest {
         // Force many small chunks so mergeSmallChunks exercises forward-merge + max-token break paths.
         ReflectionTestUtils.setField(ingestionService, "chunkSizeTokens", 200);
         ReflectionTestUtils.setField(ingestionService, "chunkMergeEnabled", true);
-        ReflectionTestUtils.setField(ingestionService, "chunkMergeMinTokens", 512);
-        ReflectionTestUtils.setField(ingestionService, "chunkMergeMaxTokens", 300);
+        // Use a realistic configuration: min just above one chunk, max below the sum of two chunks.
+        ReflectionTestUtils.setField(ingestionService, "chunkMergeMinTokens", 210);
+        ReflectionTestUtils.setField(ingestionService, "chunkMergeMaxTokens", 380);
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 450; i++) {
@@ -307,7 +308,7 @@ class SecureIngestionServiceTest {
 
         List<Document> added = captured.get();
         assertNotNull(added);
-        assertTrue(added.size() > 0);
+        assertFalse(added.isEmpty());
 
         // Our synthetic input contains no newlines; merged chunks will contain \n\n separators inserted by mergeSmallChunks.
         assertTrue(added.stream().anyMatch(d -> d.getContent() != null && d.getContent().contains("\n\n")));
