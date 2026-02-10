@@ -6,12 +6,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ConnectorService {
+    private static final Logger log = LoggerFactory.getLogger(ConnectorService.class);
+
     private final List<Connector> connectors;
     private final Map<String, ConnectorStatus> statusMap = new ConcurrentHashMap<>();
+
+    @Value("${sentinel.connectors.sync-enabled:false}")
+    private boolean syncEnabled;
 
     public ConnectorService(List<Connector> connectors) {
         this.connectors = connectors;
@@ -40,6 +49,59 @@ public class ConnectorService {
             statusMap.put(connector.getName(), status);
         }
         return results;
+    }
+
+    /**
+     * Syncs only enabled connectors. Used by scheduled sync to avoid
+     * wasting resources on connectors that are explicitly disabled.
+     */
+    public List<ConnectorSyncResult> syncEnabled() {
+        List<ConnectorSyncResult> results = new ArrayList<>();
+        for (Connector connector : connectors) {
+            if (!connector.isEnabled()) {
+                continue;
+            }
+            ConnectorSyncResult result = connector.sync();
+            results.add(result);
+            ConnectorStatus status = new ConnectorStatus(connector.getName(), connector.isEnabled(), Instant.now(), result);
+            statusMap.put(connector.getName(), status);
+        }
+        return results;
+    }
+
+    /**
+     * Scheduled connector sync. Disabled by default; enable via
+     * {@code sentinel.connectors.sync-enabled=true}. Cron expression
+     * controlled by {@code sentinel.connectors.sync-cron} (default: 2 AM daily).
+     */
+    @Scheduled(cron = "${sentinel.connectors.sync-cron:0 0 2 * * ?}")
+    public void scheduledSync() {
+        if (!syncEnabled) {
+            return;
+        }
+        log.info("Scheduled connector sync starting");
+        long startTime = System.currentTimeMillis();
+        List<ConnectorSyncResult> results = syncEnabled();
+        long duration = System.currentTimeMillis() - startTime;
+
+        int totalLoaded = 0;
+        int totalSkipped = 0;
+        int successCount = 0;
+        for (ConnectorSyncResult result : results) {
+            totalLoaded += result.loaded();
+            totalSkipped += result.skipped();
+            if (result.success()) {
+                successCount++;
+            }
+        }
+        if (log.isInfoEnabled()) {
+            log.info("Scheduled connector sync completed in {}ms: {}/{} connectors succeeded, {} documents loaded, {} skipped",
+                    duration, successCount, results.size(), totalLoaded, totalSkipped);
+        }
+    }
+
+    public boolean isSyncEnabled() {
+        return syncEnabled;
     }
 
     public List<ConnectorCatalogEntry> getCatalog() {
