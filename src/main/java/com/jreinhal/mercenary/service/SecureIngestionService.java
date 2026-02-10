@@ -16,7 +16,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import com.knuddels.jtokkit.Encodings;
+import com.knuddels.jtokkit.api.Encoding;
+import com.knuddels.jtokkit.api.EncodingRegistry;
+import com.knuddels.jtokkit.api.EncodingType;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
@@ -71,6 +77,24 @@ public class SecureIngestionService {
     private boolean extractImagesFromPdf;
     @Value("${sentinel.ocr.fallback-for-scanned-pdf:true}")
     private boolean ocrFallbackForScannedPdf;
+    @Value("${sentinel.ingest.chunking.chunk-size-tokens:800}")
+    private int chunkSizeTokens = 800;
+    @Value("${sentinel.ingest.chunking.min-chunk-size-chars:350}")
+    private int minChunkSizeChars = 350;
+    @Value("${sentinel.ingest.chunking.min-chunk-length-to-embed:5}")
+    private int minChunkLengthToEmbed = 5;
+    @Value("${sentinel.ingest.chunking.max-num-chunks:10000}")
+    private int maxNumChunks = 10000;
+    @Value("${sentinel.ingest.chunking.keep-separator:true}")
+    private boolean keepSeparator = true;
+    @Value("${sentinel.ingest.chunk-merge.enabled:true}")
+    private boolean chunkMergeEnabled = true;
+    @Value("${sentinel.ingest.chunk-merge.min-tokens:512}")
+    private int chunkMergeMinTokens = 512;
+    @Value("${sentinel.ingest.chunk-merge.max-tokens:2000}")
+    private int chunkMergeMaxTokens = 2000;
+    private static final EncodingRegistry TOKEN_ENCODING_REGISTRY = Encodings.newLazyEncodingRegistry();
+    private static final Encoding TOKEN_ENCODING = TOKEN_ENCODING_REGISTRY.getEncoding(EncodingType.CL100K_BASE);
 
     public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
         this.vectorStore = vectorStore;
@@ -138,19 +162,26 @@ public class SecureIngestionService {
                 log.info(">> DETECTED DOCUMENT: Engaging Tika text extraction...");
                 rawDocuments = this.extractTextDocuments(fileBytes, filename);
             }
-            ArrayList<Document> cleanDocs = new ArrayList<Document>();
+            List<Document> cleanDocs = new ArrayList<>();
             for (Document doc : rawDocuments) {
-                java.util.Map<String, Object> cleanMeta = new java.util.HashMap<>();
-                cleanMeta.put("source", filename);
-                cleanMeta.put("dept", dept.name());
-                cleanMeta.put("workspaceId", workspaceId);
-                cleanMeta.put("mimeType", detectedMimeType);
-                cleanMeta.put("fileSizeBytes", fileBytes.length);
-                cleanDocs.add(new Document(doc.getContent(), cleanMeta));
+                Map<String, Object> mergedMeta = new HashMap<>();
+                if (doc.getMetadata() != null) {
+                    mergedMeta.putAll(doc.getMetadata());
+                }
+                mergedMeta.put("source", filename);
+                mergedMeta.put("dept", dept.name());
+                mergedMeta.put("workspaceId", workspaceId);
+                mergedMeta.put("mimeType", detectedMimeType);
+                mergedMeta.put("fileSizeBytes", fileBytes.length);
+                cleanDocs.add(new Document(doc.getContent(), mergedMeta));
             }
-            TokenTextSplitter splitter = new TokenTextSplitter();
+            TokenTextSplitter splitter = new TokenTextSplitter(this.chunkSizeTokens, this.minChunkSizeChars, this.minChunkLengthToEmbed, this.maxNumChunks, this.keepSeparator);
             List<Document> splitDocuments = splitter.apply(cleanDocs);
-            ArrayList<Document> finalDocuments = new ArrayList<Document>();
+            if (this.chunkMergeEnabled) {
+                splitDocuments = this.mergeSmallChunks(splitDocuments, this.chunkMergeMinTokens, this.chunkMergeMaxTokens);
+            }
+            this.assignChunkIndices(splitDocuments);
+            List<Document> finalDocuments = new ArrayList<>();
             int totalRedactions = 0;
             for (Document doc : splitDocuments) {
                 PiiRedactionService.RedactionResult result = this.piiRedactionService.redact(doc.getContent(), hipaaStrict ? Boolean.TRUE : null);
@@ -173,6 +204,102 @@ public class SecureIngestionService {
         }
         catch (IOException e) {
             throw new SecureIngestionException("Secure Ingestion Failed", e);
+        }
+    }
+
+    private List<Document> mergeSmallChunks(List<Document> docs, int minTokens, int maxTokens) {
+        if (docs == null || docs.size() < 2) {
+            return docs;
+        }
+        List<Integer> tokenCounts = new ArrayList<>(docs.size());
+        for (Document doc : docs) {
+            tokenCounts.add(this.countTokens(doc.getContent()));
+        }
+
+        List<Document> merged = new ArrayList<>();
+        int i = 0;
+        while (i < docs.size()) {
+            Document base = docs.get(i);
+            String groupKey = this.chunkGroupKey(base);
+            StringBuilder content = new StringBuilder(Objects.toString(base.getContent(), ""));
+            Map<String, Object> meta = new HashMap<>(base.getMetadata());
+            int tokens = tokenCounts.get(i);
+
+            int j = i + 1;
+            while (tokens < minTokens && j < docs.size() && groupKey.equals(this.chunkGroupKey(docs.get(j)))) {
+                int nextTokens = tokenCounts.get(j);
+                if (tokens + nextTokens > maxTokens) {
+                    break;
+                }
+                content.append("\n\n").append(docs.get(j).getContent());
+                tokens += nextTokens;
+                j++;
+            }
+
+            boolean atGroupEnd = j >= docs.size() || !groupKey.equals(this.chunkGroupKey(docs.get(j)));
+            if (tokens < minTokens && atGroupEnd && !merged.isEmpty() && groupKey.equals(this.chunkGroupKey(merged.get(merged.size() - 1)))) {
+                Document prev = merged.remove(merged.size() - 1);
+                int prevTokens = this.countTokens(prev.getContent());
+                if (prevTokens + tokens <= maxTokens) {
+                    String combined = Objects.toString(prev.getContent(), "") + "\n\n" + content;
+                    merged.add(new Document(combined, new HashMap<>(prev.getMetadata())));
+                } else {
+                    merged.add(prev);
+                    merged.add(new Document(content.toString(), meta));
+                }
+            } else {
+                merged.add(new Document(content.toString(), meta));
+            }
+            i = j;
+        }
+        return merged;
+    }
+
+    private int countTokens(String text) {
+        if (text == null || text.isBlank()) {
+            return 0;
+        }
+        return TOKEN_ENCODING.encode(text).size();
+    }
+
+    private String chunkGroupKey(Document doc) {
+        if (doc == null) {
+            return "";
+        }
+        Map<String, Object> meta = doc.getMetadata();
+        if (meta == null) {
+            return "";
+        }
+        // Never merge across pages when page metadata exists.
+        Object source = meta.get("source");
+        Object dept = meta.get("dept");
+        Object workspaceId = meta.get("workspaceId");
+        Object pageNumber = meta.get("page_number");
+        Object endPageNumber = meta.get("end_page_number");
+        Object ocr = meta.get("ocr");
+        return Objects.toString(source, "") + "|" + Objects.toString(dept, "") + "|" + Objects.toString(workspaceId, "") + "|p=" + Objects.toString(pageNumber, "") + "|ep=" + Objects.toString(endPageNumber, "") + "|ocr=" + Objects.toString(ocr, "");
+    }
+
+    private void assignChunkIndices(List<Document> docs) {
+        if (docs == null || docs.isEmpty()) {
+            return;
+        }
+        Map<String, Integer> fileCounters = new HashMap<>();
+        Map<String, Integer> pageCounters = new HashMap<>();
+        for (Document doc : docs) {
+            Map<String, Object> meta = doc.getMetadata();
+            if (meta == null) {
+                continue;
+            }
+            String fileKey = Objects.toString(meta.get("source"), "") + "|" + Objects.toString(meta.get("dept"), "") + "|" + Objects.toString(meta.get("workspaceId"), "");
+            int fileIndex = fileCounters.getOrDefault(fileKey, 0);
+            fileCounters.put(fileKey, fileIndex + 1);
+            meta.put("chunk_index", fileIndex);
+
+            String pageKey = fileKey + "|p=" + Objects.toString(meta.get("page_number"), "");
+            int pageIndex = pageCounters.getOrDefault(pageKey, 0);
+            pageCounters.put(pageKey, pageIndex + 1);
+            meta.put("page_chunk_index", pageIndex);
         }
     }
 

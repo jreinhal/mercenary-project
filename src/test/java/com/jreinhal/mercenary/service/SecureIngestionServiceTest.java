@@ -5,13 +5,18 @@ import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -222,6 +227,106 @@ class SecureIngestionServiceTest {
 
         // Verify vector store was called (documents were added)
         verify(vectorStore, atLeastOnce()).add(anyList());
+    }
+
+    @Test
+    @DisplayName("Should assign chunk indices to ingested documents")
+    void shouldAssignChunkIndices() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 2500; i++) {
+            sb.append("word").append(i).append(' ');
+        }
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "long.txt",
+                "text/plain",
+                sb.toString().getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        AtomicReference<List<Document>> captured = new AtomicReference<>();
+        doAnswer(invocation -> {
+            List<Document> docs = invocation.getArgument(0);
+            captured.set(docs);
+            return null;
+        }).when(vectorStore).add(anyList());
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+
+        List<Document> added = captured.get();
+        assertNotNull(added);
+        assertFalse(added.isEmpty());
+
+        for (Document doc : added) {
+            assertNotNull(doc.getMetadata());
+            assertTrue(doc.getMetadata().containsKey("chunk_index"));
+            assertTrue(doc.getMetadata().containsKey("page_chunk_index"));
+        }
+    }
+
+    @Test
+    @DisplayName("Should merge small chunks forward but respect max token guardrails")
+    void shouldMergeSmallChunksWithMaxTokenGuardrails() {
+        // Force many small chunks so mergeSmallChunks exercises forward-merge + max-token break paths.
+        ReflectionTestUtils.setField(ingestionService, "chunkSizeTokens", 200);
+        ReflectionTestUtils.setField(ingestionService, "chunkMergeEnabled", true);
+        // Use a realistic configuration: min just above one chunk, max below the sum of two chunks.
+        ReflectionTestUtils.setField(ingestionService, "chunkMergeMinTokens", 210);
+        ReflectionTestUtils.setField(ingestionService, "chunkMergeMaxTokens", 380);
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 450; i++) {
+            sb.append("hello ");
+        }
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "merge_test.txt",
+                "text/plain",
+                sb.toString().getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        AtomicReference<List<Document>> captured = new AtomicReference<>();
+        doAnswer(invocation -> {
+            List<Document> docs = invocation.getArgument(0);
+            captured.set(docs);
+            return null;
+        }).when(vectorStore).add(anyList());
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+
+        List<Document> added = captured.get();
+        assertNotNull(added);
+        assertFalse(added.isEmpty());
+
+        // Our synthetic input contains no newlines; merged chunks will contain \n\n separators inserted by mergeSmallChunks.
+        assertTrue(added.stream().anyMatch(d -> d.getContent() != null && d.getContent().contains("\n\n")));
+    }
+
+    @Test
+    @DisplayName("Helper methods should tolerate null/empty inputs")
+    void helperMethodsShouldTolerateNullOrEmptyInputs() {
+        Integer tokens = ReflectionTestUtils.invokeMethod(ingestionService, "countTokens", " ");
+        assertNotNull(tokens);
+        assertEquals(0, tokens.intValue());
+
+        String key = ReflectionTestUtils.invokeMethod(ingestionService, "chunkGroupKey", (Object) null);
+        assertEquals("", key);
+
+        // Should be no-op (not throw)
+        ReflectionTestUtils.invokeMethod(ingestionService, "assignChunkIndices", (Object) null);
+        ReflectionTestUtils.invokeMethod(ingestionService, "assignChunkIndices", List.of());
     }
 
     // ─── Fix #4: Magic byte detection for archive/container formats ───

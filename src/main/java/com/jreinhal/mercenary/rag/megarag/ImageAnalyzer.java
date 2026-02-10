@@ -1,8 +1,6 @@
 package com.jreinhal.mercenary.rag.megarag;
 
-import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,8 +9,14 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.ChatOptionsBuilder;
+import org.springframework.ai.model.Media;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MimeType;
+import org.springframework.util.MimeTypeUtils;
 
 @Component
 public class ImageAnalyzer {
@@ -142,16 +146,79 @@ public class ImageAnalyzer {
     }
 
     private String callVisionModel(byte[] imageBytes, String prompt) {
-        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-        String fullPrompt = prompt + "\n\n[Image data provided as base64]";
         try {
-            String response = this.chatClient.prompt().user(u -> u.text(fullPrompt)).call().content();
+            // Always attach the image bytes as multimodal media. If a text-only model is used by mistake,
+            // it should fail rather than silently hallucinating.
+            MimeType mimeType = this.detectImageMimeType(imageBytes);
+            String model = (this.visionModel == null || this.visionModel.isBlank()) ? "llava" : this.visionModel;
+            ChatOptions options = ChatOptionsBuilder.builder().withModel(model).build();
+            String response = this.chatClient
+                    .prompt()
+                    .options(options)
+                    .user(u -> u.text(prompt).media(new Media(mimeType, new ByteArrayResource(imageBytes))))
+                    .call()
+                    .content();
             return response != null ? response : "";
         }
         catch (Exception e) {
             log.warn("Vision model call failed: {}", e.getMessage());
             throw e;
         }
+    }
+
+    private MimeType detectImageMimeType(byte[] imageBytes) {
+        if (imageBytes == null || imageBytes.length < 2) {
+            return MimeTypeUtils.IMAGE_JPEG;
+        }
+        // JPEG: FF D8
+        if ((imageBytes[0] & 0xFF) == 0xFF && (imageBytes[1] & 0xFF) == 0xD8) {
+            return MimeTypeUtils.IMAGE_JPEG;
+        }
+        // BMP: "BM"
+        if (imageBytes[0] == 0x42 && imageBytes[1] == 0x4D) {
+            return MimeTypeUtils.parseMimeType("image/bmp");
+        }
+        // TIFF: "II*\\0" or "MM\\0*"
+        if (imageBytes.length >= 4
+                && ((imageBytes[0] == 0x49 && imageBytes[1] == 0x49 && imageBytes[2] == 0x2A && imageBytes[3] == 0x00)
+                || (imageBytes[0] == 0x4D && imageBytes[1] == 0x4D && imageBytes[2] == 0x00 && imageBytes[3] == 0x2A))) {
+            return MimeTypeUtils.parseMimeType("image/tiff");
+        }
+        // GIF: "GIF87a" / "GIF89a"
+        if (imageBytes.length >= 6
+                && imageBytes[0] == 0x47
+                && imageBytes[1] == 0x49
+                && imageBytes[2] == 0x46
+                && imageBytes[3] == 0x38
+                && (imageBytes[4] == 0x37 || imageBytes[4] == 0x39)
+                && imageBytes[5] == 0x61) {
+            return MimeTypeUtils.IMAGE_GIF;
+        }
+        // PNG: 89 50 4E 47 0D 0A 1A 0A
+        if (imageBytes.length >= 8
+                && (imageBytes[0] & 0xFF) == 0x89
+                && imageBytes[1] == 0x50
+                && imageBytes[2] == 0x4E
+                && imageBytes[3] == 0x47
+                && imageBytes[4] == 0x0D
+                && imageBytes[5] == 0x0A
+                && imageBytes[6] == 0x1A
+                && imageBytes[7] == 0x0A) {
+            return MimeTypeUtils.IMAGE_PNG;
+        }
+        // WEBP: "RIFF" .... "WEBP"
+        if (imageBytes.length >= 12
+                && imageBytes[0] == 0x52
+                && imageBytes[1] == 0x49
+                && imageBytes[2] == 0x46
+                && imageBytes[3] == 0x46
+                && imageBytes[8] == 0x57
+                && imageBytes[9] == 0x45
+                && imageBytes[10] == 0x42
+                && imageBytes[11] == 0x50) {
+            return MimeTypeUtils.parseMimeType("image/webp");
+        }
+        return MimeTypeUtils.IMAGE_JPEG;
     }
 
     private boolean isChartType(MegaRagService.ImageType type) {
