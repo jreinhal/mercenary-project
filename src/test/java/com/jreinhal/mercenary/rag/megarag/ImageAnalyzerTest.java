@@ -210,4 +210,46 @@ class ImageAnalyzerTest {
         assertTrue(chatModel.callCount > 0);
         assertEquals(chatModel.callCount, chatModel.callsWithMedia);
     }
+
+    @Test
+    void analyzeDegradesGracefullyWhenVisionModelThrows() {
+        ThrowingVisionChatModel chatModel = new ThrowingVisionChatModel();
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        ImageAnalyzer analyzer = new ImageAnalyzer(builder);
+
+        byte[] fakeJpeg = new byte[]{
+                (byte) 0xFF, (byte) 0xD8, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, (byte) 0xFF, (byte) 0xD9
+        };
+
+        MegaRagService.ImageAnalysis analysis = analyzer.analyze(fakeJpeg, "boom.jpg");
+        assertNotNull(analysis);
+        assertEquals(MegaRagService.ImageType.UNKNOWN, analysis.imageType());
+        assertTrue(analysis.entities().isEmpty());
+        assertTrue(analysis.extractedText().isEmpty());
+        assertTrue(analysis.description().toLowerCase().contains("unavailable"));
+        assertTrue(chatModel.callCount > 0);
+    }
+
+    private static final class ThrowingVisionChatModel implements ChatModel {
+        private int callCount = 0;
+
+        @Override
+        public ChatResponse call(Prompt prompt) {
+            this.callCount++;
+            boolean hasMedia = false;
+            for (Message msg : prompt.getInstructions()) {
+                if (msg instanceof UserMessage userMessage) {
+                    hasMedia = userMessage.getMedia() != null && !userMessage.getMedia().isEmpty();
+                    break;
+                }
+            }
+            assertTrue(hasMedia, "Expected UserMessage with media attached");
+            throw new RuntimeException("Simulated vision model failure");
+        }
+
+        @Override
+        public ChatOptions getDefaultOptions() {
+            return ChatOptionsBuilder.builder().build();
+        }
+    }
 }

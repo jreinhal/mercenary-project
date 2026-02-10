@@ -313,6 +313,21 @@ class SecureIngestionServiceTest {
         assertTrue(added.stream().anyMatch(d -> d.getContent() != null && d.getContent().contains("\n\n")));
     }
 
+    @Test
+    @DisplayName("Helper methods should tolerate null/empty inputs")
+    void helperMethodsShouldTolerateNullOrEmptyInputs() {
+        Integer tokens = ReflectionTestUtils.invokeMethod(ingestionService, "countTokens", " ");
+        assertNotNull(tokens);
+        assertEquals(0, tokens.intValue());
+
+        String key = ReflectionTestUtils.invokeMethod(ingestionService, "chunkGroupKey", (Object) null);
+        assertEquals("", key);
+
+        // Should be no-op (not throw)
+        ReflectionTestUtils.invokeMethod(ingestionService, "assignChunkIndices", (Object) null);
+        ReflectionTestUtils.invokeMethod(ingestionService, "assignChunkIndices", List.of());
+    }
+
     // ─── Fix #4: Magic byte detection for archive/container formats ───
 
     @Test
