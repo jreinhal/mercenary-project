@@ -199,7 +199,11 @@ implements VectorStore {
                     andCriteria.add(Criteria.where(field).in(this.normalizeValuesForQuery(condition.values().get(0))));
                 } else if ("!=".equals(op) && !condition.values().isEmpty()) {
                     andCriteria.add(Criteria.where(field).nin(this.normalizeValuesForQuery(condition.values().get(0))));
-                } else if ("in".equals(op) && !condition.values().isEmpty()) {
+                } else if ("in".equals(op)) {
+                    if (condition.values().isEmpty()) {
+                        // Fail closed for "in []" to avoid broad prefilter scans.
+                        return new Query((CriteriaDefinition) Criteria.where((String) "_id").is("__filter_empty_in__"));
+                    }
                     Set<Object> normalized = new HashSet<>();
                     for (String value : condition.values()) {
                         normalized.addAll(this.normalizeValuesForQuery(value));

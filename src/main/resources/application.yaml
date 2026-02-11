@@ -166,7 +166,7 @@ sentinel:
     max-visual-docs: ${RAG_MAX_VISUAL_DOCS:6}
     temporal-filtering:
       # Apply documentYear prefilters when the user query expresses a year constraint (e.g. "between 2020 and 2022").
-      enabled: ${RAG_TEMPORAL_FILTERING_ENABLED:true}
+      enabled: ${RAG_TEMPORAL_FILTERING_ENABLED:false}
 
   # Domain thesaurus: configurable acronym/synonym expansion (Phase 3)
   thesaurus:
