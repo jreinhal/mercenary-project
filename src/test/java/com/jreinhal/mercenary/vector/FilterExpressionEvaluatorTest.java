@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.vector;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -68,5 +69,36 @@ class FilterExpressionEvaluatorTest {
         FilterExpressionParser.ParsedFilter lt = FilterExpressionParser.parse("documentYear < 2020");
         assertTrue(FilterExpressionEvaluator.matches(Map.of("documentYear", 2019), lt));
         assertFalse(FilterExpressionEvaluator.matches(Map.of("documentYear", 2020), lt));
+    }
+
+    @Test
+    void returnsTrueWhenParsedFilterIsNull() {
+        assertTrue(FilterExpressionEvaluator.matches(Map.of("dept", "MEDICAL"), null));
+    }
+
+    @Test
+    void returnsFalseWhenParsedFilterIsInvalid() {
+        FilterExpressionParser.ParsedFilter parsed = new FilterExpressionParser.ParsedFilter(List.of(), true);
+        assertFalse(FilterExpressionEvaluator.matches(Map.of("dept", "MEDICAL"), parsed));
+    }
+
+    @Test
+    void returnsTrueWhenParsedFilterHasNoGroups() {
+        FilterExpressionParser.ParsedFilter parsed = new FilterExpressionParser.ParsedFilter(List.of(), false);
+        assertTrue(FilterExpressionEvaluator.matches(Map.of("dept", "MEDICAL"), parsed));
+    }
+
+    @Test
+    void unknownOperatorFallsBackToTrueForCondition() {
+        FilterExpressionParser.Condition cond = new FilterExpressionParser.Condition("dept", "??", List.of("MEDICAL"));
+        FilterExpressionParser.ParsedFilter parsed = new FilterExpressionParser.ParsedFilter(List.of(List.of(cond)), false);
+        assertTrue(FilterExpressionEvaluator.matches(Map.of("dept", "ENTERPRISE"), parsed));
+    }
+
+    @Test
+    void numericComparatorFailsWhenRhsIsNotNumeric() {
+        FilterExpressionParser.Condition cond = new FilterExpressionParser.Condition("documentYear", ">=", List.of("not-a-number"));
+        FilterExpressionParser.ParsedFilter parsed = new FilterExpressionParser.ParsedFilter(List.of(List.of(cond)), false);
+        assertFalse(FilterExpressionEvaluator.matches(Map.of("documentYear", 2024), parsed));
     }
 }

@@ -161,7 +161,7 @@ final class FilterExpressionParser {
         // We intentionally parse only explicit key/value comparisons, then treat them as a single AND-group.
         // If we can't extract any comparisons, the caller will fail closed.
         // Use possessive quantifiers to avoid catastrophic backtracking (ReDoS).
-        Pattern pattern = Pattern.compile("Expression\\[type=(EQ|NE|IN|GE|LE|GT|LT|GTE|LTE),\\s*+left=Key\\[key=([^\\]]++)\\],\\s*+right=Value\\[value=([^\\]]++)\\]\\]");
+        Pattern pattern = Pattern.compile("Expression\\[type=(EQ|NE|IN|GTE|LTE|GE|LE|GT|LT),\\s*+left=Key\\[key=([^\\]]++)\\],\\s*+right=Value\\[value=([^\\]]++)\\]\\]");
         Matcher matcher = pattern.matcher(filter);
         ArrayList<Condition> conditions = new ArrayList<>();
         while (matcher.find()) {

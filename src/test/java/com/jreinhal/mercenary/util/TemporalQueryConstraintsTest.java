@@ -40,4 +40,16 @@ class TemporalQueryConstraintsTest {
     void normalizesReversedYearRanges() {
         assertEquals("documentYear >= 2020 && documentYear <= 2022", TemporalQueryConstraints.buildDocumentYearFilter("between 2022 and 2020"));
     }
+
+    @Test
+    void supportsFromToAndThroughPatterns() {
+        assertEquals("documentYear >= 2018 && documentYear <= 2020",
+                TemporalQueryConstraints.buildDocumentYearFilter("from 2018 through 2020"));
+    }
+
+    @Test
+    void returnsBlankForNullOrOutOfRangeYears() {
+        assertTrue(TemporalQueryConstraints.buildDocumentYearFilter(null).isBlank());
+        assertTrue(TemporalQueryConstraints.buildDocumentYearFilter("since 1899").isBlank());
+    }
 }
