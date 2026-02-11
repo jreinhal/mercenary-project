@@ -57,6 +57,8 @@ class SecureIngestionServiceTest {
 
     @Mock
     private TableExtractor tableExtractor;
+    @Mock
+    private SourceDocumentService sourceDocumentService;
 
     @Mock
     private HipaaPolicy hipaaPolicy;
@@ -75,7 +77,7 @@ class SecureIngestionServiceTest {
         when(tableExtractor.isEnabled()).thenReturn(false);
         when(hipaaPolicy.isStrict(any(Department.class))).thenReturn(false);
         when(hipaaPolicy.shouldDisableVisual(any(Department.class))).thenReturn(false);
-        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService, tableExtractor, hipaaPolicy, workspaceQuotaService);
+        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService, tableExtractor, sourceDocumentService, hipaaPolicy, workspaceQuotaService);
     }
 
     @Test
@@ -96,6 +98,26 @@ class SecureIngestionServiceTest {
 
         // Should not throw
         assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+    }
+
+    @Test
+    @DisplayName("Should retain source PDF bytes for on-demand page rendering")
+    void shouldRetainSourcePdfBytes() throws Exception {
+        byte[] pdfBytes = buildBlankPdf();
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "source.pdf",
+                "application/pdf",
+                pdfBytes
+        );
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+        verify(sourceDocumentService).storePdfSource(anyString(), eq(Department.ENTERPRISE), eq("source.pdf"), any(byte[].class));
     }
 
     @Test

@@ -202,6 +202,21 @@ sentinel:
       max-tables-per-document: ${INGEST_MAX_TABLES_PER_DOCUMENT:50}
       max-table-chars: ${INGEST_MAX_TABLE_CHARS:20000}
 
+  source-retention:
+    pdf:
+      # Retain source PDF bytes in-memory for on-demand page/region rendering ("View Source").
+      enabled: ${SOURCE_RETENTION_PDF_ENABLED:true}
+      # Conservative default for HIPAA strict: do not retain source bytes unless explicitly enabled.
+      allow-hipaa-strict: ${SOURCE_RETENTION_ALLOW_HIPAA_STRICT:false}
+      max-bytes: ${SOURCE_RETENTION_PDF_MAX_BYTES:52428800}
+      cache:
+        ttl-hours: ${SOURCE_RETENTION_PDF_CACHE_TTL_HOURS:1}
+        max-total-bytes: ${SOURCE_RETENTION_PDF_CACHE_MAX_TOTAL_BYTES:268435456}
+
+  source-render:
+    dpi: ${SOURCE_RENDER_DPI:160}
+    max-output-pixels: ${SOURCE_RENDER_MAX_OUTPUT_PIXELS:3686400}
+
   # License validation
   # When no key and no signing secret are set, runs in unlicensed mode (backward compatible).
   # To enforce licensing, set both LICENSE_KEY and LICENSE_SIGNING_SECRET.

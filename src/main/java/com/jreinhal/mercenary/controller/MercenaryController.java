@@ -27,10 +27,12 @@ import com.jreinhal.mercenary.reasoning.ReasoningTrace;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.service.AuditService;
 import com.jreinhal.mercenary.service.PiiRedactionService;
+import com.jreinhal.mercenary.service.PageRenderService;
 import com.jreinhal.mercenary.service.PromptGuardrailService;
 import com.jreinhal.mercenary.service.QueryDecompositionService;
 import com.jreinhal.mercenary.service.RagOrchestrationService;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import com.jreinhal.mercenary.service.SourceDocumentService;
 import com.jreinhal.mercenary.security.ContentSanitizer;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
@@ -115,6 +117,8 @@ public class MercenaryController {
     private final SessionPersistenceProvider sessionPersistenceService;
     private final RagOrchestrationService ragOrchestrationService;
     private final Cache<String, String> secureDocCache;
+    private final SourceDocumentService sourceDocumentService;
+    private final PageRenderService pageRenderService;
     private final LicenseService licenseService;
     private final AtomicInteger docCount = new AtomicInteger(0);
     private final OllamaOptions llmOptions;
@@ -136,7 +140,7 @@ public class MercenaryController {
     @Value("${sentinel.rag.max-visual-docs:8}")
     private int maxVisualDocs;
 
-    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryProvider conversationMemoryService, SessionPersistenceProvider sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache, LicenseService licenseService,
+    public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryProvider conversationMemoryService, SessionPersistenceProvider sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache, SourceDocumentService sourceDocumentService, PageRenderService pageRenderService, LicenseService licenseService,
                                @Value("${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
                                @Value("${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
                                @Value("${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
@@ -167,6 +171,8 @@ public class MercenaryController {
         this.sessionPersistenceService = sessionPersistenceService;
         this.ragOrchestrationService = ragOrchestrationService;
         this.secureDocCache = secureDocCache;
+        this.sourceDocumentService = sourceDocumentService;
+        this.pageRenderService = pageRenderService;
         this.licenseService = licenseService;
         this.llmOptions = OllamaOptions.create()
                 .withModel(llmModel)
@@ -352,6 +358,83 @@ public class MercenaryController {
             }
         }
         return new InspectResponse(content, highlights, redacted, redactionCount);
+    }
+
+    @GetMapping(value = "/source/page", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<?> renderSourcePage(
+            @RequestParam("fileName") String fileName,
+            @RequestParam("dept") String deptParam,
+            @RequestParam(value = "page", defaultValue = "1") int pageNumber) {
+        SourceAccess access = this.resolveSourceAccess(fileName, deptParam, "/api/source/page");
+        if (access.errorResponse() != null) {
+            return access.errorResponse();
+        }
+        if (pageNumber < 1) {
+            return textError(HttpStatus.BAD_REQUEST, "ERROR: page must be >= 1.");
+        }
+        byte[] sourceBytes = this.sourceDocumentService
+                .getPdfSource(access.workspaceId(), access.department().name(), access.filename())
+                .orElse(null);
+        if (sourceBytes == null || sourceBytes.length == 0) {
+            return textError(HttpStatus.NOT_FOUND, "SOURCE BYTES UNAVAILABLE BY POLICY OR RETENTION SETTINGS.");
+        }
+        try {
+            PageRenderService.RenderedImage rendered = this.pageRenderService.renderPagePng(sourceBytes, pageNumber);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.IMAGE_PNG)
+                    .header("X-Page-Number", Integer.toString(rendered.pageNumber()))
+                    .header("X-Page-Count", Integer.toString(rendered.pageCount()))
+                    .body(rendered.imageBytes());
+        } catch (IllegalArgumentException e) {
+            return textError(HttpStatus.BAD_REQUEST, "ERROR: " + e.getMessage());
+        } catch (Exception e) {
+            if (log.isErrorEnabled()) {
+                log.error("Failed to render page for {}", LogSanitizer.sanitize(fileName), e);
+            }
+            return textError(HttpStatus.INTERNAL_SERVER_ERROR, "ERROR: Unable to render source page.");
+        }
+    }
+
+    @GetMapping(value = "/source/region", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<?> renderSourceRegion(
+            @RequestParam("fileName") String fileName,
+            @RequestParam("dept") String deptParam,
+            @RequestParam(value = "page", defaultValue = "1") int pageNumber,
+            @RequestParam("x") int x,
+            @RequestParam("y") int y,
+            @RequestParam("width") int width,
+            @RequestParam("height") int height,
+            @RequestParam(value = "expandAbove", defaultValue = "150") int expandAbove,
+            @RequestParam(value = "expandBelow", defaultValue = "150") int expandBelow) {
+        SourceAccess access = this.resolveSourceAccess(fileName, deptParam, "/api/source/region");
+        if (access.errorResponse() != null) {
+            return access.errorResponse();
+        }
+        if (pageNumber < 1) {
+            return textError(HttpStatus.BAD_REQUEST, "ERROR: page must be >= 1.");
+        }
+        byte[] sourceBytes = this.sourceDocumentService
+                .getPdfSource(access.workspaceId(), access.department().name(), access.filename())
+                .orElse(null);
+        if (sourceBytes == null || sourceBytes.length == 0) {
+            return textError(HttpStatus.NOT_FOUND, "SOURCE BYTES UNAVAILABLE BY POLICY OR RETENTION SETTINGS.");
+        }
+        try {
+            PageRenderService.RenderedImage rendered = this.pageRenderService.renderRegionPng(
+                    sourceBytes, pageNumber, x, y, width, height, expandAbove, expandBelow);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.IMAGE_PNG)
+                    .header("X-Page-Number", Integer.toString(rendered.pageNumber()))
+                    .header("X-Page-Count", Integer.toString(rendered.pageCount()))
+                    .body(rendered.imageBytes());
+        } catch (IllegalArgumentException e) {
+            return textError(HttpStatus.BAD_REQUEST, "ERROR: " + e.getMessage());
+        } catch (Exception e) {
+            if (log.isErrorEnabled()) {
+                log.error("Failed to render region for {}", LogSanitizer.sanitize(fileName), e);
+            }
+            return textError(HttpStatus.INTERNAL_SERVER_ERROR, "ERROR: Unable to render source region.");
+        }
     }
 
     @GetMapping(value={"/health"})
@@ -1280,6 +1363,67 @@ public class MercenaryController {
         return false;
     }
 
+    private SourceAccess resolveSourceAccess(String fileName, String deptParam, String endpoint) {
+        User user = SecurityContext.getCurrentUser();
+        if (user == null) {
+            this.auditService.logAccessDenied(null, endpoint, "Unauthenticated access attempt", null);
+            return new SourceAccess(null, null, null, null,
+                    textError(HttpStatus.UNAUTHORIZED, "ACCESS DENIED: Authentication required."));
+        }
+        if (!user.hasPermission(UserRole.Permission.QUERY)) {
+            this.auditService.logAccessDenied(user, endpoint, "Missing QUERY permission", null);
+            return new SourceAccess(null, null, null, null,
+                    textError(HttpStatus.FORBIDDEN, "ACCESS DENIED: Insufficient permissions."));
+        }
+        Department department;
+        try {
+            department = Department.fromString(deptParam.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return new SourceAccess(null, null, null, null,
+                    textError(HttpStatus.BAD_REQUEST, "ERROR: Invalid sector."));
+        }
+        if (this.sectorConfig.requiresElevatedClearance(department)
+                && !user.canAccessClassification(department.getRequiredClearance())) {
+            this.auditService.logAccessDenied(user, endpoint, "Insufficient clearance for " + department.name(), null);
+            return new SourceAccess(null, null, null, null,
+                    textError(HttpStatus.FORBIDDEN, "ACCESS DENIED: Insufficient clearance for " + department.name() + "."));
+        }
+        if (!user.canAccessSector(department)) {
+            this.auditService.logAccessDenied(user, endpoint, "Unauthorized sector access: " + department.name(), null);
+            return new SourceAccess(null, null, null, null,
+                    textError(HttpStatus.FORBIDDEN, "ACCESS DENIED: Unauthorized sector access."));
+        }
+        String normalizedFilename = this.normalizeSourceFileName(fileName);
+        if (normalizedFilename == null) {
+            return new SourceAccess(null, null, null, null,
+                    textError(HttpStatus.BAD_REQUEST, "ERROR: Invalid filename."));
+        }
+        String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        return new SourceAccess(user, department, workspaceId, normalizedFilename, null);
+    }
+
+    private String normalizeSourceFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return null;
+        }
+        String normalized = fileName
+                .replaceFirst("(?i)^filename:\\s*", "")
+                .replaceFirst("(?i)^source:\\s*", "")
+                .replaceFirst("(?i)^citation:\\s*", "")
+                .trim();
+        if (normalized.contains("..") || normalized.contains("/") || normalized.contains("\\")
+                || normalized.contains("\u0000") || !normalized.matches("^[a-zA-Z0-9._\\-\\s]+$")) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private static ResponseEntity<String> textError(HttpStatus status, String message) {
+        return ResponseEntity.status(status)
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(message);
+    }
+
     private boolean apiKeyMatch(String targetName, Map<String, Object> meta) {
         return DocumentMetadataUtils.apiKeyMatch(targetName, meta);
     }
@@ -1305,6 +1449,10 @@ public class MercenaryController {
     }
 
     public record InspectResponse(String content, List<String> highlights, boolean redacted, int redactionCount) {
+    }
+
+    private record SourceAccess(User user, Department department, String workspaceId, String filename,
+                                ResponseEntity<?> errorResponse) {
     }
 
 }
