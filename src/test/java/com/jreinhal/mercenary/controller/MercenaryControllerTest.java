@@ -21,10 +21,12 @@ import com.jreinhal.mercenary.rag.ragpart.RagPartService;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.service.AuditService;
 import com.jreinhal.mercenary.service.PiiRedactionService;
+import com.jreinhal.mercenary.service.PageRenderService;
 import com.jreinhal.mercenary.service.PromptGuardrailService;
 import com.jreinhal.mercenary.service.QueryDecompositionService;
 import com.jreinhal.mercenary.service.RagOrchestrationService;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import com.jreinhal.mercenary.service.SourceDocumentService;
 import com.jreinhal.mercenary.service.AuthenticationService;
 import com.jreinhal.mercenary.core.license.LicenseService;
 import com.jreinhal.mercenary.security.ClientIpResolver;
@@ -55,16 +57,19 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Answers;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 @WebMvcTest(MercenaryController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -123,6 +128,10 @@ class MercenaryControllerTest {
     @MockitoBean
     private Cache<String, String> secureDocCache;
     @MockitoBean
+    private SourceDocumentService sourceDocumentService;
+    @MockitoBean
+    private PageRenderService pageRenderService;
+    @MockitoBean
     private LicenseService licenseService;
     @MockitoBean
     private ClientIpResolver clientIpResolver;
@@ -179,6 +188,80 @@ class MercenaryControllerTest {
                 .andExpect(jsonPath("$.content").value(org.hamcrest.Matchers.containsString("[REDACTED-SSN]")))
                 .andExpect(jsonPath("$.redacted").value(true))
                 .andExpect(jsonPath("$.redactionCount").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page returns rendered PNG when source is retained")
+    void sourcePageRendersPng() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+        when(sourceDocumentService.getPdfSource(eq("workspace_default"), eq("ENTERPRISE"), eq("demo.pdf")))
+                .thenReturn(java.util.Optional.of(new byte[]{0x25, 0x50, 0x44, 0x46}));
+        when(pageRenderService.renderPagePng(any(byte[].class), eq(1)))
+                .thenReturn(new PageRenderService.RenderedImage(new byte[]{1, 2, 3}, 1, 4, 100, 200));
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Page-Number", "1"))
+                .andExpect(header().string("X-Page-Count", "4"))
+                .andExpect(content().contentType("image/png"))
+                .andExpect(content().bytes(new byte[]{1, 2, 3}));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page returns 404 when source bytes are unavailable")
+    void sourcePageReturnsNotFoundWhenSourceMissing() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+        when(sourceDocumentService.getPdfSource(eq("workspace_default"), eq("ENTERPRISE"), eq("missing.pdf")))
+                .thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "missing.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("SOURCE BYTES UNAVAILABLE")));
+
+        verify(pageRenderService, never()).renderPagePng(any(byte[].class), anyInt());
+    }
+
+    @Test
+    @DisplayName("GET /api/source/region returns rendered PNG")
+    void sourceRegionRendersPng() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+        when(sourceDocumentService.getPdfSource(eq("workspace_default"), eq("ENTERPRISE"), eq("demo.pdf")))
+                .thenReturn(java.util.Optional.of(new byte[]{0x25, 0x50, 0x44, 0x46}));
+        when(pageRenderService.renderRegionPng(any(byte[].class), eq(1), eq(10), eq(20), eq(30), eq(40), eq(5), eq(6)))
+                .thenReturn(new PageRenderService.RenderedImage(new byte[]{9, 8, 7}, 1, 2, 30, 51));
+
+        mockMvc.perform(get("/api/source/region")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1")
+                        .param("x", "10")
+                        .param("y", "20")
+                        .param("width", "30")
+                        .param("height", "40")
+                        .param("expandAbove", "5")
+                        .param("expandBelow", "6"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/png"))
+                .andExpect(content().bytes(new byte[]{9, 8, 7}));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page requires authentication")
+    void sourcePageRequiresAuthentication() throws Exception {
+        SecurityContext.clear();
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Authentication required")));
     }
 
     @Test

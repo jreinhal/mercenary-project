@@ -67,6 +67,7 @@ public class SecureIngestionService {
     private final HyperGraphMemory hyperGraphMemory;
     private final LightOnOcrService lightOnOcrService;
     private final TableExtractor tableExtractor;
+    private final SourceDocumentService sourceDocumentService;
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final Tika tika;
@@ -106,7 +107,7 @@ public class SecureIngestionService {
     private static final EncodingRegistry TOKEN_ENCODING_REGISTRY = Encodings.newLazyEncodingRegistry();
     private static final Encoding TOKEN_ENCODING = TOKEN_ENCODING_REGISTRY.getEncoding(EncodingType.CL100K_BASE);
 
-    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, TableExtractor tableExtractor, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
+    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, TableExtractor tableExtractor, SourceDocumentService sourceDocumentService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
         this.vectorStore = vectorStore;
         this.piiRedactionService = piiRedactionService;
         this.partitionAssigner = partitionAssigner;
@@ -115,6 +116,7 @@ public class SecureIngestionService {
         this.hyperGraphMemory = hyperGraphMemory;
         this.lightOnOcrService = lightOnOcrService;
         this.tableExtractor = tableExtractor;
+        this.sourceDocumentService = sourceDocumentService;
         this.hipaaPolicy = hipaaPolicy;
         this.workspaceQuotaService = workspaceQuotaService;
         this.tika = new Tika();
@@ -147,6 +149,7 @@ public class SecureIngestionService {
             }
             InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(fileBytes));
             if (PDF_MIME_TYPE.equals(detectedMimeType)) {
+                this.sourceDocumentService.storePdfSource(workspaceId, dept, filename, fileBytes);
                 log.info(">> DETECTED PDF: Engaging Optical Character Recognition / PDF Stream...");
                 PagePdfDocumentReader pdfReader = new PagePdfDocumentReader((Resource)resource);
                 rawDocuments = pdfReader.get();
