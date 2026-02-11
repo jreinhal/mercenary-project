@@ -22,7 +22,7 @@ class QueryExpanderTest {
         ChatClient chatClient = mock(ChatClient.class);
         when(builder.build()).thenReturn(chatClient);
 
-        queryExpander = new QueryExpander(builder);
+        queryExpander = new QueryExpander(builder, null);
         ReflectionTestUtils.setField(queryExpander, "cacheSize", 10);
         ReflectionTestUtils.setField(queryExpander, "cacheTtlSeconds", 300L);
         ReflectionTestUtils.setField(queryExpander, "llmExpansionEnabled", false);

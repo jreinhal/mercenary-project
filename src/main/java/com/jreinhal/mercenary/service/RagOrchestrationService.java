@@ -28,6 +28,7 @@ import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.constant.StopWords;
 import com.jreinhal.mercenary.util.RagEvidenceFormatter;
+import com.jreinhal.mercenary.util.TemporalQueryConstraints;
 import com.jreinhal.mercenary.util.DocumentMetadataUtils;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -137,6 +138,8 @@ public class RagOrchestrationService {
     private int maxOverviewChars;
     @Value("${sentinel.rag.max-docs:16}")
     private int maxDocs;
+    @Value(value="${sentinel.rag.temporal-filtering.enabled:true}")
+    private boolean temporalFilteringEnabled;
 
     public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, @org.springframework.lang.Nullable ConversationMemoryProvider conversationMemoryService, @org.springframework.lang.Nullable SessionPersistenceProvider sessionPersistenceService, LicenseService licenseService, PiiRedactionService piiRedactionService, HipaaPolicy hipaaPolicy, @org.springframework.lang.Nullable HipaaAuditProvider hipaaAuditService, Cache<String, String> secureDocCache, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService,
                                   @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
@@ -2297,10 +2300,14 @@ public class RagOrchestrationService {
         List<Document> semanticResults = new ArrayList<>();
         List<Document> keywordResults = new ArrayList<>();
         try {
-            semanticResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(threshold).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
+            String filterExpression = FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId);
+            if (this.temporalFilteringEnabled) {
+                filterExpression = FilterExpressionBuilder.and(filterExpression, TemporalQueryConstraints.buildDocumentYearFilter(query));
+            }
+            semanticResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(threshold).withFilterExpression(filterExpression));
             log.info("Semantic search found {} results for query {}", semanticResults.size(), LogSanitizer.querySummary(query));
             String lowerQuery = query.toLowerCase();
-            keywordResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.01).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(dept, workspaceId)));
+            keywordResults = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.01).withFilterExpression(filterExpression));
             log.info("Keyword fallback found {} documents for query {}", keywordResults.size(), LogSanitizer.querySummary(query));
             Set<String> stopWords = Set.of("the", "and", "for", "was", "are", "is", "of", "to", "in", "what", "where", "when", "who", "how", "why", "tell", "me", "about", "describe", "find", "show", "give", "also");
             String[] queryTerms = lowerQuery.split("\\s+");

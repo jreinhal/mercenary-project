@@ -8,6 +8,7 @@ import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
 import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
+import com.jreinhal.mercenary.util.DocumentTemporalMetadataExtractor;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -185,6 +186,8 @@ public class SecureIngestionService {
                 log.info(">> DETECTED DOCUMENT: Engaging Tika text extraction...");
                 rawDocuments = this.extractTextDocuments(fileBytes, filename);
             }
+            DocumentTemporalMetadataExtractor.TemporalMetadata temporal =
+                    DocumentTemporalMetadataExtractor.extract(fileBytes, detectedMimeType, rawDocuments, filename);
             List<Document> cleanDocs = new ArrayList<>();
             for (Document doc : rawDocuments) {
                 Map<String, Object> mergedMeta = new HashMap<>();
@@ -196,6 +199,17 @@ public class SecureIngestionService {
                 mergedMeta.put("workspaceId", workspaceId);
                 mergedMeta.put("mimeType", detectedMimeType);
                 mergedMeta.put("fileSizeBytes", fileBytes.length);
+                if (temporal != null && !temporal.isEmpty()) {
+                    if (temporal.documentYear() != null) {
+                        mergedMeta.put("documentYear", temporal.documentYear());
+                    }
+                    if (temporal.documentDateEpoch() != null) {
+                        mergedMeta.put("documentDateEpoch", temporal.documentDateEpoch());
+                    }
+                    if (temporal.documentDateSource() != null) {
+                        mergedMeta.put("documentDateSource", temporal.documentDateSource());
+                    }
+                }
                 cleanDocs.add(new Document(doc.getContent(), mergedMeta));
             }
             List<Document> atomicDocs = new ArrayList<>();

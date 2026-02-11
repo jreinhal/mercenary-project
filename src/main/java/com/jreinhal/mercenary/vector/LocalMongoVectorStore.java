@@ -9,8 +9,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -27,7 +25,9 @@ public class LocalMongoVectorStore
 implements VectorStore {
     private static final Logger log = LoggerFactory.getLogger(LocalMongoVectorStore.class);
     private static final String COLLECTION_NAME = "vector_store";
-    private static final Set<String> PREFILTER_KEYS = Set.of("dept", "workspaceId", "type", "partition_id", "source", "filename", "mimeType");
+    private static final Set<String> PREFILTER_KEYS = Set.of(
+            "dept", "workspaceId", "type", "partition_id", "source", "filename", "mimeType",
+            "documentYear", "documentDateEpoch");
     private final MongoTemplate mongoTemplate;
     private final EmbeddingModel embeddingModel;
 
@@ -110,7 +110,7 @@ implements VectorStore {
     }
 
     private FilterEvaluator buildFilterEvaluator(Object filterExpression) {
-        ParsedFilter parsed = this.parseFilterExpression(filterExpression);
+        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse(filterExpression);
         if (parsed == null) {
             return metadata -> true;
         }
@@ -121,193 +121,9 @@ implements VectorStore {
         if (parsed.orGroups().isEmpty()) {
             return metadata -> true;
         }
-        return metadata -> {
-            for (List<Condition> group : parsed.orGroups()) {
-                boolean match = true;
-                for (Condition condition : group) {
-                    if (!this.matchesCondition(metadata, condition.key(), condition.op(), condition.values())) {
-                        match = false;
-                        break;
-                    }
-                }
-                if (match) {
-                    return true;
-                }
-            }
-            return false;
-        };
+        return metadata -> FilterExpressionEvaluator.matches(metadata, parsed);
     }
 
-    private ParsedFilter parseFilterExpression(Object filterExpression) {
-        if (filterExpression == null) {
-            return null;
-        }
-        String filter = String.valueOf(filterExpression).trim();
-        if (filter.isBlank()) {
-            return null;
-        }
-        // Backward compatibility for Spring AI expression string formatting
-        // Format: Expression[type=EQ, left=Key[key=dept], right=Value[value=ENTERPRISE]]
-        if (filter.contains("Key[key=") && filter.contains("Value[value=")) {
-            try {
-                ParsedFilter parsed = this.parseSpringAiExpression(filter);
-                if (parsed != null) {
-                    return parsed;
-                }
-                log.warn("Failed to parse Spring AI Expression filter (redacted): unsupported expression shape");
-                return new ParsedFilter(List.of(), true);
-            }
-            catch (Exception e) {
-                // Do not log the raw filter expression; it may contain sensitive key/value pairs.
-                log.warn("Failed to parse Spring AI Expression filter (redacted): {}", e.getMessage());
-                log.debug("Spring AI Expression parse failure details", e);
-                return new ParsedFilter(List.of(), true);
-            }
-        }
-        String[] orParts = filter.split("\\s*\\|\\|\\s*");
-        java.util.ArrayList<List<Condition>> groups = new java.util.ArrayList<>();
-        for (String orPart : orParts) {
-            String[] andParts = orPart.split("\\s*&&\\s*");
-            java.util.ArrayList<Condition> conditions = new java.util.ArrayList<>();
-            for (String cond : andParts) {
-                Condition parsed = this.parseCondition(cond.trim());
-                if (parsed != null) {
-                    conditions.add(parsed);
-                }
-            }
-            if (!conditions.isEmpty()) {
-                groups.add(conditions);
-            }
-        }
-        if (groups.isEmpty()) {
-            // Fail closed: a non-blank filter expression with no parseable conditions should not match anything.
-            log.warn("Failed to parse filter expression (redacted): no parseable conditions");
-            return new ParsedFilter(List.of(), true);
-        }
-        return new ParsedFilter(groups, false);
-    }
-
-    private Condition parseCondition(String condition) {
-        if (condition.isBlank()) {
-            return null;
-        }
-        String normalized = condition.replaceAll("\\s+", " ").trim();
-        String op = null;
-        if (normalized.contains(" in ")) {
-            op = "in";
-        } else if (normalized.contains("!=")) {
-            op = "!=";
-        } else if (normalized.contains("==")) {
-            op = "==";
-        }
-        if (op == null) {
-            return null;
-        }
-        String[] parts;
-        if (op.equals("in")) {
-            parts = normalized.split("\\s+in\\s+");
-        } else {
-            parts = normalized.split(op.equals("==") ? "==" : "!=");
-        }
-        if (parts.length < 2) {
-            return null;
-        }
-        String key = parts[0].trim();
-        String rawValue = parts[1].trim();
-        if (op.equals("in")) {
-            List<String> values = this.parseList(rawValue);
-            return new Condition(key, op, values);
-        }
-        return new Condition(key, op, List.of(this.stripQuotes(rawValue)));
-    }
-
-    private boolean matchesCondition(Map<String, Object> metadata, String key, String op, List<String> values) {
-        Object metaValue = metadata != null ? metadata.get(key) : null;
-        if (op.equals("in")) {
-            if (metaValue == null) {
-                return false;
-            }
-            return values.stream().anyMatch(v -> this.valuesEqual(metaValue, v));
-        }
-        if (values.isEmpty()) {
-            return true;
-        }
-        String cleaned = values.get(0);
-        if (op.equals("==")) {
-            if (metaValue == null) {
-                return false;
-            }
-            return this.valuesEqual(metaValue, cleaned);
-        }
-        if (op.equals("!=")) {
-            if (metaValue == null) {
-                return true;
-            }
-            return !this.valuesEqual(metaValue, cleaned);
-        }
-        return true;
-    }
-
-    private boolean valuesEqual(Object metaValue, String candidate) {
-        if (metaValue instanceof Number) {
-            Double metaNumber = ((Number) metaValue).doubleValue();
-            Double candidateNumber = this.tryParseDouble(candidate);
-            if (candidateNumber != null) {
-                return Double.compare(metaNumber, candidateNumber) == 0;
-            }
-        }
-        String metaString = String.valueOf(metaValue);
-        return metaString.equalsIgnoreCase(candidate);
-    }
-
-    private List<String> parseList(String rawValue) {
-        String trimmed = rawValue.trim();
-        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-            trimmed = trimmed.substring(1, trimmed.length() - 1);
-        }
-        if (trimmed.isBlank()) {
-            return List.of();
-        }
-        String[] parts = trimmed.split(",");
-        List<String> values = new java.util.ArrayList<>();
-        for (String part : parts) {
-            String cleaned = this.stripQuotes(part.trim());
-            if (!cleaned.isEmpty()) {
-                values.add(cleaned);
-            }
-        }
-        return values;
-    }
-
-    private String stripQuotes(String value) {
-        String trimmed = value.trim();
-        if ((trimmed.startsWith("'") && trimmed.endsWith("'")) || (trimmed.startsWith("\"") && trimmed.endsWith("\""))) {
-            return trimmed.substring(1, trimmed.length() - 1);
-        }
-        return trimmed;
-    }
-
-    private Double tryParseDouble(String value) {
-        try {
-            return Double.parseDouble(value);
-        }
-        catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private String extractBetween(String text, String startToken, String endToken) {
-        int start = text.indexOf(startToken);
-        if (start < 0) {
-            return "";
-        }
-        start += startToken.length();
-        int end = text.indexOf(endToken, start);
-        if (end < 0) {
-            end = text.length();
-        }
-        return text.substring(start, end).trim();
-    }
 
     private double calculateCosineSimilarity(float[] v1, double normA, List<Double> v2, Double normB) {
         if (v1 == null || v2 == null || v1.length == 0 || v2.isEmpty() || v1.length != v2.size()) {
@@ -349,43 +165,61 @@ implements VectorStore {
     }
 
     private Query buildPrefilterQuery(Object filterExpression) {
-        ParsedFilter parsed = this.parseFilterExpression(filterExpression);
+        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse(filterExpression);
         if (parsed == null) {
             return null;
         }
         if (parsed.invalid()) {
             // Fail closed: if a filter was supplied but couldn't be parsed, return a query that matches nothing.
-            return new Query((CriteriaDefinition)Criteria.where((String)"_id").is("__filter_parse_failure__"));
+            return new Query((CriteriaDefinition) Criteria.where((String) "_id").is("__filter_parse_failure__"));
         }
         if (parsed.orGroups().isEmpty()) {
             return null;
         }
-        List<List<Condition>> groups = parsed.orGroups();
+
+        List<List<FilterExpressionParser.Condition>> groups = parsed.orGroups();
         if (groups.isEmpty()) {
             return null;
         }
+
         ArrayList<Criteria> orCriteria = new ArrayList<>();
-        for (List<Condition> group : groups) {
+        for (List<FilterExpressionParser.Condition> group : groups) {
             if (group.isEmpty()) {
                 return null;
             }
             ArrayList<Criteria> andCriteria = new ArrayList<>();
-            for (Condition condition : group) {
+            for (FilterExpressionParser.Condition condition : group) {
                 String key = condition.key();
                 if (!PREFILTER_KEYS.contains(key)) {
                     return null;
                 }
                 String field = "metadata." + key;
-                if (condition.op().equals("==") && !condition.values().isEmpty()) {
+                String op = condition.op();
+                if ("==".equals(op) && !condition.values().isEmpty()) {
                     andCriteria.add(Criteria.where(field).in(this.normalizeValuesForQuery(condition.values().get(0))));
-                } else if (condition.op().equals("!=") && !condition.values().isEmpty()) {
+                } else if ("!=".equals(op) && !condition.values().isEmpty()) {
                     andCriteria.add(Criteria.where(field).nin(this.normalizeValuesForQuery(condition.values().get(0))));
-                } else if (condition.op().equals("in") && !condition.values().isEmpty()) {
+                } else if ("in".equals(op) && !condition.values().isEmpty()) {
                     Set<Object> normalized = new HashSet<>();
                     for (String value : condition.values()) {
                         normalized.addAll(this.normalizeValuesForQuery(value));
                     }
                     andCriteria.add(Criteria.where(field).in(normalized));
+                } else if ((">=".equals(op) || "<=".equals(op) || ">".equals(op) || "<".equals(op)) && !condition.values().isEmpty()) {
+                    Double numeric = this.tryParseDouble(condition.values().get(0));
+                    if (numeric == null) {
+                        return null;
+                    }
+                    Object normalizedNumber = this.normalizeNumberForQuery(numeric);
+                    if (">=".equals(op)) {
+                        andCriteria.add(Criteria.where(field).gte(normalizedNumber));
+                    } else if ("<=".equals(op)) {
+                        andCriteria.add(Criteria.where(field).lte(normalizedNumber));
+                    } else if (">".equals(op)) {
+                        andCriteria.add(Criteria.where(field).gt(normalizedNumber));
+                    } else if ("<".equals(op)) {
+                        andCriteria.add(Criteria.where(field).lt(normalizedNumber));
+                    }
                 }
             }
             if (andCriteria.isEmpty()) {
@@ -417,6 +251,27 @@ implements VectorStore {
         }
         variants.add(value);
         return variants;
+    }
+
+    private Object normalizeNumberForQuery(Double numeric) {
+        if (numeric == null) {
+            return null;
+        }
+        if (numeric.doubleValue() == Math.floor(numeric.doubleValue())) {
+            return numeric.longValue();
+        }
+        return numeric;
+    }
+
+    private Double tryParseDouble(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public static class MongoDocument {
@@ -472,49 +327,6 @@ implements VectorStore {
         public Document getDocument() {
             return this.document;
         }
-    }
-
-    private record Condition(String key, String op, List<String> values) {
-    }
-
-    private ParsedFilter parseSpringAiExpression(String filter) {
-        // Example legacy format (Spring AI Expression#toString):
-        // Expression[type=AND, left=Expression[type=EQ, left=Key[key=dept], right=Value[value=ENTERPRISE]], right=Expression[type=EQ, left=Key[key=workspaceId], right=Value[value=abc]]]
-        //
-        // We intentionally parse only explicit key/value comparisons, then treat them as a single AND-group.
-        // If we can't extract any comparisons, the caller will fail closed.
-        Pattern pattern = Pattern.compile("Expression\\[type=(EQ|NE|IN),\\s*left=Key\\[key=([^\\]]+)\\],\\s*right=Value\\[value=([^\\]]+)\\]\\]");
-        Matcher matcher = pattern.matcher(filter);
-        ArrayList<Condition> conditions = new ArrayList<>();
-        while (matcher.find()) {
-            String type = matcher.group(1);
-            String key = matcher.group(2);
-            String value = matcher.group(3);
-            if (type == null || key == null || value == null) {
-                continue;
-            }
-            String op = switch (type) {
-                case "EQ" -> "==";
-                case "NE" -> "!=";
-                case "IN" -> "in";
-                default -> null;
-            };
-            if (op == null) {
-                continue;
-            }
-            List<String> values = op.equals("in") ? this.parseList(value) : List.of(this.stripQuotes(value));
-            conditions.add(new Condition(key, op, values));
-        }
-        if (conditions.isEmpty()) {
-            return null;
-        }
-        // Keys/values may be sensitive in regulated deployments; avoid logging raw values.
-        Set<String> keys = conditions.stream().map(Condition::key).collect(Collectors.toSet());
-        log.debug("Parsed Spring AI Expression filter (keys={})", keys);
-        return new ParsedFilter(List.of(conditions), false);
-    }
-
-    private record ParsedFilter(List<List<Condition>> orGroups, boolean invalid) {
     }
 
     @FunctionalInterface
