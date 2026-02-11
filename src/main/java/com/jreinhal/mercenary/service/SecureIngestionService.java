@@ -147,6 +147,7 @@ public class SecureIngestionService {
                     .mapToInt(doc -> doc.getContent() != null ? doc.getContent().length() : 0)
                     .sum();
                 boolean scannedPdf = totalTextLength < MIN_TEXT_LENGTH_FOR_VALID_PDF;
+                boolean hasAnyText = totalTextLength > 0;
 
                 if (!hipaaStrict && scannedPdf && this.ocrFallbackForScannedPdf
                         && this.lightOnOcrService != null && this.lightOnOcrService.isEnabled()) {
@@ -158,10 +159,12 @@ public class SecureIngestionService {
                     }
                 }
 
-                if (!scannedPdf && this.tableExtractor != null && this.tableExtractor.isEnabled()) {
+                // Decouple table extraction from the OCR/scanned-PDF heuristic: short-but-text-layer PDFs can contain
+                // valuable tables and should still attempt extraction.
+                if (hasAnyText && this.tableExtractor != null && this.tableExtractor.isEnabled()) {
                     List<Document> tableDocs = this.tableExtractor.extractTables(fileBytes, filename);
                     if (tableDocs != null && !tableDocs.isEmpty()) {
-                        ArrayList<Document> combined = new ArrayList<>(rawDocuments);
+                        List<Document> combined = new ArrayList<>(rawDocuments);
                         combined.addAll(tableDocs);
                         rawDocuments = combined;
                     }
@@ -187,10 +190,10 @@ public class SecureIngestionService {
                 mergedMeta.put("fileSizeBytes", fileBytes.length);
                 cleanDocs.add(new Document(doc.getContent(), mergedMeta));
             }
-            ArrayList<Document> atomicDocs = new ArrayList<>();
-            ArrayList<Document> splitCandidates = new ArrayList<>();
+            List<Document> atomicDocs = new ArrayList<>();
+            List<Document> splitCandidates = new ArrayList<>();
             for (Document doc : cleanDocs) {
-                if (SecureIngestionService.isTableDoc(doc)) {
+                if (isTableDoc(doc)) {
                     atomicDocs.add(doc);
                 } else {
                     splitCandidates.add(doc);
@@ -200,7 +203,7 @@ public class SecureIngestionService {
             TokenTextSplitter splitter = new TokenTextSplitter(this.chunkSizeTokens, this.minChunkSizeChars, this.minChunkLengthToEmbed, this.maxNumChunks, this.keepSeparator);
             List<Document> splitDocuments = splitter.apply(splitCandidates);
             if (!atomicDocs.isEmpty()) {
-                ArrayList<Document> combined = new ArrayList<>(splitDocuments.size() + atomicDocs.size());
+                List<Document> combined = new ArrayList<>(splitDocuments.size() + atomicDocs.size());
                 combined.addAll(splitDocuments);
                 combined.addAll(atomicDocs);
                 splitDocuments = combined;
@@ -487,7 +490,10 @@ public class SecureIngestionService {
     }
 
     private void ingestEmbeddedImages(byte[] fileBytes, String filename, String department, List<Document> rawDocuments) {
-        String contextText = rawDocuments.stream().map(Document::getContent).collect(java.util.stream.Collectors.joining("\n\n"));
+        String contextText = rawDocuments.stream()
+                .filter(doc -> !isTableDoc(doc))
+                .map(Document::getContent)
+                .collect(java.util.stream.Collectors.joining("\n\n"));
         List<byte[]> images = this.extractEmbeddedImages(fileBytes);
         if (images.isEmpty()) {
             return;

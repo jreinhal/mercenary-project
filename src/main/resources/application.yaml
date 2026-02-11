@@ -179,6 +179,7 @@ sentinel:
     tables:
       enabled: ${INGEST_TABLES_ENABLED:true}
       max-tables-per-document: ${INGEST_MAX_TABLES_PER_DOCUMENT:50}
+      max-table-chars: ${INGEST_MAX_TABLE_CHARS:20000}
 
   # License validation
   # When no key and no signing secret are set, runs in unlicensed mode (backward compatible).

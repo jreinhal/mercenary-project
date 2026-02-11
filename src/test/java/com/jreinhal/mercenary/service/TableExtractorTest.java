@@ -119,12 +119,34 @@ class TableExtractorTest {
         TableExtractor extractor = new TableExtractor();
         ReflectionTestUtils.setField(extractor, "enabled", true);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 0);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 20000);
 
         byte[] pdfBytes = buildSimpleTablePdf();
         List<Document> tables = extractor.extractTables(pdfBytes, "simple.pdf");
 
         assertNotNull(tables);
         assertTrue(tables.isEmpty());
+    }
+
+    @Test
+    void extractTablesTruncatesOversizedTables() throws Exception {
+        TableExtractor extractor = new TableExtractor();
+        ReflectionTestUtils.setField(extractor, "enabled", true);
+        ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 40);
+
+        byte[] pdfBytes = buildSimpleTablePdf();
+        List<Document> tables = extractor.extractTables(pdfBytes, "simple.pdf");
+
+        assertNotNull(tables);
+        assertFalse(tables.isEmpty());
+
+        Document first = tables.get(0);
+        assertNotNull(first.getMetadata());
+        assertTrue(Boolean.TRUE.equals(first.getMetadata().get("table_truncated")));
+        assertNotNull(first.getMetadata().get("table_original_char_count"));
+        assertTrue(first.getContent().length() <= 40);
+        assertTrue(first.getContent().contains("[TRUNCATED]"));
     }
 
     private static byte[] buildSimpleTablePdf() throws Exception {

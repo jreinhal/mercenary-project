@@ -29,6 +29,9 @@ public class TableExtractor {
     @Value("${sentinel.ingest.tables.max-tables-per-document:50}")
     private int maxTablesPerDocument;
 
+    @Value("${sentinel.ingest.tables.max-table-chars:20000}")
+    private int maxTableChars;
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -49,7 +52,7 @@ public class TableExtractor {
             filename = "Unknown_Document.pdf";
         }
 
-        ArrayList<Document> out = new ArrayList<>();
+        List<Document> out = new ArrayList<>();
         int produced = 0;
 
         try (PDDocument pd = Loader.loadPDF(pdfBytes);
@@ -101,6 +104,13 @@ public class TableExtractor {
                     meta.put("table_height", table.getHeight());
 
                     String content = "TABLE (extracted)\n\n" + markdown;
+                    if (this.maxTableChars > 0 && content.length() > this.maxTableChars) {
+                        String suffix = "\n\n[TRUNCATED]";
+                        int headLen = Math.max(0, this.maxTableChars - suffix.length());
+                        meta.put("table_truncated", true);
+                        meta.put("table_original_char_count", content.length());
+                        content = content.substring(0, Math.min(content.length(), headLen)) + suffix;
+                    }
                     out.add(new Document(content, meta));
                     produced++;
                     tableIndexOnPage++;
@@ -110,7 +120,7 @@ public class TableExtractor {
             }
         } catch (Exception e) {
             // Avoid logging user-controlled strings (e.g., filename) to prevent log forging.
-            log.warn("TableExtractor: failed to extract tables");
+            log.warn("TableExtractor: failed to extract tables ({})", e.getClass().getSimpleName());
             log.debug("TableExtractor: extractTables exception", e);
             return List.of();
         }
@@ -155,7 +165,7 @@ public class TableExtractor {
     }
 
     private static List<String> rowToCells(List<RectangularTextContainer> row, int maxCols) {
-        ArrayList<String> cells = new ArrayList<>(maxCols);
+        List<String> cells = new ArrayList<>(maxCols);
         for (int i = 0; i < maxCols; i++) {
             String text = "";
             if (row != null && i < row.size() && row.get(i) != null) {

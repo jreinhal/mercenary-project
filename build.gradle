@@ -62,6 +62,11 @@ dependencies {
     // Exclude slf4j-simple to avoid overriding Spring Boot's logging/MDC provider.
     implementation('technology.tabula:tabula:1.0.5') {
         exclude group: 'org.slf4j', module: 'slf4j-simple'
+        // Keep a single BouncyCastle line on the classpath (this project already pulls in jdk18on via Tika).
+        exclude group: 'org.bouncycastle', module: 'bcprov-jdk15on'
+        exclude group: 'org.bouncycastle', module: 'bcmail-jdk15on'
+        exclude group: 'org.bouncycastle', module: 'bcpkix-jdk15on'
+        exclude group: 'org.bouncycastle', module: 'bcutil-jdk15on'
     }
 
     // Apache Tika for file type detection
