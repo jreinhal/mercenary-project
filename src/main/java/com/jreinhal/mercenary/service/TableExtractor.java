@@ -109,7 +109,9 @@ public class TableExtractor {
                 pageNumber++;
             }
         } catch (Exception e) {
-            log.warn("TableExtractor: failed to extract tables from {}: {}", filename, e.getMessage());
+            // Avoid logging user-controlled strings (e.g., filename) to prevent log forging.
+            log.warn("TableExtractor: failed to extract tables");
+            log.debug("TableExtractor: extractTables exception", e);
             return List.of();
         }
 

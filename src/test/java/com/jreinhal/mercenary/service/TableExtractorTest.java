@@ -37,6 +37,45 @@ class TableExtractorTest {
         assertTrue(first.getContent().contains("---"), "Expected markdown header separator");
     }
 
+    @Test
+    void extractTablesReturnsEmptyWhenDisabled() throws Exception {
+        TableExtractor extractor = new TableExtractor();
+        ReflectionTestUtils.setField(extractor, "enabled", false);
+        ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+
+        byte[] pdfBytes = buildSimpleTablePdf();
+        List<Document> tables = extractor.extractTables(pdfBytes, "simple.pdf");
+
+        assertNotNull(tables);
+        assertTrue(tables.isEmpty());
+    }
+
+    @Test
+    void extractTablesReturnsEmptyWhenPdfIsInvalid() {
+        TableExtractor extractor = new TableExtractor();
+        ReflectionTestUtils.setField(extractor, "enabled", true);
+        ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+
+        byte[] notPdf = "not a pdf".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        List<Document> tables = extractor.extractTables(notPdf, "bad.pdf");
+
+        assertNotNull(tables);
+        assertTrue(tables.isEmpty());
+    }
+
+    @Test
+    void extractTablesAcceptsBlankFilename() throws Exception {
+        TableExtractor extractor = new TableExtractor();
+        ReflectionTestUtils.setField(extractor, "enabled", true);
+        ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+
+        byte[] pdfBytes = buildSimpleTablePdf();
+        List<Document> tables = extractor.extractTables(pdfBytes, " ");
+
+        assertNotNull(tables);
+        assertFalse(tables.isEmpty());
+    }
+
     private static byte[] buildSimpleTablePdf() throws Exception {
         try (PDDocument doc = new PDDocument()) {
             PDPage page = new PDPage();
