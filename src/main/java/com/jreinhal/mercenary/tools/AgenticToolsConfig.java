@@ -1,8 +1,7 @@
-/*
- * Reconstructed from decompiled source
- */
 package com.jreinhal.mercenary.tools;
 
+import com.jreinhal.mercenary.service.AgentToolService;
+import com.jreinhal.mercenary.util.LogSanitizer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.function.Function;
@@ -43,6 +42,44 @@ public class AgenticToolsConfig {
                 log.warn("Calculator error: {}", e.getMessage());
                 return "Error: " + e.getMessage();
             }
+        };
+    }
+
+    @Bean
+    @Description("Get lightweight metadata for a document (title/date/page estimate/chunk count) by documentId or filename.")
+    public Function<DocumentInfoRequest, String> getDocumentInfo(AgentToolService agentToolService) {
+        return request -> {
+            if (request == null || request.documentId() == null || request.documentId().isBlank()) {
+                return "No documentId provided.";
+            }
+            if (log.isInfoEnabled()) {
+                log.info("Agent Tool Invoked: getDocumentInfo(documentIdSummary={}, dept={})",
+                        LogSanitizer.querySummary(request.documentId()),
+                        LogSanitizer.querySummary(request.department()));
+            }
+            return agentToolService.getDocumentInfo(request.documentId(), request.department());
+        };
+    }
+
+    @Bean
+    @Description("Get text context around a specific chunkId using source#chunk_index and token budgets before/after.")
+    public Function<AdjacentChunksRequest, String> getAdjacentChunks(AgentToolService agentToolService) {
+        return request -> {
+            if (request == null || request.chunkId() == null || request.chunkId().isBlank()) {
+                return "No chunkId provided.";
+            }
+            if (log.isInfoEnabled()) {
+                log.info("Agent Tool Invoked: getAdjacentChunks(chunkIdSummary={}, beforeTokens={}, afterTokens={}, dept={})",
+                        LogSanitizer.querySummary(request.chunkId()),
+                        request.beforeTokens(),
+                        request.afterTokens(),
+                        LogSanitizer.querySummary(request.department()));
+            }
+            return agentToolService.getAdjacentChunks(
+                    request.chunkId(),
+                    request.beforeTokens(),
+                    request.afterTokens(),
+                    request.department());
         };
     }
 
@@ -136,5 +173,11 @@ public class AgenticToolsConfig {
     }
 
     public record CalculatorRequest(String expression) {
+    }
+
+    public record DocumentInfoRequest(String documentId, String department) {
+    }
+
+    public record AdjacentChunksRequest(String chunkId, Integer beforeTokens, Integer afterTokens, String department) {
     }
 }

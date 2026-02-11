@@ -481,6 +481,10 @@ sentinel:
     use-hyde: ${AGENTIC_USE_HYDE:true}
     use-selfrag: ${AGENTIC_USE_SELFRAG:true}
     confidence-threshold: ${AGENTIC_CONFIDENCE:0.6}
+    # Phase 4.2: cap evidence breadth to preserve synthesis quality.
+    documents-per-query-ceiling: ${AGENTIC_DOCUMENTS_PER_QUERY_CEILING:40}
+    # Phase 4.2: quick persona for short/direct questions; careful investigator otherwise.
+    quick-lookup-max-terms: ${AGENTIC_QUICK_LOOKUP_MAX_TERMS:9}
 
   # LightOnOCR Service Integration
   # AI-powered OCR for scanned PDFs and document images

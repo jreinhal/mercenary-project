@@ -67,6 +67,27 @@ class Phase1PromptHardeningTest {
     }
 
     @Test
+    void buildSystemPromptIncludesHypothesisDrivenReasoningMode() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "quickLookupMaxTerms", 9);
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 40);
+
+        String information = "[alpha.pdf]\nPage: 2\ncontent";
+        Class<?> policyType = Class.forName("com.jreinhal.mercenary.service.RagOrchestrationService$ResponsePolicy");
+        Method m = RagOrchestrationService.class.getDeclaredMethod(
+                "buildSystemPrompt", String.class, String.class, policyType, Department.class);
+        m.setAccessible(true);
+
+        String prompt = (String) m.invoke(service, "What is the operating pressure?", information, null, Department.ENTERPRISE);
+        assertNotNull(prompt);
+        assertTrue(prompt.contains("AGENT REASONING MODE (internal; do not output this section):"));
+        assertTrue(prompt.contains("Persona: quick lookup."));
+        assertTrue(prompt.contains("form 1-2 hypotheses"));
+        assertTrue(prompt.contains("ask one concise clarifying question instead of assuming"));
+        assertTrue(prompt.contains("roughly 40 documents"));
+    }
+
+    @Test
     void extractiveResponsesAppendPageSuffixOutsideBracketCitations() throws Exception {
         Document doc = new Document("hello value is 42", Map.of("source", "file.pdf", "page_number", 3));
 

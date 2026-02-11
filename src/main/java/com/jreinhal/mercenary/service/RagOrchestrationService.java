@@ -112,6 +112,8 @@ public class RagOrchestrationService {
     private static final Pattern SUMMARY_HINT_PATTERN = Pattern.compile("\\b(summarize|summary|overview|brief|synopsis|recap)\\b", 2);
     private static final Pattern NUMERIC_PATTERN = Pattern.compile("\\d");
     private static final Pattern RELATIONSHIP_PATTERN = Pattern.compile("\\b(relationship|relate|comparison|compare|versus|between|difference|differ|impact|effect|align|alignment|correlat|dependency|tradeoff|link)\\b", 2);
+    private static final Pattern HISTORICAL_QUERY_PATTERN = Pattern.compile("\\b(history|historical|timeline|evolution|changed|change over time|previously|since|before|after|between)\\b", 2);
+    private static final Pattern ANALYTICAL_QUERY_PATTERN = Pattern.compile("\\b(analysis|analyze|why|impact|tradeoff|compare|comparison|trend|correlat|relationship)\\b", 2);
     private static final Pattern FILE_MARKER_PATTERN = Pattern.compile("^=+\\s*FILE\\s*:\\s*.+?=+$", 2);
     private static final Pattern FILE_MARKER_INLINE_PATTERN = Pattern.compile("^FILE\\s*:\\s*.+$", 2);
     private static final Pattern DOC_ID_HINT_PATTERN = Pattern.compile("\\b(doc\\s*id|docid|document\\s*id)\\b", 2);
@@ -138,6 +140,10 @@ public class RagOrchestrationService {
     private int maxOverviewChars;
     @Value("${sentinel.rag.max-docs:16}")
     private int maxDocs;
+    @Value("${sentinel.agentic.quick-lookup-max-terms:9}")
+    private int quickLookupMaxTerms;
+    @Value("${sentinel.agentic.documents-per-query-ceiling:40}")
+    private int documentsPerQueryCeiling;
     @Value(value="${sentinel.rag.temporal-filtering.enabled:true}")
     private boolean temporalFilteringEnabled;
 
@@ -318,7 +324,7 @@ public class RagOrchestrationService {
                 visualDocs.clear();
             }
             boolean useVisual = allowVisual && this.megaRagService != null && this.megaRagService.isEnabled() && !visualDocs.isEmpty();
-            String systemText = buildSystemPrompt(information, responsePolicy, department);
+            String systemText = buildSystemPrompt(query, information, responsePolicy, department);
             String systemMessage = systemText.replace("{information}", information);
             List<Document> extractiveDocs = this.expandDocsFromCache(topDocs, dept, query);
             boolean llmSuccess = true;
@@ -455,7 +461,7 @@ public class RagOrchestrationService {
                     RetrievalContext retryContext = this.retrieveContext(query, dept, activeFiles, routing, true, false);
                     if (!retryContext.textDocuments().isEmpty()) {
                         String retryInfo = this.buildInformation(retryContext.textDocuments(), retryContext.globalContext());
-                        String retrySystem = buildSystemPrompt(retryInfo, responsePolicy, department);
+                        String retrySystem = buildSystemPrompt(query, retryInfo, responsePolicy, department);
                         String retrySystemMessage = retrySystem.replace("{information}", retryInfo);
                         try {
                             String sysMsg = retrySystemMessage.replace("{", "[").replace("}", "]");
@@ -712,7 +718,7 @@ public class RagOrchestrationService {
                 visualDocs.clear();
             }
             boolean useVisual = allowVisual && this.megaRagService != null && this.megaRagService.isEnabled() && !visualDocs.isEmpty();
-            String systemText = buildSystemPrompt(information, responsePolicy, department);
+            String systemText = buildSystemPrompt(query, information, responsePolicy, department);
             String systemMessage = systemText.replace("{information}", information);
             List<Document> extractiveDocs = this.expandDocsFromCache(topDocs, dept, query);
             boolean llmSuccess = true;
@@ -1150,10 +1156,15 @@ public class RagOrchestrationService {
     }
 
     private String buildSystemPrompt(String information, ResponsePolicy policy, Department department) {
+        return buildSystemPrompt("", information, policy, department);
+    }
+
+    private String buildSystemPrompt(String query, String information, ResponsePolicy policy, Department department) {
         if (information == null || information.isBlank()) {
             return "You are a helpful assistant. No documents are available. Respond: 'No internal records found for this query.'";
         }
         String format = buildResponseFormat(policy, department);
+        String reasoningMode = buildReasoningModeInstructions(query);
         return String.format(
             "You are a helpful assistant that answers questions based on the provided documents.\n\n" +
             "INSTRUCTIONS:\n" +
@@ -1169,12 +1180,66 @@ public class RagOrchestrationService {
             "- Verify numerical precision: check decimal places, units, and likely OCR artifacts (0 vs O, 1 vs l, 5 vs S).\n" +
             "- If a time period is specified in the question: confirm the data matches that period.\n" +
             "- If multiple sources contain the same data point: note agreement or conflict.\n\n" +
+            "%s\n\n" +
             "%s\n" +
             "DOCUMENTS:\n%s\n\n" +
             "Answer the user's question based on the documents above.",
+            reasoningMode,
             format,
             information
         );
+    }
+
+    private String buildReasoningModeInstructions(String query) {
+        String persona = this.isQuickLookupQuery(query) ? "quick lookup" : "careful investigator";
+        String queryType = this.classifyQueryType(query);
+        return String.format(
+                "AGENT REASONING MODE (internal; do not output this section):\n" +
+                "- Persona: %s.\n" +
+                "- Before answering, form 1-2 hypotheses about what evidence should exist and where it should appear.\n" +
+                "- Verify each hypothesis with confirming and disconfirming evidence from the provided documents.\n" +
+                "- Contradiction handling by query type: factual -> flag contradictions as errors; analytical -> present conflicts as competing interpretations; historical -> present conflicts as timeline evolution.\n" +
+                "- Do not rely on few-shot pattern matching; reason from corpus evidence only.\n" +
+                "- If the query is ambiguous (missing time period, target system, or failure mode), ask one concise clarifying question instead of assuming.\n" +
+                "- Keep evidence selection focused and avoid expanding beyond roughly %d documents before synthesis.\n" +
+                "- Detected query type: %s.",
+                persona,
+                this.documentsPerQueryCeiling,
+                queryType
+        );
+    }
+
+    private boolean isQuickLookupQuery(String query) {
+        if (query == null || query.isBlank()) {
+            return false;
+        }
+        String trimmed = query.trim();
+        int terms = trimmed.split("\\s+").length;
+        if (terms > this.quickLookupMaxTerms) {
+            return false;
+        }
+        if (RELATIONSHIP_PATTERN.matcher(trimmed).find()) {
+            return false;
+        }
+        if (SUMMARY_HINT_PATTERN.matcher(trimmed).find()) {
+            return false;
+        }
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        return !(lower.contains(" and ") || lower.contains(" or ") || lower.contains(" between ") || lower.contains(" compare "));
+    }
+
+    private String classifyQueryType(String query) {
+        if (query == null || query.isBlank()) {
+            return "factual";
+        }
+        String lower = query.toLowerCase(Locale.ROOT);
+        if (HISTORICAL_QUERY_PATTERN.matcher(lower).find()) {
+            return "historical";
+        }
+        if (ANALYTICAL_QUERY_PATTERN.matcher(lower).find()) {
+            return "analytical";
+        }
+        return "factual";
     }
 
     private String appendEvidenceIfNeeded(String response, List<Document> extractiveDocs, String query, ResponsePolicy policy, boolean missingCitations) {
@@ -2628,9 +2693,23 @@ public class RagOrchestrationService {
         visualDocs = new ArrayList<>(this.filterDocumentsByFiles(visualDocs, activeFiles));
 
         textDocs = this.sortDocumentsDeterministically(new ArrayList<>(new LinkedHashSet<>(textDocs)));
+        textDocs = this.enforceDocumentCeiling(textDocs, query, strategies);
         visualDocs = new ArrayList<>(new LinkedHashSet<>(visualDocs));
 
         return new RetrievalContext(textDocs, globalContext, visualDocs, edges, strategies, modalities);
+    }
+
+    private List<Document> enforceDocumentCeiling(List<Document> docs, String query, List<String> strategies) {
+        if (docs == null || docs.isEmpty() || this.documentsPerQueryCeiling <= 0 || docs.size() <= this.documentsPerQueryCeiling) {
+            return docs;
+        }
+        if (log.isInfoEnabled()) {
+            log.info("Document ceiling applied: limited {} -> {} docs for query {}", docs.size(), this.documentsPerQueryCeiling, LogSanitizer.querySummary(query));
+        }
+        if (strategies != null && !strategies.contains("DocumentCeiling")) {
+            strategies.add("DocumentCeiling");
+        }
+        return new ArrayList<>(docs.subList(0, this.documentsPerQueryCeiling));
     }
 
     private boolean isVisualDoc(Document doc) {

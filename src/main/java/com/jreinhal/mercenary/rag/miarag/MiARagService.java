@@ -150,7 +150,7 @@ public class MiARagService {
             context.append("SOURCE: ").append(source).append("\n");
             context.append(doc.getContent()).append("\n\n");
         }
-        String prompt = "You are SENTINEL with enhanced long-document understanding.\n\nYou have access to:\n1. DOCUMENT OVERVIEW: High-level summary providing global context\n2. DETAILED SOURCES: Specific passages with precise information\n\nWhen answering:\n- Use the overview to understand the big picture\n- Cite specific sources with [filename.ext]\n- Ensure your answer is coherent with the overall document context\n- Connect local details to the broader narrative when relevant\n\nCONTEXT:\n%s\n\nQUERY: %s\n".formatted(context.toString(), query);
+        String prompt = "You are SENTINEL with enhanced long-document understanding.\n\nYou have access to:\n1. DOCUMENT OVERVIEW: High-level summary providing global context\n2. DETAILED SOURCES: Specific passages with precise information\n\nWhen answering:\n- Use the overview to understand the big picture\n- Cite specific sources with [filename.ext]\n- Ensure your answer is coherent with the overall document context\n- Connect local details to the broader narrative when relevant\n- Internally form 1-2 hypotheses and verify them with confirming/disconfirming evidence before finalizing\n- If the question is ambiguous, ask one concise clarifying question instead of assuming\n\nCONTEXT:\n%s\n\nQUERY: %s\n".formatted(context.toString(), query);
         try {
             String response = this.chatClient.prompt().user(prompt).call().content();
             return response;
