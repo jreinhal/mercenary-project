@@ -218,6 +218,23 @@ class SecureIngestionServiceTest {
     }
 
     @Test
+    void extractEmbeddedImagesReturnsEmptyForNullBytes() {
+        @SuppressWarnings("unchecked")
+        List<byte[]> images = ReflectionTestUtils.invokeMethod(ingestionService, "extractEmbeddedImages", (Object) null);
+        assertNotNull(images);
+        assertTrue(images.isEmpty());
+    }
+
+    @Test
+    void extractEmbeddedImagesReturnsEmptyForBlankPdf() throws Exception {
+        byte[] pdfBytes = buildBlankPdf();
+        @SuppressWarnings("unchecked")
+        List<byte[]> images = ReflectionTestUtils.invokeMethod(ingestionService, "extractEmbeddedImages", pdfBytes);
+        assertNotNull(images);
+        assertTrue(images.isEmpty());
+    }
+
+    @Test
     @DisplayName("Should block executable files by extension")
     void shouldBlockExecutableFilesByExtension() {
         MockMultipartFile file = new MockMultipartFile(
