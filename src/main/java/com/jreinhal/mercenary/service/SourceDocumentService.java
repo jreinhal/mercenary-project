@@ -27,8 +27,9 @@ public class SourceDocumentService {
     }
 
     public void storePdfSource(String workspaceId, Department department, String filename, byte[] fileBytes) {
+        String safeFilename = this.sanitizeFilenameForCache(filename);
         if (!this.sourcePdfRetentionEnabled || workspaceId == null || workspaceId.isBlank() || department == null
-                || filename == null || filename.isBlank() || fileBytes == null || fileBytes.length == 0) {
+                || safeFilename == null || safeFilename.isBlank() || fileBytes == null || fileBytes.length == 0) {
             return;
         }
         if (this.hipaaPolicy.shouldDisableVisual(department) && !this.allowHipaaStrictRetention) {
@@ -37,15 +38,16 @@ public class SourceDocumentService {
         if (fileBytes.length > this.maxPdfBytes) {
             return;
         }
-        this.sourcePdfCache.put(this.buildCacheKey(workspaceId, department.name(), filename), fileBytes.clone());
+        this.sourcePdfCache.put(this.buildCacheKey(workspaceId, department.name(), safeFilename), fileBytes.clone());
     }
 
     public Optional<byte[]> getPdfSource(String workspaceId, String department, String filename) {
+        String safeFilename = this.sanitizeFilenameForCache(filename);
         if (workspaceId == null || workspaceId.isBlank() || department == null || department.isBlank()
-                || filename == null || filename.isBlank()) {
+                || safeFilename == null || safeFilename.isBlank()) {
             return Optional.empty();
         }
-        byte[] bytes = this.sourcePdfCache.getIfPresent(this.buildCacheKey(workspaceId, department, filename));
+        byte[] bytes = this.sourcePdfCache.getIfPresent(this.buildCacheKey(workspaceId, department, safeFilename));
         if (bytes == null || bytes.length == 0) {
             return Optional.empty();
         }
@@ -54,5 +56,18 @@ public class SourceDocumentService {
 
     private String buildCacheKey(String workspaceId, String department, String filename) {
         return workspaceId + ":" + department.trim().toUpperCase(Locale.ROOT) + ":" + filename;
+    }
+
+    private String sanitizeFilenameForCache(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return null;
+        }
+        String value = filename.trim();
+        int slash = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'));
+        if (slash >= 0 && slash + 1 < value.length()) {
+            value = value.substring(slash + 1);
+        }
+        value = value.replace(':', '_');
+        return value.trim();
     }
 }

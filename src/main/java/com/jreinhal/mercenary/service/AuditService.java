@@ -97,7 +97,9 @@ public class AuditService {
     }
 
     public void logAccessDenied(User user, String resource, String reason, HttpServletRequest request) {
-        AuditEvent event = AuditEvent.create(AuditEvent.EventType.ACCESS_DENIED, user != null ? user.getId() : "ANONYMOUS", "Access denied to: " + resource).withUser(user).withRequest(this.clientIpResolver.resolveClientIp(request), request.getHeader("User-Agent"), request.getSession() != null ? request.getSession().getId() : null).withResource("ENDPOINT", resource).withOutcome(AuditEvent.Outcome.DENIED, reason);
+        String userAgent = request != null ? request.getHeader("User-Agent") : null;
+        String sessionId = request != null && request.getSession(false) != null ? request.getSession(false).getId() : null;
+        AuditEvent event = AuditEvent.create(AuditEvent.EventType.ACCESS_DENIED, user != null ? user.getId() : "ANONYMOUS", "Access denied to: " + resource).withUser(user).withRequest(this.clientIpResolver.resolveClientIp(request), userAgent, sessionId).withResource("ENDPOINT", resource).withOutcome(AuditEvent.Outcome.DENIED, reason);
         this.log(event);
     }
 

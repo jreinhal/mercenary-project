@@ -7,6 +7,7 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,8 @@ public class PageRenderService {
             if (pageNumber > pageCount) {
                 throw new IllegalArgumentException("Requested page is out of range.");
             }
-            BufferedImage rendered = new PDFRenderer(pd).renderImageWithDPI(pageNumber - 1, this.renderDpi);
+            float safeDpi = this.computeSafeDpi(pd, pageNumber - 1);
+            BufferedImage rendered = new PDFRenderer(pd).renderImageWithDPI(pageNumber - 1, safeDpi);
             BufferedImage bounded = this.downscaleIfNeeded(rendered);
             return new RenderedImage(this.toPngBytes(bounded), pageNumber, pageCount, bounded.getWidth(), bounded.getHeight());
         }
@@ -57,7 +59,8 @@ public class PageRenderService {
             if (pageNumber > pageCount) {
                 throw new IllegalArgumentException("Requested page is out of range.");
             }
-            BufferedImage pageImage = new PDFRenderer(pd).renderImageWithDPI(pageNumber - 1, this.renderDpi);
+            float safeDpi = this.computeSafeDpi(pd, pageNumber - 1);
+            BufferedImage pageImage = new PDFRenderer(pd).renderImageWithDPI(pageNumber - 1, safeDpi);
             int pageWidth = pageImage.getWidth();
             int pageHeight = pageImage.getHeight();
             int left = this.clamp(x, 0, Math.max(0, pageWidth - 1));
@@ -95,6 +98,24 @@ public class PageRenderService {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(image, "png", out);
         return out.toByteArray();
+    }
+
+    private float computeSafeDpi(PDDocument pd, int pageIndex) {
+        float configuredDpi = Math.max(36, this.renderDpi);
+        if (pd == null || this.maxOutputPixels <= 0) {
+            return configuredDpi;
+        }
+        PDRectangle mediaBox = pd.getPage(pageIndex).getMediaBox();
+        double pageWidthPt = Math.max(1.0, mediaBox != null ? mediaBox.getWidth() : 1.0);
+        double pageHeightPt = Math.max(1.0, mediaBox != null ? mediaBox.getHeight() : 1.0);
+        double widthPx = pageWidthPt * configuredDpi / 72.0;
+        double heightPx = pageHeightPt * configuredDpi / 72.0;
+        double pixelCount = widthPx * heightPx;
+        if (pixelCount <= this.maxOutputPixels) {
+            return configuredDpi;
+        }
+        double scale = Math.sqrt((double) this.maxOutputPixels / pixelCount);
+        return (float) Math.max(36.0, configuredDpi * scale);
     }
 
     private int clamp(int value, int min, int max) {

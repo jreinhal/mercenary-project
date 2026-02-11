@@ -100,4 +100,14 @@ class SourceDocumentServiceTest {
 
         assertArrayEquals(new byte[]{5, 6, 7}, secondRead);
     }
+
+    @Test
+    void normalizesFilenameForCacheKeyConsistency() {
+        when(hipaaPolicy.shouldDisableVisual(any(Department.class))).thenReturn(false);
+        sourceDocumentService.storePdfSource("ws", Department.ENTERPRISE, "C:\\docs\\report:2026.pdf", new byte[]{4, 5, 6});
+
+        Optional<byte[]> loaded = sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "report_2026.pdf");
+        assertTrue(loaded.isPresent());
+        assertArrayEquals(new byte[]{4, 5, 6}, loaded.get());
+    }
 }

@@ -210,8 +210,8 @@ sentinel:
       allow-hipaa-strict: ${SOURCE_RETENTION_ALLOW_HIPAA_STRICT:false}
       max-bytes: ${SOURCE_RETENTION_PDF_MAX_BYTES:52428800}
       cache:
-        max-files: ${SOURCE_RETENTION_PDF_CACHE_MAX_FILES:100}
         ttl-hours: ${SOURCE_RETENTION_PDF_CACHE_TTL_HOURS:1}
+        max-total-bytes: ${SOURCE_RETENTION_PDF_CACHE_MAX_TOTAL_BYTES:268435456}
 
   source-render:
     dpi: ${SOURCE_RENDER_DPI:160}

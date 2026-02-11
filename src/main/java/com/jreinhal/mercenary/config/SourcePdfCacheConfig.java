@@ -12,10 +12,11 @@ public class SourcePdfCacheConfig {
 
     @Bean
     public Cache<String, byte[]> sourcePdfCache(
-            @Value("${sentinel.source-retention.pdf.cache.max-files:100}") long maxFiles,
-            @Value("${sentinel.source-retention.pdf.cache.ttl-hours:1}") long ttlHours) {
+            @Value("${sentinel.source-retention.pdf.cache.ttl-hours:1}") long ttlHours,
+            @Value("${sentinel.source-retention.pdf.cache.max-total-bytes:268435456}") long maxTotalBytes) {
         return Caffeine.newBuilder()
-                .maximumSize(Math.max(1L, maxFiles))
+                .maximumWeight(Math.max(1L, maxTotalBytes))
+                .weigher((String key, byte[] value) -> value == null ? 0 : value.length)
                 .expireAfterWrite(Duration.ofHours(Math.max(1L, ttlHours)))
                 .build();
     }

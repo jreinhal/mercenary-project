@@ -370,14 +370,13 @@ public class MercenaryController {
             return access.errorResponse();
         }
         if (pageNumber < 1) {
-            return ResponseEntity.badRequest().body("ERROR: page must be >= 1.");
+            return textError(HttpStatus.BAD_REQUEST, "ERROR: page must be >= 1.");
         }
         byte[] sourceBytes = this.sourceDocumentService
                 .getPdfSource(access.workspaceId(), access.department().name(), access.filename())
                 .orElse(null);
         if (sourceBytes == null || sourceBytes.length == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("SOURCE BYTES UNAVAILABLE BY POLICY OR RETENTION SETTINGS.");
+            return textError(HttpStatus.NOT_FOUND, "SOURCE BYTES UNAVAILABLE BY POLICY OR RETENTION SETTINGS.");
         }
         try {
             PageRenderService.RenderedImage rendered = this.pageRenderService.renderPagePng(sourceBytes, pageNumber);
@@ -387,10 +386,12 @@ public class MercenaryController {
                     .header("X-Page-Count", Integer.toString(rendered.pageCount()))
                     .body(rendered.imageBytes());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("ERROR: " + e.getMessage());
+            return textError(HttpStatus.BAD_REQUEST, "ERROR: " + e.getMessage());
         } catch (Exception e) {
-            log.error("Failed to render page for {}", LogSanitizer.sanitize(fileName), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("ERROR: Unable to render source page.");
+            if (log.isErrorEnabled()) {
+                log.error("Failed to render page for {}", LogSanitizer.sanitize(fileName), e);
+            }
+            return textError(HttpStatus.INTERNAL_SERVER_ERROR, "ERROR: Unable to render source page.");
         }
     }
 
@@ -410,14 +411,13 @@ public class MercenaryController {
             return access.errorResponse();
         }
         if (pageNumber < 1) {
-            return ResponseEntity.badRequest().body("ERROR: page must be >= 1.");
+            return textError(HttpStatus.BAD_REQUEST, "ERROR: page must be >= 1.");
         }
         byte[] sourceBytes = this.sourceDocumentService
                 .getPdfSource(access.workspaceId(), access.department().name(), access.filename())
                 .orElse(null);
         if (sourceBytes == null || sourceBytes.length == 0) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("SOURCE BYTES UNAVAILABLE BY POLICY OR RETENTION SETTINGS.");
+            return textError(HttpStatus.NOT_FOUND, "SOURCE BYTES UNAVAILABLE BY POLICY OR RETENTION SETTINGS.");
         }
         try {
             PageRenderService.RenderedImage rendered = this.pageRenderService.renderRegionPng(
@@ -428,10 +428,12 @@ public class MercenaryController {
                     .header("X-Page-Count", Integer.toString(rendered.pageCount()))
                     .body(rendered.imageBytes());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("ERROR: " + e.getMessage());
+            return textError(HttpStatus.BAD_REQUEST, "ERROR: " + e.getMessage());
         } catch (Exception e) {
-            log.error("Failed to render region for {}", LogSanitizer.sanitize(fileName), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("ERROR: Unable to render source region.");
+            if (log.isErrorEnabled()) {
+                log.error("Failed to render region for {}", LogSanitizer.sanitize(fileName), e);
+            }
+            return textError(HttpStatus.INTERNAL_SERVER_ERROR, "ERROR: Unable to render source region.");
         }
     }
 
@@ -1366,36 +1368,35 @@ public class MercenaryController {
         if (user == null) {
             this.auditService.logAccessDenied(null, endpoint, "Unauthenticated access attempt", null);
             return new SourceAccess(null, null, null, null,
-                    ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("ACCESS DENIED: Authentication required."));
+                    textError(HttpStatus.UNAUTHORIZED, "ACCESS DENIED: Authentication required."));
         }
         if (!user.hasPermission(UserRole.Permission.QUERY)) {
             this.auditService.logAccessDenied(user, endpoint, "Missing QUERY permission", null);
             return new SourceAccess(null, null, null, null,
-                    ResponseEntity.status(HttpStatus.FORBIDDEN).body("ACCESS DENIED: Insufficient permissions."));
+                    textError(HttpStatus.FORBIDDEN, "ACCESS DENIED: Insufficient permissions."));
         }
         Department department;
         try {
             department = Department.fromString(deptParam.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return new SourceAccess(null, null, null, null,
-                    ResponseEntity.badRequest().body("ERROR: Invalid sector."));
+                    textError(HttpStatus.BAD_REQUEST, "ERROR: Invalid sector."));
         }
         if (this.sectorConfig.requiresElevatedClearance(department)
                 && !user.canAccessClassification(department.getRequiredClearance())) {
             this.auditService.logAccessDenied(user, endpoint, "Insufficient clearance for " + department.name(), null);
             return new SourceAccess(null, null, null, null,
-                    ResponseEntity.status(HttpStatus.FORBIDDEN)
-                            .body("ACCESS DENIED: Insufficient clearance for " + department.name() + "."));
+                    textError(HttpStatus.FORBIDDEN, "ACCESS DENIED: Insufficient clearance for " + department.name() + "."));
         }
         if (!user.canAccessSector(department)) {
             this.auditService.logAccessDenied(user, endpoint, "Unauthorized sector access: " + department.name(), null);
             return new SourceAccess(null, null, null, null,
-                    ResponseEntity.status(HttpStatus.FORBIDDEN).body("ACCESS DENIED: Unauthorized sector access."));
+                    textError(HttpStatus.FORBIDDEN, "ACCESS DENIED: Unauthorized sector access."));
         }
         String normalizedFilename = this.normalizeSourceFileName(fileName);
         if (normalizedFilename == null) {
             return new SourceAccess(null, null, null, null,
-                    ResponseEntity.badRequest().body("ERROR: Invalid filename."));
+                    textError(HttpStatus.BAD_REQUEST, "ERROR: Invalid filename."));
         }
         String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
         return new SourceAccess(user, department, workspaceId, normalizedFilename, null);
@@ -1415,6 +1416,12 @@ public class MercenaryController {
             return null;
         }
         return normalized;
+    }
+
+    private static ResponseEntity<String> textError(HttpStatus status, String message) {
+        return ResponseEntity.status(status)
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(message);
     }
 
     private boolean apiKeyMatch(String targetName, Map<String, Object> meta) {
