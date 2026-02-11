@@ -164,6 +164,27 @@ sentinel:
     max-overview-chars: ${RAG_MAX_OVERVIEW_CHARS:2400}
     max-docs: ${RAG_MAX_DOCS:12}
     max-visual-docs: ${RAG_MAX_VISUAL_DOCS:6}
+    temporal-filtering:
+      # Apply documentYear prefilters when the user query expresses a year constraint (e.g. "between 2020 and 2022").
+      enabled: ${RAG_TEMPORAL_FILTERING_ENABLED:true}
+
+  # Domain thesaurus: configurable acronym/synonym expansion (Phase 3)
+  thesaurus:
+    enabled: ${THESAURUS_ENABLED:true}
+    # Opt-in: unit conversions (e.g., PSI <-> MPa, F <-> C). Keep off unless you validate with benchmark.
+    unit-conversion-enabled: ${THESAURUS_UNIT_CONVERSION_ENABLED:false}
+    # Opt-in: index thesaurus entries into the vector store as type=thesaurus documents.
+    vector-index-enabled: ${THESAURUS_VECTOR_INDEX_ENABLED:false}
+    vector-index:
+      cache-ttl-seconds: ${THESAURUS_VECTOR_INDEX_CACHE_TTL_SECONDS:21600}
+    max-query-variants: ${THESAURUS_MAX_QUERY_VARIANTS:4}
+    # Configure per-department entries here or via environment-specific overlays.
+    # Example:
+    # entries:
+    #   GLOBAL:
+    #     HIPAA:
+    #       - Health Insurance Portability and Accountability Act
+    entries: {}
 
   ingest:
     chunking:

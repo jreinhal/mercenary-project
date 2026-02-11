@@ -3,6 +3,7 @@ package com.jreinhal.mercenary.rag.hybridrag;
 import com.jreinhal.mercenary.constant.StopWords;
 import com.jreinhal.mercenary.rag.hybridrag.QueryExpander;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
+import com.jreinhal.mercenary.util.TemporalQueryConstraints;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
 import com.jreinhal.mercenary.Department;
@@ -54,6 +55,8 @@ public class HybridRagService {
     private boolean ocrTolerance;
     @Value(value="${sentinel.performance.rag-future-timeout-seconds:8}")
     private int futureTimeoutSeconds;
+    @Value(value="${sentinel.rag.temporal-filtering.enabled:true}")
+    private boolean temporalFilteringEnabled;
 
     public HybridRagService(VectorStore vectorStore, QueryExpander queryExpander, ReasoningTracer reasoningTracer, @Qualifier("ragExecutor") ExecutorService ragExecutor) {
         this.vectorStore = vectorStore;
@@ -74,8 +77,9 @@ public class HybridRagService {
             return new HybridRetrievalResult(List.of(), Map.of("mode", "invalid-dept"));
         }
         String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
+        String filterExpression = this.buildFilterExpression(query, normalizedDept, workspaceId);
         if (!this.enabled) {
-            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(normalizedDept, workspaceId)));
+            List<Document> docs = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(10).withSimilarityThreshold(0.3).withFilterExpression(filterExpression));
             return new HybridRetrievalResult(docs, Map.of("mode", "fallback"));
         }
         long startTime = System.currentTimeMillis();
@@ -84,7 +88,7 @@ public class HybridRagService {
         Map<String, CompletableFuture<List<RankedDoc>>> futures = new LinkedHashMap<>();
         for (String variant : queryVariants) {
             try {
-                futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, normalizedDept, workspaceId), this.ragExecutor));
+                futures.put(variant, CompletableFuture.supplyAsync(() -> this.retrieveSemantic(variant, filterExpression), this.ragExecutor));
             } catch (RejectedExecutionException e) {
                 if (log.isDebugEnabled()) {
                     log.debug("RAG thread pool overloaded; skipping variant '{}': {}", variant, e.getMessage());
@@ -127,7 +131,7 @@ public class HybridRagService {
                 semanticResults.put(entry.getKey(), List.of());
             }
         }
-        List<RankedDoc> keywordResults = this.performKeywordRetrieval(query, normalizedDept, workspaceId);
+        List<RankedDoc> keywordResults = this.performKeywordRetrieval(query, filterExpression);
         if (this.ocrTolerance) {
             keywordResults = this.applyOcrTolerance(keywordResults, query);
         }
@@ -147,12 +151,12 @@ public class HybridRagService {
         return variants;
     }
 
-    private List<RankedDoc> performKeywordRetrieval(String query, String department, String workspaceId) {
+    private List<RankedDoc> performKeywordRetrieval(String query, String filterExpression) {
         Set<String> keywords = this.extractKeywords(query);
         if (keywords.isEmpty()) {
             return List.of();
         }
-        List<Document> candidates = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.1).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
+        List<Document> candidates = this.vectorStore.similaritySearch(SearchRequest.query((String)query).withTopK(50).withSimilarityThreshold(0.1).withFilterExpression(filterExpression));
         ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
         for (Document doc : candidates) {
             int keywordScore = this.countKeywordMatches(doc.getContent(), keywords);
@@ -273,13 +277,22 @@ public class HybridRagService {
         }
     }
 
-    private List<RankedDoc> retrieveSemantic(String variant, String department, String workspaceId) {
-        List<Document> results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression(FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId)));
+    private List<RankedDoc> retrieveSemantic(String variant, String filterExpression) {
+        List<Document> results = this.vectorStore.similaritySearch(SearchRequest.query((String)variant).withTopK(15).withSimilarityThreshold(0.2).withFilterExpression(filterExpression));
         ArrayList<RankedDoc> ranked = new ArrayList<RankedDoc>();
         for (int i = 0; i < results.size(); ++i) {
             ranked.add(new RankedDoc(results.get(i), i + 1, "semantic"));
         }
         return ranked;
+    }
+
+    private String buildFilterExpression(String query, String department, String workspaceId) {
+        String base = FilterExpressionBuilder.forDepartmentAndWorkspace(department, workspaceId);
+        if (!this.temporalFilteringEnabled) {
+            return base;
+        }
+        String yearFilter = TemporalQueryConstraints.buildDocumentYearFilter(query);
+        return FilterExpressionBuilder.and(base, yearFilter);
     }
 
     private String normalizeDepartment(String department) {

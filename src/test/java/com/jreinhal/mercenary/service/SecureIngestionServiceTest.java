@@ -99,6 +99,37 @@ class SecureIngestionServiceTest {
     }
 
     @Test
+    @DisplayName("Should stamp documentYear metadata onto ingested chunks when a date is present")
+    void shouldStampDocumentYearWhenDatePresent() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "dated.txt",
+                "text/plain",
+                "Report Date: 2021-05-03\nThis is a test document.".getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Document>> captor = ArgumentCaptor.forClass((Class) List.class);
+        doNothing().when(vectorStore).add(captor.capture());
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+
+        List<Document> added = captor.getValue();
+        assertNotNull(added);
+        assertFalse(added.isEmpty());
+        Document first = added.get(0);
+        assertNotNull(first.getMetadata());
+        assertEquals(2021, first.getMetadata().get("documentYear"));
+        assertNotNull(first.getMetadata().get("documentDateSource"));
+    }
+
+    @Test
     @DisplayName("Should keep table documents atomic (not split/merged) when table extraction adds them")
     void shouldKeepTableDocsAtomicWhenPresent() throws Exception {
         // Make a PDF with enough text so it is not considered scanned.

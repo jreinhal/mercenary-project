@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.rag.hybridrag;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.jreinhal.mercenary.rag.thesaurus.DomainThesaurus;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
@@ -15,12 +16,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 public class QueryExpander {
     private static final Logger log = LoggerFactory.getLogger(QueryExpander.class);
     private final ChatClient chatClient;
+    @Nullable
+    private final DomainThesaurus domainThesaurus;
     @Value(value="${sentinel.hybridrag.llm-expansion:false}")
     private boolean llmExpansionEnabled;
     @Value(value="${sentinel.hybridrag.query-expansion-cache-size:1500}")
@@ -32,8 +36,9 @@ public class QueryExpander {
     private static final String EXPANSION_PROMPT = "Generate %d alternative ways to ask this question. Each variant should:\n- Preserve the original meaning\n- Use different words or phrasing\n- Be a complete question or search query\n\nOutput each variant on a new line, numbered 1-N.\n\nOriginal query: %s\n";
     private static final Map<String, List<String>> SYNONYMS = Map.ofEntries(Map.entry("find", List.of("search", "locate", "discover", "identify")), Map.entry("show", List.of("display", "present", "reveal", "list")), Map.entry("explain", List.of("describe", "clarify", "elaborate", "detail")), Map.entry("create", List.of("make", "generate", "build", "produce")), Map.entry("delete", List.of("remove", "erase", "eliminate", "clear")), Map.entry("update", List.of("modify", "change", "edit", "revise")), Map.entry("error", List.of("issue", "problem", "bug", "fault")), Map.entry("security", List.of("protection", "safety", "defense", "safeguard")), Map.entry("data", List.of("information", "records", "content", "details")), Map.entry("user", List.of("person", "individual", "account", "member")), Map.entry("system", List.of("platform", "application", "software", "service")), Map.entry("access", List.of("permission", "authorization", "entry", "rights")));
 
-    public QueryExpander(ChatClient.Builder builder) {
+    public QueryExpander(ChatClient.Builder builder, @Nullable DomainThesaurus domainThesaurus) {
         this.chatClient = builder.build();
+        this.domainThesaurus = domainThesaurus;
     }
 
     @PostConstruct
@@ -68,6 +73,10 @@ public class QueryExpander {
         variants.addAll(synonymVariants);
         List<String> reformulations = this.generateReformulations(query);
         variants.addAll(reformulations);
+        if (this.domainThesaurus != null && this.domainThesaurus.isEnabled() && variants.size() < count) {
+            int remaining = count - variants.size();
+            variants.addAll(this.domainThesaurus.expandQuery(query, department, remaining));
+        }
         if (this.llmExpansionEnabled && variants.size() < count) {
             int remaining = count - variants.size();
             List<String> llmVariants = this.generateLlmVariants(query, remaining);
