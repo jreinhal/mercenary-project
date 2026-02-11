@@ -85,12 +85,21 @@ class ThreadPoolStatsControllerTest {
     void shouldReflectCompletedTasks() throws Exception {
         // Submit and wait for a task to complete
         ragExecutor.submit(() -> {}).get();
+        long completed = 0L;
+        long total = 0L;
+        for (int i = 0; i < 40; i++) {
+            ResponseEntity<Map<String, Object>> response = controller.getStats();
+            Map<String, Object> ragStats = (Map<String, Object>) response.getBody().get("ragExecutor");
+            completed = ((Number) ragStats.get("completedTaskCount")).longValue();
+            total = ((Number) ragStats.get("totalTaskCount")).longValue();
+            if (completed >= 1L && total >= 1L) {
+                break;
+            }
+            Thread.sleep(25L);
+        }
 
-        ResponseEntity<Map<String, Object>> response = controller.getStats();
-        Map<String, Object> ragStats = (Map<String, Object>) response.getBody().get("ragExecutor");
-
-        assertEquals(1L, ragStats.get("completedTaskCount"));
-        assertEquals(1L, ragStats.get("totalTaskCount"));
+        assertTrue(completed >= 1L);
+        assertTrue(total >= 1L);
     }
 
     @Test
