@@ -136,6 +136,41 @@ class LocalMongoVectorStoreTest {
     }
 
     @Test
+    void similaritySearchFailsClosedWhenInClauseIsEmpty() {
+        MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
+        when(embeddingModel.embed(anyString())).thenReturn(new float[]{1.0f, 0.0f});
+
+        LocalMongoVectorStore store = new LocalMongoVectorStore(mongoTemplate, embeddingModel);
+
+        LocalMongoVectorStore.MongoDocument doc = new LocalMongoVectorStore.MongoDocument();
+        doc.setId("1");
+        doc.setContent("doc");
+        doc.setMetadata(Map.of("dept", "MEDICAL"));
+        doc.setEmbedding(List.of(1.0, 0.0));
+        doc.setEmbeddingNorm(1.0);
+        when(mongoTemplate.find(any(Query.class), eq(LocalMongoVectorStore.MongoDocument.class), anyString()))
+                .thenReturn(List.of(doc));
+
+        SearchRequest request = SearchRequest.query("q")
+                .withTopK(5)
+                .withSimilarityThreshold(0.0);
+        Filter.Expression emptyInExpression = mock(Filter.Expression.class);
+        when(emptyInExpression.toString()).thenReturn("dept in []");
+        ReflectionTestUtils.setField(request, "filterExpression", emptyInExpression);
+
+        List<Document> results = store.similaritySearch(request);
+
+        assertTrue(results.isEmpty(), "Empty IN filter should fail closed");
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(LocalMongoVectorStore.MongoDocument.class), eq("vector_store"));
+        String queryString = queryCaptor.getValue().toString();
+        assertTrue(queryString.contains("\"_id\""));
+        assertTrue(queryString.contains("\"$in\""));
+        assertTrue(queryString.contains("[]"));
+    }
+
+    @Test
     void deleteReturnsFalseForEmptyIdsAndTrueWhenDocumentsDeleted() {
         MongoTemplate mongoTemplate = mock(MongoTemplate.class);
         EmbeddingModel embeddingModel = mock(EmbeddingModel.class);

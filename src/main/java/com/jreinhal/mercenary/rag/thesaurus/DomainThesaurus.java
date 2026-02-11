@@ -158,9 +158,13 @@ public class DomainThesaurus {
                 return lexical;
             }
 
-            LinkedHashMap<String, ThesaurusMatch> merged = new LinkedHashMap<>();
+            Map<String, ThesaurusMatch> merged = new LinkedHashMap<>();
             for (ThesaurusMatch lexicalMatch : lexical) {
-                merged.putIfAbsent(normalizeTermKey(lexicalMatch.term()), lexicalMatch);
+                String key = normalizeTermKey(lexicalMatch.term());
+                ThesaurusMatch existing = merged.get(key);
+                if (existing == null || shouldPreferLexical(existing, lexicalMatch)) {
+                    merged.put(key, lexicalMatch);
+                }
             }
             for (Document d : docs) {
                 Object t = d.getMetadata().get("term");
@@ -245,7 +249,9 @@ public class DomainThesaurus {
                 if (this.indexedCache != null) {
                     this.indexedCache.put(cacheKey, Boolean.TRUE);
                 }
-                log.info("DomainThesaurus: indexed {} entries for dept={} workspace={}", docs.size(), dept, workspaceId);
+                if (log.isInfoEnabled()) {
+                    log.info("DomainThesaurus: indexed {} entries for dept={} workspace={}", docs.size(), dept, workspaceId);
+                }
             }
         } finally {
             this.indexLocks.remove(cacheKey, lock);
@@ -275,6 +281,16 @@ public class DomainThesaurus {
             return "";
         }
         return term.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean shouldPreferLexical(ThesaurusMatch existing, ThesaurusMatch candidate) {
+        if (existing == null || candidate == null) {
+            return false;
+        }
+        String existingDept = existing.department();
+        String candidateDept = candidate.department();
+        return existingDept != null && GLOBAL.equalsIgnoreCase(existingDept)
+                && candidateDept != null && !GLOBAL.equalsIgnoreCase(candidateDept);
     }
 
     private void rebuildIndex() {

@@ -202,7 +202,7 @@ implements VectorStore {
                 } else if ("in".equals(op)) {
                     if (condition.values().isEmpty()) {
                         // Fail closed for "in []" to avoid broad prefilter scans.
-                        return new Query((CriteriaDefinition) Criteria.where((String) "_id").is("__filter_empty_in__"));
+                        return new Query(Criteria.where("_id").in(List.of()));
                     }
                     Set<Object> normalized = new HashSet<>();
                     for (String value : condition.values()) {

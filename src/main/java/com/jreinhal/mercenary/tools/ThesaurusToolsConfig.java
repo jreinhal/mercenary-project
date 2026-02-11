@@ -27,8 +27,10 @@ public class ThesaurusToolsConfig {
             String safeDept = LogSanitizer.querySummary(dept);
 
             // Avoid logging raw user input (log forging); only log a safe summary.
-            log.info("Agent Tool Invoked: searchThesaurus(termSummary={}, dept={})",
-                    LogSanitizer.querySummary(request.term()), safeDept);
+            if (log.isInfoEnabled()) {
+                log.info("Agent Tool Invoked: searchThesaurus(termSummary={}, dept={})",
+                        LogSanitizer.querySummary(request.term()), safeDept);
+            }
 
             List<ThesaurusMatch> matches = domainThesaurus.search(request.term(), dept, k);
             if (matches == null || matches.isEmpty()) {
