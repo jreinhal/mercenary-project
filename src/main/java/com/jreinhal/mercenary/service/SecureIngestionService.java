@@ -10,6 +10,7 @@ import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -23,13 +24,21 @@ import com.knuddels.jtokkit.Encodings;
 import com.knuddels.jtokkit.api.Encoding;
 import com.knuddels.jtokkit.api.EncodingRegistry;
 import com.knuddels.jtokkit.api.EncodingType;
+import javax.imageio.ImageIO;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.sax.BodyContentHandler;
-import org.apache.tika.extractor.EmbeddedDocumentExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -41,7 +50,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
 @Service
@@ -57,6 +65,7 @@ public class SecureIngestionService {
     private final MegaRagService megaRagService;
     private final HyperGraphMemory hyperGraphMemory;
     private final LightOnOcrService lightOnOcrService;
+    private final TableExtractor tableExtractor;
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final Tika tika;
@@ -96,7 +105,7 @@ public class SecureIngestionService {
     private static final EncodingRegistry TOKEN_ENCODING_REGISTRY = Encodings.newLazyEncodingRegistry();
     private static final Encoding TOKEN_ENCODING = TOKEN_ENCODING_REGISTRY.getEncoding(EncodingType.CL100K_BASE);
 
-    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
+    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, TableExtractor tableExtractor, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
         this.vectorStore = vectorStore;
         this.piiRedactionService = piiRedactionService;
         this.partitionAssigner = partitionAssigner;
@@ -104,6 +113,7 @@ public class SecureIngestionService {
         this.megaRagService = megaRagService;
         this.hyperGraphMemory = hyperGraphMemory;
         this.lightOnOcrService = lightOnOcrService;
+        this.tableExtractor = tableExtractor;
         this.hipaaPolicy = hipaaPolicy;
         this.workspaceQuotaService = workspaceQuotaService;
         this.tika = new Tika();
@@ -144,14 +154,27 @@ public class SecureIngestionService {
                 int totalTextLength = rawDocuments.stream()
                     .mapToInt(doc -> doc.getContent() != null ? doc.getContent().length() : 0)
                     .sum();
+                boolean scannedPdf = totalTextLength < MIN_TEXT_LENGTH_FOR_VALID_PDF;
+                boolean hasAnyText = totalTextLength > 0;
 
-                if (!hipaaStrict && totalTextLength < MIN_TEXT_LENGTH_FOR_VALID_PDF && this.ocrFallbackForScannedPdf
+                if (!hipaaStrict && scannedPdf && this.ocrFallbackForScannedPdf
                         && this.lightOnOcrService != null && this.lightOnOcrService.isEnabled()) {
                     log.info(">> SCANNED PDF DETECTED: Text extraction yielded only {} chars. Engaging LightOnOCR...", totalTextLength);
                     String ocrText = this.lightOnOcrService.ocrPdf(fileBytes, filename);
                     if (ocrText != null && !ocrText.isEmpty()) {
                         rawDocuments = List.of(new Document(ocrText, java.util.Map.of("source", filename, "ocr", "true")));
                         log.info(">> LightOnOCR: Successfully extracted {} chars from scanned PDF", ocrText.length());
+                    }
+                }
+
+                // Decouple table extraction from the OCR/scanned-PDF heuristic: short-but-text-layer PDFs can contain
+                // valuable tables and should still attempt extraction.
+                if (hasAnyText && this.tableExtractor != null && this.tableExtractor.isEnabled()) {
+                    List<Document> tableDocs = this.tableExtractor.extractTables(fileBytes, filename);
+                    if (tableDocs != null && !tableDocs.isEmpty()) {
+                        List<Document> combined = new ArrayList<>(rawDocuments);
+                        combined.addAll(tableDocs);
+                        rawDocuments = combined;
                     }
                 }
 
@@ -175,10 +198,27 @@ public class SecureIngestionService {
                 mergedMeta.put("fileSizeBytes", fileBytes.length);
                 cleanDocs.add(new Document(doc.getContent(), mergedMeta));
             }
+            List<Document> atomicDocs = new ArrayList<>();
+            List<Document> splitCandidates = new ArrayList<>();
+            for (Document doc : cleanDocs) {
+                if (isTableDoc(doc)) {
+                    atomicDocs.add(doc);
+                } else {
+                    splitCandidates.add(doc);
+                }
+            }
+
             TokenTextSplitter splitter = new TokenTextSplitter(this.chunkSizeTokens, this.minChunkSizeChars, this.minChunkLengthToEmbed, this.maxNumChunks, this.keepSeparator);
-            List<Document> splitDocuments = splitter.apply(cleanDocs);
+            List<Document> splitDocuments = splitter.apply(splitCandidates);
             if (this.chunkMergeEnabled) {
                 splitDocuments = this.mergeSmallChunks(splitDocuments, this.chunkMergeMinTokens, this.chunkMergeMaxTokens);
+            }
+            if (!atomicDocs.isEmpty()) {
+                // Keep table docs atomic (no splitter, no merge).
+                List<Document> combined = new ArrayList<>(splitDocuments.size() + atomicDocs.size());
+                combined.addAll(splitDocuments);
+                combined.addAll(atomicDocs);
+                splitDocuments = combined;
             }
             this.assignChunkIndices(splitDocuments);
             List<Document> finalDocuments = new ArrayList<>();
@@ -255,6 +295,18 @@ public class SecureIngestionService {
         return merged;
     }
 
+    private static boolean isTableDoc(Document doc) {
+        if (doc == null) {
+            return false;
+        }
+        Map<String, Object> meta = doc.getMetadata();
+        if (meta == null) {
+            return false;
+        }
+        Object type = meta.get("type");
+        return type != null && "table".equalsIgnoreCase(type.toString());
+    }
+
     private int countTokens(String text) {
         if (text == null || text.isBlank()) {
             return 0;
@@ -277,7 +329,16 @@ public class SecureIngestionService {
         Object pageNumber = meta.get("page_number");
         Object endPageNumber = meta.get("end_page_number");
         Object ocr = meta.get("ocr");
-        return Objects.toString(source, "") + "|" + Objects.toString(dept, "") + "|" + Objects.toString(workspaceId, "") + "|p=" + Objects.toString(pageNumber, "") + "|ep=" + Objects.toString(endPageNumber, "") + "|ocr=" + Objects.toString(ocr, "");
+        Object type = meta.get("type");
+        Object tableIndex = meta.get("table_index");
+        return Objects.toString(source, "")
+                + "|" + Objects.toString(dept, "")
+                + "|" + Objects.toString(workspaceId, "")
+                + "|p=" + Objects.toString(pageNumber, "")
+                + "|ep=" + Objects.toString(endPageNumber, "")
+                + "|ocr=" + Objects.toString(ocr, "")
+                + "|type=" + Objects.toString(type, "")
+                + "|tbl=" + Objects.toString(tableIndex, "");
     }
 
     private void assignChunkIndices(List<Document> docs) {
@@ -438,7 +499,10 @@ public class SecureIngestionService {
     }
 
     private void ingestEmbeddedImages(byte[] fileBytes, String filename, String department, List<Document> rawDocuments) {
-        String contextText = rawDocuments.stream().map(Document::getContent).collect(java.util.stream.Collectors.joining("\n\n"));
+        String contextText = rawDocuments.stream()
+                .filter(doc -> !isTableDoc(doc))
+                .map(Document::getContent)
+                .collect(java.util.stream.Collectors.joining("\n\n"));
         List<byte[]> images = this.extractEmbeddedImages(fileBytes);
         if (images.isEmpty()) {
             return;
@@ -455,27 +519,53 @@ public class SecureIngestionService {
     }
 
     private List<byte[]> extractEmbeddedImages(byte[] fileBytes) {
-        ArrayList<byte[]> images = new ArrayList<>();
+        List<byte[]> images = new ArrayList<>();
+        if (fileBytes == null || fileBytes.length == 0) {
+            return images;
+        }
         try {
-            AutoDetectParser parser = new AutoDetectParser();
-            ParseContext context = new ParseContext();
-            EmbeddedDocumentExtractor extractor = new EmbeddedDocumentExtractor() {
-                public boolean shouldParseEmbedded(Metadata metadata) {
-                    String type = metadata.get("Content-Type");
-                    return type != null && type.startsWith("image/");
+            // Prefer PDFBox for embedded-image extraction to avoid Tika/PDFBox version skew.
+            try (PDDocument pd = Loader.loadPDF(fileBytes)) {
+                for (PDPage page : pd.getPages()) {
+                    if (images.size() >= MAX_EMBEDDED_IMAGES) {
+                        break;
+                    }
+                    PDResources resources = page.getResources();
+                    if (resources == null) {
+                        continue;
+                    }
+                    this.collectEmbeddedImages(resources, images);
                 }
-
-                public void parseEmbedded(InputStream stream, ContentHandler handler, Metadata metadata, boolean outputHtml) throws SAXException, IOException {
-                    images.add(stream.readAllBytes());
-                }
-            };
-            context.set(EmbeddedDocumentExtractor.class, extractor);
-            parser.parse(new ByteArrayInputStream(fileBytes), new BodyContentHandler(), new Metadata(), context);
+            }
         }
         catch (Exception e) {
             log.warn("Embedded image extraction failed: {}", e.getMessage());
         }
         return images;
+    }
+
+    private void collectEmbeddedImages(PDResources resources, List<byte[]> images) throws IOException {
+        for (COSName name : resources.getXObjectNames()) {
+            if (images.size() >= MAX_EMBEDDED_IMAGES) {
+                return;
+            }
+            PDXObject xObject = resources.getXObject(name);
+            if (xObject instanceof PDImageXObject image) {
+                java.awt.image.BufferedImage buffered = image.getImage();
+                if (buffered == null) {
+                    continue;
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                ImageIO.write(buffered, "png", out);
+                images.add(out.toByteArray());
+            }
+            else if (xObject instanceof PDFormXObject form) {
+                PDResources formResources = form.getResources();
+                if (formResources != null) {
+                    this.collectEmbeddedImages(formResources, images);
+                }
+            }
+        }
     }
 
     private List<Document> extractTextDocuments(byte[] fileBytes, String filename) {
