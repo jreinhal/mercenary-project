@@ -6,6 +6,7 @@ import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
 import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +16,12 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.document.Document;
@@ -138,6 +142,79 @@ class SecureIngestionServiceTest {
         assertTrue(addedTable.getContent().contains("| A | B |"));
         assertEquals(1, addedTable.getMetadata().get("page_number"));
         assertEquals(0, addedTable.getMetadata().get("table_index"));
+    }
+
+    @Test
+    @DisplayName("Should attempt table extraction even when PDF text is below scanned threshold (short text-layer PDFs)")
+    void shouldAttemptTableExtractionForShortTextPdf() throws Exception {
+        // Below MIN_TEXT_LENGTH_FOR_VALID_PDF (100) but still text-layer.
+        byte[] pdfBytes = buildPdfWithText("x".repeat(50));
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "short.pdf",
+                "application/pdf",
+                pdfBytes
+        );
+
+        when(tableExtractor.isEnabled()).thenReturn(true);
+        when(tableExtractor.extractTables(any(), eq("short.pdf")))
+                .thenReturn(List.of(new Document("| A | B |\n| --- | --- |\n| 1 | 2 |", Map.of("type", "table"))));
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+        verify(tableExtractor, times(1)).extractTables(any(), eq("short.pdf"));
+    }
+
+    @Test
+    @DisplayName("Should not attempt table extraction when PDF has no extractable text")
+    void shouldNotAttemptTableExtractionWhenPdfHasNoText() throws Exception {
+        byte[] pdfBytes = buildBlankPdf();
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "blank.pdf",
+                "application/pdf",
+                pdfBytes
+        );
+
+        when(tableExtractor.isEnabled()).thenReturn(true);
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+        verify(tableExtractor, never()).extractTables(any(), any());
+    }
+
+    @Test
+    @DisplayName("Embedded image ingestion should build context excluding table documents")
+    void embeddedImageIngestionShouldExcludeTableDocsFromContext() throws Exception {
+        byte[] pdfBytes = buildPdfWithEmbeddedImage();
+        List<Document> rawDocs = List.of(
+                new Document("TEXT_CONTEXT", Map.of("source", "x.pdf")),
+                new Document("TABLE_CONTEXT", Map.of("type", "table"))
+        );
+
+        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(
+                ingestionService,
+                "ingestEmbeddedImages",
+                pdfBytes,
+                "x.pdf",
+                "ENTERPRISE",
+                rawDocs
+        ));
+
+        ArgumentCaptor<String> contextCaptor = ArgumentCaptor.forClass(String.class);
+        verify(megaRagService, atLeastOnce()).ingestVisualAsset(any(), eq("x.pdf"), eq("ENTERPRISE"), contextCaptor.capture());
+        String context = contextCaptor.getValue();
+        assertTrue(context.contains("TEXT_CONTEXT"));
+        assertFalse(context.contains("TABLE_CONTEXT"));
     }
 
     @Test
@@ -498,6 +575,35 @@ class SecureIngestionServiceTest {
                 cs.showText(text);
                 cs.endText();
             }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            return out.toByteArray();
+        }
+    }
+
+    private static byte[] buildBlankPdf() throws Exception {
+        try (PDDocument doc = new PDDocument()) {
+            doc.addPage(new PDPage());
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            return out.toByteArray();
+        }
+    }
+
+    private static byte[] buildPdfWithEmbeddedImage() throws Exception {
+        try (PDDocument doc = new PDDocument()) {
+            PDPage page = new PDPage();
+            doc.addPage(page);
+
+            BufferedImage img = new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB);
+            img.setRGB(0, 0, 0x00FF00);
+            img.setRGB(1, 1, 0x00FF00);
+            PDImageXObject pdImage = LosslessFactory.createFromImage(doc, img);
+
+            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                cs.drawImage(pdImage, 50, 650, 50, 50);
+            }
+
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
             return out.toByteArray();
