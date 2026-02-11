@@ -10,6 +10,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -395,6 +396,26 @@ class DomainThesaurusTest {
     void normalizeTermKeyReturnsEmptyForNull() {
         Object normalized = ReflectionTestUtils.invokeMethod(DomainThesaurus.class, "normalizeTermKey", new Object[]{null});
         assertEquals("", normalized);
+    }
+
+    @Test
+    void shouldPreferLexicalReturnsFalseWhenAnyMatchIsNull() throws Exception {
+        Method method = DomainThesaurus.class.getDeclaredMethod(
+                "shouldPreferLexical",
+                DomainThesaurus.ThesaurusMatch.class,
+                DomainThesaurus.ThesaurusMatch.class
+        );
+        method.setAccessible(true);
+
+        DomainThesaurus.ThesaurusMatch sample = new DomainThesaurus.ThesaurusMatch(
+                "BP",
+                List.of("blood pressure"),
+                "MEDICAL",
+                "lexical"
+        );
+
+        assertFalse((Boolean) method.invoke(null, null, sample));
+        assertFalse((Boolean) method.invoke(null, sample, null));
     }
 
     @Test
