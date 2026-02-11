@@ -4,15 +4,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -184,7 +193,7 @@ class DomainThesaurusTest {
         thesaurus.init();
 
         List<String> variants = thesaurus.expandQuery("BP threshold", "MEDICAL", 10);
-        assertTrue(variants.size() <= 2);
+        assertEquals(1, variants.size());
         assertFalse(variants.isEmpty());
         assertTrue(variants.stream().noneMatch(String::isBlank));
     }
@@ -247,6 +256,85 @@ class DomainThesaurusTest {
     }
 
     @Test
+    void vectorIndexDocumentIdsIncludeWorkspaceAndDepartment() {
+        DomainThesaurusProperties props = new DomainThesaurusProperties();
+        props.setEnabled(true);
+        props.setVectorIndexEnabled(true);
+        props.setEntries(Map.of("MEDICAL", Map.of("BP", List.of("blood pressure"))));
+
+        VectorStore vectorStore = mock(VectorStore.class);
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+
+        DomainThesaurus thesaurus = new DomainThesaurus(props, vectorStore);
+        ReflectionTestUtils.setField(thesaurus, "indexCacheTtlSeconds", 3600L);
+        thesaurus.init();
+
+        WorkspaceContext.setCurrentWorkspaceId("ws-42");
+        try {
+            thesaurus.search("BP", "MEDICAL", 5);
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            ArgumentCaptor<List<org.springframework.ai.document.Document>> docsCaptor =
+                    ArgumentCaptor.forClass((Class) List.class);
+            verify(vectorStore).add(docsCaptor.capture());
+            List<Document> docs = docsCaptor.getValue();
+            assertFalse(docs.isEmpty());
+            assertTrue(docs.stream().map(Document::getId).allMatch(id -> id.startsWith("thesaurus|ws-42|MEDICAL|")));
+        } finally {
+            WorkspaceContext.clear();
+        }
+    }
+
+    @Test
+    void concurrentSearchesIndexOnlyOncePerWorkspaceAndDepartment() throws Exception {
+        DomainThesaurusProperties props = new DomainThesaurusProperties();
+        props.setEnabled(true);
+        props.setVectorIndexEnabled(true);
+        props.setEntries(Map.of("MEDICAL", Map.of("BP", List.of("blood pressure"))));
+
+        VectorStore vectorStore = mock(VectorStore.class);
+        CountDownLatch addStarted = new CountDownLatch(1);
+        CountDownLatch releaseAdd = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            addStarted.countDown();
+            assertTrue(releaseAdd.await(2, TimeUnit.SECONDS));
+            return null;
+        }).when(vectorStore).add(any());
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+
+        DomainThesaurus thesaurus = new DomainThesaurus(props, vectorStore);
+        ReflectionTestUtils.setField(thesaurus, "indexCacheTtlSeconds", 3600L);
+        thesaurus.init();
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = pool.submit(() -> {
+                WorkspaceContext.setCurrentWorkspaceId("ws");
+                try {
+                    thesaurus.search("BP", "MEDICAL", 5);
+                } finally {
+                    WorkspaceContext.clear();
+                }
+            });
+            assertTrue(addStarted.await(2, TimeUnit.SECONDS));
+            Future<?> second = pool.submit(() -> {
+                WorkspaceContext.setCurrentWorkspaceId("ws");
+                try {
+                    thesaurus.search("BP", "MEDICAL", 5);
+                } finally {
+                    WorkspaceContext.clear();
+                }
+            });
+            releaseAdd.countDown();
+            first.get(2, TimeUnit.SECONDS);
+            second.get(2, TimeUnit.SECONDS);
+            verify(vectorStore, times(1)).add(any());
+        } finally {
+            releaseAdd.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void searchMergesSemanticResultsAndHandlesNonListExpansions() {
         DomainThesaurusProperties props = new DomainThesaurusProperties();
         props.setEnabled(true);
@@ -270,6 +358,64 @@ class DomainThesaurusTest {
         } finally {
             WorkspaceContext.clear();
         }
+    }
+
+    @Test
+    void searchPrefersDepartmentSpecificLexicalMatchWhenTermsDuplicate() {
+        DomainThesaurusProperties props = new DomainThesaurusProperties();
+        props.setEnabled(true);
+        props.setVectorIndexEnabled(true);
+        props.setEntries(Map.of(
+                "GLOBAL", Map.of("BP", List.of("global expansion")),
+                "MEDICAL", Map.of("BP", List.of("department expansion"))
+        ));
+
+        VectorStore vectorStore = mock(VectorStore.class);
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(
+                new Document("z", "z", Map.of("term", "MAP", "expansions", List.of("mean arterial pressure")))
+        ));
+
+        DomainThesaurus thesaurus = new DomainThesaurus(props, vectorStore);
+        thesaurus.init();
+
+        WorkspaceContext.setCurrentWorkspaceId("ws");
+        try {
+            List<DomainThesaurus.ThesaurusMatch> matches = thesaurus.search("BP", "MEDICAL", 5);
+            DomainThesaurus.ThesaurusMatch bp = matches.stream()
+                    .filter(m -> "BP".equalsIgnoreCase(m.term()))
+                    .findFirst()
+                    .orElseThrow();
+            assertEquals("MEDICAL", bp.department());
+            assertEquals(List.of("department expansion"), bp.expansions());
+        } finally {
+            WorkspaceContext.clear();
+        }
+    }
+
+    @Test
+    void normalizeTermKeyReturnsEmptyForNull() {
+        Object normalized = ReflectionTestUtils.invokeMethod(DomainThesaurus.class, "normalizeTermKey", new Object[]{null});
+        assertEquals("", normalized);
+    }
+
+    @Test
+    void shouldPreferLexicalReturnsFalseWhenAnyMatchIsNull() throws Exception {
+        Method method = DomainThesaurus.class.getDeclaredMethod(
+                "shouldPreferLexical",
+                DomainThesaurus.ThesaurusMatch.class,
+                DomainThesaurus.ThesaurusMatch.class
+        );
+        method.setAccessible(true);
+
+        DomainThesaurus.ThesaurusMatch sample = new DomainThesaurus.ThesaurusMatch(
+                "BP",
+                List.of("blood pressure"),
+                "MEDICAL",
+                "lexical"
+        );
+
+        assertFalse((Boolean) method.invoke(null, null, sample));
+        assertFalse((Boolean) method.invoke(null, sample, null));
     }
 
     @Test

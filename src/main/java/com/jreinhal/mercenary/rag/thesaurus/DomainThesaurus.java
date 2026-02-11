@@ -9,12 +9,14 @@ import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -53,6 +55,7 @@ public class DomainThesaurus {
     private Map<String, List<Entry>> deptEntries = Map.of();
 
     private Cache<String, Boolean> indexedCache;
+    private final ConcurrentMap<String, Object> indexLocks = new ConcurrentHashMap<>();
 
     @Value("${sentinel.thesaurus.vector-index.cache-ttl-seconds:21600}")
     private long indexCacheTtlSeconds;
@@ -103,9 +106,12 @@ public class DomainThesaurus {
                 String replaced = entry.replace(query, expansion);
                 if (!replaced.equalsIgnoreCase(query)) {
                     variants.add(replaced);
+                    if (variants.size() >= cap) {
+                        break;
+                    }
                 }
                 String annotated = entry.replace(query, entry.term() + " (" + expansion + ")");
-                if (!annotated.equalsIgnoreCase(query)) {
+                if (variants.size() < cap && !annotated.equalsIgnoreCase(query)) {
                     variants.add(annotated);
                 }
             }
@@ -152,23 +158,32 @@ public class DomainThesaurus {
                 return lexical;
             }
 
-            LinkedHashSet<ThesaurusMatch> merged = new LinkedHashSet<>(lexical);
+            Map<String, ThesaurusMatch> merged = new LinkedHashMap<>();
+            for (ThesaurusMatch lexicalMatch : lexical) {
+                String key = normalizeTermKey(lexicalMatch.term());
+                ThesaurusMatch existing = merged.get(key);
+                if (existing == null || shouldPreferLexical(existing, lexicalMatch)) {
+                    merged.put(key, lexicalMatch);
+                }
+            }
             for (Document d : docs) {
                 Object t = d.getMetadata().get("term");
                 Object ex = d.getMetadata().get("expansions");
                 String matchTerm = t != null ? t.toString() : "";
                 List<String> expansions = ex instanceof List<?> list ? list.stream().map(Objects::toString).toList() : List.of();
                 if (!matchTerm.isBlank()) {
-                    merged.add(new ThesaurusMatch(matchTerm, expansions, dept, "semantic"));
+                    merged.putIfAbsent(normalizeTermKey(matchTerm), new ThesaurusMatch(matchTerm, expansions, dept, "semantic"));
                 }
                 if (merged.size() >= k) {
                     break;
                 }
             }
-            return new ArrayList<>(merged);
+            return new ArrayList<>(merged.values());
         } catch (Exception e) {
             // Fail open: a thesaurus search tool should not break the main RAG loop.
-            log.debug("DomainThesaurus semantic search failed: {}", e.getMessage());
+            if (log.isDebugEnabled()) {
+                log.debug("DomainThesaurus semantic search failed: {}", e.getMessage());
+            }
             return lexical;
         }
     }
@@ -203,32 +218,44 @@ public class DomainThesaurus {
         if (this.indexedCache != null && Boolean.TRUE.equals(this.indexedCache.getIfPresent(cacheKey))) {
             return;
         }
-        List<Entry> entries = this.entriesFor(dept);
-        if (entries.isEmpty()) {
-            if (this.indexedCache != null) {
-                this.indexedCache.put(cacheKey, Boolean.TRUE);
-            }
-            return;
-        }
+        Object lock = this.indexLocks.computeIfAbsent(cacheKey, k -> new Object());
+        try {
+            synchronized (lock) {
+                if (this.indexedCache != null && Boolean.TRUE.equals(this.indexedCache.getIfPresent(cacheKey))) {
+                    return;
+                }
+                List<Entry> entries = this.entriesFor(dept);
+                if (entries.isEmpty()) {
+                    if (this.indexedCache != null) {
+                        this.indexedCache.put(cacheKey, Boolean.TRUE);
+                    }
+                    return;
+                }
 
-        ArrayList<Document> docs = new ArrayList<>(entries.size());
-        for (Entry entry : entries) {
-            String id = "thesaurus|" + dept + "|" + entry.term().toUpperCase(Locale.ROOT);
-            String content = "THESAURUS\n\nTERM: " + entry.term() + "\nEXPANSIONS: " + String.join(", ", entry.expansions());
-            Document d = new Document(id, content, Map.of(
-                    "type", THESAURUS_TYPE,
-                    "dept", dept,
-                    "workspaceId", workspaceId,
-                    "term", entry.term(),
-                    "expansions", entry.expansions()
-            ));
-            docs.add(d);
+                List<Document> docs = new ArrayList<>(entries.size());
+                for (Entry entry : entries) {
+                    String id = "thesaurus|" + workspaceId + "|" + dept + "|" + entry.term().toUpperCase(Locale.ROOT);
+                    String content = "THESAURUS\n\nTERM: " + entry.term() + "\nEXPANSIONS: " + String.join(", ", entry.expansions());
+                    Document d = new Document(id, content, Map.of(
+                            "type", THESAURUS_TYPE,
+                            "dept", dept,
+                            "workspaceId", workspaceId,
+                            "term", entry.term(),
+                            "expansions", entry.expansions()
+                    ));
+                    docs.add(d);
+                }
+                vectorStore.add(docs);
+                if (this.indexedCache != null) {
+                    this.indexedCache.put(cacheKey, Boolean.TRUE);
+                }
+                if (log.isInfoEnabled()) {
+                    log.info("DomainThesaurus: indexed {} entries for dept={} workspace={}", docs.size(), dept, workspaceId);
+                }
+            }
+        } finally {
+            this.indexLocks.remove(cacheKey, lock);
         }
-        vectorStore.add(docs);
-        if (this.indexedCache != null) {
-            this.indexedCache.put(cacheKey, Boolean.TRUE);
-        }
-        log.info("DomainThesaurus: indexed {} entries for dept={} workspace={}", docs.size(), dept, workspaceId);
     }
 
     private List<Entry> entriesFor(@Nullable String department) {
@@ -247,6 +274,23 @@ public class DomainThesaurus {
         }
         String d = department.trim().toUpperCase(Locale.ROOT);
         return d;
+    }
+
+    private static String normalizeTermKey(String term) {
+        if (term == null) {
+            return "";
+        }
+        return term.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean shouldPreferLexical(ThesaurusMatch existing, ThesaurusMatch candidate) {
+        if (existing == null || candidate == null) {
+            return false;
+        }
+        String existingDept = existing.department();
+        String candidateDept = candidate.department();
+        return existingDept != null && GLOBAL.equalsIgnoreCase(existingDept)
+                && candidateDept != null && !GLOBAL.equalsIgnoreCase(candidateDept);
     }
 
     private void rebuildIndex() {

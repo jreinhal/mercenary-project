@@ -24,10 +24,13 @@ public class ThesaurusToolsConfig {
             }
             String dept = request.department();
             int k = request.topK() != null ? request.topK().intValue() : 5;
+            String safeDept = LogSanitizer.querySummary(dept);
 
             // Avoid logging raw user input (log forging); only log a safe summary.
-            log.info("Agent Tool Invoked: searchThesaurus(termSummary={}, dept={})",
-                    LogSanitizer.querySummary(request.term()), dept);
+            if (log.isInfoEnabled()) {
+                log.info("Agent Tool Invoked: searchThesaurus(termSummary={}, dept={})",
+                        LogSanitizer.querySummary(request.term()), safeDept);
+            }
 
             List<ThesaurusMatch> matches = domainThesaurus.search(request.term(), dept, k);
             if (matches == null || matches.isEmpty()) {
@@ -45,4 +48,3 @@ public class ThesaurusToolsConfig {
     public record ThesaurusSearchRequest(String term, String department, Integer topK) {
     }
 }
-
