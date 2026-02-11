@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -63,5 +64,40 @@ class SourceDocumentServiceTest {
         Optional<byte[]> loaded = sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "big.pdf");
 
         assertFalse(loaded.isPresent());
+    }
+
+    @Test
+    void doesNotStoreSourceWhenRetentionDisabled() {
+        ReflectionTestUtils.setField(sourceDocumentService, "sourcePdfRetentionEnabled", false);
+        sourceDocumentService.storePdfSource("ws", Department.ENTERPRISE, "file.pdf", new byte[]{1, 2, 3});
+        assertFalse(sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "file.pdf").isPresent());
+    }
+
+    @Test
+    void storesSourceInHipaaStrictWhenExplicitlyAllowed() {
+        ReflectionTestUtils.setField(sourceDocumentService, "allowHipaaStrictRetention", true);
+        when(hipaaPolicy.shouldDisableVisual(eq(Department.MEDICAL))).thenReturn(true);
+
+        sourceDocumentService.storePdfSource("ws", Department.MEDICAL, "allowed.pdf", new byte[]{7, 8, 9});
+        assertTrue(sourceDocumentService.getPdfSource("ws", "MEDICAL", "allowed.pdf").isPresent());
+    }
+
+    @Test
+    void returnsEmptyForInvalidLookupInputs() {
+        assertFalse(sourceDocumentService.getPdfSource("", "ENTERPRISE", "file.pdf").isPresent());
+        assertFalse(sourceDocumentService.getPdfSource("ws", "", "file.pdf").isPresent());
+        assertFalse(sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "").isPresent());
+    }
+
+    @Test
+    void returnedBytesAreDefensiveCopies() {
+        when(hipaaPolicy.shouldDisableVisual(any(Department.class))).thenReturn(false);
+        sourceDocumentService.storePdfSource("ws", Department.ENTERPRISE, "copy.pdf", new byte[]{5, 6, 7});
+
+        byte[] firstRead = sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "copy.pdf").orElseThrow();
+        firstRead[0] = 99;
+        byte[] secondRead = sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "copy.pdf").orElseThrow();
+
+        assertArrayEquals(new byte[]{5, 6, 7}, secondRead);
     }
 }

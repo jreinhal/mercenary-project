@@ -3,7 +3,9 @@ package com.jreinhal.mercenary.controller;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.config.SectorConfig;
 import com.jreinhal.mercenary.filter.SecurityContext;
+import com.jreinhal.mercenary.model.ClearanceLevel;
 import com.jreinhal.mercenary.model.User;
+import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.service.ConversationMemoryProvider;
 import com.jreinhal.mercenary.service.SessionPersistenceProvider;
 import com.jreinhal.mercenary.rag.ModalityRouter;
@@ -35,6 +37,7 @@ import com.jreinhal.mercenary.dto.EnhancedAskResponse;
 import com.jreinhal.mercenary.reasoning.ReasoningTrace;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -265,6 +268,214 @@ class MercenaryControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/source/page rejects invalid sector")
+    void sourcePageRejectsInvalidSector() throws Exception {
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "INVALID")
+                        .param("page", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Invalid sector")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page rejects invalid filename")
+    void sourcePageRejectsInvalidFilename() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "../secrets.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Invalid filename")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page rejects page numbers less than 1")
+    void sourcePageRejectsInvalidPageNumber() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("page must be >= 1")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page returns 400 when renderer rejects request")
+    void sourcePageReturnsBadRequestOnRendererValidationError() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+        when(sourceDocumentService.getPdfSource(eq("workspace_default"), eq("ENTERPRISE"), eq("demo.pdf")))
+                .thenReturn(java.util.Optional.of(new byte[]{0x25, 0x50, 0x44, 0x46}));
+        when(pageRenderService.renderPagePng(any(byte[].class), eq(1)))
+                .thenThrow(new IllegalArgumentException("Requested page is out of range."));
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("out of range")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page returns 500 when renderer fails unexpectedly")
+    void sourcePageReturnsServerErrorOnRendererFailure() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+        when(sourceDocumentService.getPdfSource(eq("workspace_default"), eq("ENTERPRISE"), eq("demo.pdf")))
+                .thenReturn(java.util.Optional.of(new byte[]{0x25, 0x50, 0x44, 0x46}));
+        when(pageRenderService.renderPagePng(any(byte[].class), eq(1)))
+                .thenThrow(new RuntimeException("renderer crash"));
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Unable to render source page")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page denies user without QUERY permission")
+    void sourcePageDeniesUserWithoutQueryPermission() throws Exception {
+        SecurityContext.setCurrentUser(buildUser(Set.of(), Set.of(Department.ENTERPRISE), ClearanceLevel.UNCLASSIFIED));
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Insufficient permissions")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page denies sector access when user not allowed")
+    void sourcePageDeniesUnauthorizedSector() throws Exception {
+        SecurityContext.setCurrentUser(buildUser(Set.of(UserRole.VIEWER), Set.of(Department.ENTERPRISE), ClearanceLevel.UNCLASSIFIED));
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "GOVERNMENT")
+                        .param("page", "1"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Unauthorized sector")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/page denies access when clearance is insufficient")
+    void sourcePageDeniesInsufficientClearance() throws Exception {
+        SecurityContext.setCurrentUser(buildUser(Set.of(UserRole.VIEWER), Set.of(Department.GOVERNMENT), ClearanceLevel.UNCLASSIFIED));
+        when(sectorConfig.requiresElevatedClearance(Department.GOVERNMENT)).thenReturn(true);
+
+        mockMvc.perform(get("/api/source/page")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "GOVERNMENT")
+                        .param("page", "1"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Insufficient clearance")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/region propagates access validation errors")
+    void sourceRegionReturnsAccessError() throws Exception {
+        mockMvc.perform(get("/api/source/region")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "INVALID")
+                        .param("page", "1")
+                        .param("x", "1")
+                        .param("y", "1")
+                        .param("width", "10")
+                        .param("height", "10"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /api/source/region returns 400 for invalid page")
+    void sourceRegionRejectsInvalidPage() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+
+        mockMvc.perform(get("/api/source/region")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "0")
+                        .param("x", "1")
+                        .param("y", "1")
+                        .param("width", "10")
+                        .param("height", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("page must be >= 1")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/region returns 404 when source bytes are unavailable")
+    void sourceRegionReturnsNotFoundWhenSourceMissing() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+        when(sourceDocumentService.getPdfSource(eq("workspace_default"), eq("ENTERPRISE"), eq("demo.pdf")))
+                .thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/source/region")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1")
+                        .param("x", "1")
+                        .param("y", "1")
+                        .param("width", "10")
+                        .param("height", "10"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("SOURCE BYTES UNAVAILABLE")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/region returns 400 when renderer rejects region request")
+    void sourceRegionReturnsBadRequestOnRendererValidationError() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+        when(sourceDocumentService.getPdfSource(eq("workspace_default"), eq("ENTERPRISE"), eq("demo.pdf")))
+                .thenReturn(java.util.Optional.of(new byte[]{0x25, 0x50, 0x44, 0x46}));
+        when(pageRenderService.renderRegionPng(any(byte[].class), eq(1), eq(10), eq(20), eq(30), eq(40), eq(5), eq(6)))
+                .thenThrow(new IllegalArgumentException("width and height must be > 0."));
+
+        mockMvc.perform(get("/api/source/region")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1")
+                        .param("x", "10")
+                        .param("y", "20")
+                        .param("width", "30")
+                        .param("height", "40")
+                        .param("expandAbove", "5")
+                        .param("expandBelow", "6"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("width and height")));
+    }
+
+    @Test
+    @DisplayName("GET /api/source/region returns 500 when renderer fails unexpectedly")
+    void sourceRegionReturnsServerErrorOnRendererFailure() throws Exception {
+        when(sectorConfig.requiresElevatedClearance(any())).thenReturn(false);
+        when(sourceDocumentService.getPdfSource(eq("workspace_default"), eq("ENTERPRISE"), eq("demo.pdf")))
+                .thenReturn(java.util.Optional.of(new byte[]{0x25, 0x50, 0x44, 0x46}));
+        when(pageRenderService.renderRegionPng(any(byte[].class), eq(1), eq(10), eq(20), eq(30), eq(40), eq(5), eq(6)))
+                .thenThrow(new RuntimeException("renderer crash"));
+
+        mockMvc.perform(get("/api/source/region")
+                        .param("fileName", "demo.pdf")
+                        .param("dept", "ENTERPRISE")
+                        .param("page", "1")
+                        .param("x", "10")
+                        .param("y", "20")
+                        .param("width", "30")
+                        .param("height", "40")
+                        .param("expandAbove", "5")
+                        .param("expandBelow", "6"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Unable to render source region")));
+    }
+
+    @Test
     @DisplayName("GET /api/ask delegates to ragOrchestrationService.ask()")
     void askDelegatesToService() throws Exception {
         when(ragOrchestrationService.ask(anyString(), anyString(), any(), any(), any()))
@@ -391,5 +602,18 @@ class MercenaryControllerTest {
         mockMvc.perform(get("/api/reasoning/any-trace"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").value("Authentication required"));
+    }
+
+    private static User buildUser(Set<UserRole> roles, Set<Department> allowedSectors, ClearanceLevel clearance) {
+        User user = new User();
+        user.setId("u-test");
+        user.setUsername("u-test");
+        user.setDisplayName("u-test");
+        user.setRoles(roles);
+        user.setAllowedSectors(allowedSectors);
+        user.setClearance(clearance);
+        user.setWorkspaceIds(Set.of("workspace_default"));
+        user.setActive(true);
+        return user;
     }
 }

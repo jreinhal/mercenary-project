@@ -107,6 +107,39 @@ public class PageRenderService {
         return value;
     }
 
-    public record RenderedImage(byte[] imageBytes, int pageNumber, int pageCount, int width, int height) {
+    public static final class RenderedImage {
+        private final byte[] imageBytes;
+        private final int pageNumber;
+        private final int pageCount;
+        private final int width;
+        private final int height;
+
+        public RenderedImage(byte[] imageBytes, int pageNumber, int pageCount, int width, int height) {
+            this.imageBytes = imageBytes != null ? imageBytes.clone() : new byte[0];
+            this.pageNumber = pageNumber;
+            this.pageCount = pageCount;
+            this.width = width;
+            this.height = height;
+        }
+
+        public byte[] imageBytes() {
+            return this.imageBytes.clone();
+        }
+
+        public int pageNumber() {
+            return this.pageNumber;
+        }
+
+        public int pageCount() {
+            return this.pageCount;
+        }
+
+        public int width() {
+            return this.width;
+        }
+
+        public int height() {
+            return this.height;
+        }
     }
 }

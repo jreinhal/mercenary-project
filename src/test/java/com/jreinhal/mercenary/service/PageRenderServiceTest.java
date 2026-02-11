@@ -56,6 +56,57 @@ class PageRenderServiceTest {
                 pageRenderService.renderRegionPng(pdfBytes, 1, 0, 0, 0, 100, 10, 10));
     }
 
+    @Test
+    void renderPageRejectsNullPdfBytes() {
+        assertThrows(IllegalArgumentException.class, () -> pageRenderService.renderPagePng(null, 1));
+    }
+
+    @Test
+    void renderPageRejectsZeroPageNumber() throws Exception {
+        byte[] pdfBytes = buildPdfWithPages(1);
+        assertThrows(IllegalArgumentException.class, () -> pageRenderService.renderPagePng(pdfBytes, 0));
+    }
+
+    @Test
+    void renderRegionRejectsNegativeExpandValues() throws Exception {
+        byte[] pdfBytes = buildPdfWithPages(1);
+        assertThrows(IllegalArgumentException.class, () ->
+                pageRenderService.renderRegionPng(pdfBytes, 1, 0, 0, 10, 10, -1, 0));
+    }
+
+    @Test
+    void renderRegionRejectsOutOfRangePage() throws Exception {
+        byte[] pdfBytes = buildPdfWithPages(1);
+        assertThrows(IllegalArgumentException.class, () ->
+                pageRenderService.renderRegionPng(pdfBytes, 2, 0, 0, 10, 10, 0, 0));
+    }
+
+    @Test
+    void renderRegionClampsCoordinatesOutsidePageBounds() throws Exception {
+        byte[] pdfBytes = buildPdfWithPages(1);
+        PageRenderService.RenderedImage rendered = pageRenderService.renderRegionPng(
+                pdfBytes, 1, 99999, 99999, 50, 50, 0, 0);
+        assertTrue(rendered.imageBytes().length > 0);
+    }
+
+    @Test
+    void renderPageDownscalesWhenPixelBudgetExceeded() throws Exception {
+        ReflectionTestUtils.setField(pageRenderService, "maxOutputPixels", 5_000);
+        byte[] pdfBytes = buildPdfWithPages(1);
+        PageRenderService.RenderedImage rendered = pageRenderService.renderPagePng(pdfBytes, 1);
+        assertTrue((rendered.width() * rendered.height()) <= 5_000);
+    }
+
+    @Test
+    void renderedImageExposesDefensiveByteArray() throws Exception {
+        byte[] pdfBytes = buildPdfWithPages(1);
+        PageRenderService.RenderedImage rendered = pageRenderService.renderPagePng(pdfBytes, 1);
+        byte[] first = rendered.imageBytes();
+        first[0] = (byte) (first[0] ^ 0x7F);
+        byte[] second = rendered.imageBytes();
+        assertTrue(first[0] != second[0]);
+    }
+
     private static byte[] buildPdfWithPages(int pageCount) throws Exception {
         try (PDDocument doc = new PDDocument();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
