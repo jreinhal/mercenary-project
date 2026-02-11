@@ -23,6 +23,7 @@ class TableExtractorTest {
         TableExtractor extractor = new TableExtractor();
         ReflectionTestUtils.setField(extractor, "enabled", true);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 20000);
 
         byte[] pdfBytes = buildSimpleTablePdf();
         List<Document> tables = extractor.extractTables(pdfBytes, "simple.pdf");
@@ -43,6 +44,7 @@ class TableExtractorTest {
         TableExtractor extractor = new TableExtractor();
         ReflectionTestUtils.setField(extractor, "enabled", false);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 20000);
 
         byte[] pdfBytes = buildSimpleTablePdf();
         List<Document> tables = extractor.extractTables(pdfBytes, "simple.pdf");
@@ -56,6 +58,7 @@ class TableExtractorTest {
         TableExtractor extractor = new TableExtractor();
         ReflectionTestUtils.setField(extractor, "enabled", true);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 20000);
 
         byte[] notPdf = "not a pdf".getBytes(StandardCharsets.UTF_8);
         List<Document> tables = extractor.extractTables(notPdf, "bad.pdf");
@@ -69,6 +72,7 @@ class TableExtractorTest {
         TableExtractor extractor = new TableExtractor();
         ReflectionTestUtils.setField(extractor, "enabled", true);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 20000);
 
         byte[] pdfBytes = buildSimpleTablePdf();
         List<Document> tables = extractor.extractTables(pdfBytes, " ");
@@ -82,6 +86,7 @@ class TableExtractorTest {
         TableExtractor extractor = new TableExtractor();
         ReflectionTestUtils.setField(extractor, "enabled", true);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 20000);
 
         List<Document> tables = extractor.extractTables(null, "simple.pdf");
 
@@ -94,6 +99,7 @@ class TableExtractorTest {
         TableExtractor extractor = new TableExtractor();
         ReflectionTestUtils.setField(extractor, "enabled", true);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 20000);
 
         List<Document> tables = extractor.extractTables(new byte[0], "simple.pdf");
 
@@ -106,6 +112,7 @@ class TableExtractorTest {
         TableExtractor extractor = new TableExtractor();
         ReflectionTestUtils.setField(extractor, "enabled", true);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+        ReflectionTestUtils.setField(extractor, "maxTableChars", 20000);
 
         byte[] pdfBytes = buildSimpleTablePdf();
         List<Document> tables = extractor.extractTables(pdfBytes, null);

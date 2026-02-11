@@ -19,6 +19,18 @@ import technology.tabula.extractors.BasicExtractionAlgorithm;
 import technology.tabula.extractors.SpreadsheetExtractionAlgorithm;
 import technology.tabula.RectangularTextContainer;
 
+/**
+ * Extracts tables from the text layer of a PDF using Tabula and emits them as atomic markdown documents.
+ *
+ * Configuration:
+ * - {@code sentinel.ingest.tables.enabled} (default {@code true}): enable/disable table extraction
+ * - {@code sentinel.ingest.tables.max-tables-per-document} (default {@code 50}): safety cap per PDF
+ * - {@code sentinel.ingest.tables.max-table-chars} (default {@code 20000}): truncation cap for a single table document
+ *
+ * Notes:
+ * - This extractor is intended for text-layer PDFs. For scanned/image-only PDFs, extraction typically yields an empty list.
+ * - Returned {@link Document}s include {@code metadata.type=table} and page/table indices so downstream chunking can keep them atomic.
+ */
 @Service
 public class TableExtractor {
     private static final Logger log = LoggerFactory.getLogger(TableExtractor.class);

@@ -210,14 +210,15 @@ public class SecureIngestionService {
 
             TokenTextSplitter splitter = new TokenTextSplitter(this.chunkSizeTokens, this.minChunkSizeChars, this.minChunkLengthToEmbed, this.maxNumChunks, this.keepSeparator);
             List<Document> splitDocuments = splitter.apply(splitCandidates);
+            if (this.chunkMergeEnabled) {
+                splitDocuments = this.mergeSmallChunks(splitDocuments, this.chunkMergeMinTokens, this.chunkMergeMaxTokens);
+            }
             if (!atomicDocs.isEmpty()) {
+                // Keep table docs atomic (no splitter, no merge).
                 List<Document> combined = new ArrayList<>(splitDocuments.size() + atomicDocs.size());
                 combined.addAll(splitDocuments);
                 combined.addAll(atomicDocs);
                 splitDocuments = combined;
-            }
-            if (this.chunkMergeEnabled) {
-                splitDocuments = this.mergeSmallChunks(splitDocuments, this.chunkMergeMinTokens, this.chunkMergeMaxTokens);
             }
             this.assignChunkIndices(splitDocuments);
             List<Document> finalDocuments = new ArrayList<>();
@@ -518,7 +519,7 @@ public class SecureIngestionService {
     }
 
     private List<byte[]> extractEmbeddedImages(byte[] fileBytes) {
-        ArrayList<byte[]> images = new ArrayList<>();
+        List<byte[]> images = new ArrayList<>();
         if (fileBytes == null || fileBytes.length == 0) {
             return images;
         }
