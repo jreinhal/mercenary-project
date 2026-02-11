@@ -32,6 +32,7 @@ public final class DocumentTemporalMetadataExtractor {
             "\\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\s+(\\d{1,2})(?:,)?\\s+((?:19|20)\\d{2})\\b",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern YEAR_ONLY = Pattern.compile("\\b((?:19|20)\\d{2})\\b");
+    private static final Pattern FILENAME_YEAR = Pattern.compile("(?<!\\d)((?:19|20)\\d{2})(?!\\d)");
 
     private DocumentTemporalMetadataExtractor() {}
 
@@ -119,7 +120,7 @@ public final class DocumentTemporalMetadataExtractor {
         if (filename == null || filename.isBlank()) {
             return new TemporalMetadata(null, null, null);
         }
-        Matcher m = YEAR_ONLY.matcher(filename);
+        Matcher m = FILENAME_YEAR.matcher(filename);
         if (!m.find()) {
             return new TemporalMetadata(null, null, null);
         }
@@ -266,4 +267,3 @@ public final class DocumentTemporalMetadataExtractor {
         return modified;
     }
 }
-

@@ -2,8 +2,10 @@ package com.jreinhal.mercenary.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.ByteArrayOutputStream;
+import java.util.List;
 import java.util.Calendar;
 import java.util.TimeZone;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -65,5 +67,34 @@ class DocumentTemporalMetadataExtractorTest {
         assertNotNull(meta.documentDateEpoch());
         assertEquals("pdf_metadata", meta.documentDateSource());
     }
-}
 
+    @Test
+    void extractsYearOnlyWhenNoFullDateIsPresent() {
+        DocumentTemporalMetadataExtractor.TemporalMetadata meta =
+                DocumentTemporalMetadataExtractor.extractFromText("Prepared in 2018\nNo specific date here");
+
+        assertEquals(2018, meta.documentYear());
+        assertNull(meta.documentDateEpoch());
+        assertEquals("text_year", meta.documentDateSource());
+    }
+
+    @Test
+    void fallsBackToFilenameYearWhenBytesAndTextAreEmpty() {
+        DocumentTemporalMetadataExtractor.TemporalMetadata meta =
+                DocumentTemporalMetadataExtractor.extract(new byte[0], "text/plain", List.of(), "report-2017.txt");
+
+        assertEquals(2017, meta.documentYear());
+        assertNull(meta.documentDateEpoch());
+        assertEquals("filename_year", meta.documentDateSource());
+    }
+
+    @Test
+    void ignoresOutOfRangeFutureDates() {
+        // 2099 matches the regex but should be rejected by safeYear().
+        DocumentTemporalMetadataExtractor.TemporalMetadata meta =
+                DocumentTemporalMetadataExtractor.extractFromText("Report Date: 2099-01-01");
+
+        assertNull(meta.documentYear());
+        assertNull(meta.documentDateEpoch());
+    }
+}

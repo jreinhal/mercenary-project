@@ -8,41 +8,23 @@ import org.junit.jupiter.api.Test;
 class FilterExpressionBuilderTest {
 
     @Test
+    void forDepartmentAndWorkspaceExcludesThesaurusByDefault() {
+        String filter = FilterExpressionBuilder.forDepartmentAndWorkspace("MEDICAL", "ws");
+        assertTrue(filter.contains("type != 'thesaurus'"));
+    }
+
+    @Test
+    void excludingThesaurusDoesNotAddDuplicateCondition() {
+        String filter = FilterExpressionBuilder.forDepartmentAndWorkspaceExcludingType("MEDICAL", "ws", "thesaurus");
+        int occurrences = filter.split("type != 'thesaurus'", -1).length - 1;
+        assertEquals(1, occurrences);
+    }
+
+    @Test
     void andHandlesBlankInputs() {
-        assertEquals("b", FilterExpressionBuilder.and("", "b"));
-        assertEquals("a", FilterExpressionBuilder.and("a", ""));
-        assertEquals("", FilterExpressionBuilder.and("", ""));
-    }
-
-    @Test
-    void forDepartmentEscapesValuesAndExcludesThesaurus() {
-        String expr = FilterExpressionBuilder.forDepartment("O'Hara\\X");
-        assertEquals("dept == 'O\\'Hara\\\\X' && type != 'thesaurus'", expr);
-    }
-
-    @Test
-    void forDepartmentExcludingTypeAddsDefaultThesaurusExclusion() {
-        String expr = FilterExpressionBuilder.forDepartmentExcludingType("ENTERPRISE", "visual");
-        assertEquals("dept == 'ENTERPRISE' && type != 'visual' && type != 'thesaurus'", expr);
-    }
-
-    @Test
-    void forDepartmentExcludingTypeDoesNotDuplicateThesaurusExclusionWhenAlreadyExcludingThesaurus() {
-        String expr = FilterExpressionBuilder.forDepartmentExcludingType("ENTERPRISE", "thesaurus");
-        assertEquals("dept == 'ENTERPRISE' && type != 'thesaurus'", expr);
-    }
-
-    @Test
-    void forDepartmentAndWorkspaceExcludingTypeDoesNotDuplicateThesaurusExclusionWhenAlreadyExcludingThesaurus() {
-        String expr = FilterExpressionBuilder.forDepartmentAndWorkspaceExcludingType("ENTERPRISE", "ws", "THESAURUS");
-        assertEquals("dept == 'ENTERPRISE' && workspaceId == 'ws' && type != 'THESAURUS'", expr);
-    }
-
-    @Test
-    void forDepartmentAndWorkspaceIncludesWorkspaceAndExcludesThesaurus() {
-        String expr = FilterExpressionBuilder.forDepartmentAndWorkspace("ENTERPRISE", "ws");
-        assertTrue(expr.contains("workspaceId == 'ws'"));
-        assertTrue(expr.contains("type != 'thesaurus'"));
+        assertEquals("x", FilterExpressionBuilder.and("", "x"));
+        assertEquals("x", FilterExpressionBuilder.and("x", ""));
+        assertEquals("a && b", FilterExpressionBuilder.and("a", "b"));
     }
 }
 

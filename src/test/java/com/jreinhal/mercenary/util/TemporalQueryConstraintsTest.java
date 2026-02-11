@@ -29,5 +29,15 @@ class TemporalQueryConstraintsTest {
     void avoidsAccidentalYearMatchesWhenNoTemporalHints() {
         assertTrue(TemporalQueryConstraints.buildDocumentYearFilter("DOC-ID ABC-2020-XYZ").isBlank());
     }
-}
 
+    @Test
+    void supportsSinceAndBefore() {
+        assertEquals("documentYear >= 2019", TemporalQueryConstraints.buildDocumentYearFilter("since 2019 show changes"));
+        assertEquals("documentYear <= 2010", TemporalQueryConstraints.buildDocumentYearFilter("before 2010 policies"));
+    }
+
+    @Test
+    void normalizesReversedYearRanges() {
+        assertEquals("documentYear >= 2020 && documentYear <= 2022", TemporalQueryConstraints.buildDocumentYearFilter("between 2022 and 2020"));
+    }
+}

@@ -52,4 +52,21 @@ class FilterExpressionEvaluatorTest {
         FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse("this is not a filter");
         assertFalse(FilterExpressionEvaluator.matches(Map.of("dept", "MEDICAL"), parsed));
     }
+
+    @Test
+    void supportsNotEqualsWithMissingMetaAsTrue() {
+        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse("type != 'thesaurus'");
+        assertTrue(FilterExpressionEvaluator.matches(Map.of(), parsed), "Missing type should satisfy '!='");
+    }
+
+    @Test
+    void supportsStrictGreaterAndLessThan() {
+        FilterExpressionParser.ParsedFilter gt = FilterExpressionParser.parse("documentYear > 2020");
+        assertTrue(FilterExpressionEvaluator.matches(Map.of("documentYear", "2021"), gt));
+        assertFalse(FilterExpressionEvaluator.matches(Map.of("documentYear", 2020), gt));
+
+        FilterExpressionParser.ParsedFilter lt = FilterExpressionParser.parse("documentYear < 2020");
+        assertTrue(FilterExpressionEvaluator.matches(Map.of("documentYear", 2019), lt));
+        assertFalse(FilterExpressionEvaluator.matches(Map.of("documentYear", 2020), lt));
+    }
 }

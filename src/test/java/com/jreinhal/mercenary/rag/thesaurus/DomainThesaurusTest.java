@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.rag.thesaurus;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -91,5 +92,70 @@ class DomainThesaurusTest {
         } finally {
             WorkspaceContext.clear();
         }
+    }
+
+    @Test
+    void expandQueryReturnsEmptyWhenDisabled() {
+        DomainThesaurusProperties props = new DomainThesaurusProperties();
+        props.setEnabled(false);
+        props.setEntries(Map.of("GLOBAL", Map.of("HIPAA", List.of("x"))));
+
+        DomainThesaurus thesaurus = new DomainThesaurus(props, null);
+        thesaurus.init();
+
+        assertTrue(thesaurus.expandQuery("HIPAA", "MEDICAL", 5).isEmpty());
+    }
+
+    @Test
+    void expandsTemperatureConversionWhenEnabled() {
+        DomainThesaurusProperties props = new DomainThesaurusProperties();
+        props.setEnabled(true);
+        props.setUnitConversionEnabled(true);
+        props.setMaxQueryVariants(10);
+        props.setEntries(Map.of());
+
+        DomainThesaurus thesaurus = new DomainThesaurus(props, null);
+        thesaurus.init();
+
+        List<String> variants = thesaurus.expandQuery("temp 32 F", "ENTERPRISE", 5);
+        assertTrue(variants.stream().anyMatch(v -> v.contains("0 C")));
+    }
+
+    @Test
+    void searchFallsBackToLexicalWhenVectorSearchFails() {
+        DomainThesaurusProperties props = new DomainThesaurusProperties();
+        props.setEnabled(true);
+        props.setVectorIndexEnabled(true);
+        props.setMaxQueryVariants(10);
+        props.setEntries(Map.of("GLOBAL", Map.of(
+                "HIPAA", List.of("Health Insurance Portability and Accountability Act")
+        )));
+
+        VectorStore vectorStore = mock(VectorStore.class);
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenThrow(new RuntimeException("boom"));
+
+        DomainThesaurus thesaurus = new DomainThesaurus(props, vectorStore);
+        thesaurus.init();
+
+        List<DomainThesaurus.ThesaurusMatch> matches = thesaurus.search("HIPAA", "MEDICAL", 5);
+        assertFalse(matches.isEmpty());
+        assertTrue(matches.stream().anyMatch(m -> m.term().equalsIgnoreCase("HIPAA")));
+    }
+
+    @Test
+    void searchCanMatchOnExpansionText() {
+        DomainThesaurusProperties props = new DomainThesaurusProperties();
+        props.setEnabled(true);
+        props.setVectorIndexEnabled(false);
+        props.setEntries(Map.of("GLOBAL", Map.of(
+                "HIPAA", List.of("Health Insurance Portability and Accountability Act")
+        )));
+
+        DomainThesaurus thesaurus = new DomainThesaurus(props, null);
+        thesaurus.init();
+
+        List<DomainThesaurus.ThesaurusMatch> matches = thesaurus.search("health insurance", "ENTERPRISE", 5);
+        assertFalse(matches.isEmpty());
+        assertTrue(matches.stream().anyMatch(m -> m.term().equalsIgnoreCase("HIPAA")));
     }
 }
