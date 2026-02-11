@@ -116,7 +116,7 @@ public class TableExtractor {
         }
 
         if (!out.isEmpty()) {
-            log.info("TableExtractor: extracted {} table(s) from {}", out.size(), filename);
+            log.info("TableExtractor: extracted {} table(s)", out.size());
         }
         return out;
     }

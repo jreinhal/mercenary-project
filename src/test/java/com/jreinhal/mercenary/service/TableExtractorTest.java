@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -56,7 +57,7 @@ class TableExtractorTest {
         ReflectionTestUtils.setField(extractor, "enabled", true);
         ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
 
-        byte[] notPdf = "not a pdf".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] notPdf = "not a pdf".getBytes(StandardCharsets.UTF_8);
         List<Document> tables = extractor.extractTables(notPdf, "bad.pdf");
 
         assertNotNull(tables);
@@ -74,6 +75,56 @@ class TableExtractorTest {
 
         assertNotNull(tables);
         assertFalse(tables.isEmpty());
+    }
+
+    @Test
+    void extractTablesReturnsEmptyWhenPdfBytesNull() {
+        TableExtractor extractor = new TableExtractor();
+        ReflectionTestUtils.setField(extractor, "enabled", true);
+        ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+
+        List<Document> tables = extractor.extractTables(null, "simple.pdf");
+
+        assertNotNull(tables);
+        assertTrue(tables.isEmpty());
+    }
+
+    @Test
+    void extractTablesReturnsEmptyWhenPdfBytesEmpty() {
+        TableExtractor extractor = new TableExtractor();
+        ReflectionTestUtils.setField(extractor, "enabled", true);
+        ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+
+        List<Document> tables = extractor.extractTables(new byte[0], "simple.pdf");
+
+        assertNotNull(tables);
+        assertTrue(tables.isEmpty());
+    }
+
+    @Test
+    void extractTablesAcceptsNullFilename() throws Exception {
+        TableExtractor extractor = new TableExtractor();
+        ReflectionTestUtils.setField(extractor, "enabled", true);
+        ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 10);
+
+        byte[] pdfBytes = buildSimpleTablePdf();
+        List<Document> tables = extractor.extractTables(pdfBytes, null);
+
+        assertNotNull(tables);
+        assertFalse(tables.isEmpty());
+    }
+
+    @Test
+    void extractTablesHonorsMaxTablesPerDocument() throws Exception {
+        TableExtractor extractor = new TableExtractor();
+        ReflectionTestUtils.setField(extractor, "enabled", true);
+        ReflectionTestUtils.setField(extractor, "maxTablesPerDocument", 0);
+
+        byte[] pdfBytes = buildSimpleTablePdf();
+        List<Document> tables = extractor.extractTables(pdfBytes, "simple.pdf");
+
+        assertNotNull(tables);
+        assertTrue(tables.isEmpty());
     }
 
     private static byte[] buildSimpleTablePdf() throws Exception {
