@@ -57,6 +57,7 @@ public class SecureIngestionService {
     private final MegaRagService megaRagService;
     private final HyperGraphMemory hyperGraphMemory;
     private final LightOnOcrService lightOnOcrService;
+    private final TableExtractor tableExtractor;
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final Tika tika;
@@ -96,7 +97,7 @@ public class SecureIngestionService {
     private static final EncodingRegistry TOKEN_ENCODING_REGISTRY = Encodings.newLazyEncodingRegistry();
     private static final Encoding TOKEN_ENCODING = TOKEN_ENCODING_REGISTRY.getEncoding(EncodingType.CL100K_BASE);
 
-    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
+    public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, TableExtractor tableExtractor, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
         this.vectorStore = vectorStore;
         this.piiRedactionService = piiRedactionService;
         this.partitionAssigner = partitionAssigner;
@@ -104,6 +105,7 @@ public class SecureIngestionService {
         this.megaRagService = megaRagService;
         this.hyperGraphMemory = hyperGraphMemory;
         this.lightOnOcrService = lightOnOcrService;
+        this.tableExtractor = tableExtractor;
         this.hipaaPolicy = hipaaPolicy;
         this.workspaceQuotaService = workspaceQuotaService;
         this.tika = new Tika();
@@ -144,14 +146,24 @@ public class SecureIngestionService {
                 int totalTextLength = rawDocuments.stream()
                     .mapToInt(doc -> doc.getContent() != null ? doc.getContent().length() : 0)
                     .sum();
+                boolean scannedPdf = totalTextLength < MIN_TEXT_LENGTH_FOR_VALID_PDF;
 
-                if (!hipaaStrict && totalTextLength < MIN_TEXT_LENGTH_FOR_VALID_PDF && this.ocrFallbackForScannedPdf
+                if (!hipaaStrict && scannedPdf && this.ocrFallbackForScannedPdf
                         && this.lightOnOcrService != null && this.lightOnOcrService.isEnabled()) {
                     log.info(">> SCANNED PDF DETECTED: Text extraction yielded only {} chars. Engaging LightOnOCR...", totalTextLength);
                     String ocrText = this.lightOnOcrService.ocrPdf(fileBytes, filename);
                     if (ocrText != null && !ocrText.isEmpty()) {
                         rawDocuments = List.of(new Document(ocrText, java.util.Map.of("source", filename, "ocr", "true")));
                         log.info(">> LightOnOCR: Successfully extracted {} chars from scanned PDF", ocrText.length());
+                    }
+                }
+
+                if (!scannedPdf && this.tableExtractor != null && this.tableExtractor.isEnabled()) {
+                    List<Document> tableDocs = this.tableExtractor.extractTables(fileBytes, filename);
+                    if (tableDocs != null && !tableDocs.isEmpty()) {
+                        ArrayList<Document> combined = new ArrayList<>(rawDocuments);
+                        combined.addAll(tableDocs);
+                        rawDocuments = combined;
                     }
                 }
 
@@ -175,8 +187,24 @@ public class SecureIngestionService {
                 mergedMeta.put("fileSizeBytes", fileBytes.length);
                 cleanDocs.add(new Document(doc.getContent(), mergedMeta));
             }
+            ArrayList<Document> atomicDocs = new ArrayList<>();
+            ArrayList<Document> splitCandidates = new ArrayList<>();
+            for (Document doc : cleanDocs) {
+                if (SecureIngestionService.isTableDoc(doc)) {
+                    atomicDocs.add(doc);
+                } else {
+                    splitCandidates.add(doc);
+                }
+            }
+
             TokenTextSplitter splitter = new TokenTextSplitter(this.chunkSizeTokens, this.minChunkSizeChars, this.minChunkLengthToEmbed, this.maxNumChunks, this.keepSeparator);
-            List<Document> splitDocuments = splitter.apply(cleanDocs);
+            List<Document> splitDocuments = splitter.apply(splitCandidates);
+            if (!atomicDocs.isEmpty()) {
+                ArrayList<Document> combined = new ArrayList<>(splitDocuments.size() + atomicDocs.size());
+                combined.addAll(splitDocuments);
+                combined.addAll(atomicDocs);
+                splitDocuments = combined;
+            }
             if (this.chunkMergeEnabled) {
                 splitDocuments = this.mergeSmallChunks(splitDocuments, this.chunkMergeMinTokens, this.chunkMergeMaxTokens);
             }
@@ -255,6 +283,18 @@ public class SecureIngestionService {
         return merged;
     }
 
+    private static boolean isTableDoc(Document doc) {
+        if (doc == null) {
+            return false;
+        }
+        Map<String, Object> meta = doc.getMetadata();
+        if (meta == null) {
+            return false;
+        }
+        Object type = meta.get("type");
+        return type != null && "table".equalsIgnoreCase(type.toString());
+    }
+
     private int countTokens(String text) {
         if (text == null || text.isBlank()) {
             return 0;
@@ -277,7 +317,16 @@ public class SecureIngestionService {
         Object pageNumber = meta.get("page_number");
         Object endPageNumber = meta.get("end_page_number");
         Object ocr = meta.get("ocr");
-        return Objects.toString(source, "") + "|" + Objects.toString(dept, "") + "|" + Objects.toString(workspaceId, "") + "|p=" + Objects.toString(pageNumber, "") + "|ep=" + Objects.toString(endPageNumber, "") + "|ocr=" + Objects.toString(ocr, "");
+        Object type = meta.get("type");
+        Object tableIndex = meta.get("table_index");
+        return Objects.toString(source, "")
+                + "|" + Objects.toString(dept, "")
+                + "|" + Objects.toString(workspaceId, "")
+                + "|p=" + Objects.toString(pageNumber, "")
+                + "|ep=" + Objects.toString(endPageNumber, "")
+                + "|ocr=" + Objects.toString(ocr, "")
+                + "|type=" + Objects.toString(type, "")
+                + "|tbl=" + Objects.toString(tableIndex, "");
     }
 
     private void assignChunkIndices(List<Document> docs) {

@@ -165,6 +165,21 @@ sentinel:
     max-docs: ${RAG_MAX_DOCS:12}
     max-visual-docs: ${RAG_MAX_VISUAL_DOCS:6}
 
+  ingest:
+    chunking:
+      chunk-size-tokens: ${INGEST_CHUNK_SIZE_TOKENS:800}
+      min-chunk-size-chars: ${INGEST_MIN_CHUNK_SIZE_CHARS:350}
+      min-chunk-length-to-embed: ${INGEST_MIN_CHUNK_LENGTH_TO_EMBED:5}
+      max-num-chunks: ${INGEST_MAX_NUM_CHUNKS:10000}
+      keep-separator: ${INGEST_KEEP_SEPARATOR:true}
+    chunk-merge:
+      enabled: ${INGEST_CHUNK_MERGE_ENABLED:true}
+      min-tokens: ${INGEST_CHUNK_MERGE_MIN_TOKENS:512}
+      max-tokens: ${INGEST_CHUNK_MERGE_MAX_TOKENS:2000}
+    tables:
+      enabled: ${INGEST_TABLES_ENABLED:true}
+      max-tables-per-document: ${INGEST_MAX_TABLES_PER_DOCUMENT:50}
+
   # License validation
   # When no key and no signing secret are set, runs in unlicensed mode (backward compatible).
   # To enforce licensing, set both LICENSE_KEY and LICENSE_SIGNING_SECRET.

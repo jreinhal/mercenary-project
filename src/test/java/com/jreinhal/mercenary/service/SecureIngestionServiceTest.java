@@ -5,9 +5,16 @@ import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import com.jreinhal.mercenary.rag.megarag.MegaRagService;
 import com.jreinhal.mercenary.rag.miarag.MiARagService;
 import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +52,9 @@ class SecureIngestionServiceTest {
     private LightOnOcrService lightOnOcrService;
 
     @Mock
+    private TableExtractor tableExtractor;
+
+    @Mock
     private HipaaPolicy hipaaPolicy;
     @Mock
     private com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
@@ -58,9 +68,10 @@ class SecureIngestionServiceTest {
         when(megaRagService.isEnabled()).thenReturn(false);
         when(hyperGraphMemory.isIndexingEnabled()).thenReturn(false);
         when(lightOnOcrService.isEnabled()).thenReturn(false);
+        when(tableExtractor.isEnabled()).thenReturn(false);
         when(hipaaPolicy.isStrict(any(Department.class))).thenReturn(false);
         when(hipaaPolicy.shouldDisableVisual(any(Department.class))).thenReturn(false);
-        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService, hipaaPolicy, workspaceQuotaService);
+        ingestionService = new SecureIngestionService(vectorStore, piiRedactionService, partitionAssigner, miARagService, megaRagService, hyperGraphMemory, lightOnOcrService, tableExtractor, hipaaPolicy, workspaceQuotaService);
     }
 
     @Test
@@ -81,6 +92,52 @@ class SecureIngestionServiceTest {
 
         // Should not throw
         assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+    }
+
+    @Test
+    @DisplayName("Should keep table documents atomic (not split/merged) when table extraction adds them")
+    void shouldKeepTableDocsAtomicWhenPresent() throws Exception {
+        // Make a PDF with enough text so it is not considered scanned.
+        byte[] pdfBytes = buildPdfWithText("x".repeat(400));
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "tables.pdf",
+                "application/pdf",
+                pdfBytes
+        );
+
+        // Return one synthetic table doc (already markdown) and ensure it bypasses splitting.
+        when(tableExtractor.isEnabled()).thenReturn(true);
+        Document tableDoc = new Document("| A | B |\n| --- | --- |\n| 1 | 2 |",
+                Map.of("type", "table", "page_number", 1, "table_index", 0));
+        when(tableExtractor.extractTables(any(), eq("tables.pdf"))).thenReturn(List.of(tableDoc));
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        AtomicReference<List<Document>> captured = new AtomicReference<>();
+        doAnswer(invocation -> {
+            captured.set(invocation.getArgument(0));
+            return null;
+        }).when(vectorStore).add(anyList());
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+
+        List<Document> added = captured.get();
+        assertNotNull(added);
+        assertFalse(added.isEmpty());
+
+        Document addedTable = added.stream()
+                .filter(d -> d.getMetadata() != null && "table".equalsIgnoreCase(String.valueOf(d.getMetadata().get("type"))))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(addedTable, "Expected at least one table document to be added to the vector store");
+        assertTrue(addedTable.getContent().contains("| A | B |"));
+        assertEquals(1, addedTable.getMetadata().get("page_number"));
+        assertEquals(0, addedTable.getMetadata().get("table_index"));
     }
 
     @Test
@@ -428,5 +485,22 @@ class SecureIngestionServiceTest {
 
         assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE),
             "Legitimate text files should still be accepted after blocklist expansion");
+    }
+
+    private static byte[] buildPdfWithText(String text) throws Exception {
+        try (PDDocument doc = new PDDocument()) {
+            PDPage page = new PDPage();
+            doc.addPage(page);
+            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                cs.beginText();
+                cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                cs.newLineAtOffset(50, 700);
+                cs.showText(text);
+                cs.endText();
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            return out.toByteArray();
+        }
     }
 }
