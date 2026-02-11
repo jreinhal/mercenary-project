@@ -38,5 +38,18 @@ class FilterExpressionEvaluatorTest {
         assertTrue(FilterExpressionEvaluator.matches(Map.of("dept", "GOVERNMENT", "documentYear", 2022), parsed));
         assertFalse(FilterExpressionEvaluator.matches(Map.of("dept", "ENTERPRISE", "documentYear", 2022), parsed));
     }
-}
 
+    @Test
+    void parsesLegacySpringAiExpressionFormat() {
+        String legacy = "Expression[type=GE, left=Key[key=documentYear], right=Value[value=2020]]";
+        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse(legacy);
+        assertTrue(FilterExpressionEvaluator.matches(Map.of("documentYear", 2021), parsed));
+        assertFalse(FilterExpressionEvaluator.matches(Map.of("documentYear", 2019), parsed));
+    }
+
+    @Test
+    void failsClosedWhenFilterCannotBeParsed() {
+        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse("this is not a filter");
+        assertFalse(FilterExpressionEvaluator.matches(Map.of("dept", "MEDICAL"), parsed));
+    }
+}

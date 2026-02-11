@@ -2,7 +2,6 @@ package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.util.DocumentTemporalMetadataExtractor;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,7 +60,7 @@ public class MetadataBackfillService {
         seedQuery.limit(Math.max(1, this.maxSources));
 
         List<Map> seeds = this.mongoTemplate.find(seedQuery, Map.class, VECTOR_STORE_COLLECTION);
-        Set<String> sources = new HashSet<>();
+        Set<String> sources = new java.util.LinkedHashSet<>();
         for (Map seed : seeds) {
             Object meta = seed.get("metadata");
             if (!(meta instanceof Map<?, ?> metaMap)) {

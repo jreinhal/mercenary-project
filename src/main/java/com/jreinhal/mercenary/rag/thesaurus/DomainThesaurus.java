@@ -49,8 +49,8 @@ public class DomainThesaurus {
     @Nullable
     private final VectorStore vectorStore;
 
-    private volatile List<Entry> globalEntries = List.of();
-    private volatile Map<String, List<Entry>> deptEntries = Map.of();
+    private List<Entry> globalEntries = List.of();
+    private Map<String, List<Entry>> deptEntries = Map.of();
 
     private Cache<String, Boolean> indexedCache;
 
@@ -337,7 +337,19 @@ public class DomainThesaurus {
 
     private static String format(double value) {
         // Prefer stable formatting for retrieval (avoid scientific notation).
-        return String.format(Locale.ROOT, "%.3f", value).replaceAll("\\.?0+$", "");
+        String s = String.format(Locale.ROOT, "%.3f", value);
+        int dot = s.indexOf('.');
+        if (dot < 0) {
+            return s;
+        }
+        int end = s.length();
+        while (end > dot + 1 && s.charAt(end - 1) == '0') {
+            end--;
+        }
+        if (end > dot && s.charAt(end - 1) == '.') {
+            end--;
+        }
+        return s.substring(0, end);
     }
 
     private record ScoredMatch(ThesaurusMatch match, int score) {}
@@ -385,4 +397,3 @@ public class DomainThesaurus {
         }
     }
 }
-

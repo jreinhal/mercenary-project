@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.vector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,9 +18,6 @@ import java.util.regex.Pattern;
  * (best-effort, fail-closed).
  */
 final class FilterExpressionParser {
-    private static final Pattern IN_PATTERN = Pattern.compile("^(.+?)\\s+in\\s+(.+)$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern CMP_PATTERN = Pattern.compile("^(.+?)\\s*(==|!=|>=|<=|>|<)\\s*(.+)$");
-
     private FilterExpressionParser() {}
 
     static ParsedFilter parse(Object filterExpression) {
@@ -45,10 +43,10 @@ final class FilterExpressionParser {
             }
         }
 
-        String[] orParts = filter.split("\\s*\\|\\|\\s*");
+        List<String> orParts = splitByOperator(filter, "||");
         ArrayList<List<Condition>> groups = new ArrayList<>();
         for (String orPart : orParts) {
-            String[] andParts = orPart.split("\\s*&&\\s*");
+            List<String> andParts = splitByOperator(orPart, "&&");
             ArrayList<Condition> conditions = new ArrayList<>();
             for (String cond : andParts) {
                 Condition parsed = parseCondition(cond.trim());
@@ -72,22 +70,58 @@ final class FilterExpressionParser {
         }
         String normalized = condition.replaceAll("\\s+", " ").trim();
 
-        Matcher in = IN_PATTERN.matcher(normalized);
-        if (in.matches()) {
-            String key = in.group(1).trim();
-            String raw = in.group(2).trim();
-            List<String> values = parseList(raw);
-            return new Condition(key, "in", values);
-        }
-
-        Matcher cmp = CMP_PATTERN.matcher(normalized);
-        if (!cmp.matches()) {
+        // Fast-path for "in" (case-insensitive). This parser is intentionally simple; values should not contain " in ".
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        int inIdx = lower.indexOf(" in ");
+        if (inIdx > 0) {
+            String key = normalized.substring(0, inIdx).trim();
+            String raw = normalized.substring(inIdx + 4).trim();
+            if (!key.isBlank()) {
+                List<String> values = parseList(raw);
+                return new Condition(key, "in", values);
+            }
             return null;
         }
-        String key = cmp.group(1).trim();
-        String op = cmp.group(2).trim();
-        String rawValue = cmp.group(3).trim();
-        return new Condition(key, op, List.of(stripQuotes(rawValue)));
+
+        // Comparators: search in longest-first order.
+        String[] ops = new String[]{">=", "<=", "!=", "==", ">", "<"};
+        for (String op : ops) {
+            int idx = normalized.indexOf(op);
+            if (idx <= 0) {
+                continue;
+            }
+            String key = normalized.substring(0, idx).trim();
+            String rawValue = normalized.substring(idx + op.length()).trim();
+            if (key.isBlank() || rawValue.isBlank()) {
+                return null;
+            }
+            return new Condition(key, op, List.of(stripQuotes(rawValue)));
+        }
+
+        return null;
+    }
+
+    private static List<String> splitByOperator(String text, String operator) {
+        if (text == null) {
+            return List.of();
+        }
+        String t = text;
+        if (t.isBlank()) {
+            return List.of("");
+        }
+        ArrayList<String> parts = new ArrayList<>();
+        int idx = 0;
+        int opLen = operator.length();
+        while (true) {
+            int next = t.indexOf(operator, idx);
+            if (next < 0) {
+                parts.add(t.substring(idx).trim());
+                break;
+            }
+            parts.add(t.substring(idx, next).trim());
+            idx = next + opLen;
+        }
+        return parts;
     }
 
     private static List<String> parseList(String rawValue) {
@@ -126,7 +160,8 @@ final class FilterExpressionParser {
         //
         // We intentionally parse only explicit key/value comparisons, then treat them as a single AND-group.
         // If we can't extract any comparisons, the caller will fail closed.
-        Pattern pattern = Pattern.compile("Expression\\[type=(EQ|NE|IN|GE|LE|GT|LT),\\s*left=Key\\[key=([^\\]]+)\\],\\s*right=Value\\[value=([^\\]]+)\\]\\]");
+        // Use possessive quantifiers to avoid catastrophic backtracking (ReDoS).
+        Pattern pattern = Pattern.compile("Expression\\[type=(EQ|NE|IN|GE|LE|GT|LT|GTE|LTE),\\s*+left=Key\\[key=([^\\]]++)\\],\\s*+right=Value\\[value=([^\\]]++)\\]\\]");
         Matcher matcher = pattern.matcher(filter);
         ArrayList<Condition> conditions = new ArrayList<>();
         while (matcher.find()) {
@@ -140,8 +175,8 @@ final class FilterExpressionParser {
                 case "EQ" -> "==";
                 case "NE" -> "!=";
                 case "IN" -> "in";
-                case "GE" -> ">=";
-                case "LE" -> "<=";
+                case "GE", "GTE" -> ">=";
+                case "LE", "LTE" -> "<=";
                 case "GT" -> ">";
                 case "LT" -> "<";
                 default -> null;
