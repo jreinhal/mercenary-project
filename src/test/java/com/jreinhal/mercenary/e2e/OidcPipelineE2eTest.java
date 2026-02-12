@@ -1,6 +1,5 @@
 package com.jreinhal.mercenary.e2e;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -85,7 +84,7 @@ class OidcPipelineE2eTest {
         registry.add("app.auth-mode", () -> "OIDC");
         registry.add("app.oidc.issuer", () -> OIDC_ISSUER);
         registry.add("app.oidc.client-id", () -> OIDC_CLIENT_ID);
-        registry.add("app.oidc.local-jwks-path", () -> OIDC_JWKS_PATH.toString());
+        registry.add("app.oidc.local-jwks-path", OIDC_JWKS_PATH::toString);
         registry.add("app.oidc.authorization-uri", () -> "https://idp.e2e.local/authorize");
         registry.add("app.oidc.token-uri", () -> "https://idp.e2e.local/oauth/token");
         registry.add("app.guardrails.llm-enabled", () -> "false");
@@ -257,7 +256,7 @@ class OidcPipelineE2eTest {
         }
     }
 
-    private static class StubChatModel implements ChatModel {
+    private static final class StubChatModel implements ChatModel {
         @Override
         public ChatResponse call(Prompt prompt) {
             return new ChatResponse(List.of(new Generation(new AssistantMessage("Stub response"))));
