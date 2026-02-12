@@ -67,6 +67,18 @@ class Phase1PromptHardeningTest {
     }
 
     @Test
+    void buildSystemPromptReturnsNoDocsMessageWhenInformationMissing() throws Exception {
+        RagOrchestrationService service = newTestService();
+        Class<?> policyType = Class.forName("com.jreinhal.mercenary.service.RagOrchestrationService$ResponsePolicy");
+        Method m = RagOrchestrationService.class.getDeclaredMethod("buildSystemPrompt", String.class, policyType, Department.class);
+        m.setAccessible(true);
+
+        String prompt = (String) m.invoke(service, "   ", null, Department.ENTERPRISE);
+        assertNotNull(prompt);
+        assertTrue(prompt.contains("No documents are available"));
+    }
+
+    @Test
     void buildSystemPromptIncludesHypothesisDrivenReasoningMode() throws Exception {
         RagOrchestrationService service = newTestService();
         ReflectionTestUtils.setField(service, "quickLookupMaxTerms", 9);
@@ -115,6 +127,35 @@ class Phase1PromptHardeningTest {
                 null,
                 Department.ENTERPRISE);
         assertTrue(historical.contains("Detected query type: historical."));
+
+        String factual = (String) m.invoke(
+                service,
+                "What is operating pressure",
+                information,
+                null,
+                Department.ENTERPRISE);
+        assertTrue(factual.contains("Detected query type: factual."));
+    }
+
+    @Test
+    void buildSystemPromptUsesCarefulInvestigatorForSummaryStyleQuery() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "quickLookupMaxTerms", 20);
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 40);
+
+        String information = "[alpha.pdf]\nPage: 7\ncontent";
+        Class<?> policyType = Class.forName("com.jreinhal.mercenary.service.RagOrchestrationService$ResponsePolicy");
+        Method m = RagOrchestrationService.class.getDeclaredMethod(
+                "buildSystemPrompt", String.class, String.class, policyType, Department.class);
+        m.setAccessible(true);
+
+        String prompt = (String) m.invoke(
+                service,
+                "Provide summary and compare impacts",
+                information,
+                null,
+                Department.ENTERPRISE);
+        assertTrue(prompt.contains("Persona: careful investigator."));
     }
 
     @Test
@@ -147,6 +188,37 @@ class Phase1PromptHardeningTest {
         Object out = m.invoke(service, docs, "query");
         assertTrue(out instanceof List<?>);
         assertTrue(((List<?>) out).size() == 2);
+    }
+
+    @Test
+    void enforceDocumentCeilingNoOpWhenAlreadyWithinLimit() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 5);
+
+        Method m = RagOrchestrationService.class.getDeclaredMethod("enforceDocumentCeiling", List.class, String.class);
+        m.setAccessible(true);
+
+        List<Document> docs = List.of(new Document("a"), new Document("b"));
+        Object out = m.invoke(service, docs, "query");
+        assertTrue(out instanceof List<?>);
+        assertTrue(((List<?>) out).size() == 2);
+    }
+
+    @Test
+    void selectTopDocumentsAppliesCeilingAndTopLimit() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 20);
+
+        Method m = RagOrchestrationService.class.getDeclaredMethod("selectTopDocuments", List.class, String.class);
+        m.setAccessible(true);
+
+        List<Document> docs = new java.util.ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            docs.add(new Document("doc-" + i));
+        }
+        Object out = m.invoke(service, docs, "query");
+        assertTrue(out instanceof List<?>);
+        assertTrue(((List<?>) out).size() == 15);
     }
 
     @Test
