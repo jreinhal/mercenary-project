@@ -9,12 +9,18 @@ import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
 import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import com.jreinhal.mercenary.util.DocumentTemporalMetadataExtractor;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -104,8 +110,25 @@ public class SecureIngestionService {
     private int chunkMergeMinTokens = 512;
     @Value("${sentinel.ingest.chunk-merge.max-tokens:2000}")
     private int chunkMergeMaxTokens = 2000;
+    @Value("${sentinel.ingest.resilience.enabled:true}")
+    private boolean resilienceEnabled = true;
+    @Value("${sentinel.ingest.resilience.max-retries:1}")
+    private int ingestMaxRetries = 1;
+    @Value("${sentinel.ingest.resilience.failure-threshold-percent:50}")
+    private double ingestFailureThresholdPercent = 50.0;
+    @Value("${sentinel.ingest.resilience.failure-threshold-min-samples:5}")
+    private int ingestFailureThresholdMinSamples = 5;
+    @Value("${sentinel.ingest.resilience.checkpoint-path:build/ingestion/session.json}")
+    private String ingestCheckpointPath = "build/ingestion/session.json";
     private static final EncodingRegistry TOKEN_ENCODING_REGISTRY = Encodings.newLazyEncodingRegistry();
     private static final Encoding TOKEN_ENCODING = TOKEN_ENCODING_REGISTRY.getEncoding(EncodingType.CL100K_BASE);
+    private final Object checkpointLock = new Object();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private long sessionStartTime = System.currentTimeMillis();
+    private int processedCount = 0;
+    private int failedCount = 0;
+    private String lastProcessedDoc = "";
+    private final List<String> failedDocs = new ArrayList<>();
 
     public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, TableExtractor tableExtractor, SourceDocumentService sourceDocumentService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
         this.vectorStore = vectorStore;
@@ -122,7 +145,45 @@ public class SecureIngestionService {
         this.tika = new Tika();
     }
 
+    @PostConstruct
+    void initializeResilienceState() {
+        if (this.resilienceEnabled) {
+            this.loadCheckpointState();
+        }
+    }
+
     public void ingest(MultipartFile file, Department dept) {
+        this.enforceFailureThreshold();
+        int maxAttempts = this.resilienceEnabled ? Math.max(1, this.ingestMaxRetries + 1) : 1;
+        String filename = file != null ? file.getOriginalFilename() : "unknown";
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            boolean fallbackMode = attempt > 1;
+            try {
+                this.ingestInternal(file, dept, fallbackMode);
+                this.recordIngestionOutcome(filename, true);
+                return;
+            } catch (SecurityException e) {
+                this.recordIngestionOutcome(filename, false);
+                throw e;
+            } catch (RuntimeException e) {
+                boolean lastAttempt = attempt >= maxAttempts;
+                if (lastAttempt || !this.isRetriableIngestionFailure(e)) {
+                    this.recordIngestionOutcome(filename, false);
+                    throw e;
+                }
+                if (log.isWarnEnabled()) {
+                    log.warn("Ingestion attempt {}/{} failed for {}. Retrying with fallback mode. Error: {}",
+                            attempt, maxAttempts, LogSanitizer.sanitize(filename), e.getMessage());
+                }
+            }
+        }
+    }
+
+    private boolean isRetriableIngestionFailure(RuntimeException e) {
+        return !(e instanceof SecurityException);
+    }
+
+    private void ingestInternal(MultipartFile file, Department dept, boolean fallbackMode) {
         try {
             List<Document> rawDocuments;
             String filename = file.getOriginalFilename();
@@ -173,7 +234,7 @@ public class SecureIngestionService {
 
                 // Decouple table extraction from the OCR/scanned-PDF heuristic: short-but-text-layer PDFs can contain
                 // valuable tables and should still attempt extraction.
-                if (hasAnyText && this.tableExtractor != null && this.tableExtractor.isEnabled()) {
+                if (!fallbackMode && hasAnyText && this.tableExtractor != null && this.tableExtractor.isEnabled()) {
                     List<Document> tableDocs = this.tableExtractor.extractTables(fileBytes, filename);
                     if (tableDocs != null && !tableDocs.isEmpty()) {
                         List<Document> combined = new ArrayList<>(rawDocuments);
@@ -182,7 +243,7 @@ public class SecureIngestionService {
                     }
                 }
 
-                if (!hipaaStrict && this.extractImagesFromPdf && this.megaRagService != null && this.megaRagService.isEnabled()) {
+                if (!fallbackMode && !hipaaStrict && this.extractImagesFromPdf && this.megaRagService != null && this.megaRagService.isEnabled()) {
                     this.ingestEmbeddedImages(fileBytes, filename, dept.name(), rawDocuments);
                 }
             } else {
@@ -623,6 +684,131 @@ public class SecureIngestionService {
         } catch (Exception e) {
             log.warn("Unexpected extraction failure for {}: {}", filename, e.getMessage());
             return "";
+        }
+    }
+
+    private void loadCheckpointState() {
+        if (this.ingestCheckpointPath == null || this.ingestCheckpointPath.isBlank()) {
+            return;
+        }
+        Path checkpoint = Paths.get(this.ingestCheckpointPath);
+        if (!Files.exists(checkpoint)) {
+            return;
+        }
+        synchronized (this.checkpointLock) {
+            try {
+                Map<String, Object> state = this.objectMapper.readValue(checkpoint.toFile(), new TypeReference<Map<String, Object>>() {});
+                this.sessionStartTime = this.readLong(state.get("startTime"), System.currentTimeMillis());
+                this.processedCount = this.readInt(state.get("processedCount"), 0);
+                this.failedCount = this.readInt(state.get("failedCount"), 0);
+                this.lastProcessedDoc = Objects.toString(state.get("lastProcessedDoc"), "");
+                this.failedDocs.clear();
+                Object docs = state.get("failedDocs");
+                if (docs instanceof List<?> list) {
+                    for (Object item : list) {
+                        if (item != null) {
+                            this.failedDocs.add(item.toString());
+                        }
+                    }
+                }
+                if (log.isInfoEnabled()) {
+                    log.info("Loaded ingestion checkpoint: processed={}, failed={}, lastDoc={}",
+                            this.processedCount, this.failedCount, LogSanitizer.sanitize(this.lastProcessedDoc));
+                }
+            } catch (Exception e) {
+                if (log.isWarnEnabled()) {
+                    log.warn("Unable to load ingestion checkpoint '{}': {}", this.ingestCheckpointPath, e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void recordIngestionOutcome(String filename, boolean success) {
+        if (!this.resilienceEnabled) {
+            return;
+        }
+        synchronized (this.checkpointLock) {
+            this.lastProcessedDoc = filename != null ? filename : "";
+            if (success) {
+                this.processedCount++;
+                this.failedDocs.remove(filename);
+            } else {
+                this.failedCount++;
+                if (filename != null && !filename.isBlank() && !this.failedDocs.contains(filename)) {
+                    this.failedDocs.add(filename);
+                }
+            }
+            this.persistCheckpointState();
+        }
+    }
+
+    private void persistCheckpointState() {
+        if (this.ingestCheckpointPath == null || this.ingestCheckpointPath.isBlank()) {
+            return;
+        }
+        try {
+            Path checkpoint = Paths.get(this.ingestCheckpointPath);
+            Path parent = checkpoint.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Map<String, Object> state = new HashMap<>();
+            state.put("startTime", this.sessionStartTime);
+            state.put("processedCount", this.processedCount);
+            state.put("failedCount", this.failedCount);
+            state.put("lastProcessedDoc", this.lastProcessedDoc);
+            state.put("failedDocs", new ArrayList<>(this.failedDocs));
+            this.objectMapper.writerWithDefaultPrettyPrinter().writeValue(checkpoint.toFile(), state);
+        } catch (Exception e) {
+            if (log.isWarnEnabled()) {
+                log.warn("Unable to persist ingestion checkpoint '{}': {}", this.ingestCheckpointPath, e.getMessage());
+            }
+        }
+    }
+
+    private void enforceFailureThreshold() {
+        if (!this.resilienceEnabled || this.ingestFailureThresholdPercent <= 0.0) {
+            return;
+        }
+        synchronized (this.checkpointLock) {
+            int total = this.processedCount + this.failedCount;
+            if (total < Math.max(1, this.ingestFailureThresholdMinSamples)) {
+                return;
+            }
+            double failureRate = ((double)this.failedCount * 100.0) / (double)total;
+            if (failureRate > this.ingestFailureThresholdPercent) {
+                throw new SecureIngestionException(String.format(
+                        "Ingestion halted: failure rate %.1f%% exceeded threshold %.1f%% (processed=%d, failed=%d)",
+                        failureRate, this.ingestFailureThresholdPercent, this.processedCount, this.failedCount), null);
+            }
+        }
+    }
+
+    private int readInt(Object value, int fallback) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    private long readLong(Object value, long fallback) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Long.parseLong(value.toString());
+        } catch (Exception e) {
+            return fallback;
         }
     }
 }

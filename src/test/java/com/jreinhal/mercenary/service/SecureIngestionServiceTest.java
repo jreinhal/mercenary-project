@@ -1,5 +1,7 @@
 package com.jreinhal.mercenary.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.rag.hgmem.HyperGraphMemory;
 import com.jreinhal.mercenary.rag.megarag.MegaRagService;
@@ -8,6 +10,8 @@ import com.jreinhal.mercenary.rag.ragpart.PartitionAssigner;
 import java.io.ByteArrayOutputStream;
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -632,6 +636,72 @@ class SecureIngestionServiceTest {
 
         assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE),
             "Legitimate text files should still be accepted after blocklist expansion");
+    }
+
+    @Test
+    @DisplayName("Phase 5.3: Retries ingestion once on transient vector-store failure")
+    void retriesOnTransientVectorStoreFailure() throws Exception {
+        Path checkpoint = Files.createTempFile("ingest-retry-", ".json");
+        ReflectionTestUtils.setField(ingestionService, "ingestCheckpointPath", checkpoint.toString());
+        ReflectionTestUtils.setField(ingestionService, "resilienceEnabled", true);
+        ReflectionTestUtils.setField(ingestionService, "ingestMaxRetries", 1);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "retry.txt", "text/plain", "retry content".getBytes(StandardCharsets.UTF_8));
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0), java.util.Collections.emptyMap()));
+        doThrow(new RuntimeException("transient"))
+                .doNothing()
+                .when(vectorStore).add(anyList());
+
+        assertDoesNotThrow(() -> ingestionService.ingest(file, Department.ENTERPRISE));
+        verify(vectorStore, times(2)).add(anyList());
+
+        Map<String, Object> state = new ObjectMapper().readValue(checkpoint.toFile(), new TypeReference<Map<String, Object>>() {});
+        assertEquals(1, ((Number) state.get("processedCount")).intValue());
+        assertEquals(0, ((Number) state.get("failedCount")).intValue());
+    }
+
+    @Test
+    @DisplayName("Phase 5.3: Writes failed document checkpoint when retries are exhausted")
+    void writesCheckpointForFailedIngestion() throws Exception {
+        Path checkpoint = Files.createTempFile("ingest-fail-", ".json");
+        ReflectionTestUtils.setField(ingestionService, "ingestCheckpointPath", checkpoint.toString());
+        ReflectionTestUtils.setField(ingestionService, "resilienceEnabled", true);
+        ReflectionTestUtils.setField(ingestionService, "ingestMaxRetries", 0);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "failed.txt", "text/plain", "failure content".getBytes(StandardCharsets.UTF_8));
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0), java.util.Collections.emptyMap()));
+        doThrow(new RuntimeException("persistent")).when(vectorStore).add(anyList());
+
+        assertThrows(RuntimeException.class, () -> ingestionService.ingest(file, Department.ENTERPRISE));
+
+        Map<String, Object> state = new ObjectMapper().readValue(checkpoint.toFile(), new TypeReference<Map<String, Object>>() {});
+        assertEquals(0, ((Number) state.get("processedCount")).intValue());
+        assertEquals(1, ((Number) state.get("failedCount")).intValue());
+        @SuppressWarnings("unchecked")
+        List<String> failedDocs = (List<String>) state.get("failedDocs");
+        assertTrue(failedDocs.contains("failed.txt"));
+    }
+
+    @Test
+    @DisplayName("Phase 5.3: Failure threshold blocks ingestion when exceeded")
+    void failureThresholdBlocksFurtherIngestion() {
+        ReflectionTestUtils.setField(ingestionService, "resilienceEnabled", true);
+        ReflectionTestUtils.setField(ingestionService, "ingestFailureThresholdPercent", 10.0);
+        ReflectionTestUtils.setField(ingestionService, "ingestFailureThresholdMinSamples", 1);
+        ReflectionTestUtils.setField(ingestionService, "processedCount", 0);
+        ReflectionTestUtils.setField(ingestionService, "failedCount", 1);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "blocked.txt", "text/plain", "blocked content".getBytes(StandardCharsets.UTF_8));
+
+        assertThrows(SecureIngestionException.class, () -> ingestionService.ingest(file, Department.ENTERPRISE));
+        verify(vectorStore, never()).add(anyList());
     }
 
     private static byte[] buildPdfWithText(String text) throws Exception {
