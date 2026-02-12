@@ -4,7 +4,8 @@ param(
     [string]$AdminPassword = $env:SENTINEL_ADMIN_PASSWORD,
     [string]$OllamaUrl = $env:OLLAMA_URL,
     [string]$OutputDir = "build\\e2e-results",
-    [int]$RequestTimeoutSec = 120
+    [int]$RequestTimeoutSec = 120,
+    [string]$DefaultBuildEdition = $env:SENTINEL_E2E_BUILD_EDITION
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,6 +42,11 @@ if ([string]::IsNullOrWhiteSpace($MongoUri)) {
 if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
     throw "SENTINEL_ADMIN_PASSWORD is required for STANDARD auth profiles. Set env SENTINEL_ADMIN_PASSWORD or pass -AdminPassword."
 }
+
+if ([string]::IsNullOrWhiteSpace($DefaultBuildEdition)) {
+    $DefaultBuildEdition = "enterprise"
+}
+Write-Log "Default non-govcloud build edition: $DefaultBuildEdition"
 
 function Ensure-Ollama($ollamaUrl) {
     $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
@@ -174,7 +180,7 @@ db.users.updateOne(
     return $true
 }
 
-function Start-App($profile, $port, $extraEnv, $logPath) {
+function Start-App($profile, $port, $buildEdition, $extraEnv, $logPath) {
     function Escape-PsSingleQuoted([string]$value) {
         if ($null -eq $value) { return "" }
         # Escape for PowerShell single-quoted strings: ' -> ''
@@ -208,8 +214,9 @@ function Start-App($profile, $port, $extraEnv, $logPath) {
         $envAssignments += "`$env:$($kvp.Key)='$(Escape-PsSingleQuoted $kvp.Value)'"
     }
     $envPrefix = ($envAssignments -join "; ")
-    $cmd = "$envPrefix; cd '$PWD'; ./gradlew bootRun"
-    Write-Log "Starting profile '$profile' on port $port"
+    $editionArg = "-Pedition='$(Escape-PsSingleQuoted $buildEdition)'"
+    $cmd = "$envPrefix; cd '$PWD'; ./gradlew bootRun $editionArg"
+    Write-Log "Starting profile '$profile' on port $port (build edition '$buildEdition')"
     $stderrPath = "$logPath.err"
     return Start-Process -FilePath "powershell" -ArgumentList "-NoProfile -Command $cmd" -RedirectStandardOutput $logPath -RedirectStandardError $stderrPath -PassThru
 }
@@ -472,6 +479,7 @@ foreach ($profile in $Profiles) {
     $baseUrl = "http://127.0.0.1:$port"
     $skipCert = $false
     $extraEnv = @{}
+    $buildEdition = $DefaultBuildEdition
 
     if ($profile -eq "dev") {
         # Use a non-default port to avoid clobbering a manually-running UI on 8080.
@@ -488,6 +496,9 @@ foreach ($profile in $Profiles) {
         $extraEnv["CAC_REQUIRE_APPROVAL"] = "false"
         $extraEnv["APP_CSRF_BYPASS_INGEST"] = "true"
         $extraEnv["COOKIE_SECURE"] = "true"
+        # Keep profile smoke tests runnable on CI/dev machines that do not pre-load air-gap model artifacts.
+        $extraEnv["AIRGAP_MODEL_VALIDATION_ENABLED"] = "false"
+        $buildEdition = "government"
     } elseif ($profile -in @("standard", "enterprise")) {
         $port = if ($profile -eq "enterprise") { 18082 } else { 18081 }
         $extraEnv["AUTH_MODE"] = "STANDARD"
@@ -533,7 +544,7 @@ foreach ($profile in $Profiles) {
     $logPath = Join-Path $OutputDir "boot_$profile`_$timestamp.log"
     $proc = $null
     try {
-        $proc = Start-App $profile $port $extraEnv $logPath
+        $proc = Start-App $profile $port $buildEdition $extraEnv $logPath
         $healthy = Wait-ForHealth $baseUrl 120 $skipCert $port
         if (-not $healthy) {
             Write-Log "Health check failed for profile '$profile'"
