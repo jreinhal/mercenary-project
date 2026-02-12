@@ -747,6 +747,55 @@ class SecureIngestionServiceTest {
         verify(vectorStore, times(1)).add(anyList());
     }
 
+    @Test
+    @DisplayName("Phase 5.3: Non-transient runtime errors should not be retried")
+    void nonTransientRuntimeErrorIsNotRetried() throws Exception {
+        Path checkpoint = Files.createTempFile("ingest-nontransient-", ".json");
+        ReflectionTestUtils.setField(ingestionService, "ingestCheckpointPath", checkpoint.toString());
+        ReflectionTestUtils.setField(ingestionService, "resilienceEnabled", true);
+        ReflectionTestUtils.setField(ingestionService, "ingestMaxRetries", 1);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "nontransient.txt", "text/plain", "bad content".getBytes(StandardCharsets.UTF_8));
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0), java.util.Collections.emptyMap()));
+        doThrow(new RuntimeException("validation failed")).when(vectorStore).add(anyList());
+
+        assertThrows(RuntimeException.class, () -> ingestionService.ingest(file, Department.ENTERPRISE));
+        verify(vectorStore, times(1)).add(anyList());
+    }
+
+    @Test
+    @DisplayName("Phase 5.3: Failed docs checkpoint list is capped")
+    void failedDocsCheckpointListIsCapped() throws Exception {
+        Path checkpoint = Files.createTempFile("ingest-failed-cap-", ".json");
+        ReflectionTestUtils.setField(ingestionService, "ingestCheckpointPath", checkpoint.toString());
+        ReflectionTestUtils.setField(ingestionService, "resilienceEnabled", true);
+        ReflectionTestUtils.setField(ingestionService, "ingestMaxRetries", 0);
+        ReflectionTestUtils.setField(ingestionService, "ingestFailureThresholdPercent", 100.0);
+        ReflectionTestUtils.setField(ingestionService, "ingestFailedDocsMax", 1);
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0), java.util.Collections.emptyMap()));
+        doThrow(new RuntimeException("persistent")).when(vectorStore).add(anyList());
+
+        MockMultipartFile file1 = new MockMultipartFile(
+                "file", "failed-one.txt", "text/plain", "f1".getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile file2 = new MockMultipartFile(
+                "file", "failed-two.txt", "text/plain", "f2".getBytes(StandardCharsets.UTF_8));
+
+        assertThrows(RuntimeException.class, () -> ingestionService.ingest(file1, Department.ENTERPRISE));
+        assertThrows(RuntimeException.class, () -> ingestionService.ingest(file2, Department.ENTERPRISE));
+
+        Map<String, Object> state = new ObjectMapper().readValue(checkpoint.toFile(), new TypeReference<Map<String, Object>>() {});
+        @SuppressWarnings("unchecked")
+        List<String> failedDocs = (List<String>) state.get("failedDocs");
+        assertEquals(1, failedDocs.size());
+        assertEquals("failed-two.txt", failedDocs.get(0));
+    }
+
     private static byte[] buildPdfWithText(String text) throws Exception {
         try (PDDocument doc = new PDDocument()) {
             PDPage page = new PDPage();

@@ -18,11 +18,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -120,6 +123,8 @@ public class SecureIngestionService {
     private int ingestFailureThresholdMinSamples = 5;
     @Value("${sentinel.ingest.resilience.checkpoint-path:build/ingestion/session.json}")
     private String ingestCheckpointPath = "build/ingestion/session.json";
+    @Value("${sentinel.ingest.resilience.failed-docs-max:500}")
+    private int ingestFailedDocsMax = 500;
     private static final EncodingRegistry TOKEN_ENCODING_REGISTRY = Encodings.newLazyEncodingRegistry();
     private static final Encoding TOKEN_ENCODING = TOKEN_ENCODING_REGISTRY.getEncoding(EncodingType.CL100K_BASE);
     private final Object checkpointLock = new Object();
@@ -129,7 +134,7 @@ public class SecureIngestionService {
     private int failedCount = 0;
     private int securityRejectedCount = 0;
     private String lastProcessedDoc = "";
-    private final List<String> failedDocs = new ArrayList<>();
+    private final Set<String> failedDocs = new LinkedHashSet<>();
 
     public SecureIngestionService(VectorStore vectorStore, PiiRedactionService piiRedactionService, PartitionAssigner partitionAssigner, MiARagService miARagService, MegaRagService megaRagService, HyperGraphMemory hyperGraphMemory, LightOnOcrService lightOnOcrService, TableExtractor tableExtractor, SourceDocumentService sourceDocumentService, HipaaPolicy hipaaPolicy, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService) {
         this.vectorStore = vectorStore;
@@ -181,7 +186,14 @@ public class SecureIngestionService {
     }
 
     private boolean isRetriableIngestionFailure(RuntimeException e) {
-        return !(e instanceof SecurityException) && !(e instanceof NonRetriableIngestionException);
+        if (e instanceof SecurityException || e instanceof NonRetriableIngestionException || e instanceof SecureIngestionException || e instanceof IllegalArgumentException) {
+            return false;
+        }
+        String message = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+        return message.contains("timeout")
+                || message.contains("tempor")
+                || message.contains("connection")
+                || message.contains("transient");
     }
 
     private void ingestInternal(MultipartFile file, Department dept, boolean fallbackMode) {
@@ -721,6 +733,7 @@ public class SecureIngestionService {
                             this.failedDocs.add(item.toString());
                         }
                     }
+                    this.enforceFailedDocRetentionLimit();
                 }
                 if (log.isInfoEnabled()) {
                     log.info("Loaded ingestion checkpoint: processed={}, failed={}, securityRejected={}, lastDoc={}",
@@ -747,6 +760,7 @@ public class SecureIngestionService {
                 this.failedCount++;
                 if (filename != null && !filename.isBlank() && !this.failedDocs.contains(filename)) {
                     this.failedDocs.add(filename);
+                    this.enforceFailedDocRetentionLimit();
                 }
             }
             this.persistCheckpointState();
@@ -781,7 +795,13 @@ public class SecureIngestionService {
             state.put("securityRejectedCount", this.securityRejectedCount);
             state.put("lastProcessedDoc", this.lastProcessedDoc);
             state.put("failedDocs", new ArrayList<>(this.failedDocs));
-            this.objectMapper.writerWithDefaultPrettyPrinter().writeValue(checkpoint.toFile(), state);
+            Path tempCheckpoint = checkpoint.resolveSibling(checkpoint.getFileName().toString() + ".tmp");
+            this.objectMapper.writerWithDefaultPrettyPrinter().writeValue(tempCheckpoint.toFile(), state);
+            try {
+                Files.move(tempCheckpoint, checkpoint, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tempCheckpoint, checkpoint, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (Exception e) {
             if (log.isWarnEnabled()) {
                 log.warn("Unable to persist ingestion checkpoint '{}': {}", this.ingestCheckpointPath, e.getMessage());
@@ -798,12 +818,20 @@ public class SecureIngestionService {
             if (total < Math.max(1, this.ingestFailureThresholdMinSamples)) {
                 return;
             }
-            double failureRate = ((double)this.failedCount * 100.0) / (double)total;
+            double failureRate = (double) this.failedCount * 100.0 / (double) total;
             if (failureRate > this.ingestFailureThresholdPercent) {
                 throw new SecureIngestionException(String.format(
                         "Ingestion halted: failure rate %.1f%% exceeded threshold %.1f%% (processed=%d, failed=%d)",
                         failureRate, this.ingestFailureThresholdPercent, this.processedCount, this.failedCount), null);
             }
+        }
+    }
+
+    private void enforceFailedDocRetentionLimit() {
+        int maxFailedDocs = Math.max(1, this.ingestFailedDocsMax);
+        while (this.failedDocs.size() > maxFailedDocs) {
+            String oldest = this.failedDocs.iterator().next();
+            this.failedDocs.remove(oldest);
         }
     }
 
