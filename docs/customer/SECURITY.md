@@ -161,6 +161,68 @@ Endpoints:
 - Prompt injection detection and blocking
 - Magic byte file type validation (blocks executables regardless of extension)
 
+## RAG-Specific Security Controls
+
+### Corpus poisoning defense (RAGPart)
+
+SENTINEL includes retrieval-time corpus poisoning defense through RAGPart before generation paths are finalized.
+
+RAGPart configuration keys:
+- `RAGPART_ENABLED`
+- `RAGPART_PARTITIONS`
+- `RAGPART_COMBINATION_SIZE`
+- `RAGPART_SUSPICION_THRESHOLD`
+
+Operational intent:
+- increase partitioning and lower suspicion thresholds for stricter environments
+- validate thresholds against your benchmark corpus before production rollout
+
+### Hallucination risk and abstention control
+
+SENTINEL applies uncertainty/hallucination risk checks in the query orchestration flow. High-risk responses can be suppressed in favor of abstention-style fallback (`No relevant records found.`) instead of returning low-confidence synthesis.
+
+### Evidence and source verification controls
+
+- citation-aware response policies are edition-sensitive (stricter in regulated editions)
+- `/api/source/page` and `/api/source/region` enforce authentication, sector authorization, and source-retention policy checks before returning any image data
+- HIPAA strict deployments should keep source retention conservative by default (`SOURCE_RETENTION_ALLOW_HIPAA_STRICT=false`)
+
+### Multi-tenant isolation and fail-closed filtering
+
+- retrieval paths enforce workspace and sector constraints
+- access denials are audited
+- fail-closed prefiltering is applied for invalid/empty scope inputs to prevent accidental cross-tenant widening
+
+## RAG Threat Model Additions
+
+Security reviews should explicitly include:
+
+- corpus poisoning via maliciously crafted documents
+- prompt injection delivered through ingested content
+- cross-workspace data leakage from weak filter composition
+- sensitive visual evidence retention leakage (especially in regulated sectors)
+
+Recommended mitigations:
+- enable RAGPart and validate thresholds
+- keep prompt-injection and guardrail enforcement enabled
+- run cross-workspace authorization tests for query, reasoning, and source-render endpoints
+- document source-retention policy exceptions and approvals
+
+## NIST 800-53 Mapping Notes (RAG Controls)
+
+- **SI-10 (Information Input Validation)**: ingestion checks, file-type validation, prompt-injection screening, RAGPart suspicious-content filtering
+- **SI-4 (System Monitoring)**: audit logging of denied access, prompt-injection blocks, and security-relevant query behavior
+
+## Security Testing Procedures (RAG)
+
+At minimum, validate:
+
+- poisoning-defense regression scenarios (malicious retrieval candidates are filtered)
+- injection blocking in query and document-driven contexts
+- workspace/sector isolation for `/api/ask*`, `/api/reasoning/*`, `/api/source/*`
+- HIPAA strict behavior for source rendering when source retention is disabled
+- citation/evidence fallback behavior under low-confidence retrieval conditions
+
 ## Related Guidance
 
 - Enterprise tuning: ENTERPRISE_TUNING.md
