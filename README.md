@@ -4,7 +4,7 @@ Secure, air-gap compatible RAG platform for enterprise and government deployment
 
 ## RAG Capability Snapshot
 
-SENTINEL includes the core upgrade pillars from the RAG improvement program:
+SENTINEL includes the implemented Phase 0-5 RAG capabilities:
 
 - **Corpus Poisoning Defense** via RAGPart validation before generation.
 - **Agentic Multi-Hop Reasoning** with tool-augmented orchestration for complex queries.
@@ -95,7 +95,7 @@ Key environment variables:
 - LLM_MODEL
 - EMBEDDING_MODEL
 
-Feature toggles commonly tuned in production:
+Feature flags and tuning knobs commonly adjusted in production:
 - AGENTIC_ENABLED
 - THESAURUS_ENABLED
 - RAG_TEMPORAL_FILTERING_ENABLED
