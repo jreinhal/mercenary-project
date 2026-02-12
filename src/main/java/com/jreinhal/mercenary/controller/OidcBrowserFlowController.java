@@ -46,6 +46,9 @@ import org.springframework.web.client.RestTemplate;
 public class OidcBrowserFlowController {
 
     private static final Logger log = LoggerFactory.getLogger(OidcBrowserFlowController.class);
+    private static final String OIDC_DISCOVERY_PATH = "/.well-known/openid-configuration";
+    private static final String OIDC_METADATA_AUTHORIZATION_ENDPOINT = "authorization_endpoint";
+    private static final String OIDC_METADATA_TOKEN_ENDPOINT = "token_endpoint";
     private static final String SESSION_PKCE_VERIFIER = "oidc.pkce.verifier";
     private static final String SESSION_OAUTH_STATE = "oidc.oauth.state";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -305,7 +308,11 @@ public class OidcBrowserFlowController {
             return authorizationUri;
         }
         if (issuer != null && !issuer.isBlank()) {
-            return issuer + "/authorize";
+            String discoveredAuthorizationEndpoint = resolveFromOidcMetadata(OIDC_METADATA_AUTHORIZATION_ENDPOINT);
+            if (discoveredAuthorizationEndpoint != null) {
+                return discoveredAuthorizationEndpoint;
+            }
+            return normalizeIssuer(issuer) + "/authorize";
         }
         return null;
     }
@@ -315,9 +322,51 @@ public class OidcBrowserFlowController {
             return tokenUri;
         }
         if (issuer != null && !issuer.isBlank()) {
-            return issuer + "/oauth/token";
+            String discoveredTokenEndpoint = resolveFromOidcMetadata(OIDC_METADATA_TOKEN_ENDPOINT);
+            if (discoveredTokenEndpoint != null) {
+                return discoveredTokenEndpoint;
+            }
+            return normalizeIssuer(issuer) + "/oauth/token";
         }
         return null;
+    }
+
+    private String resolveFromOidcMetadata(String metadataKey) {
+        Map<String, Object> metadata = resolveOidcMetadata();
+        if (metadata.isEmpty()) {
+            return null;
+        }
+        Object value = metadata.get(metadataKey);
+        if (value instanceof String endpoint && !endpoint.isBlank()) {
+            return endpoint;
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> resolveOidcMetadata() {
+        if (issuer == null || issuer.isBlank()) {
+            return Map.of();
+        }
+        String metadataUri = normalizeIssuer(issuer) + OIDC_DISCOVERY_PATH;
+        try {
+            Map<String, Object> metadata = restTemplate.getForObject(metadataUri, Map.class);
+            if (metadata == null || metadata.isEmpty()) {
+                return Map.of();
+            }
+            return metadata;
+        } catch (Exception e) {
+            log.debug("OIDC discovery metadata unavailable at {}: {}", metadataUri, e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private static String normalizeIssuer(String rawIssuer) {
+        String normalized = rawIssuer.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
     }
 
     private String resolveRedirectUri(HttpServletRequest request) {

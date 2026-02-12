@@ -8,8 +8,10 @@ import com.jreinhal.mercenary.service.OidcAuthenticationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.net.URI;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -18,11 +20,13 @@ import org.springframework.web.client.RestTemplate;
 class OidcBrowserFlowControllerTest {
 
     private OidcBrowserFlowController controller;
+    private OidcAuthenticationService oidcAuthService;
+    private RestTemplate restTemplate;
 
     @BeforeEach
     void setUp() {
-        OidcAuthenticationService oidcAuthService = mock(OidcAuthenticationService.class);
-        RestTemplate restTemplate = mock(RestTemplate.class);
+        oidcAuthService = mock(OidcAuthenticationService.class);
+        restTemplate = mock(RestTemplate.class);
         controller = new OidcBrowserFlowController(oidcAuthService, restTemplate);
         ReflectionTestUtils.setField(controller, "clientId", "test-client-id");
         ReflectionTestUtils.setField(controller, "authorizationUri", "https://idp.example.com/authorize");
@@ -74,6 +78,44 @@ class OidcBrowserFlowControllerTest {
     void authorizeFallsBackToIssuerForAuthUri() throws Exception {
         ReflectionTestUtils.setField(controller, "authorizationUri", "");
         ReflectionTestUtils.setField(controller, "issuer", "https://idp.example.com");
+        HttpServletRequest request = mockRequest();
+        HttpSession session = mock(HttpSession.class);
+        when(request.getSession(true)).thenReturn(session);
+
+        ResponseEntity<Void> response = controller.authorize(request);
+
+        assertEquals(HttpStatus.FOUND, response.getStatusCode());
+        URI location = response.getHeaders().getLocation();
+        assertNotNull(location);
+        assertTrue(location.toString().startsWith("https://idp.example.com/authorize?"));
+    }
+
+    @Test
+    void authorizeUsesDiscoveredAuthorizationEndpointWhenConfigured() throws Exception {
+        ReflectionTestUtils.setField(controller, "authorizationUri", "");
+        ReflectionTestUtils.setField(controller, "issuer", "https://idp.example.com/");
+        when(restTemplate.getForObject("https://idp.example.com/.well-known/openid-configuration", Map.class))
+                .thenReturn(Map.of("authorization_endpoint", "https://idp.example.com/oauth2/v2.0/authorize"));
+
+        HttpServletRequest request = mockRequest();
+        HttpSession session = mock(HttpSession.class);
+        when(request.getSession(true)).thenReturn(session);
+
+        ResponseEntity<Void> response = controller.authorize(request);
+
+        assertEquals(HttpStatus.FOUND, response.getStatusCode());
+        URI location = response.getHeaders().getLocation();
+        assertNotNull(location);
+        assertTrue(location.toString().startsWith("https://idp.example.com/oauth2/v2.0/authorize?"));
+    }
+
+    @Test
+    void authorizeFallsBackToIssuerPathWhenDiscoveryMissingAuthorizationEndpoint() {
+        ReflectionTestUtils.setField(controller, "authorizationUri", "");
+        ReflectionTestUtils.setField(controller, "issuer", "https://idp.example.com/");
+        when(restTemplate.getForObject("https://idp.example.com/.well-known/openid-configuration", Map.class))
+                .thenReturn(Map.of("issuer", "https://idp.example.com/"));
+
         HttpServletRequest request = mockRequest();
         HttpSession session = mock(HttpSession.class);
         when(request.getSession(true)).thenReturn(session);
@@ -222,6 +264,72 @@ class OidcBrowserFlowControllerTest {
 
         verify(session).removeAttribute("oidc.pkce.verifier");
         verify(session).removeAttribute("oidc.oauth.state");
+    }
+
+    @Test
+    void callbackUsesDiscoveredTokenEndpointWhenConfigured() {
+        ReflectionTestUtils.setField(controller, "tokenUri", "");
+        ReflectionTestUtils.setField(controller, "issuer", "https://idp.example.com/");
+        when(restTemplate.getForObject("https://idp.example.com/.well-known/openid-configuration", Map.class))
+                .thenReturn(Map.of("token_endpoint", "https://idp.example.com/oauth2/v2.0/token"));
+        when(restTemplate.exchange(
+                eq("https://idp.example.com/oauth2/v2.0/token"),
+                eq(HttpMethod.POST),
+                any(),
+                eq(Map.class)))
+                .thenReturn(new ResponseEntity<>(Map.of(), HttpStatus.OK));
+
+        HttpServletRequest request = mockRequest();
+        HttpSession session = mock(HttpSession.class);
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute("oidc.oauth.state")).thenReturn("state123");
+        when(session.getAttribute("oidc.pkce.verifier")).thenReturn("verifier123");
+
+        ResponseEntity<Void> response = controller.callback(
+                "auth-code", "state123", null, null, request);
+
+        assertEquals(HttpStatus.FOUND, response.getStatusCode());
+        URI location = response.getHeaders().getLocation();
+        assertNotNull(location);
+        assertTrue(location.toString().contains("auth_error=no_id_token"));
+        verify(restTemplate).exchange(
+                eq("https://idp.example.com/oauth2/v2.0/token"),
+                eq(HttpMethod.POST),
+                any(),
+                eq(Map.class));
+    }
+
+    @Test
+    void callbackFallsBackToIssuerTokenPathWhenDiscoveryUnavailable() {
+        ReflectionTestUtils.setField(controller, "tokenUri", "");
+        ReflectionTestUtils.setField(controller, "issuer", "https://idp.example.com/");
+        when(restTemplate.getForObject("https://idp.example.com/.well-known/openid-configuration", Map.class))
+                .thenThrow(new RuntimeException("discovery unavailable"));
+        when(restTemplate.exchange(
+                eq("https://idp.example.com/oauth/token"),
+                eq(HttpMethod.POST),
+                any(),
+                eq(Map.class)))
+                .thenReturn(new ResponseEntity<>(Map.of(), HttpStatus.OK));
+
+        HttpServletRequest request = mockRequest();
+        HttpSession session = mock(HttpSession.class);
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute("oidc.oauth.state")).thenReturn("state123");
+        when(session.getAttribute("oidc.pkce.verifier")).thenReturn("verifier123");
+
+        ResponseEntity<Void> response = controller.callback(
+                "auth-code", "state123", null, null, request);
+
+        assertEquals(HttpStatus.FOUND, response.getStatusCode());
+        URI location = response.getHeaders().getLocation();
+        assertNotNull(location);
+        assertTrue(location.toString().contains("auth_error=no_id_token"));
+        verify(restTemplate).exchange(
+                eq("https://idp.example.com/oauth/token"),
+                eq(HttpMethod.POST),
+                any(),
+                eq(Map.class));
     }
 
     // ===== PKCE Utility Tests =====
