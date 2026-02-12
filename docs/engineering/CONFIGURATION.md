@@ -122,9 +122,9 @@ Notes:
 - EMBEDDING_MULTIMODAL_ENABLED (default: false)
 
 ### Agentic orchestration tuning
-- AGENTIC_ENABLED (default: false)
 - AGENTIC_DOCUMENTS_PER_QUERY_CEILING (default: 40)
 - AGENTIC_QUICK_LOOKUP_MAX_TERMS (default: 9)
+Note: `AGENTIC_ENABLED` and other global agentic feature flags are also listed under **Feature flags (selected)** near the end of this document.
 
 ## Recommended baselines by edition
 
