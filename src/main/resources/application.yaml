@@ -228,6 +228,13 @@ sentinel:
   vectorstore:
     force-local: ${SENTINEL_FORCE_LOCAL_VECTOR_STORE:false}
     force-atlas: ${SENTINEL_FORCE_ATLAS_VECTOR_STORE:false}
+  embedding:
+    # Embed in batches for better ingestion throughput (Phase 5.2 evaluation).
+    batch-size: ${EMBEDDING_BATCH_SIZE:128}
+    # Optional target dimension guardrail. Set 0 to disable strict dimension targeting.
+    target-dimensions: ${EMBEDDING_TARGET_DIMENSIONS:0}
+    # Enables Document(media+text) embedding attempts for visual assets (falls back to text if unsupported).
+    multimodal-enabled: ${EMBEDDING_MULTIMODAL_ENABLED:false}
 
 # ============================================
 # SENTINEL Advanced RAG Configuration
@@ -355,6 +362,10 @@ sentinel:
   # Cross-modal retrieval for images, charts, and text
   megarag:
     enabled: ${MEGARAG_ENABLED:true}
+    # Build joint visual embedding payloads (description + OCR + entities + related text context).
+    multimodal-embeddings-enabled: ${MEGARAG_MULTIMODAL_EMBEDDINGS_ENABLED:false}
+    multimodal-query-prefix: ${MEGARAG_MULTIMODAL_QUERY_PREFIX:vision query:}
+    multimodal-context-max-chars: ${MEGARAG_MULTIMODAL_CONTEXT_MAX_CHARS:1500}
     # Visual retrieval weight vs text (0.0-1.0)
     visual-weight: ${MEGARAG_VISUAL_WEIGHT:0.3}
     # Minimum confidence for cross-modal links

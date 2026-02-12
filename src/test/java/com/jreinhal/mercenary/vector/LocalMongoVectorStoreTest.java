@@ -4,15 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mongodb.client.result.DeleteResult;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,13 +25,95 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.model.Media;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.util.MimeTypeUtils;
 
 class LocalMongoVectorStoreTest {
+
+    @Test
+    void addBatchesTextEmbeddingsAndUsesEmbeddingTextOverride() {
+        MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
+        LocalMongoVectorStore store = new LocalMongoVectorStore(mongoTemplate, embeddingModel, 2, 0, false);
+
+        Document d1 = new Document("d1", "Visible content 1", new HashMap<>(Map.of("dept", "ENTERPRISE", "embeddingText", "alpha")));
+        Document d2 = new Document("d2", "Visible content 2", new HashMap<>(Map.of("dept", "ENTERPRISE", "embeddingText", "beta")));
+        Document d3 = new Document("d3", "gamma", new HashMap<>(Map.of("dept", "ENTERPRISE")));
+
+        when(embeddingModel.embed(eq(List.of("alpha", "beta"))))
+                .thenReturn(List.of(new float[]{1.0f, 0.0f}, new float[]{0.0f, 1.0f}));
+        when(embeddingModel.embed(eq(List.of("gamma"))))
+                .thenReturn(List.of(new float[]{0.5f, 0.5f}));
+
+        store.add(List.of(d1, d2, d3));
+
+        verify(embeddingModel).embed(eq(List.of("alpha", "beta")));
+        verify(embeddingModel).embed(eq(List.of("gamma")));
+        verify(mongoTemplate, times(3)).save(any(LocalMongoVectorStore.MongoDocument.class), eq("vector_store"));
+    }
+
+    @Test
+    void addUsesMultimodalEmbeddingForDocumentsWithMedia() {
+        MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
+        LocalMongoVectorStore store = new LocalMongoVectorStore(mongoTemplate, embeddingModel, 128, 0, true);
+
+        Document visualDoc = new Document(
+                "visual-1",
+                "chart summary",
+                List.of(new Media(MimeTypeUtils.IMAGE_PNG, new ByteArrayResource(new byte[]{1, 2, 3}))),
+                new HashMap<>(Map.of("type", "visual", "embeddingText", "joint visual payload")));
+
+        when(embeddingModel.embed(any(Document.class))).thenReturn(new float[]{0.2f, 0.8f});
+
+        store.add(List.of(visualDoc));
+
+        verify(embeddingModel).embed(any(Document.class));
+        verify(embeddingModel, never()).embed(anyList());
+    }
+
+    @Test
+    void addFallsBackToTextEmbeddingWhenMultimodalEmbeddingFails() {
+        MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
+        LocalMongoVectorStore store = new LocalMongoVectorStore(mongoTemplate, embeddingModel, 128, 0, true);
+
+        Document visualDoc = new Document(
+                "visual-2",
+                "fallback content",
+                List.of(new Media(MimeTypeUtils.IMAGE_PNG, new ByteArrayResource(new byte[]{9, 8, 7}))),
+                new HashMap<>(Map.of("type", "visual", "embeddingText", "vision text")));
+
+        doThrow(new RuntimeException("no multimodal support")).when(embeddingModel).embed(any(Document.class));
+        when(embeddingModel.embed(anyString())).thenReturn(new float[]{1.0f, 0.0f});
+
+        store.add(List.of(visualDoc));
+
+        verify(embeddingModel).embed(any(Document.class));
+        verify(embeddingModel).embed(eq("vision text"));
+    }
+
+    @Test
+    void addFailsWhenEmbeddingBatchResponseSizeDoesNotMatchInputSize() {
+        MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
+        LocalMongoVectorStore store = new LocalMongoVectorStore(mongoTemplate, embeddingModel, 2, 0, false);
+
+        Document d1 = new Document("id-1", "alpha", new HashMap<>(Map.of("dept", "ENTERPRISE")));
+        Document d2 = new Document("id-2", "beta", new HashMap<>(Map.of("dept", "ENTERPRISE")));
+        when(embeddingModel.embed(eq(List.of("alpha", "beta"))))
+                .thenReturn(List.of(new float[]{1.0f, 0.0f}));
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> store.add(List.of(d1, d2)));
+        assertTrue(ex.getMessage().contains("Failed to save vectors"));
+        verify(mongoTemplate, never()).save(any(LocalMongoVectorStore.MongoDocument.class), eq("vector_store"));
+    }
 
     @Test
     void similaritySearchUsesPrefilterQueryForNumericComparators() {
