@@ -124,7 +124,7 @@ class CrossEncoderRerankerTest {
         List<HiFiRagService.ScoredDocument> ranked = this.reranker.rerank("system metrics", List.of(doc));
 
         assertEquals(1, ranked.size());
-        assertTrue(ranked.get(0).score() > 0.0);
+        assertTrue(ranked.get(0).score() >= 0.99);
     }
 
     @Test

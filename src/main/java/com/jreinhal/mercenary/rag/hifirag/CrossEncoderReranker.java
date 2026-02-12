@@ -36,17 +36,17 @@ public class CrossEncoderReranker {
     private final ChatClient chatClient;
     private final ExecutorService executor;
     private final EmbeddingModel embeddingModel;
-    @Value(value="${sentinel.hifirag.reranker.batch-size:5}")
+    @Value("${sentinel.hifirag.reranker.batch-size:5}")
     private int batchSize;
-    @Value(value="${sentinel.hifirag.reranker.timeout-seconds:30}")
+    @Value("${sentinel.hifirag.reranker.timeout-seconds:30}")
     private int timeoutSeconds;
-    @Value(value="${sentinel.hifirag.reranker.mode:auto}")
+    @Value("${sentinel.hifirag.reranker.mode:dedicated}")
     private String rerankerMode;
-    @Value(value="${sentinel.hifirag.reranker.use-llm:true}")
+    @Value("${sentinel.hifirag.reranker.use-llm:true}")
     private boolean useLlm;
-    @Value(value="${sentinel.hifirag.reranker.cache-size:2000}")
+    @Value("${sentinel.hifirag.reranker.cache-size:2000}")
     private int cacheSize;
-    @Value(value="${sentinel.hifirag.reranker.cache-ttl-seconds:900}")
+    @Value("${sentinel.hifirag.reranker.cache-ttl-seconds:900}")
     private long cacheTtlSeconds;
     private Cache<String, Double> scoreCache;
 
@@ -64,17 +64,21 @@ public class CrossEncoderReranker {
                     .expireAfterWrite(Duration.ofSeconds(this.cacheTtlSeconds))
                     .build();
         }
-        log.info("Cross-Encoder Reranker initialized (mode={}, useLlmFallback={}, embeddingModel={})",
-                this.rerankerMode, this.useLlm, this.embeddingModel != null);
+        if (log.isInfoEnabled()) {
+            log.info("Cross-Encoder Reranker initialized (mode={}, useLlmFallback={}, embeddingModel={})",
+                    this.rerankerMode, this.useLlm, this.embeddingModel != null);
+        }
     }
 
     public List<HiFiRagService.ScoredDocument> rerank(String query, List<Document> documents) {
         if (documents.isEmpty()) {
             return List.of();
         }
-        log.debug("Cross-encoder reranking {} documents", documents.size());
+        if (log.isDebugEnabled()) {
+            log.debug("Cross-encoder reranking {} documents", documents.size());
+        }
         long startTime = System.currentTimeMillis();
-        List<HiFiRagService.ScoredDocument> scored;
+        List<HiFiRagService.ScoredDocument> scored = List.of();
         RerankerMode mode = this.resolveRerankerMode();
         switch (mode) {
             case DEDICATED -> {
@@ -85,12 +89,13 @@ public class CrossEncoderReranker {
             }
             case LLM -> scored = this.rerankWithLlm(query, documents);
             case KEYWORD -> scored = this.rerankWithKeywords(query, documents);
-            default -> scored = this.useLlm ? this.rerankWithLlm(query, documents) : this.rerankWithKeywords(query, documents);
         }
         if (scored.isEmpty() && !documents.isEmpty()) {
             scored = this.rerankWithKeywords(query, documents);
         }
-        log.debug("Reranking completed in {}ms", (System.currentTimeMillis() - startTime));
+        if (log.isDebugEnabled()) {
+            log.debug("Reranking completed in {}ms", System.currentTimeMillis() - startTime);
+        }
         return scored.stream().sorted((a, b) -> Double.compare(b.score(), a.score())).collect(Collectors.toList());
     }
 
@@ -181,6 +186,14 @@ public class CrossEncoderReranker {
                 content = content.substring(0, 1000) + "...";
             }
             float[] pairEmbedding = this.safeEmbed("query: " + query + "\ndocument: " + content);
+            if (pairEmbedding.length == 0 || pairEmbedding.length != queryEmbedding.length) {
+                if (log.isDebugEnabled()) {
+                    log.debug(
+                            "Dedicated reranker produced invalid embedding for query-document pair; using keyword fallback (query len={}, pair len={})",
+                            queryEmbedding.length, pairEmbedding.length);
+                }
+                return this.scoreWithKeywords(query, doc);
+            }
             double cosine = this.calculateCosineSimilarity(queryEmbedding, pairEmbedding);
             double score = Math.max(0.0, Math.min(1.0, (cosine + 1.0) / 2.0));
             if (this.scoreCache != null) {
@@ -188,7 +201,9 @@ public class CrossEncoderReranker {
             }
             return new HiFiRagService.ScoredDocument(doc, score);
         } catch (Exception e) {
-            log.debug("Dedicated model scoring failed, using keyword fallback: {}", e.getMessage());
+            if (log.isDebugEnabled()) {
+                log.debug("Dedicated model scoring failed, using keyword fallback: {}", e.getMessage());
+            }
             return this.scoreWithKeywords(query, doc);
         }
     }
@@ -218,7 +233,9 @@ public class CrossEncoderReranker {
             return new HiFiRagService.ScoredDocument(doc, score);
         }
         catch (Exception e) {
-            log.debug("LLM scoring failed for document, using fallback: {}", e.getMessage());
+            if (log.isDebugEnabled()) {
+                log.debug("LLM scoring failed for document, using fallback: {}", e.getMessage());
+            }
             return this.scoreWithKeywords(query, doc);
         }
     }
@@ -234,7 +251,9 @@ public class CrossEncoderReranker {
                 return Math.max(0.0, Math.min(1.0, score));
             }
             catch (NumberFormatException numberFormatException) {
-                log.debug("Cross-encoder score parse failed: {}", response);
+                if (log.isDebugEnabled()) {
+                    log.debug("Cross-encoder score parse failed: {}", response);
+                }
             }
         }
         return 0.5;
@@ -248,7 +267,9 @@ public class CrossEncoderReranker {
             float[] embedding = this.embeddingModel.embed(text);
             return embedding != null ? embedding : new float[0];
         } catch (Exception e) {
-            log.debug("Dedicated reranker embedding failed: {}", e.getMessage());
+            if (log.isDebugEnabled()) {
+                log.debug("Dedicated reranker embedding failed: {}", e.getMessage());
+            }
             return new float[0];
         }
     }
