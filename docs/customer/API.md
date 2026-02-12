@@ -51,8 +51,8 @@ Response (`application/json`):
   "answer": "string",
   "reasoning": [
     {
-      "type": "QUERY_ANALYSIS",
-      "name": "Query Analysis",
+      "type": "query_analysis",
+      "label": "Query Analysis",
       "detail": "Single query detected"
     }
   ],
@@ -83,6 +83,8 @@ Response (`application/json`):
 - `citationCount`, `answerable`, `answerabilityGate`
 - `citationRescue`, `excerptFallbackApplied`
 - `editionPolicy`, `editionMaxTokens`, `editionEnforceCitations`
+
+`reasoning` entries are emitted with lowercase `type` values plus `label`, `detail`, and `durationMs`.
 
 ### `GET /api/ask/stream`
 
