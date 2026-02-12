@@ -208,7 +208,7 @@ Recommended mitigations:
 - run cross-workspace authorization tests for query, reasoning, and source-render endpoints
 - document source-retention policy exceptions and approvals
 
-## NIST 800-53 Mapping Notes (RAG Controls)
+## NIST SP 800-53 Mapping Notes (RAG Controls)
 
 - **SI-10 (Information Input Validation)**: ingestion checks, file-type validation, prompt-injection screening, RAGPart suspicious-content filtering
 - **SI-4 (System Monitoring)**: audit logging of denied access, prompt-injection blocks, and security-relevant query behavior
