@@ -82,10 +82,11 @@ implements VectorStore {
                 this.embedTextDocumentsInBatches(documentsNeedingTextEmbeddings, resolvedEmbeddings);
             }
 
+            int persistedCount = 0;
             for (Document doc : documents) {
                 List<Double> embedding = resolvedEmbeddings.get(doc);
                 if (embedding == null || embedding.isEmpty()) {
-                    continue;
+                    throw new IllegalStateException("Missing embedding for document id=" + doc.getId());
                 }
                 double embeddingNorm = this.computeNorm(embedding);
                 MongoDocument mongoDoc = new MongoDocument();
@@ -96,8 +97,11 @@ implements VectorStore {
                 mongoDoc.setEmbeddingNorm(embeddingNorm);
                 mongoDoc.setEmbeddingDimensions(embedding.size());
                 this.mongoTemplate.save(mongoDoc, COLLECTION_NAME);
+                persistedCount++;
             }
-            log.info("Persisted {} documents to local MongoDB", documents.size());
+            if (log.isInfoEnabled()) {
+                log.info("Persisted {} documents to local MongoDB", persistedCount);
+            }
         }
         catch (Exception e) {
             log.error("CRITICAL ERROR in LocalMongoVectorStore.add()", (Throwable)e);
@@ -129,10 +133,12 @@ implements VectorStore {
         FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse(filterExpression);
         Query prefilterQuery = this.buildPrefilterQuery(parsed);
         List<MongoDocument> allDocs = prefilterQuery != null ? this.mongoTemplate.find(prefilterQuery, MongoDocument.class, COLLECTION_NAME) : this.mongoTemplate.findAll(MongoDocument.class, COLLECTION_NAME);
-        log.debug("Total documents found in vector store: {}", allDocs.size());
+        if (log.isDebugEnabled()) {
+            log.debug("Total documents found in vector store: {}", allDocs.size());
+        }
         FilterEvaluator evaluator = this.buildFilterEvaluator(parsed);
         return allDocs.stream().filter(md -> evaluator.matches(md.getMetadata())).map(md -> {
-            HashMap<String, Object> metadata = md.getMetadata() != null ? new HashMap<String, Object>(md.getMetadata()) : new HashMap<>();
+            Map<String, Object> metadata = md.getMetadata() != null ? new HashMap<String, Object>(md.getMetadata()) : new HashMap<>();
             Document doc = new Document(md.getId(), md.getContent(), metadata);
             return new ScoredDocument(doc, this.calculateCosineSimilarity(embeddingArray, queryNorm, md.getEmbedding(), md.getEmbeddingNorm()));
         }).filter(scored -> scored.score >= threshold).sorted((a, b) -> Double.compare(b.score, a.score)).limit(topK).map(scored -> {
@@ -366,7 +372,7 @@ implements VectorStore {
     }
 
     private List<Double> toDoubleList(float[] embeddingArray) {
-        java.util.ArrayList<Double> embedding = new java.util.ArrayList<>(embeddingArray.length);
+        ArrayList<Double> embedding = new ArrayList<>(embeddingArray.length);
         for (float f : embeddingArray) {
             embedding.add((double)f);
         }
@@ -377,8 +383,8 @@ implements VectorStore {
         if (embedding == null || embedding.length == 0) {
             throw new IllegalArgumentException("Embedding vector must not be empty");
         }
-        if (this.targetEmbeddingDimensions > 0 && embedding.length != this.targetEmbeddingDimensions && log.isWarnEnabled()) {
-            log.warn("Embedding dimensions {} differ from configured target {}", embedding.length, this.targetEmbeddingDimensions);
+        if (this.targetEmbeddingDimensions > 0 && embedding.length != this.targetEmbeddingDimensions) {
+            throw new IllegalArgumentException("Embedding dimensions " + embedding.length + " differ from configured target " + this.targetEmbeddingDimensions);
         }
     }
 

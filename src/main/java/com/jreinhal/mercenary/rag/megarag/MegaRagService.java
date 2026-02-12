@@ -9,7 +9,6 @@ import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.net.URLConnection;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,21 +49,21 @@ public class MegaRagService {
     private final VisualEntityLinker visualEntityLinker;
     private final ReasoningTracer reasoningTracer;
     private final ExecutorService ragExecutor;
-    @Value(value="${sentinel.megarag.enabled:true}")
+    @Value("${sentinel.megarag.enabled:true}")
     private boolean enabled;
-    @Value(value="${sentinel.megarag.visual-weight:0.3}")
+    @Value("${sentinel.megarag.visual-weight:0.3}")
     private double visualWeight;
-    @Value(value="${sentinel.megarag.text-weight:0.7}")
+    @Value("${sentinel.megarag.text-weight:0.7}")
     private double textWeight;
-    @Value(value="${sentinel.megarag.cross-modal-threshold:0.5}")
+    @Value("${sentinel.megarag.cross-modal-threshold:0.5}")
     private double crossModalThreshold;
-    @Value(value="${sentinel.performance.rag-future-timeout-seconds:8}")
+    @Value("${sentinel.performance.rag-future-timeout-seconds:8}")
     private int futureTimeoutSeconds;
-    @Value(value="${sentinel.megarag.multimodal-embeddings-enabled:false}")
+    @Value("${sentinel.megarag.multimodal-embeddings-enabled:false}")
     private boolean multimodalEmbeddingsEnabled;
-    @Value(value="${sentinel.megarag.multimodal-query-prefix:vision query: }")
+    @Value("${sentinel.megarag.multimodal-query-prefix:vision query: }")
     private String multimodalQueryPrefix;
-    @Value(value="${sentinel.megarag.multimodal-context-max-chars:1500}")
+    @Value("${sentinel.megarag.multimodal-context-max-chars:1500}")
     private int multimodalContextMaxChars;
     private static final String VISUAL_NODES_COLLECTION = "megarag_visual_nodes";
     private static final String CROSS_MODAL_EDGES_COLLECTION = "megarag_cross_modal_edges";
@@ -81,20 +80,29 @@ public class MegaRagService {
 
     @PostConstruct
     public void init() {
-        log.info("MegaRAG Service initialized (enabled={}, visualWeight={}, textWeight={}, multimodalEmbeddings={})",
-                new Object[]{this.enabled, this.visualWeight, this.textWeight, this.multimodalEmbeddingsEnabled});
+        if (log.isInfoEnabled()) {
+            log.info("MegaRAG Service initialized (enabled={}, visualWeight={}, textWeight={}, multimodalEmbeddings={})",
+                    new Object[]{this.enabled, this.visualWeight, this.textWeight, this.multimodalEmbeddingsEnabled});
+        }
     }
 
     public VisualIngestionResult ingestVisualAsset(byte[] imageBytes, String filename, String department, String contextText) {
         if (!this.enabled) {
             return new VisualIngestionResult(false, "MegaRAG disabled", List.of(), null);
         }
+        String normalizedDept = this.normalizeDepartment(department);
+        if (normalizedDept == null) {
+            if (log.isWarnEnabled()) {
+                log.warn("MegaRAG: Invalid department '{}' for visual ingestion", department);
+            }
+            return new VisualIngestionResult(false, "Invalid department", List.of(), null);
+        }
         long startTime = System.currentTimeMillis();
         try {
             String workspaceId = WorkspaceContext.getCurrentWorkspaceId();
             ImageAnalysis analysis = this.imageAnalyzer.analyze(imageBytes, filename);
             List<VisualEntity> visualEntities = analysis.entities();
-            VisualNode node = new VisualNode(UUID.randomUUID().toString(), filename, analysis.imageType(), analysis.description(), analysis.extractedText(), visualEntities.stream().map(VisualEntity::name).toList(), department, workspaceId, System.currentTimeMillis());
+            VisualNode node = new VisualNode(UUID.randomUUID().toString(), filename, analysis.imageType(), analysis.description(), analysis.extractedText(), visualEntities.stream().map(VisualEntity::name).toList(), normalizedDept, workspaceId, System.currentTimeMillis());
             this.mongoTemplate.save(node, VISUAL_NODES_COLLECTION);
             if (contextText != null && !contextText.isBlank()) {
                 List<CrossModalEdge> edges = this.visualEntityLinker.linkEntities(visualEntities, contextText, node.id(), workspaceId);
@@ -103,9 +111,9 @@ public class MegaRagService {
                 }
             }
             String description = analysis.description() != null ? analysis.description() : "";
-            HashMap<String, Object> metadata = new HashMap<>();
+            Map<String, Object> metadata = new java.util.HashMap<>();
             metadata.put("source", filename);
-            metadata.put("dept", department);
+            metadata.put("dept", normalizedDept);
             metadata.put("workspaceId", workspaceId);
             metadata.put("type", "visual");
             metadata.put("imageType", analysis.imageType().name());
@@ -118,7 +126,9 @@ public class MegaRagService {
             Document visualDoc = new Document(description, this.buildVisualMedia(imageBytes, filename), metadata);
             this.vectorStore.add(List.of(visualDoc));
             long elapsed = System.currentTimeMillis() - startTime;
-            log.info("MegaRAG: Ingested visual asset '{}' ({}) with {} entities in {}ms", new Object[]{filename, analysis.imageType(), visualEntities.size(), elapsed});
+            if (log.isInfoEnabled()) {
+                log.info("MegaRAG: Ingested visual asset '{}' ({}) with {} entities in {}ms", new Object[]{filename, analysis.imageType(), visualEntities.size(), elapsed});
+            }
             return new VisualIngestionResult(true, "Success", visualEntities, node.id());
         }
         catch (Exception e) {

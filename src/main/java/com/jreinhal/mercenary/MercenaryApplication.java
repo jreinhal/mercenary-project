@@ -108,7 +108,7 @@ public class MercenaryApplication {
     }
 
     @Bean
-    public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel, @Value(value="${app.auth-mode:DEV}") String authMode, @Value(value="${sentinel.embedding.batch-size:128}") int embeddingBatchSize, @Value(value="${sentinel.embedding.target-dimensions:0}") int targetEmbeddingDimensions, @Value(value="${sentinel.embedding.multimodal-enabled:false}") boolean multimodalEmbeddingsEnabled) {
+    public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel, @Value("${app.auth-mode:DEV}") String authMode, @Value("${sentinel.embedding.batch-size:128}") int embeddingBatchSize, @Value("${sentinel.embedding.target-dimensions:0}") int targetEmbeddingDimensions, @Value("${sentinel.embedding.multimodal-enabled:false}") boolean multimodalEmbeddingsEnabled) {
         String mongoUri = this.environment.getProperty("spring.data.mongodb.uri", "");
         boolean forceLocal = Boolean.parseBoolean(this.environment.getProperty("sentinel.vectorstore.force-local", "false"));
         boolean forceAtlas = Boolean.parseBoolean(this.environment.getProperty("sentinel.vectorstore.force-atlas", "false"));
