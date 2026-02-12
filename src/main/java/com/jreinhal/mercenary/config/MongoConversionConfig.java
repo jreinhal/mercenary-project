@@ -25,14 +25,13 @@ public class MongoConversionConfig {
         @Override
         public Department convert(String source) {
             if (source == null || source.isBlank()) {
-                return null;
+                return Department.ENTERPRISE;
             }
             try {
                 return Department.fromString(source);
             } catch (IllegalArgumentException ex) {
-                // Fail closed for unknown legacy values while preserving app startup.
-                log.warn("Ignoring unknown department value '{}' from persisted user record", source);
-                return null;
+                log.warn("Unknown department value '{}' from persisted user record. Falling back to ENTERPRISE.", source);
+                return Department.ENTERPRISE;
             }
         }
     }

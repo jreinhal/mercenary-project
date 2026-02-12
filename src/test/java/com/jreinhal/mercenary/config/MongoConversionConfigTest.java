@@ -19,10 +19,10 @@ class MongoConversionConfigTest {
     }
 
     @Test
-    void readingConverterReturnsNullForUnknownOrBlankValues() {
-        assertNull(readingConverter.convert("UNKNOWN_SECTOR"));
-        assertNull(readingConverter.convert("   "));
-        assertNull(readingConverter.convert(null));
+    void readingConverterFallsBackToEnterpriseForUnknownOrBlankValues() {
+        assertEquals(Department.ENTERPRISE, readingConverter.convert("UNKNOWN_SECTOR"));
+        assertEquals(Department.ENTERPRISE, readingConverter.convert("   "));
+        assertEquals(Department.ENTERPRISE, readingConverter.convert(null));
     }
 
     @Test
