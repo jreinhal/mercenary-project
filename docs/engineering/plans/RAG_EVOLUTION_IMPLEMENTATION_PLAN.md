@@ -1554,7 +1554,7 @@ sentinel:
 - [x] Document configuration options via API
 
 #### Configuration Guide Updates
-- [ ] Complete reference for all new `sentinel.*` properties
+- [x] Complete reference for all new `sentinel.*` properties
 - [x] Recommended configurations by edition:
   - Trial/Enterprise: Balanced defaults
   - Medical: Higher grounding thresholds
