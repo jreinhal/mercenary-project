@@ -108,7 +108,7 @@ public class MercenaryApplication {
     }
 
     @Bean
-    public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel, @Value(value="${app.auth-mode:DEV}") String authMode) {
+    public VectorStore vectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel, @Value(value="${app.auth-mode:DEV}") String authMode, @Value(value="${sentinel.embedding.batch-size:128}") int embeddingBatchSize, @Value(value="${sentinel.embedding.target-dimensions:0}") int targetEmbeddingDimensions, @Value(value="${sentinel.embedding.multimodal-enabled:false}") boolean multimodalEmbeddingsEnabled) {
         String mongoUri = this.environment.getProperty("spring.data.mongodb.uri", "");
         boolean forceLocal = Boolean.parseBoolean(this.environment.getProperty("sentinel.vectorstore.force-local", "false"));
         boolean forceAtlas = Boolean.parseBoolean(this.environment.getProperty("sentinel.vectorstore.force-atlas", "false"));
@@ -121,7 +121,7 @@ public class MercenaryApplication {
             if (forceLocal || isLocalMongo) {
                 log.info("Using LocalMongoVectorStore (local MongoDB detected).");
             }
-            return new LocalMongoVectorStore(mongoTemplate, embeddingModel);
+            return new LocalMongoVectorStore(mongoTemplate, embeddingModel, embeddingBatchSize, targetEmbeddingDimensions, multimodalEmbeddingsEnabled);
         }
         MongoDBAtlasVectorStore.MongoDBVectorStoreConfig config = MongoDBAtlasVectorStore.MongoDBVectorStoreConfig.builder().withCollectionName("vector_store").withVectorIndexName("vector_index").withPathName("embedding").withMetadataFieldsToFilter(List.of("dept", "source")).build();
         return new MongoDBAtlasVectorStore(mongoTemplate, embeddingModel, config, false);

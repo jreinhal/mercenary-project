@@ -4,6 +4,7 @@ import com.mongodb.client.result.DeleteResult;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,11 +31,22 @@ implements VectorStore {
             "documentYear", "documentDateEpoch");
     private final MongoTemplate mongoTemplate;
     private final EmbeddingModel embeddingModel;
+    private final int embeddingBatchSize;
+    private final int targetEmbeddingDimensions;
+    private final boolean multimodalEmbeddingsEnabled;
 
     public LocalMongoVectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel) {
+        this(mongoTemplate, embeddingModel, 128, 0, false);
+    }
+
+    public LocalMongoVectorStore(MongoTemplate mongoTemplate, EmbeddingModel embeddingModel, int embeddingBatchSize, int targetEmbeddingDimensions, boolean multimodalEmbeddingsEnabled) {
         this.mongoTemplate = mongoTemplate;
         this.embeddingModel = embeddingModel;
-        log.info("Initialized LocalMongoVectorStore (Off-Grid Persistence Mode)");
+        this.embeddingBatchSize = Math.max(1, embeddingBatchSize);
+        this.targetEmbeddingDimensions = Math.max(0, targetEmbeddingDimensions);
+        this.multimodalEmbeddingsEnabled = multimodalEmbeddingsEnabled;
+        log.info("Initialized LocalMongoVectorStore (Off-Grid Persistence Mode, batchSize={}, targetDims={}, multimodal={})",
+                this.embeddingBatchSize, this.targetEmbeddingDimensions, this.multimodalEmbeddingsEnabled);
     }
 
     @SuppressWarnings("deprecation")
@@ -43,23 +55,37 @@ implements VectorStore {
             return;
         }
         try {
+            Map<Document, List<Double>> resolvedEmbeddings = new IdentityHashMap<>();
+            List<Document> documentsNeedingTextEmbeddings = new ArrayList<>();
             for (Document doc : documents) {
                 List<Double> embedding = null;
                 float[] rawEmbedding = doc.getEmbedding();
                 if (rawEmbedding != null && rawEmbedding.length > 0) {
-                    embedding = new java.util.ArrayList<>(rawEmbedding.length);
-                    for (float f : rawEmbedding) {
-                        embedding.add((double) f);
-                    }
+                    this.validateEmbeddingDimensions(rawEmbedding);
+                    embedding = this.toDoubleList(rawEmbedding);
                 }
                 if (embedding == null || embedding.isEmpty()) {
-                    // Avoid logging document identifiers in regulated deployments.
-                    log.debug("Generating embedding for document (id redacted)");
-                    float[] embeddingArray = this.embeddingModel.embed(doc.getContent());
-                    embedding = new java.util.ArrayList<>(embeddingArray.length);
-                    for (float f : embeddingArray) {
-                        embedding.add((double) f);
+                    if (this.shouldUseMultimodalEmbedding(doc)) {
+                        float[] embeddingArray = this.embedDocumentWithFallback(doc);
+                        this.validateEmbeddingDimensions(embeddingArray);
+                        embedding = this.toDoubleList(embeddingArray);
+                    } else {
+                        documentsNeedingTextEmbeddings.add(doc);
                     }
+                }
+                if (embedding != null && !embedding.isEmpty()) {
+                    resolvedEmbeddings.put(doc, embedding);
+                }
+            }
+
+            if (!documentsNeedingTextEmbeddings.isEmpty()) {
+                this.embedTextDocumentsInBatches(documentsNeedingTextEmbeddings, resolvedEmbeddings);
+            }
+
+            for (Document doc : documents) {
+                List<Double> embedding = resolvedEmbeddings.get(doc);
+                if (embedding == null || embedding.isEmpty()) {
+                    continue;
                 }
                 double embeddingNorm = this.computeNorm(embedding);
                 MongoDocument mongoDoc = new MongoDocument();
@@ -68,6 +94,7 @@ implements VectorStore {
                 mongoDoc.setMetadata(doc.getMetadata());
                 mongoDoc.setEmbedding(embedding);
                 mongoDoc.setEmbeddingNorm(embeddingNorm);
+                mongoDoc.setEmbeddingDimensions(embedding.size());
                 this.mongoTemplate.save(mongoDoc, COLLECTION_NAME);
             }
             log.info("Persisted {} documents to local MongoDB", documents.size());
@@ -93,12 +120,17 @@ implements VectorStore {
         int topK = request.getTopK();
         double threshold = request.getSimilarityThreshold();
         Object filterExpression = request.getFilterExpression();
+        if (this.targetEmbeddingDimensions > 0 && log.isDebugEnabled()) {
+            log.debug("Running similarity search with target embedding dimensions={}", this.targetEmbeddingDimensions);
+        }
         float[] embeddingArray = this.embeddingModel.embed(queryText);
+        this.validateEmbeddingDimensions(embeddingArray);
         double queryNorm = this.computeNorm(embeddingArray);
-        Query prefilterQuery = this.buildPrefilterQuery(filterExpression);
+        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse(filterExpression);
+        Query prefilterQuery = this.buildPrefilterQuery(parsed);
         List<MongoDocument> allDocs = prefilterQuery != null ? this.mongoTemplate.find(prefilterQuery, MongoDocument.class, COLLECTION_NAME) : this.mongoTemplate.findAll(MongoDocument.class, COLLECTION_NAME);
         log.debug("Total documents found in vector store: {}", allDocs.size());
-        FilterEvaluator evaluator = this.buildFilterEvaluator(filterExpression);
+        FilterEvaluator evaluator = this.buildFilterEvaluator(parsed);
         return allDocs.stream().filter(md -> evaluator.matches(md.getMetadata())).map(md -> {
             HashMap<String, Object> metadata = md.getMetadata() != null ? new HashMap<String, Object>(md.getMetadata()) : new HashMap<>();
             Document doc = new Document(md.getId(), md.getContent(), metadata);
@@ -109,8 +141,7 @@ implements VectorStore {
         }).collect(Collectors.toList());
     }
 
-    private FilterEvaluator buildFilterEvaluator(Object filterExpression) {
-        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse(filterExpression);
+    private FilterEvaluator buildFilterEvaluator(FilterExpressionParser.ParsedFilter parsed) {
         if (parsed == null) {
             return metadata -> true;
         }
@@ -164,8 +195,7 @@ implements VectorStore {
         return sum;
     }
 
-    private Query buildPrefilterQuery(Object filterExpression) {
-        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse(filterExpression);
+    private Query buildPrefilterQuery(FilterExpressionParser.ParsedFilter parsed) {
         if (parsed == null) {
             return null;
         }
@@ -278,6 +308,78 @@ implements VectorStore {
         }
     }
 
+    private float[] embedDocumentWithFallback(Document doc) {
+        String text = this.resolveEmbeddingText(doc);
+        try {
+            if (log.isDebugEnabled()) {
+                log.debug("Generating multimodal embedding for document (id redacted)");
+            }
+            Document embeddingDoc = new Document(doc.getId(), text, doc.getMedia(), doc.getMetadata());
+            return this.embeddingModel.embed(embeddingDoc);
+        } catch (Exception e) {
+            if (log.isWarnEnabled()) {
+                log.warn("Multimodal embedding failed, falling back to text embedding: {}", e.getMessage());
+            }
+            return this.embeddingModel.embed(text);
+        }
+    }
+
+    private void embedTextDocumentsInBatches(List<Document> documentsNeedingTextEmbeddings, Map<Document, List<Double>> resolvedEmbeddings) {
+        for (int i = 0; i < documentsNeedingTextEmbeddings.size(); i += this.embeddingBatchSize) {
+            int end = Math.min(i + this.embeddingBatchSize, documentsNeedingTextEmbeddings.size());
+            List<Document> batch = documentsNeedingTextEmbeddings.subList(i, end);
+            List<String> inputs = batch.stream().map(this::resolveEmbeddingText).toList();
+            if (log.isDebugEnabled()) {
+                log.debug("Generating text embeddings in batch (size={})", batch.size());
+            }
+            List<float[]> vectors = this.embeddingModel.embed(inputs);
+            int bound = Math.min(batch.size(), vectors.size());
+            for (int j = 0; j < bound; j++) {
+                float[] vector = vectors.get(j);
+                this.validateEmbeddingDimensions(vector);
+                resolvedEmbeddings.put(batch.get(j), this.toDoubleList(vector));
+            }
+        }
+    }
+
+    private String resolveEmbeddingText(Document doc) {
+        if (doc == null) {
+            return "";
+        }
+        Map<String, Object> metadata = doc.getMetadata();
+        if (metadata != null) {
+            Object embeddingText = metadata.get("embeddingText");
+            if (embeddingText != null) {
+                String value = embeddingText.toString();
+                if (!value.isBlank()) {
+                    return value;
+                }
+            }
+        }
+        return doc.getContent() != null ? doc.getContent() : "";
+    }
+
+    private boolean shouldUseMultimodalEmbedding(Document doc) {
+        return this.multimodalEmbeddingsEnabled && doc != null && doc.getMedia() != null && !doc.getMedia().isEmpty();
+    }
+
+    private List<Double> toDoubleList(float[] embeddingArray) {
+        java.util.ArrayList<Double> embedding = new java.util.ArrayList<>(embeddingArray.length);
+        for (float f : embeddingArray) {
+            embedding.add((double)f);
+        }
+        return embedding;
+    }
+
+    private void validateEmbeddingDimensions(float[] embedding) {
+        if (embedding == null || embedding.length == 0) {
+            throw new IllegalArgumentException("Embedding vector must not be empty");
+        }
+        if (this.targetEmbeddingDimensions > 0 && embedding.length != this.targetEmbeddingDimensions && log.isWarnEnabled()) {
+            log.warn("Embedding dimensions {} differ from configured target {}", embedding.length, this.targetEmbeddingDimensions);
+        }
+    }
+
     public static class MongoDocument {
         @Id
         private String id;
@@ -285,6 +387,7 @@ implements VectorStore {
         private Map<String, Object> metadata;
         private List<Double> embedding;
         private Double embeddingNorm;
+        private Integer embeddingDimensions;
 
         public String getId() {
             return this.id;
@@ -324,6 +427,14 @@ implements VectorStore {
 
         public void setEmbeddingNorm(Double embeddingNorm) {
             this.embeddingNorm = embeddingNorm;
+        }
+
+        public Integer getEmbeddingDimensions() {
+            return this.embeddingDimensions;
+        }
+
+        public void setEmbeddingDimensions(Integer embeddingDimensions) {
+            this.embeddingDimensions = embeddingDimensions;
         }
     }
 
