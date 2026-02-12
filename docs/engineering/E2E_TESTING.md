@@ -46,6 +46,12 @@ pwsh -File tools/run_e2e_profiles.ps1
 ```
 Uses the `ci-e2e` + `dev` test profiles (`src/test/resources/application-ci-e2e.yml`) with an in-memory vector store and stubbed chat/embedding models.
 
+## CI-lite OIDC enterprise E2E
+```
+./gradlew ciOidcE2eTest
+```
+Uses `ci-e2e` + `enterprise` with OIDC mode and local signed JWT/JWKS fixtures to validate the enterprise bearer-token auth path in CI.
+
 ## UI smoke tests (Playwright runner)
 1) Start the app (dev or standard profile).
 2) Run the Playwright checks:
@@ -99,4 +105,4 @@ Playwright UI outputs (local):
 - `pwsh` not found: install PowerShell 7 or run profiles individually without govcloud.
 
 ## GitHub Actions
-The repo CI workflow is `.github/workflows/ci.yml` and runs unit tests, enterprise packaging (`-Pedition=enterprise build -x test`), and `ciE2eTest`. There is no full E2E workflow in this repository.
+The repo CI workflow is `.github/workflows/ci.yml` and runs unit tests, enterprise packaging (`-Pedition=enterprise build -x test`), `ciE2eTest`, and `ciOidcE2eTest`. There is no full E2E workflow in this repository.

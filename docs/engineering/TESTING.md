@@ -16,6 +16,12 @@
 ```
 Uses the `ci-e2e` + `dev` test profiles with an in-memory vector store and stubbed chat/embedding models.
 
+## CI-lite OIDC enterprise E2E
+```
+./gradlew ciOidcE2eTest
+```
+Uses `ci-e2e` + `enterprise` with OIDC mode and a locally generated JWT/JWKS test fixture to validate the enterprise auth path.
+
 ## End-to-end runs (local)
 For full-profile/full-sector E2E validation, use:
 ```

@@ -130,8 +130,10 @@ Build:
 ```
 ./gradlew test
 ./gradlew ciE2eTest
+./gradlew ciOidcE2eTest
 ```
 `ciE2eTest` uses the `ci-e2e` + `dev` test profiles with an in-memory vector store and stubbed chat/embedding models.
+`ciOidcE2eTest` validates the enterprise OIDC bearer-token path using local JWT/JWKS test fixtures.
 
 ## Documentation
 - docs/README.md
