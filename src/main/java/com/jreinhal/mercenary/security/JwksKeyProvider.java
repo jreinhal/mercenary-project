@@ -1,5 +1,6 @@
 package com.jreinhal.mercenary.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -7,6 +8,7 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
@@ -14,6 +16,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.text.ParseException;
 import java.time.Instant;
+import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.slf4j.Logger;
@@ -24,6 +27,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwksKeyProvider {
     private static final Logger log = LoggerFactory.getLogger(JwksKeyProvider.class);
+    private static final String OIDC_DISCOVERY_PATH = "/.well-known/openid-configuration";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     @Value(value="${app.oidc.jwks-uri:}")
     private String jwksUri;
     @Value(value="${app.oidc.local-jwks-path:}")
@@ -78,15 +83,58 @@ public class JwksKeyProvider {
             return remoteKeys;
         }
         if (this.issuer != null && !this.issuer.isEmpty()) {
-            String discoveredUri = this.issuer + "/.well-known/jwks.json";
-            JWKSet discoveredKeys = this.loadFromUri(discoveredUri);
-            if (discoveredKeys != null) {
-                return discoveredKeys;
+            String normalizedIssuer = normalizeIssuer(this.issuer);
+            String discoveredJwksUri = discoverJwksUriFromIssuer(normalizedIssuer);
+            if (discoveredJwksUri != null) {
+                JWKSet discoveredKeys = this.loadFromUri(discoveredJwksUri);
+                if (discoveredKeys != null) {
+                    return discoveredKeys;
+                }
             }
-            String string = this.issuer + "/.well-known/openid-configuration";
+            // Backward-compatible fallback for providers that expose JWKS at this legacy path.
+            String fallbackUri = normalizedIssuer + "/.well-known/jwks.json";
+            JWKSet fallbackKeys = this.loadFromUri(fallbackUri);
+            if (fallbackKeys != null) {
+                return fallbackKeys;
+            }
         }
         log.error("Failed to load JWKS from any source");
         return null;
+    }
+
+    String discoverJwksUriFromIssuer(String normalizedIssuer) {
+        String metadataUri = normalizedIssuer + OIDC_DISCOVERY_PATH;
+        Map<String, Object> metadata = fetchOpenIdConfiguration(metadataUri);
+        if (metadata == null || metadata.isEmpty()) {
+            return null;
+        }
+        Object jwksUriValue = metadata.get("jwks_uri");
+        if (jwksUriValue instanceof String jwksUriString && !jwksUriString.isBlank()) {
+            return jwksUriString;
+        }
+        log.warn("OIDC discovery metadata missing jwks_uri at {}", metadataUri);
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> fetchOpenIdConfiguration(String metadataUri) {
+        try {
+            URL url = URI.create(metadataUri).toURL();
+            try (InputStream stream = url.openStream()) {
+                return OBJECT_MAPPER.readValue(stream, Map.class);
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            log.debug("Failed to load OIDC discovery metadata from {}: {}", metadataUri, e.getMessage());
+            return null;
+        }
+    }
+
+    static String normalizeIssuer(String rawIssuer) {
+        String normalized = rawIssuer.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
     }
 
     private JWKSet loadFromFile(String path) {
@@ -107,7 +155,7 @@ public class JwksKeyProvider {
         }
     }
 
-    private JWKSet loadFromUri(String uri) {
+    JWKSet loadFromUri(String uri) {
         try {
             log.debug("Fetching JWKS from: {}", uri);
             URL url = URI.create(uri).toURL();

@@ -56,6 +56,15 @@ Optional:
 - OIDC_REQUIRE_MFA
 - OIDC_MFA_CLAIMS
 - OIDC_MFA_ACR
+- OIDC_AUTHORIZATION_URI
+- OIDC_TOKEN_URI
+- OIDC_REDIRECT_URI
+- OIDC_SCOPES
+
+Endpoint resolution order:
+- Browser auth endpoint: `OIDC_AUTHORIZATION_URI` -> issuer discovery (`/.well-known/openid-configuration`) -> `<issuer>/authorize` fallback
+- Browser token endpoint: `OIDC_TOKEN_URI` -> issuer discovery (`/.well-known/openid-configuration`) -> `<issuer>/oauth/token` fallback
+- JWT keyset endpoint: `OIDC_LOCAL_JWKS` -> `OIDC_JWKS_URI` -> issuer discovery `jwks_uri` -> `<issuer>/.well-known/jwks.json` fallback
 
 ## CAC Configuration (govcloud profile)
 
