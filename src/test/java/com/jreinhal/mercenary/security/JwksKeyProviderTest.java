@@ -1,6 +1,8 @@
 package com.jreinhal.mercenary.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
@@ -19,6 +21,39 @@ class JwksKeyProviderTest {
     void normalizeIssuerStripsTrailingSlash() {
         assertEquals("https://idp.example.com", JwksKeyProvider.normalizeIssuer("https://idp.example.com/"));
         assertEquals("https://idp.example.com", JwksKeyProvider.normalizeIssuer("https://idp.example.com///"));
+    }
+
+    @Test
+    void fetchOpenIdConfigurationReturnsEmptyMapForInvalidUri() {
+        JwksKeyProvider provider = new JwksKeyProvider();
+
+        Map<String, Object> metadata = provider.fetchOpenIdConfiguration("://invalid-uri");
+
+        assertTrue(metadata.isEmpty());
+    }
+
+    @Test
+    void discoverJwksUriFromIssuerReturnsConfiguredJwksUri() {
+        JwksKeyProvider provider = spy(new JwksKeyProvider());
+        doReturn(Map.of("jwks_uri", "https://idp.example.com/oauth2/keys"))
+                .when(provider)
+                .fetchOpenIdConfiguration("https://idp.example.com/.well-known/openid-configuration");
+
+        String discovered = provider.discoverJwksUriFromIssuer("https://idp.example.com");
+
+        assertEquals("https://idp.example.com/oauth2/keys", discovered);
+    }
+
+    @Test
+    void discoverJwksUriFromIssuerReturnsNullWhenMissingJwksUri() {
+        JwksKeyProvider provider = spy(new JwksKeyProvider());
+        doReturn(Map.of("issuer", "https://idp.example.com/"))
+                .when(provider)
+                .fetchOpenIdConfiguration("https://idp.example.com/.well-known/openid-configuration");
+
+        String discovered = provider.discoverJwksUriFromIssuer("https://idp.example.com");
+
+        assertNull(discovered);
     }
 
     @Test

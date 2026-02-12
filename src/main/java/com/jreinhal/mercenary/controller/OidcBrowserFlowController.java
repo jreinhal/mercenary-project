@@ -55,7 +55,6 @@ public class OidcBrowserFlowController {
 
     private final OidcAuthenticationService oidcAuthenticationService;
     private final RestTemplate restTemplate;
-    private volatile Map<String, Object> oidcMetadata;
 
     @Value("${app.oidc.issuer:}")
     private String issuer;
@@ -334,7 +333,7 @@ public class OidcBrowserFlowController {
 
     private String resolveFromOidcMetadata(String metadataKey) {
         Map<String, Object> metadata = resolveOidcMetadata();
-        if (metadata == null || metadata.isEmpty()) {
+        if (metadata.isEmpty()) {
             return null;
         }
         Object value = metadata.get(metadataKey);
@@ -346,23 +345,19 @@ public class OidcBrowserFlowController {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> resolveOidcMetadata() {
-        if (oidcMetadata != null) {
-            return oidcMetadata;
-        }
         if (issuer == null || issuer.isBlank()) {
-            return null;
+            return Map.of();
         }
         String metadataUri = normalizeIssuer(issuer) + OIDC_DISCOVERY_PATH;
         try {
             Map<String, Object> metadata = restTemplate.getForObject(metadataUri, Map.class);
             if (metadata == null || metadata.isEmpty()) {
-                return null;
+                return Map.of();
             }
-            oidcMetadata = metadata;
             return metadata;
         } catch (Exception e) {
             log.debug("OIDC discovery metadata unavailable at {}: {}", metadataUri, e.getMessage());
-            return null;
+            return Map.of();
         }
     }
 

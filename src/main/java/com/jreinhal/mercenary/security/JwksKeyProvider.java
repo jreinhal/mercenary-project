@@ -105,7 +105,7 @@ public class JwksKeyProvider {
     String discoverJwksUriFromIssuer(String normalizedIssuer) {
         String metadataUri = normalizedIssuer + OIDC_DISCOVERY_PATH;
         Map<String, Object> metadata = fetchOpenIdConfiguration(metadataUri);
-        if (metadata == null || metadata.isEmpty()) {
+        if (metadata.isEmpty()) {
             return null;
         }
         Object jwksUriValue = metadata.get("jwks_uri");
@@ -125,7 +125,7 @@ public class JwksKeyProvider {
             }
         } catch (IOException | IllegalArgumentException e) {
             log.debug("Failed to load OIDC discovery metadata from {}: {}", metadataUri, e.getMessage());
-            return null;
+            return Map.of();
         }
     }
 
