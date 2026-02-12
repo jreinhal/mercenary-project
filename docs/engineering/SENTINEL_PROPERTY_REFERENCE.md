@@ -1,4 +1,4 @@
-﻿# SENTINEL Property Reference
+# SENTINEL Property Reference
 
 Complete `sentinel.*` leaf-property reference extracted from:
 - `src/main/resources/application.yaml`
