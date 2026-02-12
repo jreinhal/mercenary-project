@@ -159,6 +159,23 @@ class Phase1PromptHardeningTest {
     }
 
     @Test
+    void buildSystemPromptHandlesNullQuery() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "quickLookupMaxTerms", 9);
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 40);
+
+        String information = "[alpha.pdf]\nPage: 1\ncontent";
+        Class<?> policyType = Class.forName("com.jreinhal.mercenary.service.RagOrchestrationService$ResponsePolicy");
+        Method m = RagOrchestrationService.class.getDeclaredMethod(
+                "buildSystemPrompt", String.class, String.class, policyType, Department.class);
+        m.setAccessible(true);
+
+        String prompt = (String) m.invoke(service, null, information, null, Department.ENTERPRISE);
+        assertTrue(prompt.contains("Persona: careful investigator."));
+        assertTrue(prompt.contains("Detected query type: factual."));
+    }
+
+    @Test
     void enforceDocumentCeilingTruncatesWhenExceeded() throws Exception {
         RagOrchestrationService service = newTestService();
         ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 2);
@@ -202,6 +219,22 @@ class Phase1PromptHardeningTest {
         Object out = m.invoke(service, docs, "query");
         assertTrue(out instanceof List<?>);
         assertTrue(((List<?>) out).size() == 2);
+    }
+
+    @Test
+    void enforceDocumentCeilingHandlesNullAndEmptyDocs() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 5);
+
+        Method m = RagOrchestrationService.class.getDeclaredMethod("enforceDocumentCeiling", List.class, String.class);
+        m.setAccessible(true);
+
+        Object nullOut = m.invoke(service, null, "query");
+        assertTrue(nullOut == null);
+
+        Object emptyOut = m.invoke(service, List.of(), "query");
+        assertTrue(emptyOut instanceof List<?>);
+        assertTrue(((List<?>) emptyOut).isEmpty());
     }
 
     @Test
