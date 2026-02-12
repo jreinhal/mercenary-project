@@ -327,8 +327,11 @@ sentinel:
     relevance-threshold: ${HIFIRAG_RELEVANCE_THRESHOLD:0.5}
     max-iterations: ${HIFIRAG_MAX_ITERATIONS:2}
     reranker:
+      # Reranker mode: dedicated (embedding-based model scorer), llm, keyword, or auto.
+      mode: ${HIFIRAG_RERANKER_MODE:dedicated}
       batch-size: ${HIFIRAG_RERANKER_BATCH:5}
       timeout-seconds: ${HIFIRAG_RERANKER_TIMEOUT:30}
+      # LLM is retained as fallback when dedicated scoring is unavailable.
       use-llm: ${HIFIRAG_USE_LLM:true}
       cache-size: ${HIFIRAG_RERANKER_CACHE_SIZE:2000}
       cache-ttl-seconds: ${HIFIRAG_RERANKER_CACHE_TTL:900}
