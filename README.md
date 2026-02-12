@@ -2,6 +2,16 @@
 
 Secure, air-gap compatible RAG platform for enterprise and government deployments.
 
+## RAG Capability Snapshot
+
+SENTINEL includes the core upgrade pillars from the RAG improvement program:
+
+- **Corpus Poisoning Defense** via RAGPart validation before generation.
+- **Agentic Multi-Hop Reasoning** with tool-augmented orchestration for complex queries.
+- **Multimodal Ingestion + Retrieval** across text, tables, and visual assets.
+- **Hierarchical and Hybrid Retrieval** with chunk/document routing, reranking, and query expansion.
+- **Hallucination Risk Controls** with corpus-grounded uncertainty checks and abstention paths.
+
 ## Capabilities (Current)
 
 Note: Capabilities are edition/profile dependent; some features are optional or disabled by default.
@@ -9,20 +19,26 @@ Note: Capabilities are edition/profile dependent; some features are optional or 
 ### Retrieval & Orchestration
 - **Multiple RAG Strategies (Feature-Flagged)** — HybridRAG, HiFi-RAG, MegaRAG, MiA-RAG, QuCo-RAG, RAGPart, AdaptiveRAG, CRAG, and BidirectionalRAG are implemented and can be enabled/combined per deployment.
 - **Adaptive Query Routing** — AdaptiveRAG classifies each query and routes to chunk-level or document-level retrieval based on complexity.
+- **Agent Tool Suite** — Agentic orchestration can use document info lookup, adjacent-chunk expansion, and visual-region evidence tools for deeper investigations.
 - **Corrective Retrieval** — CRAG detects low-confidence results and rewrites the query before re-searching.
 - **Corpus Poisoning Defense** — RAGPart partitions the corpus to detect and isolate adversarial injections.
 - **Uncertainty Quantification** — QuCo-RAG performs corpus-grounded uncertainty checks to flag potentially hallucinated or weakly supported answers.
 
 ### Document Processing
 - **Metadata-Preserving Ingestion** — Upstream extractor metadata (e.g., PDF `page_number`) is preserved where available, and each ingested chunk is tagged with deterministic `chunk_index` / `page_chunk_index` for traceability.
+- **Table-Aware Extraction Pipeline** — Ingestion includes table extraction paths and table-specific chunk handling to preserve tabular evidence fidelity.
 - **Multimodal Visual Analysis** — MegaRAG classifies images into common visual types (charts/diagrams/tables/etc) and extracts text, entities, and descriptions for retrieval.
+- **Ingestion Resilience** — Checkpoint/resume state, bounded retries, and failure thresholds help long-running ingestion complete reliably.
 
 ### Citations & Trust
 - **Evidence Metadata** — Retrieved chunks carry `source` and (when available) `page_number` metadata to support page-level traceability and audits.
+- **Visual Evidence Endpoints** — Source page and cropped region rendering support direct citation verification workflows.
 
 ### Search Intelligence
 - **Query Expansion** — HybridRAG can expand queries via deterministic reformulations/synonyms, with optional LLM-assisted expansion.
 - **Hybrid Semantic + Keyword Retrieval** — HybridRAG fuses dense vector similarity with keyword-based heuristics via Reciprocal Rank Fusion, with OCR-tolerance heuristics for degraded scans.
+- **Domain Thesaurus Expansion** — Department/workspace-aware acronym and synonym expansion improves recall on specialized vocabularies.
+- **Temporal Filtering** — Query-time year constraints can prefilter retrieval when temporal expressions are detected.
 
 ### Security & Compliance
 - **PII Redaction** — Automatic detection and redaction aligned to NIST, GDPR, HIPAA, and PCI-DSS standards.
@@ -33,15 +49,25 @@ Note: Capabilities are edition/profile dependent; some features are optional or 
 - **License Validation** — HMAC-based license keys with edition, expiry, and org binding. Tamper-evident and offline-verifiable.
 - **Authentication Modes** — DEV, STANDARD (username/password with admin bootstrap), OIDC (browser-based Auth Code + PKCE flow), and CAC (smart card / certificate-based).
 
-## Roadmap (Planned / In Progress)
+## Architecture (High Level)
 
-- **PDF Table Extraction** — Route text-layer PDFs through a deterministic table extractor (e.g., Tabula) and scanned PDFs through PDF rendering + vision extraction for high-fidelity tables.
-- **Visual Source Evidence for Tables** — Store table crops as evidence (or render on demand from source PDFs in strict environments) and use them as a fallback when extraction is uncertain.
-- **Source Page Verification UI** — Click a citation to render the original PDF page on demand from the stored source document.
-- **Decoupled Citation Verification** — Add an optional post-generation citation verification pass to validate that cited sources support claims.
-- **Domain-Aware Query Expansion** — Per-edition thesaurus for abbreviations, synonyms, and unit normalization (e.g., LOX, PSI/MPa; medical brand to generic).
-- **Temporal Filtering & Scoring** — Extract and index document dates to support time-range queries and temporal decay scoring.
-- **Numeric/Tabular Answer Verification** — Add table-aware verification checklists (especially for MEDICAL/GOVERNMENT editions) before finalizing numeric claims.
+```text
+Ingestion (text/table/visual extraction + metadata + resilience checkpoints)
+    ->
+Vector + Hybrid Indexing (semantic, lexical, thesaurus, temporal metadata)
+    ->
+Retrieval Orchestration (HybridRAG / HiFi-RAG / Agentic / CRAG / RAGPart)
+    ->
+Grounding + Uncertainty Checks (QuCo-RAG + policy gates)
+    ->
+Response + Citations (+ optional source page/region evidence rendering)
+```
+
+## Roadmap (Next)
+
+- Expand benchmark automation and hard-document regression packs for release gating.
+- Continue optional model-infrastructure evaluation (multimodal embeddings and reranker tuning per deployment hardware).
+- Broaden customer-facing docs (API, security, and operations runbooks) for newly shipped RAG capabilities.
 
 ## Quick start
 
@@ -68,6 +94,17 @@ Key environment variables:
 - OLLAMA_URL
 - LLM_MODEL
 - EMBEDDING_MODEL
+
+Feature toggles commonly tuned in production:
+- AGENTIC_ENABLED
+- THESAURUS_ENABLED
+- RAG_TEMPORAL_FILTERING_ENABLED
+- HIFIRAG_RERANKER_MODE (`dedicated`, `auto`, `llm`, `keyword`)
+- EMBEDDING_BATCH_SIZE
+- EMBEDDING_MULTIMODAL_ENABLED
+- INGEST_RESILIENCE_ENABLED
+- INGEST_MAX_RETRIES
+- SOURCE_RETENTION_PDF_ENABLED
 
 STANDARD profile bootstrap:
 - SENTINEL_BOOTSTRAP_ENABLED=true
