@@ -25,6 +25,28 @@ class AgenticToolsConfigTest {
     }
 
     @Test
+    void getDocumentInfoToolHandlesMissingDocumentId() {
+        AgentToolService service = mock(AgentToolService.class);
+        AgenticToolsConfig cfg = new AgenticToolsConfig();
+
+        Function<AgenticToolsConfig.DocumentInfoRequest, String> tool = cfg.getDocumentInfo(service);
+        String out = tool.apply(new AgenticToolsConfig.DocumentInfoRequest(" ", "ENTERPRISE"));
+
+        assertThat(out).contains("No documentId provided");
+    }
+
+    @Test
+    void getDocumentInfoToolHandlesNullRequest() {
+        AgentToolService service = mock(AgentToolService.class);
+        AgenticToolsConfig cfg = new AgenticToolsConfig();
+
+        Function<AgenticToolsConfig.DocumentInfoRequest, String> tool = cfg.getDocumentInfo(service);
+        String out = tool.apply(null);
+
+        assertThat(out).contains("No documentId provided");
+    }
+
+    @Test
     void getAdjacentChunksToolDelegatesToService() {
         AgentToolService service = mock(AgentToolService.class);
         when(service.getAdjacentChunks("alpha.pdf#2", 300, 400, "ENTERPRISE"))
@@ -45,6 +67,17 @@ class AgenticToolsConfigTest {
 
         Function<AgenticToolsConfig.AdjacentChunksRequest, String> tool = cfg.getAdjacentChunks(service);
         String out = tool.apply(new AgenticToolsConfig.AdjacentChunksRequest(" ", 300, 400, "ENTERPRISE"));
+
+        assertThat(out).contains("No chunkId provided");
+    }
+
+    @Test
+    void getAdjacentChunksToolHandlesNullRequest() {
+        AgentToolService service = mock(AgentToolService.class);
+        AgenticToolsConfig cfg = new AgenticToolsConfig();
+
+        Function<AgenticToolsConfig.AdjacentChunksRequest, String> tool = cfg.getAdjacentChunks(service);
+        String out = tool.apply(null);
 
         assertThat(out).contains("No chunkId provided");
     }

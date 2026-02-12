@@ -76,6 +76,23 @@ class AgentToolServiceTest {
     }
 
     @Test
+    void getDocumentInfoValidatesBlankId() {
+        String out = this.service.getDocumentInfo(" ", "ENTERPRISE");
+
+        assertThat(out).contains("No documentId provided");
+        verifyNoInteractions(this.mongoTemplate);
+    }
+
+    @Test
+    void getDocumentInfoReturnsNotFoundWhenNoRows() {
+        when(this.mongoTemplate.find(any(Query.class), eq(Map.class), eq("vector_store"))).thenReturn(List.of());
+
+        String out = this.service.getDocumentInfo("missing.pdf", "ENTERPRISE");
+
+        assertThat(out).contains("No document metadata found");
+    }
+
+    @Test
     void getAdjacentChunksReturnsBeforeAndAfterContext() {
         List<Map> rows = List.of(
                 chunkRow("alpha.pdf", 0, "intro context"),
@@ -95,6 +112,28 @@ class AgentToolServiceTest {
         assertThat(out).contains("[alpha.pdf#2]");
         assertThat(out).contains("AFTER:");
         assertThat(out).contains("[alpha.pdf#3]");
+    }
+
+    @Test
+    void getAdjacentChunksReturnsNotFoundWhenSourceHasNoChunks() {
+        when(this.mongoTemplate.find(any(Query.class), eq(Map.class), eq("vector_store"))).thenReturn(List.of());
+
+        String out = this.service.getAdjacentChunks("alpha.pdf#2", null, null, "ENTERPRISE");
+
+        assertThat(out).contains("No chunks found for source");
+    }
+
+    @Test
+    void getAdjacentChunksReturnsNotFoundWhenAnchorMissing() {
+        List<Map> rows = List.of(
+                chunkRow("alpha.pdf", 0, "intro"),
+                chunkRow("alpha.pdf", 1, "body")
+        );
+        when(this.mongoTemplate.find(any(Query.class), eq(Map.class), eq("vector_store"))).thenReturn(rows);
+
+        String out = this.service.getAdjacentChunks("alpha.pdf#9", -10, 99999, "ENTERPRISE");
+
+        assertThat(out).contains("was not found");
     }
 
     @Test

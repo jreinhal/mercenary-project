@@ -312,7 +312,7 @@ public class RagOrchestrationService {
             if (suppressSensitiveLogs) {
                 log.debug("Sensitive document previews suppressed (regulated mode).");
             }
-            List<Document> topDocs = orderedDocs.stream().limit(15L).toList();
+            List<Document> topDocs = this.selectTopDocuments(orderedDocs, query);
             if (hipaaStrict && this.hipaaAuditService != null) {
                 List<String> docIds = topDocs.stream().map(doc -> String.valueOf(doc.getMetadata().getOrDefault("source", "unknown"))).distinct().toList();
                 this.hipaaAuditService.logPhiQuery(user, query, topDocs.size(), docIds);
@@ -684,7 +684,7 @@ public class RagOrchestrationService {
             ArrayList<Document> rawDocs = new ArrayList<Document>(allDocs);
             stepStart = System.currentTimeMillis();
             List<Document> orderedDocs = this.sortDocumentsDeterministically(rawDocs);
-            List<Document> topDocs = orderedDocs.stream().limit(15L).toList();
+            List<Document> topDocs = this.selectTopDocuments(orderedDocs, query);
             if (hipaaStrict && this.hipaaAuditService != null) {
                 List<String> docIds = topDocs.stream().map(doc -> String.valueOf(doc.getMetadata().getOrDefault("source", "unknown"))).distinct().toList();
                 this.hipaaAuditService.logPhiQuery(user, query, topDocs.size(), docIds);
@@ -2693,23 +2693,24 @@ public class RagOrchestrationService {
         visualDocs = new ArrayList<>(this.filterDocumentsByFiles(visualDocs, activeFiles));
 
         textDocs = this.sortDocumentsDeterministically(new ArrayList<>(new LinkedHashSet<>(textDocs)));
-        textDocs = this.enforceDocumentCeiling(textDocs, query, strategies);
         visualDocs = new ArrayList<>(new LinkedHashSet<>(visualDocs));
 
         return new RetrievalContext(textDocs, globalContext, visualDocs, edges, strategies, modalities);
     }
 
-    private List<Document> enforceDocumentCeiling(List<Document> docs, String query, List<String> strategies) {
+    private List<Document> enforceDocumentCeiling(List<Document> docs, String query) {
         if (docs == null || docs.isEmpty() || this.documentsPerQueryCeiling <= 0 || docs.size() <= this.documentsPerQueryCeiling) {
             return docs;
         }
         if (log.isInfoEnabled()) {
             log.info("Document ceiling applied: limited {} -> {} docs for query {}", docs.size(), this.documentsPerQueryCeiling, LogSanitizer.querySummary(query));
         }
-        if (strategies != null && !strategies.contains("DocumentCeiling")) {
-            strategies.add("DocumentCeiling");
-        }
         return new ArrayList<>(docs.subList(0, this.documentsPerQueryCeiling));
+    }
+
+    private List<Document> selectTopDocuments(List<Document> orderedDocs, String query) {
+        List<Document> cappedDocs = this.enforceDocumentCeiling(orderedDocs, query);
+        return cappedDocs.stream().limit(15L).toList();
     }
 
     private boolean isVisualDoc(Document doc) {

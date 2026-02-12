@@ -139,8 +139,6 @@ public class MercenaryController {
     private int maxDocs;
     @Value("${sentinel.rag.max-visual-docs:8}")
     private int maxVisualDocs;
-    @Value("${sentinel.agentic.documents-per-query-ceiling:40}")
-    private int documentsPerQueryCeiling;
 
     public MercenaryController(ChatClient.Builder builder, VectorStore vectorStore, SecureIngestionService ingestionService, MongoTemplate mongoTemplate, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, PiiRedactionService piiRedactionService, ConversationMemoryProvider conversationMemoryService, SessionPersistenceProvider sessionPersistenceService, RagOrchestrationService ragOrchestrationService, Cache<String, String> secureDocCache, SourceDocumentService sourceDocumentService, PageRenderService pageRenderService, LicenseService licenseService,
                                @Value("${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
@@ -1025,23 +1023,9 @@ public class MercenaryController {
         visualDocs = new ArrayList<>(this.filterDocumentsByFiles(visualDocs, activeFiles));
 
         textDocs = this.sortDocumentsDeterministically(new ArrayList<>(new LinkedHashSet<>(textDocs)));
-        textDocs = this.enforceDocumentCeiling(textDocs, query, strategies);
         visualDocs = new ArrayList<>(new LinkedHashSet<>(visualDocs));
 
         return new RetrievalContext(textDocs, globalContext, visualDocs, edges, strategies, modalities);
-    }
-
-    private List<Document> enforceDocumentCeiling(List<Document> docs, String query, List<String> strategies) {
-        if (docs == null || docs.isEmpty() || this.documentsPerQueryCeiling <= 0 || docs.size() <= this.documentsPerQueryCeiling) {
-            return docs;
-        }
-        if (log.isInfoEnabled()) {
-            log.info("SSE retrieval document ceiling applied: limited {} -> {} docs for query {}", docs.size(), this.documentsPerQueryCeiling, LogSanitizer.querySummary(query));
-        }
-        if (strategies != null && !strategies.contains("DocumentCeiling")) {
-            strategies.add("DocumentCeiling");
-        }
-        return new ArrayList<>(docs.subList(0, this.documentsPerQueryCeiling));
     }
 
     private boolean isVisualDoc(Document doc) {

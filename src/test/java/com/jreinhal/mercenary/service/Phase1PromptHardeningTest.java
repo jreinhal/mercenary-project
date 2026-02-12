@@ -88,6 +88,68 @@ class Phase1PromptHardeningTest {
     }
 
     @Test
+    void buildSystemPromptClassifiesAnalyticalAndHistoricalQueries() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "quickLookupMaxTerms", 5);
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 40);
+
+        String information = "[alpha.pdf]\nPage: 7\ncontent";
+        Class<?> policyType = Class.forName("com.jreinhal.mercenary.service.RagOrchestrationService$ResponsePolicy");
+        Method m = RagOrchestrationService.class.getDeclaredMethod(
+                "buildSystemPrompt", String.class, String.class, policyType, Department.class);
+        m.setAccessible(true);
+
+        String analytical = (String) m.invoke(
+                service,
+                "Compare operational risk and impact across systems",
+                information,
+                null,
+                Department.ENTERPRISE);
+        assertTrue(analytical.contains("Persona: careful investigator."));
+        assertTrue(analytical.contains("Detected query type: analytical."));
+
+        String historical = (String) m.invoke(
+                service,
+                "Show timeline changes between 2018 and 2022",
+                information,
+                null,
+                Department.ENTERPRISE);
+        assertTrue(historical.contains("Detected query type: historical."));
+    }
+
+    @Test
+    void enforceDocumentCeilingTruncatesWhenExceeded() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 2);
+
+        Method m = RagOrchestrationService.class.getDeclaredMethod("enforceDocumentCeiling", List.class, String.class);
+        m.setAccessible(true);
+
+        List<Document> docs = List.of(
+                new Document("a"),
+                new Document("b"),
+                new Document("c")
+        );
+        Object out = m.invoke(service, docs, "query");
+        assertTrue(out instanceof List<?>);
+        assertTrue(((List<?>) out).size() == 2);
+    }
+
+    @Test
+    void enforceDocumentCeilingNoOpWhenDisabled() throws Exception {
+        RagOrchestrationService service = newTestService();
+        ReflectionTestUtils.setField(service, "documentsPerQueryCeiling", 0);
+
+        Method m = RagOrchestrationService.class.getDeclaredMethod("enforceDocumentCeiling", List.class, String.class);
+        m.setAccessible(true);
+
+        List<Document> docs = List.of(new Document("a"), new Document("b"));
+        Object out = m.invoke(service, docs, "query");
+        assertTrue(out instanceof List<?>);
+        assertTrue(((List<?>) out).size() == 2);
+    }
+
+    @Test
     void extractiveResponsesAppendPageSuffixOutsideBracketCitations() throws Exception {
         Document doc = new Document("hello value is 42", Map.of("source", "file.pdf", "page_number", 3));
 
