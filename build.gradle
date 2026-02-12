@@ -207,3 +207,10 @@ tasks.register('ciE2eTest', Test) {
     useJUnitPlatform()
     include '**/PipelineE2eTest.class'
 }
+
+tasks.register('ciOidcE2eTest', Test) {
+    description = 'Run CI-lite OIDC enterprise path E2E tests.'
+    group = 'verification'
+    useJUnitPlatform()
+    include '**/OidcPipelineE2eTest.class'
+}

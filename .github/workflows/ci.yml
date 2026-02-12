@@ -37,6 +37,9 @@ jobs:
       - name: CI-lite pipeline E2E
         run: ./gradlew ciE2eTest
 
+      - name: CI-lite OIDC enterprise E2E
+        run: ./gradlew ciOidcE2eTest
+
       - name: SonarCloud analysis
         if: ${{ env.SONAR_TOKEN != '' }}
         env:

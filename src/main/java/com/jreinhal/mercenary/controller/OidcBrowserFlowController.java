@@ -12,6 +12,7 @@ import java.util.Base64;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpEntity;
@@ -74,6 +75,7 @@ public class OidcBrowserFlowController {
     @Value("${app.oidc.scopes:openid profile email}")
     private String scopes;
 
+    @Autowired
     public OidcBrowserFlowController(OidcAuthenticationService oidcAuthenticationService) {
         this(oidcAuthenticationService, new RestTemplate());
     }
