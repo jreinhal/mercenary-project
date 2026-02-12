@@ -354,6 +354,17 @@
                         <li><strong>Sources:</strong> List of retrieved documents with similarity scores</li>
                     </ul>
 
+                    <h3>Page and Region Verification</h3>
+                    <p>
+                        For retained source PDFs, operators can verify evidence at page or region granularity.
+                        This supports exact source checks for dense tables, diagrams, and quoted text.
+                    </p>
+                    <ul>
+                        <li><strong>Source Page:</strong> Render full source page for a cited document</li>
+                        <li><strong>Source Region:</strong> Render a bounded box with configurable context expansion</li>
+                        <li><strong>Policy-Aware Access:</strong> Rendering is blocked when retention policy forbids source bytes</li>
+                    </ul>
+
                     <div class="callout warning">
                         <div class="callout-title">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -390,7 +401,7 @@
                         <div class="feature-card">
                             <div class="feature-card-icon">⚖️</div>
                             <h4>Cross-Encoder Reranking</h4>
-                            <p>LLM-as-judge semantic scoring for precise relevance.</p>
+                            <p>Dedicated reranking with automatic fallback modes for stable relevance scoring.</p>
                         </div>
                     </div>
 
@@ -408,6 +419,37 @@
                         <li><strong>Entity Extraction:</strong> Pattern-based NER for key entities</li>
                         <li><strong>Hypergraph Storage:</strong> MongoDB-backed relationship storage</li>
                         <li><strong>Multi-hop Traversal:</strong> BFS exploration across documents</li>
+                    </ul>
+
+                    <h3>Domain Thesaurus and Temporal Filtering</h3>
+                    <p>
+                        Retrieval can expand specialized terms and apply date-aware prefilters when queries include time bounds.
+                    </p>
+                    <ul>
+                        <li><strong>Domain Expansion:</strong> Acronym/synonym expansion per sector and workspace</li>
+                        <li><strong>Unit Normalization:</strong> Optional conversion-aware matching (for validated deployments)</li>
+                        <li><strong>Temporal Prefilter:</strong> Year/range constraints narrow retrieval scope before synthesis</li>
+                    </ul>
+
+                    <h3>Multimodal and Visual Evidence Support</h3>
+                    <ul>
+                        <li><strong>Visual Context:</strong> Image and chart metadata can participate in retrieval context</li>
+                        <li><strong>Source Rendering:</strong> Page/region rendering endpoints support direct evidence validation</li>
+                        <li><strong>Regulated Controls:</strong> HIPAA strict deployments can disable persistent visual retention</li>
+                    </ul>
+
+                    <h3>Ingestion Resilience and Safety</h3>
+                    <ul>
+                        <li><strong>Checkpoint/Resume:</strong> Long-running ingestion can recover from interruptions</li>
+                        <li><strong>Bounded Retries:</strong> Retry logic and fallback modes reduce batch failure rates</li>
+                        <li><strong>Failure Thresholds:</strong> Safety limits stop ingestion when failure rates exceed configured bounds</li>
+                    </ul>
+
+                    <h3>Hallucination Risk Controls</h3>
+                    <ul>
+                        <li><strong>Uncertainty Analysis:</strong> QuCo-RAG checks for unsupported or low-confidence generations</li>
+                        <li><strong>Abstention Path:</strong> High-risk responses are suppressed in favor of evidence-first fallback</li>
+                        <li><strong>Citation Enforcement:</strong> Regulated sectors require strict source-backed responses</li>
                     </ul>
                 </div>
 
@@ -581,7 +623,7 @@
                 <!-- FOOTER -->
                 <div class="docs-footer">
                     <p class="docs-footer-text">
-                        SENTINEL Intelligence Platform v2.2.0 | Build 2026.01<br>
+                        SENTINEL Intelligence Platform v2.3.0 | Build 2026.02<br>
                         Powered by 9 Research-Backed RAG Engines
                     </p>
                 </div>
