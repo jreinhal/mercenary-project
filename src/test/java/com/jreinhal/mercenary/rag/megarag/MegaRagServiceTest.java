@@ -140,4 +140,32 @@ class MegaRagServiceTest {
         assertTrue(embeddingText.contains("entities: thrust"));
         assertTrue(embeddingText.contains("related_context: related engineering context"));
     }
+
+    @Test
+    void ingestVisualAssetSkipsContextWhenConfiguredMaxCharsIsNegative() {
+        WorkspaceContext.setCurrentWorkspaceId("ws-test");
+        ReflectionTestUtils.setField(this.service, "multimodalContextMaxChars", -10);
+
+        MegaRagService.ImageAnalysis analysis = new MegaRagService.ImageAnalysis(
+                MegaRagService.ImageType.CHART_BAR,
+                "bar chart",
+                "A=10 B=12",
+                List.of(),
+                Map.of());
+        when(this.imageAnalyzer.analyze(any(byte[].class), anyString())).thenReturn(analysis);
+        when(this.visualEntityLinker.linkEntities(anyList(), anyString(), anyString(), anyString())).thenReturn(List.of());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Document>> docsCaptor = ArgumentCaptor.forClass(List.class);
+        doNothing().when(this.vectorStore).add(docsCaptor.capture());
+
+        MegaRagService.VisualIngestionResult result = this.service.ingestVisualAsset(
+                new byte[]{5, 6, 7},
+                "chart.jpg",
+                "ENTERPRISE",
+                "context that should be skipped");
+
+        assertTrue(result.success());
+        String embeddingText = String.valueOf(docsCaptor.getValue().get(0).getMetadata().get("embeddingText"));
+        assertFalse(embeddingText.contains("related_context:"));
+    }
 }

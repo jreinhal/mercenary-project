@@ -323,8 +323,11 @@ public class MegaRagService {
             }
         }
         if (contextText != null && !contextText.isBlank()) {
-            String trimmed = contextText.length() > this.multimodalContextMaxChars ? contextText.substring(0, this.multimodalContextMaxChars) : contextText;
-            sb.append("related_context: ").append(trimmed).append("\n");
+            int safeMaxChars = Math.max(0, this.multimodalContextMaxChars);
+            if (safeMaxChars > 0) {
+                String trimmed = contextText.length() > safeMaxChars ? contextText.substring(0, safeMaxChars) : contextText;
+                sb.append("related_context: ").append(trimmed).append("\n");
+            }
         }
         return sb.toString();
     }

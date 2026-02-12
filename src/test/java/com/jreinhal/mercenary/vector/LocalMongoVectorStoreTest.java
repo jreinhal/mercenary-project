@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -96,6 +97,22 @@ class LocalMongoVectorStoreTest {
 
         verify(embeddingModel).embed(any(Document.class));
         verify(embeddingModel).embed(eq("vision text"));
+    }
+
+    @Test
+    void addFailsWhenEmbeddingBatchResponseSizeDoesNotMatchInputSize() {
+        MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
+        LocalMongoVectorStore store = new LocalMongoVectorStore(mongoTemplate, embeddingModel, 2, 0, false);
+
+        Document d1 = new Document("id-1", "alpha", new HashMap<>(Map.of("dept", "ENTERPRISE")));
+        Document d2 = new Document("id-2", "beta", new HashMap<>(Map.of("dept", "ENTERPRISE")));
+        when(embeddingModel.embed(eq(List.of("alpha", "beta"))))
+                .thenReturn(List.of(new float[]{1.0f, 0.0f}));
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> store.add(List.of(d1, d2)));
+        assertTrue(ex.getMessage().contains("Failed to save vectors"));
+        verify(mongoTemplate, never()).save(any(LocalMongoVectorStore.MongoDocument.class), eq("vector_store"));
     }
 
     @Test

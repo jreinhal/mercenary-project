@@ -333,8 +333,10 @@ implements VectorStore {
                 log.debug("Generating text embeddings in batch (size={})", batch.size());
             }
             List<float[]> vectors = this.embeddingModel.embed(inputs);
-            int bound = Math.min(batch.size(), vectors.size());
-            for (int j = 0; j < bound; j++) {
+            if (vectors.size() != batch.size()) {
+                throw new IllegalStateException("Embedding backend returned " + vectors.size() + " vectors for batch size " + batch.size());
+            }
+            for (int j = 0; j < batch.size(); j++) {
                 float[] vector = vectors.get(j);
                 this.validateEmbeddingDimensions(vector);
                 resolvedEmbeddings.put(batch.get(j), this.toDoubleList(vector));
