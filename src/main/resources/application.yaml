@@ -206,7 +206,7 @@ sentinel:
       max-retries: ${INGEST_MAX_RETRIES:1}
       failure-threshold-percent: ${INGEST_FAILURE_THRESHOLD_PERCENT:50}
       failure-threshold-min-samples: ${INGEST_FAILURE_THRESHOLD_MIN_SAMPLES:5}
-      checkpoint-path: ${INGEST_CHECKPOINT_PATH:build/ingestion/session.json}
+      checkpoint-path: ${INGEST_CHECKPOINT_PATH:${java.io.tmpdir}/sentinel-ingestion/session.json}
       failed-docs-max: ${INGEST_FAILED_DOCS_MAX:500}
 
   source-retention:

@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -121,8 +122,8 @@ public class SecureIngestionService {
     private double ingestFailureThresholdPercent = 50.0;
     @Value("${sentinel.ingest.resilience.failure-threshold-min-samples:5}")
     private int ingestFailureThresholdMinSamples = 5;
-    @Value("${sentinel.ingest.resilience.checkpoint-path:build/ingestion/session.json}")
-    private String ingestCheckpointPath = "build/ingestion/session.json";
+    @Value("${sentinel.ingest.resilience.checkpoint-path:${java.io.tmpdir}/sentinel-ingestion/session.json}")
+    private String ingestCheckpointPath = Paths.get(System.getProperty("java.io.tmpdir", "."), "sentinel-ingestion", "session.json").toString();
     @Value("${sentinel.ingest.resilience.failed-docs-max:500}")
     private int ingestFailedDocsMax = 500;
     private static final EncodingRegistry TOKEN_ENCODING_REGISTRY = Encodings.newLazyEncodingRegistry();
@@ -159,9 +160,12 @@ public class SecureIngestionService {
     }
 
     public void ingest(MultipartFile file, Department dept) {
+        if (file == null) {
+            throw new SecureIngestionException("No file provided for ingestion.", null);
+        }
         this.enforceFailureThreshold();
         int maxAttempts = this.resilienceEnabled ? Math.max(1, this.ingestMaxRetries + 1) : 1;
-        String filename = file != null ? file.getOriginalFilename() : "unknown";
+        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "unknown";
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             boolean fallbackMode = attempt > 1;
             try {
@@ -340,7 +344,9 @@ public class SecureIngestionService {
                 }
                 throw e;
             }
-            log.info("Securely ingested {} memory points. Total PII redactions: {}", finalDocuments.size(), totalRedactions);
+            if (log.isInfoEnabled()) {
+                log.info("Securely ingested {} memory points. Total PII redactions: {}", finalDocuments.size(), totalRedactions);
+            }
         }
         catch (IOException e) {
             throw new SecureIngestionException("Secure Ingestion Failed", e);
@@ -539,7 +545,7 @@ public class SecureIngestionService {
             log.error("SECURITY: Blocked executable magic bytes. File: {}", safeFilename);
             throw new SecurityException("File content appears to be an executable and is not allowed: " + filename);
         }
-        String extension = this.getExtension(filename).toLowerCase();
+        String extension = this.getExtension(filename).toLowerCase(Locale.ROOT);
         if ("pdf".equals(extension) && !PDF_MIME_TYPE.equals(detectedMimeType)) {
             log.warn("SECURITY WARNING: PDF extension but detected as: {} - File: {}", safeMimeType, safeFilename);
         }
@@ -782,6 +788,7 @@ public class SecureIngestionService {
         if (this.ingestCheckpointPath == null || this.ingestCheckpointPath.isBlank()) {
             return;
         }
+        Path tempCheckpoint = null;
         try {
             Path checkpoint = Paths.get(this.ingestCheckpointPath);
             Path parent = checkpoint.getParent();
@@ -795,7 +802,7 @@ public class SecureIngestionService {
             state.put("securityRejectedCount", this.securityRejectedCount);
             state.put("lastProcessedDoc", this.lastProcessedDoc);
             state.put("failedDocs", new ArrayList<>(this.failedDocs));
-            Path tempCheckpoint = checkpoint.resolveSibling(checkpoint.getFileName().toString() + ".tmp");
+            tempCheckpoint = checkpoint.resolveSibling(checkpoint.getFileName().toString() + ".tmp");
             this.objectMapper.writerWithDefaultPrettyPrinter().writeValue(tempCheckpoint.toFile(), state);
             try {
                 Files.move(tempCheckpoint, checkpoint, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -805,6 +812,13 @@ public class SecureIngestionService {
         } catch (Exception e) {
             if (log.isWarnEnabled()) {
                 log.warn("Unable to persist ingestion checkpoint '{}': {}", this.ingestCheckpointPath, e.getMessage());
+            }
+        } finally {
+            if (tempCheckpoint != null) {
+                try {
+                    Files.deleteIfExists(tempCheckpoint);
+                } catch (Exception ignore) {
+                }
             }
         }
     }

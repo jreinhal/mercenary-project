@@ -705,6 +705,12 @@ class SecureIngestionServiceTest {
     }
 
     @Test
+    @DisplayName("Phase 5.3: Null file should fail fast")
+    void nullFileFailsFast() {
+        assertThrows(SecureIngestionException.class, () -> ingestionService.ingest(null, Department.ENTERPRISE));
+    }
+
+    @Test
     @DisplayName("Phase 5.3: Security rejections should not trip resilience failure threshold")
     void securityRejectionsDoNotTripFailureThreshold() throws Exception {
         Path checkpoint = Files.createTempFile("ingest-security-", ".json");
