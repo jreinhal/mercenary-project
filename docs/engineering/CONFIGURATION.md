@@ -129,7 +129,7 @@ Notes:
 ## Recommended baselines by edition
 
 These are operational starting points, not strict policy requirements.
-Edition selection is separate from Spring profiles and `APP_PROFILE`: use `-Pedition=<edition>` at build time or set `sentinel.license.edition` at runtime.
+Edition selection is separate from Spring profiles and `APP_PROFILE`: use `-Pedition=<edition>` at build time or set `sentinel.license.edition` at runtime. Do not assume that changing `APP_PROFILE` (or any Spring profile) changes the active edition.
 
 - Trial / Enterprise (balanced):
   THESAURUS_ENABLED=true
