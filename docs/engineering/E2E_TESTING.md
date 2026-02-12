@@ -99,4 +99,4 @@ Playwright UI outputs (local):
 - `pwsh` not found: install PowerShell 7 or run profiles individually without govcloud.
 
 ## GitHub Actions
-The repo CI workflow is `.github/workflows/ci.yml` and runs unit tests plus `ciE2eTest`. There is no full E2E workflow in this repository.
+The repo CI workflow is `.github/workflows/ci.yml` and runs unit tests, enterprise packaging (`-Pedition=enterprise build -x test`), and `ciE2eTest`. There is no full E2E workflow in this repository.
