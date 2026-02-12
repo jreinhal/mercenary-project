@@ -93,6 +93,28 @@ class AgentToolServiceTest {
     }
 
     @Test
+    void getDocumentInfoHandlesInvalidTemporalMetadataAndBlankDepartment() {
+        List<Map> rows = List.of(
+                Map.of(
+                        "content", "chunk one",
+                        "metadata", Map.of(
+                                "source", "",
+                                "workspaceId", "workspace_default",
+                                "documentYear", "not-a-year",
+                                "documentDateEpoch", "not-an-epoch"
+                        )
+                )
+        );
+        when(this.mongoTemplate.find(any(Query.class), eq(Map.class), eq("vector_store"))).thenReturn(rows);
+
+        String out = this.service.getDocumentInfo("folder/alpha.pdf", " ");
+
+        assertThat(out).contains("- source: folder/alpha.pdf");
+        assertThat(out).doesNotContain("documentYear:");
+        assertThat(out).doesNotContain("department:");
+    }
+
+    @Test
     void getAdjacentChunksReturnsBeforeAndAfterContext() {
         List<Map> rows = List.of(
                 chunkRow("alpha.pdf", 0, "intro context"),
@@ -134,6 +156,36 @@ class AgentToolServiceTest {
         String out = this.service.getAdjacentChunks("alpha.pdf#9", -10, 99999, "ENTERPRISE");
 
         assertThat(out).contains("was not found");
+    }
+
+    @Test
+    void getAdjacentChunksRejectsNegativeChunkIndex() {
+        String out = this.service.getAdjacentChunks("alpha.pdf#-1", 100, 100, "ENTERPRISE");
+
+        assertThat(out).contains("Invalid chunkId format");
+        verifyNoInteractions(this.mongoTemplate);
+    }
+
+    @Test
+    void getAdjacentChunksRejectsNonNumericChunkIndex() {
+        String out = this.service.getAdjacentChunks("alpha.pdf#abc", 100, 100, "ENTERPRISE");
+
+        assertThat(out).contains("Invalid chunkId format");
+        verifyNoInteractions(this.mongoTemplate);
+    }
+
+    @Test
+    void getAdjacentChunksTruncatesLongChunkContent() {
+        String longContent = "x".repeat(2000);
+        List<Map> rows = List.of(
+                chunkRow("alpha.pdf", 2, longContent)
+        );
+        when(this.mongoTemplate.find(any(Query.class), eq(Map.class), eq("vector_store"))).thenReturn(rows);
+
+        String out = this.service.getAdjacentChunks("alpha.pdf#2", 100, 100, "ENTERPRISE");
+
+        assertThat(out).contains("TARGET:");
+        assertThat(out).contains("...");
     }
 
     @Test
