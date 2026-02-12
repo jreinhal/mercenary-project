@@ -4,6 +4,7 @@ This guide documents the profile/sector E2E runner used for local validation.
 
 ## What it does
 - Starts the app for each profile (dev, standard, enterprise, govcloud)
+- Uses profile-compatible build editions automatically (`govcloud` -> `-Pedition=government`, others default to `enterprise`)
 - Ingests one test document per sector
 - Runs /ask, /ask/enhanced, and /inspect for each sector
 - Writes a results summary and JSON artifact per run
@@ -27,6 +28,17 @@ pwsh -File tools/run_e2e_profiles.ps1
 pwsh -File tools/run_e2e_profiles.ps1
 ```
 Starts each profile, ingests a test document per sector, and runs `/ask`, `/ask/enhanced`, and `/inspect`.
+
+### Build edition control
+The profile runner is edition-aware:
+- `govcloud` runs with Gradle `-Pedition=government`
+- `dev`, `standard`, and `enterprise` run with a default non-govcloud edition (`enterprise`)
+
+You can override the default non-govcloud edition:
+```
+$env:SENTINEL_E2E_BUILD_EDITION="enterprise"
+pwsh -File tools/run_e2e_profiles.ps1
+```
 
 ## CI-lite pipeline E2E
 ```
@@ -61,6 +73,7 @@ Notes:
 - Generates a local TLS keystore if missing
 - Sets `APP_CSRF_BYPASS_INGEST=true` to bypass CSRF on `/api/ingest/**` during test runs
   - Do not enable this flag in production
+- Sets `AIRGAP_MODEL_VALIDATION_ENABLED=false` for local/CI smoke runs so govcloud profile tests do not require preloaded local model artifacts
 
 ## Output artifacts
 All E2E results are written to:
@@ -80,6 +93,7 @@ Playwright UI outputs (local):
 
 ## Troubleshooting
 - Govcloud 403 on ingest: confirm `APP_CSRF_BYPASS_INGEST=true` was set for the run.
+- Govcloud health timeout before API checks: inspect `build/e2e-results/boot_govcloud_<timestamp>.log` for startup failures (TLS, auth mode, or air-gap model validation).
 - Connection refused: ensure MongoDB and Ollama are running.
 - 429 rate limit exceeded during automated bulk uploads: temporarily set `APP_RATE_LIMIT_ENABLED=false` for the run, then re-enable.
 - `pwsh` not found: install PowerShell 7 or run profiles individually without govcloud.
