@@ -351,4 +351,12 @@ These scripts set `APP_PROFILE=dev` and enable entity indexing automatically.
 - SELFRAG_ENABLED
 - AGENTIC_ENABLED
 
-For full detail, see src/main/resources/application.yaml.
+## Complete `sentinel.*` reference
+
+Complete leaf-property reference (including profile-specific overrides) is published in:
+- `docs/engineering/SENTINEL_PROPERTY_REFERENCE.md`
+
+Source of truth:
+- `src/main/resources/application.yaml`
+- `src/main/resources/application-enterprise.yaml`
+- `src/main/resources/application-foundation.yaml`
