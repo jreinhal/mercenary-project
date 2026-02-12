@@ -1514,69 +1514,65 @@ sentinel:
 **Documentation Update Checklist**:
 
 #### README.md Updates
-- [ ] Add "RAG Capabilities" section describing new features
-- [ ] Update "Key Capabilities" with:
+- [x] Add "RAG Capabilities" section describing new features
+- [x] Update "Key Capabilities" with:
   - Corpus poisoning defense (RAGPart)
   - Agentic multi-hop reasoning (Graph-O1)
   - Multimodal retrieval (images, tables, text)
   - Hierarchical document understanding (Mindscape)
   - Hallucination detection & explicit abstention
-- [ ] Update architecture diagram showing new components
-- [ ] Add configuration quick-start for new features
-- [ ] Update system requirements if any new dependencies
+- [x] Update architecture diagram showing new components (high-level text diagram in README)
+- [x] Add configuration quick-start for new features
+- [x] Update system requirements if any new dependencies
 
 #### User Manual Updates
-- [ ] Chapter: "Understanding RAG in SENTINEL"
+- [x] Chapter: "Understanding RAG in SENTINEL"
   - How retrieval-augmented generation works
   - Why SENTINEL uses multiple retrieval strategies
-- [ ] Chapter: "Working with Multimodal Documents"
+- [x] Chapter: "Working with Multimodal Documents"
   - Uploading documents with images/charts
   - How visual content is indexed and retrieved
   - Cross-modal query examples
-- [ ] Chapter: "Understanding Confidence Scores"
+- [x] Chapter: "Understanding Confidence Scores"
   - What confidence scores mean
   - When and why SENTINEL abstains from answering
   - How to interpret verification results
-- [ ] Chapter: "Security Features"
+- [x] Chapter: "Security Features"
   - Corpus poisoning protection explained (user-friendly)
   - How SENTINEL validates retrieved information
-- [ ] Update screenshots for new UI elements (if any)
-- [ ] Add troubleshooting section for new features
+- [x] Update screenshots for new UI elements (if any) - N/A for current documentation-only UI changes
+- [x] Add troubleshooting section for new features
 
 #### API Documentation Updates
-- [ ] Document new endpoints (if any)
-- [ ] Update `/ask` response schema with:
-  - `confidence` field
-  - `verificationDetails` object
-  - `groundingScore` field
-  - `abstentionReason` (when applicable)
-- [ ] Document new query parameters:
-  - `modalityHint` - suggest preferred modality
-  - `granularityHint` - suggest paragraph vs document level
-  - `requireVerification` - force hallucination check
-- [ ] Add examples for multimodal queries
-- [ ] Document configuration options via API
+- [x] Document new endpoints (if any)
+- [x] Update `/ask` and `/ask/enhanced` response contract notes, including confidence/verification field mapping and unsupported dedicated fields (`groundingScore`, `abstentionReason`)
+- [x] Document query-hint parameter status:
+  - `modalityHint` - reserved compatibility placeholder (currently ignored)
+  - `granularityHint` - reserved compatibility placeholder (currently ignored)
+  - `requireVerification` - reserved compatibility placeholder (currently ignored)
+- [x] Add examples for multimodal queries
+- [x] Document configuration options via API
 
 #### Configuration Guide Updates
 - [ ] Complete reference for all new `sentinel.*` properties
-- [ ] Recommended configurations by edition:
+- [x] Recommended configurations by edition:
   - Trial/Enterprise: Balanced defaults
   - Medical: Higher grounding thresholds
   - Government: Strictest verification, mandatory abstention
-- [ ] Performance tuning guide:
+- [x] Performance tuning guide:
   - Search depth/width trade-offs
   - Cascade model selection
   - Index optimization
-- [ ] Troubleshooting common configuration issues
+- [x] Troubleshooting common configuration issues
 
 #### Security Documentation Updates
-- [ ] Add "Corpus Poisoning Defense" section
-- [ ] Document RAGPart configuration for security auditors
-- [ ] Add to NIST 800-53 control mapping:
+- [x] Add "Corpus Poisoning Defense" section
+- [x] Document RAGPart configuration for security auditors
+- [x] Add to NIST 800-53 control mapping:
   - SI-10: Information Input Validation (RAGPart)
   - SI-4: System Monitoring (Verification logging)
-- [ ] Update threat model with RAG-specific attacks
-- [ ] Add security testing procedures for new features
+- [x] Update threat model with RAG-specific attacks
+- [x] Add security testing procedures for new features
 
 #### CHANGELOG.md Entry Template
 ```markdown
