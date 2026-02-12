@@ -23,9 +23,18 @@ Optional query params:
 - `file`: repeatable active-file filter
 - `files`: comma-separated active-file filter
 
+Compatibility query params (currently ignored by server logic):
+- `modalityHint`: not interpreted by `/api/ask`
+- `granularityHint`: not interpreted by `/api/ask`
+- `requireVerification`: not interpreted by `/api/ask`
+
 Response:
 - `200 text/plain` (answer text)
 - Error/denial cases also return text messages (for example `ACCESS DENIED`, `INVALID SECTOR`, `SECURITY ALERT`)
+
+Contract notes:
+- `/api/ask` is a plain-text endpoint and does not return top-level structured fields like `confidence`, `verificationDetails`, `groundingScore`, or `abstentionReason`.
+- For structured telemetry, use `/api/ask/enhanced`.
 
 ### `GET|POST /api/ask/enhanced`
 
@@ -43,6 +52,11 @@ Optional query params:
 - `useHyde`: retrieval override hint
 - `useGraphRag`: retrieval override hint
 - `useReranking`: retrieval override hint
+
+Compatibility query params (currently ignored by server logic):
+- `modalityHint`: not interpreted by `/api/ask/enhanced`
+- `granularityHint`: not interpreted by `/api/ask/enhanced`
+- `requireVerification`: not interpreted by `/api/ask/enhanced`
 
 Response (`application/json`):
 
@@ -85,6 +99,27 @@ Response (`application/json`):
 - `editionPolicy`, `editionMaxTokens`, `editionEnforceCitations`
 
 `reasoning` entries are emitted with lowercase `type` values plus `label`, `detail`, and `durationMs`.
+
+Field mapping notes:
+- `confidence`: represented as `metrics.routingConfidence` (routing confidence, not a global factuality score).
+- `verificationDetails`: no dedicated object; verification-related signals are exposed via metrics (for example `answerabilityGate`, `evidenceMatch`, `citationRescue`).
+- `groundingScore`: not currently exposed as a dedicated API field.
+- `abstentionReason`: not currently exposed as a dedicated API field; abstentions are conveyed in the `answer` text.
+
+### Multimodal query examples
+
+Enhanced query focused on visual evidence:
+
+```
+GET /api/ask/enhanced?q=Summarize+the+chart+trend+in+q4_report.pdf&dept=ENTERPRISE&file=q4_report.pdf
+```
+
+Render cited page or region for verification:
+
+```
+GET /api/source/page?fileName=q4_report.pdf&dept=ENTERPRISE&page=3
+GET /api/source/region?fileName=q4_report.pdf&dept=ENTERPRISE&page=3&x=420&y=260&width=620&height=280
+```
 
 ### `GET /api/ask/stream`
 
@@ -218,6 +253,10 @@ Base path: `/api/graph`
 - `GET /api/user/context`
 - `GET /api/config/sectors`
 - `GET /api/config/current-sector`
+
+Configuration API notes:
+- The config endpoints expose sector availability/current-sector context.
+- There is no public endpoint that returns the full runtime `sentinel.*` configuration map.
 
 ## Admin (ADMIN role)
 

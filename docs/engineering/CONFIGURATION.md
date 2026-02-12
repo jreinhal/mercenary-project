@@ -152,6 +152,14 @@ Edition selection is separate from Spring profiles and `APP_PROFILE`: use `-Pedi
   Use `HIFIRAG_RERANKER_MODE=auto` if dedicated reranking resources are constrained.
   Apply environment-approved retention controls when `SOURCE_RETENTION_PDF_ENABLED=true`.
 
+## Troubleshooting common configuration issues
+
+- Profile/auth mismatch: outside `dev`, do not use `AUTH_MODE=DEV`; use `STANDARD`, `OIDC`, or `CAC` to avoid startup security failures.
+- Profile vs edition mismatch: `APP_PROFILE` and Gradle `-Pedition=` are separate controls; for govcloud smoke runs use `-Pedition=government`.
+- STANDARD bootstrap failures: when `SENTINEL_BOOTSTRAP_ENABLED=true`, set `SENTINEL_ADMIN_PASSWORD` (or `SENTINEL_BOOTSTRAP_ADMIN_PASSWORD`).
+- Source evidence `404` on `/api/source/*`: confirm `SOURCE_RETENTION_PDF_ENABLED=true` and verify HIPAA strict retention policy (`SOURCE_RETENTION_ALLOW_HIPAA_STRICT`).
+- Local startup health failures in govcloud tests: disable air-gap model validation for smoke automation (`AIRGAP_MODEL_VALIDATION_ENABLED=false`) unless required model artifacts are preloaded.
+
 ## Tokenization vault
 - APP_TOKENIZATION_SECRET_KEY (maps to app.tokenization.secret-key)
 
