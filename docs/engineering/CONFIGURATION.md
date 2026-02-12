@@ -113,10 +113,10 @@ Notes:
 ### Reranker and embedding evaluation knobs
 - HIFIRAG_RERANKER_MODE (default: `dedicated`; options: `dedicated`, `auto`, `llm`, `keyword`)
 - HIFIRAG_RERANKER_BATCH (default: 5)
-- HIFIRAG_RERANKER_TIMEOUT (default: 30)
+- HIFIRAG_RERANKER_TIMEOUT (default: 30 seconds)
 - HIFIRAG_USE_LLM (default: true, fallback path)
 - HIFIRAG_RERANKER_CACHE_SIZE (default: 2000)
-- HIFIRAG_RERANKER_CACHE_TTL (default: 900)
+- HIFIRAG_RERANKER_CACHE_TTL (default: 900 seconds)
 - EMBEDDING_BATCH_SIZE (default: 128)
 - EMBEDDING_TARGET_DIMENSIONS (default: 0; 0 disables strict dimension targeting)
 - EMBEDDING_MULTIMODAL_ENABLED (default: false)
@@ -129,23 +129,28 @@ Notes:
 ## Recommended baselines by edition
 
 These are operational starting points, not strict policy requirements.
+Edition selection is separate from Spring profiles and `APP_PROFILE`: use `-Pedition=<edition>` at build time or set `sentinel.license.edition` at runtime.
 
 - Trial / Enterprise (balanced):
-  - THESAURUS_ENABLED=true
-  - RAG_TEMPORAL_FILTERING_ENABLED=true
-  - INGEST_RESILIENCE_ENABLED=true
-  - HIFIRAG_RERANKER_MODE=auto
-  - SOURCE_RETENTION_PDF_ENABLED=true
+  THESAURUS_ENABLED=true
+  RAG_TEMPORAL_FILTERING_ENABLED=true
+  INGEST_RESILIENCE_ENABLED=true
+  HIFIRAG_RERANKER_MODE=auto
+  SOURCE_RETENTION_PDF_ENABLED=true
 - Medical (strict-by-default posture):
-  - SOURCE_RETENTION_ALLOW_HIPAA_STRICT=false
-  - THESAURUS_UNIT_CONVERSION_ENABLED=false until benchmark-validated
-  - AGENTIC_DOCUMENTS_PER_QUERY_CEILING=40
-  - Keep citation-enforcing response policy enabled (default behavior in medical edition)
+  SOURCE_RETENTION_ALLOW_HIPAA_STRICT=false
+  THESAURUS_UNIT_CONVERSION_ENABLED=false
+  AGENTIC_DOCUMENTS_PER_QUERY_CEILING=40
+  Keep citation-enforcing response policy enabled (default behavior in medical edition).
+  Keep `THESAURUS_UNIT_CONVERSION_ENABLED` disabled until benchmark-validated in your environment.
 - Government (strict verification posture):
-  - AGENTIC_ENABLED=true only after latency testing in target environment
-  - AGENTIC_DOCUMENTS_PER_QUERY_CEILING=40
-  - HIFIRAG_RERANKER_MODE=dedicated (or auto fallback in constrained deployments)
-  - SOURCE_RETENTION_PDF_ENABLED=true (for page/region auditability) with environment-approved retention controls
+  AGENTIC_ENABLED=true
+  AGENTIC_DOCUMENTS_PER_QUERY_CEILING=40
+  HIFIRAG_RERANKER_MODE=dedicated
+  SOURCE_RETENTION_PDF_ENABLED=true
+  Enable `AGENTIC_ENABLED` only after latency testing in the target environment.
+  Use `HIFIRAG_RERANKER_MODE=auto` if dedicated reranking resources are constrained.
+  Apply environment-approved retention controls when `SOURCE_RETENTION_PDF_ENABLED=true`.
 
 ## Tokenization vault
 - APP_TOKENIZATION_SECRET_KEY (maps to app.tokenization.secret-key)
