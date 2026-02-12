@@ -31,6 +31,9 @@ jobs:
       - name: Test with lint warnings as errors
         run: ./gradlew clean test -Plint -PlintWerror
 
+      - name: Verify enterprise packaging build
+        run: ./gradlew -Pedition=enterprise build -x test
+
       - name: CI-lite pipeline E2E
         run: ./gradlew ciE2eTest
 
