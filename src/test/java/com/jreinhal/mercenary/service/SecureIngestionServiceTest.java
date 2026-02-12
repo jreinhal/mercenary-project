@@ -704,6 +704,49 @@ class SecureIngestionServiceTest {
         verify(vectorStore, never()).add(anyList());
     }
 
+    @Test
+    @DisplayName("Phase 5.3: Security rejections should not trip resilience failure threshold")
+    void securityRejectionsDoNotTripFailureThreshold() throws Exception {
+        Path checkpoint = Files.createTempFile("ingest-security-", ".json");
+        ReflectionTestUtils.setField(ingestionService, "ingestCheckpointPath", checkpoint.toString());
+        ReflectionTestUtils.setField(ingestionService, "resilienceEnabled", true);
+        ReflectionTestUtils.setField(ingestionService, "ingestFailureThresholdPercent", 0.0);
+        ReflectionTestUtils.setField(ingestionService, "ingestFailureThresholdMinSamples", 1);
+
+        MockMultipartFile blocked = new MockMultipartFile(
+                "file", "blocked.exe", "application/octet-stream", new byte[]{0x4D, 0x5A, 0x00});
+        assertThrows(SecurityException.class, () -> ingestionService.ingest(blocked, Department.ENTERPRISE));
+
+        MockMultipartFile legit = new MockMultipartFile(
+                "file", "ok.txt", "text/plain", "legit content".getBytes(StandardCharsets.UTF_8));
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0), java.util.Collections.emptyMap()));
+
+        assertDoesNotThrow(() -> ingestionService.ingest(legit, Department.ENTERPRISE));
+    }
+
+    @Test
+    @DisplayName("Phase 5.3: Do not retry after vector-store write succeeded")
+    void doesNotRetryAfterVectorWriteSucceeds() throws Exception {
+        Path checkpoint = Files.createTempFile("ingest-noretry-", ".json");
+        ReflectionTestUtils.setField(ingestionService, "ingestCheckpointPath", checkpoint.toString());
+        ReflectionTestUtils.setField(ingestionService, "resilienceEnabled", true);
+        ReflectionTestUtils.setField(ingestionService, "ingestMaxRetries", 1);
+        when(hyperGraphMemory.isIndexingEnabled()).thenReturn(true);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "once.txt", "text/plain", "single write only".getBytes(StandardCharsets.UTF_8));
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0), java.util.Collections.emptyMap()));
+        doNothing().when(vectorStore).add(anyList());
+        doThrow(new RuntimeException("post-write failure")).when(hyperGraphMemory).indexDocument(any(Document.class), anyString());
+
+        assertThrows(RuntimeException.class, () -> ingestionService.ingest(file, Department.ENTERPRISE));
+        verify(vectorStore, times(1)).add(anyList());
+    }
+
     private static byte[] buildPdfWithText(String text) throws Exception {
         try (PDDocument doc = new PDDocument()) {
             PDPage page = new PDPage();

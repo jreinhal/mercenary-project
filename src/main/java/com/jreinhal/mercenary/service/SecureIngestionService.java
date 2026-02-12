@@ -127,6 +127,7 @@ public class SecureIngestionService {
     private long sessionStartTime = System.currentTimeMillis();
     private int processedCount = 0;
     private int failedCount = 0;
+    private int securityRejectedCount = 0;
     private String lastProcessedDoc = "";
     private final List<String> failedDocs = new ArrayList<>();
 
@@ -163,7 +164,7 @@ public class SecureIngestionService {
                 this.recordIngestionOutcome(filename, true);
                 return;
             } catch (SecurityException e) {
-                this.recordIngestionOutcome(filename, false);
+                this.recordSecurityRejection(filename);
                 throw e;
             } catch (RuntimeException e) {
                 boolean lastAttempt = attempt >= maxAttempts;
@@ -180,7 +181,7 @@ public class SecureIngestionService {
     }
 
     private boolean isRetriableIngestionFailure(RuntimeException e) {
-        return !(e instanceof SecurityException);
+        return !(e instanceof SecurityException) && !(e instanceof NonRetriableIngestionException);
     }
 
     private void ingestInternal(MultipartFile file, Department dept, boolean fallbackMode) {
@@ -307,16 +308,25 @@ public class SecureIngestionService {
                 totalRedactions += result.getTotalRedactions();
                 finalDocuments.add(redactedDoc);
             }
-            this.partitionAssigner.assignBatch(finalDocuments);
-            this.vectorStore.add(finalDocuments);
-            if (this.hyperGraphMemory != null && this.hyperGraphMemory.isIndexingEnabled()) {
-                for (Document doc : finalDocuments) {
-                    this.hyperGraphMemory.indexDocument(doc, dept.name());
+            boolean vectorStoreWritten = false;
+            try {
+                this.partitionAssigner.assignBatch(finalDocuments);
+                this.vectorStore.add(finalDocuments);
+                vectorStoreWritten = true;
+                if (this.hyperGraphMemory != null && this.hyperGraphMemory.isIndexingEnabled()) {
+                    for (Document doc : finalDocuments) {
+                        this.hyperGraphMemory.indexDocument(doc, dept.name());
+                    }
                 }
-            }
-            if (this.miARagService != null && this.miARagService.isEnabled() && finalDocuments.size() >= this.minChunksForMindscape) {
-                List<String> chunks = finalDocuments.stream().map(Document::getContent).toList();
-                this.miARagService.buildMindscape(chunks, filename, dept.name());
+                if (this.miARagService != null && this.miARagService.isEnabled() && finalDocuments.size() >= this.minChunksForMindscape) {
+                    List<String> chunks = finalDocuments.stream().map(Document::getContent).toList();
+                    this.miARagService.buildMindscape(chunks, filename, dept.name());
+                }
+            } catch (RuntimeException e) {
+                if (vectorStoreWritten) {
+                    throw new NonRetriableIngestionException("Post-write ingestion step failed after vector persistence", e);
+                }
+                throw e;
             }
             log.info("Securely ingested {} memory points. Total PII redactions: {}", finalDocuments.size(), totalRedactions);
         }
@@ -701,6 +711,7 @@ public class SecureIngestionService {
                 this.sessionStartTime = this.readLong(state.get("startTime"), System.currentTimeMillis());
                 this.processedCount = this.readInt(state.get("processedCount"), 0);
                 this.failedCount = this.readInt(state.get("failedCount"), 0);
+                this.securityRejectedCount = this.readInt(state.get("securityRejectedCount"), 0);
                 this.lastProcessedDoc = Objects.toString(state.get("lastProcessedDoc"), "");
                 this.failedDocs.clear();
                 Object docs = state.get("failedDocs");
@@ -712,8 +723,8 @@ public class SecureIngestionService {
                     }
                 }
                 if (log.isInfoEnabled()) {
-                    log.info("Loaded ingestion checkpoint: processed={}, failed={}, lastDoc={}",
-                            this.processedCount, this.failedCount, LogSanitizer.sanitize(this.lastProcessedDoc));
+                    log.info("Loaded ingestion checkpoint: processed={}, failed={}, securityRejected={}, lastDoc={}",
+                            this.processedCount, this.failedCount, this.securityRejectedCount, LogSanitizer.sanitize(this.lastProcessedDoc));
                 }
             } catch (Exception e) {
                 if (log.isWarnEnabled()) {
@@ -742,6 +753,17 @@ public class SecureIngestionService {
         }
     }
 
+    private void recordSecurityRejection(String filename) {
+        if (!this.resilienceEnabled) {
+            return;
+        }
+        synchronized (this.checkpointLock) {
+            this.lastProcessedDoc = filename != null ? filename : "";
+            this.securityRejectedCount++;
+            this.persistCheckpointState();
+        }
+    }
+
     private void persistCheckpointState() {
         if (this.ingestCheckpointPath == null || this.ingestCheckpointPath.isBlank()) {
             return;
@@ -756,6 +778,7 @@ public class SecureIngestionService {
             state.put("startTime", this.sessionStartTime);
             state.put("processedCount", this.processedCount);
             state.put("failedCount", this.failedCount);
+            state.put("securityRejectedCount", this.securityRejectedCount);
             state.put("lastProcessedDoc", this.lastProcessedDoc);
             state.put("failedDocs", new ArrayList<>(this.failedDocs));
             this.objectMapper.writerWithDefaultPrettyPrinter().writeValue(checkpoint.toFile(), state);
@@ -809,6 +832,12 @@ public class SecureIngestionService {
             return Long.parseLong(value.toString());
         } catch (Exception e) {
             return fallback;
+        }
+    }
+
+    private static final class NonRetriableIngestionException extends RuntimeException {
+        private NonRetriableIngestionException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }
