@@ -79,6 +79,79 @@ Notes:
 - RAG_MAX_DOCS
 - RAG_MAX_VISUAL_DOCS
 
+## RAG upgrades (Phase 3-5)
+
+### Domain and temporal retrieval
+- RAG_TEMPORAL_FILTERING_ENABLED (default: false)
+- THESAURUS_ENABLED (default: true)
+- THESAURUS_UNIT_CONVERSION_ENABLED (default: false)
+- THESAURUS_VECTOR_INDEX_ENABLED (default: false)
+- THESAURUS_VECTOR_INDEX_CACHE_TTL_SECONDS (default: 21600)
+- THESAURUS_MAX_QUERY_VARIANTS (default: 4)
+
+### Source evidence retention and rendering
+- SOURCE_RETENTION_PDF_ENABLED (default: true)
+- SOURCE_RETENTION_ALLOW_HIPAA_STRICT (default: false)
+- SOURCE_RETENTION_PDF_MAX_BYTES (default: 52428800)
+- SOURCE_RETENTION_PDF_CACHE_TTL_HOURS (default: 1)
+- SOURCE_RETENTION_PDF_CACHE_MAX_TOTAL_BYTES (default: 268435456)
+- SOURCE_RENDER_DPI (default: 160)
+- SOURCE_RENDER_MAX_OUTPUT_PIXELS (default: 3686400)
+
+Notes:
+- `/api/source/page` and `/api/source/region` require retained source bytes.
+- HIPAA strict environments should keep `SOURCE_RETENTION_ALLOW_HIPAA_STRICT=false` unless policy explicitly allows retention.
+
+### Ingestion resilience
+- INGEST_RESILIENCE_ENABLED (default: true)
+- INGEST_MAX_RETRIES (default: 1)
+- INGEST_FAILURE_THRESHOLD_PERCENT (default: 50)
+- INGEST_FAILURE_THRESHOLD_MIN_SAMPLES (default: 5)
+- INGEST_CHECKPOINT_PATH (default: `${java.io.tmpdir}/sentinel-ingestion/session.json`)
+- INGEST_FAILED_DOCS_MAX (default: 500)
+
+### Reranker and embedding evaluation knobs
+- HIFIRAG_RERANKER_MODE (default: `dedicated`; options: `dedicated`, `auto`, `llm`, `keyword`)
+- HIFIRAG_RERANKER_BATCH (default: 5)
+- HIFIRAG_RERANKER_TIMEOUT (default: 30 seconds)
+- HIFIRAG_USE_LLM (default: true, fallback path)
+- HIFIRAG_RERANKER_CACHE_SIZE (default: 2000)
+- HIFIRAG_RERANKER_CACHE_TTL (default: 900 seconds)
+- EMBEDDING_BATCH_SIZE (default: 128)
+- EMBEDDING_TARGET_DIMENSIONS (default: 0; 0 disables strict dimension targeting)
+- EMBEDDING_MULTIMODAL_ENABLED (default: false)
+
+### Agentic orchestration tuning
+- AGENTIC_DOCUMENTS_PER_QUERY_CEILING (default: 40)
+- AGENTIC_QUICK_LOOKUP_MAX_TERMS (default: 9)
+Note: `AGENTIC_ENABLED` and other global agentic feature flags are also listed under **Feature flags (selected)** near the end of this document.
+
+## Recommended baselines by edition
+
+These are operational starting points, not strict policy requirements.
+Edition selection is separate from Spring profiles and `APP_PROFILE`: use `-Pedition=<edition>` at build time or set `sentinel.license.edition` at runtime. Do not assume that changing `APP_PROFILE` (or any Spring profile) changes the active edition.
+
+- Trial / Enterprise (balanced):
+  THESAURUS_ENABLED=true
+  RAG_TEMPORAL_FILTERING_ENABLED=true
+  INGEST_RESILIENCE_ENABLED=true
+  HIFIRAG_RERANKER_MODE=auto
+  SOURCE_RETENTION_PDF_ENABLED=true
+- Medical (strict-by-default posture):
+  SOURCE_RETENTION_ALLOW_HIPAA_STRICT=false
+  THESAURUS_UNIT_CONVERSION_ENABLED=false
+  AGENTIC_DOCUMENTS_PER_QUERY_CEILING=40
+  Keep citation-enforcing response policy enabled (default behavior in medical edition).
+  Keep `THESAURUS_UNIT_CONVERSION_ENABLED` disabled until benchmark-validated in your environment.
+- Government (strict verification posture):
+  AGENTIC_ENABLED=true
+  AGENTIC_DOCUMENTS_PER_QUERY_CEILING=40
+  HIFIRAG_RERANKER_MODE=dedicated
+  SOURCE_RETENTION_PDF_ENABLED=true
+  Enable `AGENTIC_ENABLED` only after latency testing in the target environment.
+  Use `HIFIRAG_RERANKER_MODE=auto` if dedicated reranking resources are constrained.
+  Apply environment-approved retention controls when `SOURCE_RETENTION_PDF_ENABLED=true`.
+
 ## Tokenization vault
 - APP_TOKENIZATION_SECRET_KEY (maps to app.tokenization.secret-key)
 
