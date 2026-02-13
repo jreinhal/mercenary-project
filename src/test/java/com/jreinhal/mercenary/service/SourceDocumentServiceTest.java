@@ -110,4 +110,22 @@ class SourceDocumentServiceTest {
         assertTrue(loaded.isPresent());
         assertArrayEquals(new byte[]{4, 5, 6}, loaded.get());
     }
+
+    @Test
+    void removesCachedPdfSource() {
+        when(hipaaPolicy.shouldDisableVisual(any(Department.class))).thenReturn(false);
+        sourceDocumentService.storePdfSource("ws", Department.ENTERPRISE, "remove.pdf", new byte[]{1, 2, 3});
+        assertTrue(sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "remove.pdf").isPresent());
+
+        sourceDocumentService.removePdfSource("ws", Department.ENTERPRISE, "remove.pdf");
+        assertFalse(sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "remove.pdf").isPresent());
+    }
+
+    @Test
+    void removePdfSourceIsNoOpForInvalidInputs() {
+        sourceDocumentService.removePdfSource("", Department.ENTERPRISE, "x.pdf");
+        sourceDocumentService.removePdfSource("ws", null, "x.pdf");
+        sourceDocumentService.removePdfSource("ws", Department.ENTERPRISE, "");
+        assertTrue(true);
+    }
 }

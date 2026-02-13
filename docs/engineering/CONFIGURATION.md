@@ -265,6 +265,10 @@ Reporting APIs:
 ## Connectors (admin-only)
 - SENTINEL_CONNECTORS_ENABLED (default: true; disabled in govcloud profile)
 - SENTINEL_CONNECTORS_ALLOW_REGULATED (default: false)
+- SENTINEL_CONNECTORS_INCREMENTAL_SYNC_ENABLED (default: true)
+- SENTINEL_CONNECTORS_LEGACY_MIGRATION_ENABLED (default: false; one-time startup migration, run after at least one connector sync)
+- SENTINEL_CONNECTORS_LEGACY_MIGRATION_DRY_RUN (default: true)
+- SENTINEL_CONNECTORS_LEGACY_MIGRATION_FORCE (default: false; rerun even if already marked complete)
 
 ### SharePoint (Microsoft Graph)
 - SENTINEL_SHAREPOINT_ENABLED
