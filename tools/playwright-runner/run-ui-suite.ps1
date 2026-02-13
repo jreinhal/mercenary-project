@@ -77,6 +77,27 @@ try {
     $env:SERVER_PORT = "$port"
     $env:MONGODB_URI = $MongoUri
     $env:OLLAMA_URL = $OllamaUrl
+    if (($AuthMode ?? "").Trim().ToUpperInvariant() -ne "OIDC") {
+        # Enterprise profile wires OIDC properties at startup even in non-OIDC auth modes.
+        # Use local placeholders when omitted so STANDARD/DEV UI suites can boot deterministically.
+        if ([string]::IsNullOrWhiteSpace($env:OIDC_ISSUER)) {
+            $env:OIDC_ISSUER = "http://127.0.0.1/oidc-placeholder"
+        }
+        if ([string]::IsNullOrWhiteSpace($env:OIDC_CLIENT_ID)) {
+            $env:OIDC_CLIENT_ID = "sentinel-ui-suite"
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($AdminPass)) {
+        # Keep backend bootstrap/login credentials in sync with the UI runner login.
+        $env:SENTINEL_ADMIN_PASSWORD = $AdminPass
+        if ([string]::IsNullOrWhiteSpace($env:SENTINEL_BOOTSTRAP_ADMIN_PASSWORD)) {
+            $env:SENTINEL_BOOTSTRAP_ADMIN_PASSWORD = $AdminPass
+        }
+    }
+    $bootstrapEnabled = (($env:SENTINEL_BOOTSTRAP_ENABLED ?? "").Trim().ToLowerInvariant() -eq "true")
+    if ($bootstrapEnabled -and [string]::IsNullOrWhiteSpace($env:SENTINEL_BOOTSTRAP_ADMIN_PASSWORD) -and [string]::IsNullOrWhiteSpace($env:SENTINEL_ADMIN_PASSWORD)) {
+        throw "SENTINEL_BOOTSTRAP_ENABLED=true but no admin password was provided. Set SENTINEL_BOOTSTRAP_ADMIN_PASSWORD or SENTINEL_ADMIN_PASSWORD."
+    }
 
     # Air-gap enforcement: ensure Spring AI doesn't attempt to wire external providers.
     $env:SPRING_AUTOCONFIGURE_EXCLUDE = "org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration,org.springframework.ai.autoconfigure.azure.openai.AzureOpenAiAutoConfiguration,org.springframework.ai.autoconfigure.vectorstore.mongo.MongoDBAtlasVectorStoreAutoConfiguration,org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration,org.springframework.ai.autoconfigure.vertexai.palm2.VertexAiPalm2AutoConfiguration"

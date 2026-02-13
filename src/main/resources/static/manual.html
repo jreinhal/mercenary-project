@@ -617,6 +617,11 @@
                                 <td>Pre-existing chunks missing connector metadata</td>
                                 <td>Run legacy migration: enable <code>SENTINEL_CONNECTORS_LEGACY_MIGRATION_ENABLED=true</code> (dry-run first)</td>
                             </tr>
+                            <tr>
+                                <td>Response shows gibberish characters or duplicated clauses</td>
+                                <td>Corrupted/binary-like text leaked into synthesized output</td>
+                                <td>Treat as FAIL in UAT; verify latest build with formatting sanitizer and re-run response-format checks</td>
+                            </tr>
                         </tbody>
                     </table>
 

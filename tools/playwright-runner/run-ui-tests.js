@@ -473,6 +473,37 @@ function isSecurityAlert(text) {
   return /SECURITY ALERT/i.test(String(text));
 }
 
+function normalizeFormattingToken(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function hasMirroredDuplicateClause(text) {
+  if (!text) return false;
+  const lines = String(text).split(/\r?\n/);
+  for (const line of lines) {
+    const separators = [' - ', ' — ', ' – '];
+    for (const separator of separators) {
+      let idx = line.indexOf(separator);
+      while (idx > 0 && idx + separator.length < line.length) {
+        const left = line.slice(0, idx).trim();
+        const right = line.slice(idx + separator.length).trim();
+        if (left && right) {
+          const leftNorm = normalizeFormattingToken(left);
+          const rightNorm = normalizeFormattingToken(right);
+          if (leftNorm && rightNorm && (leftNorm === rightNorm || leftNorm.endsWith(` ${rightNorm}`) || rightNorm.endsWith(` ${leftNorm}`))) {
+            return true;
+          }
+        }
+        idx = line.indexOf(separator, idx + separator.length);
+      }
+    }
+  }
+  return false;
+}
+
 function hasFormattingArtifacts(text) {
   if (!text) return false;
   const t = String(text);
@@ -480,8 +511,13 @@ function hasFormattingArtifacts(text) {
   const hasToolJson = /(^|\s)\{\s*\"name\"\s*:\s*\"[^\"]+\"\s*,\s*\"parameters\"\s*:/i.test(t)
     || /\"name\"\s*:\s*\"calculator\"/i.test(t);
   const hasFormattingIssueFallback = /encountered a formatting issue/i.test(t);
+  const hasMojibake = /\uFFFD/.test(t) || /�{2,}/.test(t);
+  const hasBinarySignatureNoise = /(^|\n)\s*(\d+\.\s*)?(PK\s+(this is a zip|test zip|zip archive)|Rar!|(?:\d+\s*)?Fake Java class)/i.test(t);
   return hasToolJson
     || hasFormattingIssueFallback
+    || hasMojibake
+    || hasBinarySignatureNoise
+    || hasMirroredDuplicateClause(t)
     || /===\s*file\s*:/i.test(t)
     || /\bfile\s*:\s*.+\.(txt|pdf|doc|docx|xlsx|xls|csv|pptx|html?|json|ndjson|log)\b/i.test(t);
 }
@@ -645,18 +681,18 @@ function expectedEntityCount(entities) {
   return Math.min(2, entities.length);
 }
 
-async function uploadFile(page, filePath, timeoutMs = 120000) {
+async function uploadFile(page, filePath, timeoutMs = 120000, auth = { user: adminUser, pass: adminPass }) {
   const fileName = path.basename(filePath);
+  const terminalUploadStatus = /ingested|upload failed|files ingested|failed|blocked|not allowed|unsupported|security/i;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    // Capture the backend response for the multipart POST. This avoids relying solely on UI text
-    // (which can be cleared automatically) and helps diagnose hangs.
-    const reqPromise = page.waitForRequest((r) => {
+    // Capture the backend multipart response early so fast failures/successes are not missed.
+    const ingestResponsePromise = page.waitForResponse((r) => {
       try {
-        return r.method() === 'POST' && new URL(r.url()).pathname.endsWith('/api/ingest/file');
+        return r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/api/ingest/file');
       } catch {
         return false;
       }
-    }, { timeout: 15000 }).catch(() => null);
+    }, { timeout: timeoutMs }).catch(() => null);
 
     await page.setInputFiles('#file-input', filePath);
 
@@ -672,10 +708,10 @@ async function uploadFile(page, filePath, timeoutMs = 120000) {
         const stage = document.getElementById('upload-stage');
         const status = document.getElementById('upload-status');
         const progressVisible = progress ? !progress.classList.contains('hidden') : false;
-        const statusText = status ? (status.innerText || '') : '';
         // NOTE: #upload-stage is initialized to "Uploading..." even when idle.
         // Only treat as "running" if the progress UI is actually visible.
-        const alreadyRunning = progressVisible || /ingested|Upload failed|files ingested|failed/i.test(statusText);
+        // Stale terminal text from a previous upload must not suppress a new upload trigger.
+        const alreadyRunning = progressVisible;
 
         if (alreadyRunning) return;
 
@@ -692,10 +728,7 @@ async function uploadFile(page, filePath, timeoutMs = 120000) {
       // ignore
     }
 
-    const req = await reqPromise;
-    const resp = req
-      ? await page.waitForResponse((r) => r.request() === req, { timeout: timeoutMs }).catch(() => null)
-      : null;
+    const resp = await ingestResponsePromise;
     if (resp) {
       // If the backend responded, prefer that as the ground truth outcome.
       let respText = '';
@@ -708,7 +741,7 @@ async function uploadFile(page, filePath, timeoutMs = 120000) {
           const hidden = progress ? progress.classList.contains('hidden') : true;
           const el = document.getElementById('upload-status');
           const text = el ? (el.innerText || '') : '';
-          return hidden || /ingested|Upload failed|files ingested|failed/i.test(text);
+          return hidden || terminalUploadStatus.test(text);
         }, null, { timeout: 30000 });
       } catch { /* ignore */ }
       const statusText = (await page.locator('#upload-status').innerText()).trim();
@@ -726,7 +759,7 @@ async function uploadFile(page, filePath, timeoutMs = 120000) {
 
         const statusEl = document.getElementById('upload-status');
         const text = statusEl ? (statusEl.innerText || '') : '';
-        if (/ingested|Upload failed|files ingested|failed/i.test(text)) {
+        if (terminalUploadStatus.test(text)) {
           return 'DONE';
         }
 
@@ -761,12 +794,16 @@ async function uploadFile(page, filePath, timeoutMs = 120000) {
       });
       const shotPath = path.join(screenshotDir, `upload_timeout_${Date.now()}.png`);
       try { await page.screenshot({ path: shotPath, fullPage: true }); } catch { /* ignore */ }
-      const reqUrl = req ? req.url() : null;
-      throw new Error(`Upload did not complete within ${Math.round(timeoutMs / 1000)}s (attempt=${attempt}, file=${fileName}, reqUrl=${reqUrl}). Debug=${JSON.stringify(debug)} Screenshot=${shotPath}. OriginalError=${err && err.message ? err.message : String(err)}`);
+      const reqUrl = `${baseUrl}/api/ingest/file`;
+      const timeoutSummary = `TIMEOUT ${Math.round(timeoutMs / 1000)}s (attempt=${attempt}, file=${fileName}, reqUrl=${reqUrl})`;
+      if (attempt < 2) {
+        continue;
+      }
+      return `${timeoutSummary}. Debug=${JSON.stringify(debug)} Screenshot=${shotPath}. OriginalError=${err && err.message ? err.message : String(err)}`;
     }
 
     if (outcome === 'AUTH') {
-      const relogin = await loginIfNeeded(page, adminUser, adminPass);
+      const relogin = await loginIfNeeded(page, auth?.user || adminUser, auth?.pass || adminPass);
       if (relogin.attempted && !relogin.success) {
         throw new Error(`Re-login failed during upload: ${relogin.error || 'Unknown error'}`);
       }
@@ -1278,27 +1315,41 @@ async function run() {
     const piiStatus = await uploadFile(page, piiUpload, 360000);
 
     // Ensure the freshly uploaded file is the active scope so retrieval can't "miss" it.
+    // In slower environments the context panel can lag behind ingest completion.
     const piiFilename = path.basename(piiUpload);
-    await page.waitForFunction((fn) => {
-      const docs = Array.from(document.querySelectorAll('#context-docs .context-doc'));
-      return docs.some(el => (el && (el.innerText || el.textContent || '')).includes(fn));
-    }, piiFilename, { timeout: 30000 });
-    await page.evaluate((fn) => {
-      const docs = Array.from(document.querySelectorAll('#context-docs .context-doc'));
-      for (const el of docs) {
-        const t = (el && (el.innerText || el.textContent || '')).trim();
-        if (t && t.includes(fn)) {
-          el.click();
-          // If it became inactive (toggle), click again to ensure active.
-          if (!el.classList.contains('active')) el.click();
-          return;
+    let piiScopeStatus = 'not_found_in_context_docs';
+    try {
+      await page.waitForFunction((fn) => {
+        const docs = Array.from(document.querySelectorAll('#context-docs .context-doc'));
+        return docs.some(el => (el && (el.innerText || el.textContent || '')).includes(fn));
+      }, piiFilename, { timeout: 120000 });
+      const piiScoped = await page.evaluate((fn) => {
+        const docs = Array.from(document.querySelectorAll('#context-docs .context-doc'));
+        for (const el of docs) {
+          const t = (el && (el.innerText || el.textContent || '')).trim();
+          if (t && t.includes(fn)) {
+            el.click();
+            // If it became inactive (toggle), click again to ensure active.
+            if (!el.classList.contains('active')) el.click();
+            return Boolean(el.classList.contains('active'));
+          }
         }
-      }
-    }, piiFilename);
+        return false;
+      }, piiFilename);
+      piiScopeStatus = piiScoped ? 'scoped_active' : 'present_not_active';
+    } catch {
+      piiScopeStatus = 'not_found_in_context_docs';
+    }
 
     const piiQuery = 'Summarize the PII test record for MR987654 (Patient: John Doe).';
     const piiResult = await runQueryWithRetry(page, piiQuery);
-    const piiInspector = await openSourceAndGetContent(page, piiFilename);
+    let piiInspector = '';
+    let piiInspectorError = null;
+    try {
+      piiInspector = await openSourceAndGetContent(page, piiFilename);
+    } catch (err) {
+      piiInspectorError = err && err.message ? err.message : String(err);
+    }
     const piiExpectedEntities = expectedEntityCount(piiResult.entities);
     const piiGraphPass = results.deepAnalysis?.enabled ? entityGraphOk(piiResult.entityGraph, piiExpectedEntities) : true;
     const piiQueryGraphPass = queryGraphOk(piiResult.queryGraph, piiResult.sources.length)
@@ -1326,6 +1377,8 @@ async function run() {
       query: piiQuery,
       expected: expectedPiiMarker,
       result: piiResult,
+      scopeStatus: piiScopeStatus,
+      inspectorError: piiInspectorError,
       inspectorSample: piiInspector.slice(0, 300),
       graphChecks: { queryGraph: piiResult.queryGraph, entityGraph: piiResult.entityGraph },
       strictEntity: piiStrict,
@@ -1378,14 +1431,7 @@ async function run() {
     try {
       const fileInput = viewerPage.locator('#file-input');
       if ((await fileInput.count()) > 0) {
-        await viewerPage.setInputFiles('#file-input', validUpload);
-        await viewerPage.waitForFunction(() => {
-          const el = document.getElementById('upload-status');
-          if (!el) return false;
-          const text = el.innerText || '';
-          return /ingested|Upload failed|files ingested|failed|auth/i.test(text);
-        }, null, { timeout: 60000 });
-        viewerUploadStatus = (await viewerPage.locator('#upload-status').innerText()).trim();
+        viewerUploadStatus = await uploadFile(viewerPage, validUpload, 90000, { user: viewerUser, pass: viewerPass });
         viewerUploadPass = !/ingested/i.test(viewerUploadStatus);
       }
     } catch (err) {

@@ -796,7 +796,10 @@ public class MercenaryController {
             return response;
         }
 
-        String trimmed = response.trim();
+        String trimmed = ContentSanitizer.sanitizeResponseText(response);
+        if (trimmed.isBlank()) {
+            return "";
+        }
 
         // Detect function call JSON pattern: {"name": "...", "parameters": {...}}
         if (trimmed.startsWith("{\"name\"") && trimmed.contains("\"parameters\"")) {
@@ -825,7 +828,7 @@ public class MercenaryController {
                                                    .replace("\\t", "\t");
                                 log.warn("Cleaned malformed function call response, extracted: {}...",
                                     extracted.substring(0, Math.min(100, extracted.length())));
-                                return extracted;
+                                return ContentSanitizer.sanitizeResponseText(extracted);
                             }
                         }
                     }
@@ -849,7 +852,7 @@ public class MercenaryController {
                 return cleanLlmResponse(trimmed.substring(start, end + 1));
             }
         }
-        return trimmed;
+        return ContentSanitizer.sanitizeResponseText(trimmed);
     }
 
     private static int countCitations(String response) {

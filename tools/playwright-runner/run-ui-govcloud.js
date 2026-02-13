@@ -330,9 +330,47 @@ function hasNoDirectAnswer(text) {
   return /no direct answer/i.test(text);
 }
 
+function normalizeFormattingToken(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function hasMirroredDuplicateClause(text) {
+  if (!text) return false;
+  const lines = String(text).split(/\r?\n/);
+  for (const line of lines) {
+    const separators = [' - ', ' — ', ' – '];
+    for (const separator of separators) {
+      let idx = line.indexOf(separator);
+      while (idx > 0 && idx + separator.length < line.length) {
+        const left = line.slice(0, idx).trim();
+        const right = line.slice(idx + separator.length).trim();
+        if (left && right) {
+          const leftNorm = normalizeFormattingToken(left);
+          const rightNorm = normalizeFormattingToken(right);
+          if (leftNorm && rightNorm && (leftNorm === rightNorm || leftNorm.endsWith(` ${rightNorm}`) || rightNorm.endsWith(` ${leftNorm}`))) {
+            return true;
+          }
+        }
+        idx = line.indexOf(separator, idx + separator.length);
+      }
+    }
+  }
+  return false;
+}
+
 function hasFormattingArtifacts(text) {
   if (!text) return false;
-  return /===\s*file\s*:/i.test(text) || /\bfile\s*:\s*.+\.(txt|pdf|doc|docx|xlsx|xls|csv|pptx|html?|json|ndjson|log)\b/i.test(text);
+  const t = String(text);
+  const hasMojibake = /\uFFFD/.test(t) || /�{2,}/.test(t);
+  const hasBinarySignatureNoise = /(^|\n)\s*(\d+\.\s*)?(PK\s+(this is a zip|test zip|zip archive)|Rar!|(?:\d+\s*)?Fake Java class)/i.test(t);
+  return hasMojibake
+    || hasBinarySignatureNoise
+    || hasMirroredDuplicateClause(t)
+    || /===\s*file\s*:/i.test(t)
+    || /\bfile\s*:\s*.+\.(txt|pdf|doc|docx|xlsx|xls|csv|pptx|html?|json|ndjson|log)\b/i.test(t);
 }
 
 function meetsMinLength(text, minChars) {

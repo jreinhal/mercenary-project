@@ -140,6 +140,10 @@ Build:
 ```
 `ciE2eTest` uses the `ci-e2e` + `dev` test profiles with an in-memory vector store and stubbed chat/embedding models.
 `ciOidcE2eTest` validates the enterprise OIDC bearer-token path using local JWT/JWKS test fixtures.
+Response-format quality is a release gate in UI/UAT runs:
+- no mojibake/replacement characters (`�`)
+- no binary-signature noise rendered as prose (`PK...`, `Rar!...`, class magic-byte gibberish)
+- no mirrored duplicate clauses (`X - X`)
 
 ## Documentation
 - docs/README.md

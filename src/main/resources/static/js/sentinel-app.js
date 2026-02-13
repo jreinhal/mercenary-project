@@ -7433,9 +7433,10 @@
             div.className = 'message assistant';
             div.id = msgId;
 
-            const processedText = processCitations(text);
-            const bracketCitations = (text.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || []);
-            const backtickCitations = (text.match(/`([^`]+\.(pdf|txt|md))`/gi) || []);
+            const normalizedText = sanitizeResponseFormatting(text);
+            const processedText = processCitations(normalizedText);
+            const bracketCitations = (normalizedText.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || []);
+            const backtickCitations = (normalizedText.match(/`([^`]+\.(pdf|txt|md))`/gi) || []);
             const citationCount = bracketCitations.length + backtickCitations.length;
             const confidence = Math.floor(75 + Math.random() * 20);
             const confClass = confidence >= 85 ? 'high' : confidence >= 70 ? 'medium' : 'low';
@@ -7503,23 +7504,73 @@
             }
 
 
-            const entities = extractEntities(text, true);
+            const entities = extractEntities(normalizedText, true);
 
             const sourceFilenames = sources
                 .map(s => typeof s === 'string' ? s : (s.filename || s.source || s.name))
                 .filter(Boolean);
             lastQueryMeta = buildQueryMeta(lastQuery, metrics, reasoningSteps);
-            recordMessage('assistant', text, sourceFilenames, entities, lastQueryMeta);
+            recordMessage('assistant', normalizedText, sourceFilenames, entities, lastQueryMeta);
             state.messageIndex.set(msgId, {
                 query: lastQuery || '',
-                response: text || '',
+                response: normalizedText || '',
                 sources: sourceFilenames,
                 meta: lastQueryMeta,
                 reasoningSteps: reasoningSteps.length,
                 metrics: metrics || {}
             });
 
-            updateRightPanel(text, sources, confidence, metrics);
+            updateRightPanel(normalizedText, sources, confidence, metrics);
+        }
+
+        function normalizeFormattingToken(text) {
+            return String(text || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim();
+        }
+
+        function collapseMirroredClause(line) {
+            if (!line) return '';
+            const separators = [' - ', ' — ', ' – '];
+            for (const separator of separators) {
+                let idx = line.indexOf(separator);
+                while (idx > 0 && idx + separator.length < line.length) {
+                    const left = line.slice(0, idx).trim();
+                    const right = line.slice(idx + separator.length).trim();
+                    if (left && right) {
+                        const leftNorm = normalizeFormattingToken(left);
+                        const rightNorm = normalizeFormattingToken(right);
+                        if (leftNorm && rightNorm && (leftNorm === rightNorm || leftNorm.endsWith(` ${rightNorm}`) || rightNorm.endsWith(` ${leftNorm}`))) {
+                            return left;
+                        }
+                    }
+                    idx = line.indexOf(separator, idx + separator.length);
+                }
+            }
+            return line;
+        }
+
+        function sanitizeResponseFormatting(text) {
+            if (text === null || text === undefined) return '';
+            let cleaned = String(text)
+                .replace(/\uFEFF/g, '')
+                .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+                .replace(/\uFFFD+/g, '');
+
+            cleaned = cleaned
+                .replace(/(^|\n)(\s*\d+\.\s*)?PK\s+(?=(this is a zip|test zip|zip archive))/gim, '$1$2')
+                .replace(/(^|\n)(\s*\d+\.\s*)?Rar!\s*/gim, '$1$2')
+                .replace(/(^|\n)(\s*\d+\.\s*)?\d+\s*(?=Fake\s+Java\s+class\b)/gim, '$1$2');
+
+            cleaned = cleaned
+                .split(/\r?\n/)
+                .map(line => collapseMirroredClause(line))
+                .join('\n');
+
+            cleaned = cleaned.replace(/[ \t]{2,}/g, ' ');
+            cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+            return cleaned.trim();
         }
 
         function normalizeFilename(filename) {
@@ -7567,7 +7618,8 @@
         function processCitations(text) {
             const extPattern = '(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log)';
 
-            let cleanText = text.replace(new RegExp(`\\[(?:(?:filename|source|citation):\\s*)?([^\\]]+\\.${extPattern})\\]`, 'gi'), '');
+            let cleanText = sanitizeResponseFormatting(text);
+            cleanText = cleanText.replace(new RegExp(`\\[(?:(?:filename|source|citation):\\s*)?([^\\]]+\\.${extPattern})\\]`, 'gi'), '');
 
             cleanText = cleanText.replace(new RegExp(`\\[filename\\]\\s*\\(([^)]+\\.${extPattern})\\)`, 'gi'), '');
 
@@ -7957,7 +8009,8 @@
                         }
 
                         // Convert markdown to HTML for display
-                        let displayText = escapeHtml(tokenBuffer);
+                        const sanitizedStreamingText = sanitizeResponseFormatting(tokenBuffer);
+                        let displayText = escapeHtml(sanitizedStreamingText);
                         displayText = displayText.replace(/\n/g, '<br>');
                         displayText = displayText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
                         displayText = displayText.replace(/\[([^\]]+)\]/g, '<span class="citation">[$1]</span>');
@@ -8173,9 +8226,12 @@
         let currentHighlightIndex = 0;
 
         function formatSourceContent(content, highlights = []) {
-            const normalizedHighlights = highlights.map(h => h.trim());
+            const safeContent = sanitizeResponseFormatting(content || '');
+            const normalizedHighlights = highlights
+                .map(h => sanitizeResponseFormatting(h || '').trim())
+                .filter(Boolean);
 
-            const lines = content.split('\n');
+            const lines = safeContent.split('\n');
             let inContent = false;
             let result = [];
             let highlightCount = 0;

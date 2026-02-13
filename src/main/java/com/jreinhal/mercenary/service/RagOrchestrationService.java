@@ -1273,7 +1273,10 @@ public class RagOrchestrationService {
             return response;
         }
 
-        String trimmed = response.trim();
+        String trimmed = ContentSanitizer.sanitizeResponseText(response);
+        if (trimmed.isBlank()) {
+            return "";
+        }
         // Normalize away common invisible prefix characters that can appear in some model responses
         // (e.g., BOM/zero-width spaces) so prefix checks don't fail silently.
         String normalized = trimmed.replace("\uFEFF", "");
@@ -1291,7 +1294,7 @@ public class RagOrchestrationService {
                     if (log.isWarnEnabled()) {
                         log.warn("Stripped malformed tool-call placeholder from LLM response (kept remainder)");
                     }
-                    return remainder;
+                    return ContentSanitizer.sanitizeResponseText(remainder);
                 }
             }
             if (log.isWarnEnabled()) {
@@ -1329,7 +1332,7 @@ public class RagOrchestrationService {
                                     log.warn("Cleaned malformed function call response, extracted: {}...",
                                         extracted.substring(0, Math.min(100, extracted.length())));
                                 }
-                                return extracted;
+                                return ContentSanitizer.sanitizeResponseText(extracted);
                             }
                         }
                     }
@@ -1353,7 +1356,7 @@ public class RagOrchestrationService {
             return "The system encountered a formatting issue. Please try rephrasing your question.";
         }
 
-        return response;
+        return ContentSanitizer.sanitizeResponseText(response);
     }
 
     private static int countCitations(String response) {
@@ -1435,6 +1438,7 @@ public class RagOrchestrationService {
             if (wantsSummary && snippet.length() < 160) {
                 snippet = RagOrchestrationService.augmentSnippetForSummary(doc.getContent(), keywords, snippet);
             }
+            snippet = ContentSanitizer.sanitizeResponseText(snippet);
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
             String pageSuffix = RagEvidenceFormatter.buildCitationPageSuffix(doc.getMetadata());
             summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]").append(pageSuffix).append("\n");
@@ -1444,7 +1448,7 @@ public class RagOrchestrationService {
         if (added == 0) {
             return NO_RELEVANT_RECORDS;
         }
-        return summary.toString().trim();
+        return ContentSanitizer.sanitizeResponseText(summary.toString().trim());
     }
 
     private static String buildEvidenceFallbackResponse(List<Document> docs, String query) {
@@ -1507,6 +1511,7 @@ public class RagOrchestrationService {
             if (wantsSummary && snippet.length() < 160) {
                 snippet = RagOrchestrationService.augmentSnippetForSummary(doc.getContent(), keywords, snippet);
             }
+            snippet = ContentSanitizer.sanitizeResponseText(snippet);
             if (snippet.isBlank() || !seenSnippets.add(snippet)) continue;
             String pageSuffix = RagEvidenceFormatter.buildCitationPageSuffix(doc.getMetadata());
             summary.append(added + 1).append(". ").append(snippet).append(" [").append(source).append("]").append(pageSuffix).append("\n");
@@ -1527,7 +1532,7 @@ public class RagOrchestrationService {
         if (added == 0) {
             return NO_RELEVANT_RECORDS;
         }
-        return summary.toString().trim();
+        return ContentSanitizer.sanitizeResponseText(summary.toString().trim());
     }
 
     private static boolean queryWantsMetrics(String query) {
@@ -2300,7 +2305,7 @@ public class RagOrchestrationService {
         cleaned = cleaned.replaceAll("\\s*-\\s*-\\s*", " - ");
         cleaned = cleaned.replaceAll("^\\s*-\\s*", "");
         cleaned = cleaned.replaceAll("\\s*-\\s*$", "");
-        return cleaned.trim();
+        return ContentSanitizer.sanitizeResponseText(cleaned);
     }
 
     private static Set<String> buildQueryKeywords(String query) {
