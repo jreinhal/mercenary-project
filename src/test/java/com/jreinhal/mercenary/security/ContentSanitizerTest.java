@@ -95,6 +95,8 @@ class ContentSanitizerTest {
 
         assertFalse(sanitized.contains("\uFFFD"));
         assertFalse(sanitized.contains(" - This is a valid test document about project security testing. - This is a valid test document about project security testing."));
+        assertFalse(sanitized.contains("PKtest"));
+        assertFalse(sanitized.contains("3. PK"));
         assertTrue(sanitized.contains("2. Valid TEST2 - This is a valid test document about project security testing."));
         assertTrue(sanitized.toLowerCase().contains("test zip content"));
     }
