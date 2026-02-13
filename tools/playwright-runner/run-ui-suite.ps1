@@ -7,7 +7,8 @@ param(
     [string]$AdminUser = "admin",
     [string]$AdminPass = $env:SENTINEL_ADMIN_PASSWORD,
     [string]$RunLabel = $env:RUN_LABEL,
-    [string]$SkipSeedDocs = $env:SKIP_SEED_DOCS
+    [string]$SkipSeedDocs = $env:SKIP_SEED_DOCS,
+    [int]$UiTimeoutSec = 900
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,6 +67,8 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 $outLog = Join-Path $logDir "boot_$Profile`_$port.log"
 $errLog = Join-Path $logDir "boot_$Profile`_$port.log.err"
+$uiOutLog = Join-Path $logDir "ui_$Profile`_$port.log"
+$uiErrLog = Join-Path $logDir "ui_$Profile`_$port.log.err"
 
 Write-Log "Starting backend: profile=$Profile auth=$AuthMode port=$port"
 
@@ -116,6 +119,23 @@ try {
     $env:SPRING_AI_VERTEX_AI_EMBEDDING_TEXT_ENABLED = "false"
     $env:SPRING_AI_VERTEX_AI_EMBEDDING_MULTIMODAL_ENABLED = "false"
 
+    # UI/UAT determinism: disable ingestion resilience fail-threshold gating.
+    # Persisted failed-doc checkpoints can block all uploads before file-type validation executes.
+    $env:SENTINEL_INGEST_RESILIENCE_ENABLED = "false"
+    # UI/UAT determinism: avoid fail-closed LLM guardrail dependence in local/offline runs.
+    # Pattern + semantic layers remain active.
+    if ([string]::IsNullOrWhiteSpace($env:GUARDRAILS_LLM_ENABLED)) {
+        $env:GUARDRAILS_LLM_ENABLED = "false"
+    }
+    if ([string]::IsNullOrWhiteSpace($env:GUARDRAILS_LLM_SCHEMA_ENABLED)) {
+        $env:GUARDRAILS_LLM_SCHEMA_ENABLED = "false"
+    }
+    if ([string]::IsNullOrWhiteSpace($env:DEEP_ANALYSIS_MODE)) {
+        # Full deep-graph checks are covered by dedicated graph test scripts.
+        # Keep default UI UAT runs stable and bounded.
+        $env:DEEP_ANALYSIS_MODE = "off"
+    }
+
     $backend = Start-Process -FilePath "pwsh" -ArgumentList "-NoProfile", "-Command", "cd '$repoRoot'; ./gradlew bootRun" -RedirectStandardOutput $outLog -RedirectStandardError $errLog -PassThru
 
     if (-not (Wait-ForHealth $BaseUrl 180)) {
@@ -133,9 +153,20 @@ try {
             $env:SKIP_SEED_DOCS = $SkipSeedDocs
         }
 
-        node .\\run-ui-tests.js
-        if ($LASTEXITCODE -ne 0) {
-            throw "UI suite failed (exit=$LASTEXITCODE)."
+        $uiProc = Start-Process -FilePath "node" -ArgumentList ".\\run-ui-tests.js" -WorkingDirectory $runnerDir -RedirectStandardOutput $uiOutLog -RedirectStandardError $uiErrLog -PassThru
+        $startedAt = Get-Date
+        while (-not $uiProc.HasExited) {
+            $elapsed = ((Get-Date) - $startedAt).TotalSeconds
+            if ($elapsed -ge $UiTimeoutSec) {
+                Write-Log "UI suite timeout reached (${UiTimeoutSec}s), terminating PID=$($uiProc.Id)"
+                cmd /c "taskkill /PID $($uiProc.Id) /T /F" | Out-Null
+                throw "UI suite timed out after ${UiTimeoutSec}s (see $uiOutLog and $uiErrLog)."
+            }
+            Start-Sleep -Seconds 1
+            $uiProc.Refresh()
+        }
+        if ($uiProc.ExitCode -ne 0) {
+            throw "UI suite failed (exit=$($uiProc.ExitCode)). See $uiOutLog and $uiErrLog."
         }
     } finally {
         Pop-Location
@@ -150,6 +181,12 @@ try {
         $errLen = (Get-Item $errLog).Length
         if ($errLen -gt 0) {
             Write-Log "Backend stderr log not empty ($errLen bytes): $errLog"
+        }
+    }
+    if (Test-Path $uiErrLog) {
+        $uiErrLen = (Get-Item $uiErrLog).Length
+        if ($uiErrLen -gt 0) {
+            Write-Log "UI stderr log not empty ($uiErrLen bytes): $uiErrLog"
         }
     }
 }

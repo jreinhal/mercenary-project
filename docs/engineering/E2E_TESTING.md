@@ -64,6 +64,40 @@ Notes:
 - Requires Node.js and Microsoft Edge (Playwright uses the Edge channel).
 - For RBAC checks in the UI script, start the app with `APP_PROFILE=dev,test-users` to seed test users.
 
+### Enterprise UI/UAT (bounded, phased)
+Use the suite wrapper so runs are time-bounded and do not hang indefinitely.
+
+Core phase (all enterprise checks except dedicated PII phase):
+```powershell
+$env:RUN_LABEL="ENTERPRISE_UAT_CORE"
+$env:TEST_SCOPE="full"
+$env:SKIP_PII="true"
+pwsh -File tools/playwright-runner/run-ui-suite.ps1 `
+  -BaseUrl "http://127.0.0.1:18080" `
+  -Profile "enterprise" `
+  -AuthMode "STANDARD" `
+  -RunLabel $env:RUN_LABEL `
+  -UiTimeoutSec 780
+```
+
+PII phase (dedicated redaction validation):
+```powershell
+$env:RUN_LABEL="ENTERPRISE_UAT_PII"
+$env:TEST_SCOPE="pii"
+$env:SKIP_PII="false"
+pwsh -File tools/playwright-runner/run-ui-suite.ps1 `
+  -BaseUrl "http://127.0.0.1:18080" `
+  -Profile "enterprise" `
+  -AuthMode "STANDARD" `
+  -RunLabel $env:RUN_LABEL `
+  -UiTimeoutSec 420
+```
+
+Notes:
+- `run-ui-suite.ps1` enforces a hard timeout (`-UiTimeoutSec`) for `run-ui-tests.js`.
+- Default local enterprise UAT behavior sets `DEEP_ANALYSIS_MODE=off` in the suite wrapper to keep runs stable and bounded.
+- PII scope is handled via `TEST_SCOPE=pii` in `run-ui-tests.js`.
+
 ## Profile notes
 ### dev
 - Auth mode: DEV

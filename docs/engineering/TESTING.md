@@ -37,6 +37,23 @@ node run-ui-tests.js
 ```
 Requires the app running locally and Microsoft Edge installed.
 
+## Enterprise UI/UAT (bounded)
+Use the suite wrapper to enforce hard timeouts:
+```powershell
+$env:RUN_LABEL="ENTERPRISE_UAT_CORE"
+$env:TEST_SCOPE="full"
+$env:SKIP_PII="true"
+pwsh -File tools/playwright-runner/run-ui-suite.ps1 -Profile enterprise -AuthMode STANDARD -RunLabel $env:RUN_LABEL -UiTimeoutSec 780
+```
+
+Dedicated PII phase:
+```powershell
+$env:RUN_LABEL="ENTERPRISE_UAT_PII"
+$env:TEST_SCOPE="pii"
+$env:SKIP_PII="false"
+pwsh -File tools/playwright-runner/run-ui-suite.ps1 -Profile enterprise -AuthMode STANDARD -RunLabel $env:RUN_LABEL -UiTimeoutSec 420
+```
+
 ## Notes
 - The dev profile enables Swagger UI
 - Local E2E runs require MongoDB + Ollama

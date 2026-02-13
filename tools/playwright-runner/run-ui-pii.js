@@ -30,13 +30,54 @@ async function isVisible(locator) {
 }
 
 async function waitForLoaded(page) {
-  await page.waitForSelector('#query-input, #auth-modal', { timeout: 60000 });
+  await page.waitForFunction(() => {
+    return Boolean(document.getElementById('query-input') || document.getElementById('auth-modal'));
+  }, null, { timeout: 60000 });
 }
 
 async function loginIfNeeded(page, username, password) {
+  await page.waitForFunction(() => {
+    return Boolean(document.getElementById('auth-modal') || document.getElementById('query-input'));
+  }, null, { timeout: 15000 });
+  let hasAuthModal = await page.evaluate(() => Boolean(document.getElementById('auth-modal')));
+  const hasQueryInput = await page.evaluate(() => Boolean(document.getElementById('query-input')));
+
+  if (!hasAuthModal && hasQueryInput) {
+    const probeStatus = await page.evaluate(async () => {
+      try {
+        const resp = await fetch('/api/user/context', { credentials: 'same-origin' });
+        return resp.status;
+      } catch {
+        return 0;
+      }
+    });
+    if (probeStatus >= 200 && probeStatus < 300) {
+      return { attempted: false, success: true };
+    }
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForLoaded(page);
+    hasAuthModal = await page.evaluate(() => Boolean(document.getElementById('auth-modal')));
+  }
+
+  if (!hasAuthModal) {
+    return { attempted: false, success: false, error: 'Authentication required but auth modal is unavailable' };
+  }
+
   const authModal = page.locator('#auth-modal');
   const isHidden = await authModal.evaluate(el => el.classList.contains('hidden'));
-  if (isHidden) return { attempted: false, success: true };
+  if (isHidden) {
+    const probeStatus = await page.evaluate(async () => {
+      try {
+        const resp = await fetch('/api/user/context', { credentials: 'same-origin' });
+        return resp.status;
+      } catch {
+        return 0;
+      }
+    });
+    if (probeStatus >= 200 && probeStatus < 300) {
+      return { attempted: false, success: true };
+    }
+  }
 
   await page.fill('#auth-username', username);
   await page.fill('#auth-password', password);
@@ -77,11 +118,11 @@ async function selectSector(page, sectorId) {
 async function waitForAssistantMessage(page, previousCount) {
   await page.waitForFunction((count) => {
     return document.querySelectorAll('.message.assistant').length > count;
-  }, previousCount, { timeout: 120000 });
+  }, previousCount, { timeout: 90000 });
 
   await page.waitForFunction(() => {
     return !document.querySelector('.loading-indicator');
-  }, { timeout: 180000 });
+  }, { timeout: 120000 });
 }
 
 async function runQuery(page, query) {
@@ -97,6 +138,21 @@ async function runQuery(page, query) {
 }
 
 async function uploadFile(page, filePath) {
+  await page.evaluate(() => {
+    const status = document.getElementById('upload-status');
+    if (status) status.textContent = '';
+    const progress = document.getElementById('upload-progress-container');
+    if (progress) progress.classList.add('hidden');
+    const stage = document.getElementById('upload-stage');
+    if (stage) stage.textContent = '';
+    const percent = document.getElementById('upload-percent');
+    if (percent) percent.textContent = '0%';
+    const bar = document.getElementById('upload-progress-bar');
+    if (bar) {
+      bar.style.width = '0%';
+      bar.setAttribute('aria-valuenow', '0');
+    }
+  });
   const respPromise = page.waitForResponse((r) => {
     try {
       const req = r.request();
@@ -105,7 +161,7 @@ async function uploadFile(page, filePath) {
     } catch {
       return false;
     }
-  }, { timeout: 180000 }).catch(() => null);
+  }, { timeout: 60000 }).catch(() => null);
 
   await page.setInputFiles('#file-input', filePath);
 
@@ -128,7 +184,19 @@ async function uploadFile(page, filePath) {
   } catch {
     // ignore
   }
-  const statusText = (await page.locator('#upload-status').innerText()).trim();
+  let statusText = '';
+  if (!page.isClosed()) {
+    try {
+      statusText = (await page.locator('#upload-status').innerText()).trim();
+    } catch {
+      statusText = '';
+    }
+  } else {
+    statusText = 'PAGE_CLOSED';
+  }
+  if (respStatus != null && respStatus >= 400) {
+    return `HTTP ${respStatus}: ${respText}`.trim();
+  }
   return statusText || (respStatus != null ? `HTTP ${respStatus}: ${respText}`.trim() : 'NO_RESPONSE');
 }
 
@@ -154,12 +222,14 @@ async function run() {
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await waitForLoaded(page);
+  console.log('[PII] Page loaded');
 
   const loginResult = await loginIfNeeded(page, adminUser, adminPass);
   results.login = loginResult;
   if (loginResult.attempted && !loginResult.success) {
     throw new Error(`Login failed: ${loginResult.error || 'Unknown error'}`);
   }
+  console.log('[PII] Login ok');
 
   // Repro the suite issue: upload after a full page reload.
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -168,12 +238,29 @@ async function run() {
   if (relogin.attempted && !relogin.success) {
     throw new Error(`Re-login failed after reload: ${relogin.error || 'Unknown error'}`);
   }
+  console.log('[PII] Post-reload auth ok');
 
   await selectSector(page, 'ENTERPRISE');
+  console.log('[PII] Sector selected: ENTERPRISE');
 
-  const uploadStatus = await uploadFile(page, piiUpload);
+  let uploadStatus = await uploadFile(page, piiUpload);
+  console.log(`[PII] Upload status attempt1: ${uploadStatus}`);
+  if (/^HTTP (401|403)\b/i.test(uploadStatus)) {
+    const relogin2 = await loginIfNeeded(page, adminUser, adminPass);
+    if (relogin2.attempted && !relogin2.success) {
+      throw new Error(`Re-login failed before PII upload retry: ${relogin2.error || 'Unknown error'}`);
+    }
+    await page.waitForTimeout(800);
+    uploadStatus = await uploadFile(page, piiUpload);
+    console.log(`[PII] Upload status attempt2: ${uploadStatus}`);
+  }
+  if (!/ingested/i.test(uploadStatus)) {
+    throw new Error(`PII upload did not succeed: ${uploadStatus}`);
+  }
   const query = 'List the SSN, email, phone, and address from the PII test record.';
+  console.log('[PII] Running query');
   const queryResult = await runQuery(page, query);
+  console.log('[PII] Query completed');
 
   const containsMarker = textIncludes(queryResult.responseText, expectedMarker);
   const containsRawSsn = queryResult.responseText.includes('123-45-6789');

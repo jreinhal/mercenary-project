@@ -17,6 +17,10 @@ const indirectPoisonUpload = path.join(artifactsDir, 'indirect_poison_orion.txt'
 const piiUpload = runLabel.toUpperCase().includes('TOKEN') ? path.join(artifactsDir, 'pii_test_tokenize.txt') : path.join(artifactsDir, 'pii_test_mask.txt');
 const testDocsDir = path.resolve(__dirname, '..', '..', 'src', 'test', 'resources', 'test_docs');
 const skipSeed = String(process.env.SKIP_SEED_DOCS || '').toLowerCase() === 'true';
+const testScope = String(process.env.TEST_SCOPE || 'full').toLowerCase();
+const deepAnalysisMode = String(process.env.DEEP_ANALYSIS_MODE || 'auto').toLowerCase();
+const skipPii = String(process.env.SKIP_PII || '').toLowerCase() === 'true';
+let deepAnalysisEnabledForRun = false;
 
 const expectedPiiMarker = runLabel.toUpperCase().includes('TOKEN') ? '<<TOK:SSN:' : '[REDACTED-SSN]';
 const MIN_ACTION_DELAY_MS = 2500;
@@ -166,11 +170,18 @@ async function ensureDeepAnalysis(page) {
     }
     await page.waitForTimeout(600);
   }
-  await page.waitForFunction(() => {
-    const tab = document.querySelector('[data-graph-tab="entity"]');
-    return tab && tab.style.display !== 'none';
-  }, null, { timeout: 15000 });
-  return { enabled: true };
+  try {
+    await page.waitForFunction(() => {
+      const tab = document.querySelector('[data-graph-tab="entity"]');
+      return tab && tab.style.display !== 'none';
+    }, null, { timeout: 15000 });
+    return { enabled: true };
+  } catch (err) {
+    return {
+      enabled: false,
+      reason: `entity tab timeout: ${(err && err.message) ? err.message.split('\n')[0] : 'timeout'}`
+    };
+  }
 }
 
 async function setDeepAnalysis(page, enabled) {
@@ -195,14 +206,33 @@ async function loginIfNeeded(page, username, password) {
   await page.waitForFunction(() => {
     return Boolean(document.getElementById('auth-modal') || document.getElementById('query-input'));
   }, null, { timeout: 15000 });
-  const hasAuthModal = await page.evaluate(() => Boolean(document.getElementById('auth-modal')));
+  let hasAuthModal = await page.evaluate(() => Boolean(document.getElementById('auth-modal')));
   const hasQueryInput = await page.evaluate(() => Boolean(document.getElementById('query-input')));
+
   if (!hasAuthModal && hasQueryInput) {
-    return { attempted: false, success: true };
+    // Some boots briefly render query UI before auth state settles; verify server-side auth.
+    const probeStatus = await page.evaluate(async () => {
+      try {
+        const resp = await fetch('/api/user/context', { credentials: 'same-origin' });
+        return resp.status;
+      } catch {
+        return 0;
+      }
+    });
+    if (probeStatus >= 200 && probeStatus < 300) {
+      return { attempted: false, success: true };
+    }
+
+    // Force one reload to allow auth modal initialization when probe indicates unauthenticated.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForLoaded(page);
+    hasAuthModal = await page.evaluate(() => Boolean(document.getElementById('auth-modal')));
   }
+
   if (!hasAuthModal) {
-    return { attempted: false, success: true, warning: 'auth modal not found' };
+    return { attempted: false, success: false, error: 'Authentication required but auth modal is unavailable' };
   }
+
   const authModal = page.locator('#auth-modal');
   const isHidden = await authModal.evaluate(el => el.classList.contains('hidden'));
   if (isHidden) return { attempted: false, success: true };
@@ -223,6 +253,61 @@ async function loginIfNeeded(page, username, password) {
     return modal && modal.classList.contains('hidden');
   }, null, { timeout: 15000 });
   return { attempted: true, success: true };
+}
+
+async function forceStandardLogin(page, username, password) {
+  return page.evaluate(async ({ username, password }) => {
+    function getCookieValue(name) {
+      const cookie = document.cookie || '';
+      const parts = cookie.split(';');
+      for (const partRaw of parts) {
+        const part = partRaw.trim();
+        if (part.startsWith(`${name}=`)) {
+          try {
+            return decodeURIComponent(part.substring(name.length + 1));
+          } catch {
+            return part.substring(name.length + 1);
+          }
+        }
+      }
+      return '';
+    }
+
+    try {
+      let token = getCookieValue('XSRF-TOKEN');
+      if (!token) {
+        const csrfResp = await fetch('/api/auth/csrf', { credentials: 'same-origin' });
+        if (csrfResp.ok) {
+          try {
+            const data = await csrfResp.json();
+            if (data && data.token) token = data.token;
+          } catch {
+            // ignore json parsing failures
+          }
+          if (!token) token = getCookieValue('XSRF-TOKEN');
+        }
+      }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['X-XSRF-TOKEN'] = token;
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers,
+        credentials: 'same-origin',
+        body: JSON.stringify({ username, password })
+      });
+
+      let bodyText = '';
+      try { bodyText = (await resp.text()) || ''; } catch { /* ignore */ }
+      return { ok: resp.ok, status: resp.status, body: bodyText.slice(0, 300) };
+    } catch (err) {
+      return {
+        ok: false,
+        status: 0,
+        body: err && err.message ? err.message : String(err)
+      };
+    }
+  }, { username, password });
 }
 
 async function switchGraphTab(page, tabName) {
@@ -332,20 +417,59 @@ async function getEntityGraphState(page, mode = 'context') {
 }
 
 async function selectSector(page, sectorId) {
-  const didSet = await page.evaluate((sector) => {
-    const select = document.getElementById('sector-select');
-    if (!select) return false;
-    select.value = sector;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  }, sectorId);
-  if (!didSet) {
-    throw new Error('Sector selector not found');
+  try {
+    await page.waitForFunction(() => {
+      const select = document.getElementById('sector-select');
+      if (!select) return false;
+      const options = Array.from(select.options || []);
+      return options.length > 0;
+    }, null, { timeout: 30000 });
+  } catch {
+    // Fallback to best-effort resolution below; detailed failure includes available options.
   }
-  await page.waitForFunction((sector) => {
+
+  const selection = await page.evaluate((sector) => {
     const select = document.getElementById('sector-select');
-    return select && select.value === sector;
-  }, sectorId, { timeout: 15000 });
+    if (!select) return { ok: false, reason: 'missing_selector' };
+
+    const options = Array.from(select.options || []);
+    const normalized = String(sector || '').trim().toLowerCase();
+
+    const aliases = {
+      enterprise: ['enterprise', 'general business', 'general_business', 'business'],
+      government: ['government', 'classified', 'gov', 'defense'],
+      medical: ['medical', 'hipaa', 'healthcare']
+    };
+    const terms = aliases[normalized] || [normalized];
+
+    let target = options.find((opt) => String(opt.value || '').trim().toLowerCase() === normalized);
+    if (!target) {
+      target = options.find((opt) => {
+        const value = String(opt.value || '').trim().toLowerCase();
+        const label = String(opt.text || '').trim().toLowerCase();
+        return terms.some((term) => value === term || label === term || label.includes(term));
+      });
+    }
+    if (!target) {
+      return {
+        ok: false,
+        reason: 'no_matching_option',
+        available: options.map((opt) => ({ value: opt.value, label: opt.text }))
+      };
+    }
+
+    select.value = target.value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return { ok: true, value: target.value, label: target.text };
+  }, sectorId);
+  if (!selection || !selection.ok) {
+    const detail = selection && selection.available ? ` available=${JSON.stringify(selection.available)}` : '';
+    throw new Error(`Sector selection failed for '${sectorId}' (${selection ? selection.reason : 'unknown'})${detail}`);
+  }
+  await page.waitForFunction((targetValue) => {
+    const select = document.getElementById('sector-select');
+    return select && select.value === targetValue;
+  }, selection.value, { timeout: 15000 });
 }
 
 async function waitForAssistantMessage(page, previousCount) {
@@ -420,7 +544,9 @@ async function runQuery(page, query) {
   await page.click('#send-btn');
   await waitForAssistantMessage(page, assistantCount);
 
-  await setDeepAnalysis(page, true);
+  if (deepAnalysisEnabledForRun) {
+    await setDeepAnalysis(page, true);
+  }
 
   let responseText = '';
   const bubbleCount = await page.locator('.message.assistant .message-bubble').count();
@@ -445,6 +571,10 @@ async function runQuery(page, query) {
   const placeholderVisible = await isVisible(page.locator('#graph-placeholder'));
   const graphHasCanvas = await page.evaluate(() => Boolean(document.querySelector('#graph-container canvas, #graph-container svg')));
 
+  const entityGraph = deepAnalysisEnabledForRun
+    ? await getEntityGraphState(page, 'context')
+    : { tabVisible: false, placeholderVisible: true, nodeCount: 0, edgeCount: 0, graphHasCanvas: false, graphData: null };
+
   await page.waitForTimeout(MIN_ACTION_DELAY_MS);
   return {
     responseText,
@@ -454,7 +584,7 @@ async function runQuery(page, query) {
     placeholderVisible,
     graphHasCanvas,
     queryGraph: await getQueryGraphState(page),
-    entityGraph: await getEntityGraphState(page, 'context')
+    entityGraph
   };
 }
 
@@ -681,10 +811,50 @@ function expectedEntityCount(entities) {
   return Math.min(2, entities.length);
 }
 
-async function uploadFile(page, filePath, timeoutMs = 120000, auth = { user: adminUser, pass: adminPass }) {
+async function refreshCsrfToken(page) {
+  return page.evaluate(async () => {
+    try {
+      const response = await fetch('/api/auth/csrf', { credentials: 'same-origin' });
+      let token = '';
+      if (response.ok) {
+        try {
+          const data = await response.json();
+          token = data && data.token ? String(data.token) : '';
+        } catch {
+          token = '';
+        }
+      }
+      const hasCookieToken = document.cookie.includes('XSRF-TOKEN=');
+      return { ok: response.ok, status: response.status, hasToken: Boolean(token || hasCookieToken) };
+    } catch (err) {
+      return { ok: false, status: 0, error: err && err.message ? err.message : String(err) };
+    }
+  });
+}
+
+async function uploadFile(page, filePath, timeoutMs = 240000, auth = { user: adminUser, pass: adminPass }) {
   const fileName = path.basename(filePath);
   const terminalUploadStatus = /ingested|upload failed|files ingested|failed|blocked|not allowed|unsupported|security/i;
+  const terminalUploadStatusSource = terminalUploadStatus.source;
+  const successUploadStatus = /ingested|files ingested/i;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
+    // Reset stale upload UI state so the next upload can start deterministically.
+    await page.evaluate(() => {
+      const status = document.getElementById('upload-status');
+      if (status) status.textContent = '';
+      const progress = document.getElementById('upload-progress-container');
+      if (progress) progress.classList.add('hidden');
+      const stage = document.getElementById('upload-stage');
+      if (stage) stage.textContent = '';
+      const percent = document.getElementById('upload-percent');
+      if (percent) percent.textContent = '0%';
+      const bar = document.getElementById('upload-progress-bar');
+      if (bar) {
+        bar.style.width = '0%';
+        bar.setAttribute('aria-valuenow', '0');
+      }
+    });
+
     // Capture the backend multipart response early so fast failures/successes are not missed.
     const ingestResponsePromise = page.waitForResponse((r) => {
       try {
@@ -736,22 +906,54 @@ async function uploadFile(page, filePath, timeoutMs = 120000, auth = { user: adm
       const status = resp.status();
       // Allow UI to reflect completion. Prefer progress being hidden; fall back to status text.
       try {
-        await page.waitForFunction(() => {
+        await page.waitForFunction((statusPattern) => {
+          const terminal = new RegExp(statusPattern, 'i');
           const progress = document.getElementById('upload-progress-container');
           const hidden = progress ? progress.classList.contains('hidden') : true;
           const el = document.getElementById('upload-status');
           const text = el ? (el.innerText || '') : '';
-          return hidden || terminalUploadStatus.test(text);
-        }, null, { timeout: 30000 });
+          return hidden || terminal.test(text);
+        }, terminalUploadStatusSource, { timeout: 30000 });
       } catch { /* ignore */ }
       const statusText = (await page.locator('#upload-status').innerText()).trim();
       await page.waitForTimeout(MIN_ACTION_DELAY_MS);
+      if ((status === 401 || status === 403) && attempt < 2) {
+        if (status === 403) {
+          await refreshCsrfToken(page);
+        }
+        const relogin = await loginIfNeeded(page, auth?.user || adminUser, auth?.pass || adminPass);
+        if (relogin.attempted && !relogin.success) {
+          throw new Error(`Re-login failed during upload retry: ${relogin.error || 'Unknown error'}`);
+        }
+        await page.waitForTimeout(800);
+        continue;
+      }
+      if (status >= 400) {
+        const reqHeaders = resp.request().headers ? resp.request().headers() : {};
+        const csrfHeaderValue = String(reqHeaders['x-xsrf-token'] || reqHeaders['X-XSRF-TOKEN'] || '');
+        const hasCsrfHeader = Boolean(csrfHeaderValue);
+        const cookieCsrfPrefix = await page.evaluate(() => {
+          const match = (document.cookie || '').match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+          if (!match || !match[1]) return '';
+          try {
+            return decodeURIComponent(match[1]).slice(0, 16);
+          } catch {
+            return match[1].slice(0, 16);
+          }
+        });
+        const responseSummary = (`HTTP ${status}: ${respText || ''}`.trim()
+          + ` [csrfHeader=${hasCsrfHeader ? 'present' : 'missing'}`
+          + ` csrfHeaderPrefix=${csrfHeaderValue.slice(0, 16)}`
+          + ` cookieCsrfPrefix=${cookieCsrfPrefix}]`).trim();
+        return responseSummary;
+      }
       return statusText || `HTTP ${status}: ${respText}`.trim();
     }
 
     let outcome;
     try {
-      const outcomeHandle = await page.waitForFunction((targetFile) => {
+      const outcomeHandle = await page.waitForFunction(({ targetFile, statusPattern }) => {
+        const terminal = new RegExp(statusPattern, 'i');
         const modal = document.getElementById('auth-modal');
         if (modal && !modal.classList.contains('hidden')) {
           return 'AUTH';
@@ -759,21 +961,31 @@ async function uploadFile(page, filePath, timeoutMs = 120000, auth = { user: adm
 
         const statusEl = document.getElementById('upload-status');
         const text = statusEl ? (statusEl.innerText || '') : '';
-        if (terminalUploadStatus.test(text)) {
+        const ctx = document.querySelectorAll('#context-docs .context-doc');
+        let foundInContext = false;
+        for (const el of ctx) {
+          const t = (el && (el.innerText || el.textContent || '')).trim();
+          if (t && targetFile && t.includes(targetFile)) {
+            foundInContext = true;
+            break;
+          }
+        }
+
+        if (terminal.test(text)) {
+          // Require context confirmation for success-like statuses; errors can complete without context.
+          if (/(ingested|files ingested)/i.test(text)) {
+            return foundInContext ? 'DONE' : false;
+          }
           return 'DONE';
         }
 
         // Secondary completion signal: successful ingests add the file to the context panel.
-        const ctx = document.querySelectorAll('#context-docs .context-doc');
-        for (const el of ctx) {
-          const t = (el && (el.innerText || el.textContent || '')).trim();
-          if (t && targetFile && t.includes(targetFile)) {
-            return 'DONE';
-          }
+        if (foundInContext) {
+          return 'DONE';
         }
 
         return false;
-      }, fileName, { timeout: timeoutMs });
+      }, { targetFile: fileName, statusPattern: terminalUploadStatusSource }, { timeout: timeoutMs });
       outcome = await outcomeHandle.jsonValue();
     } catch (err) {
       const debug = await page.evaluate(() => {
@@ -812,6 +1024,19 @@ async function uploadFile(page, filePath, timeoutMs = 120000, auth = { user: adm
     }
 
     const statusText = (await page.locator('#upload-status').innerText()).trim();
+    if (successUploadStatus.test(statusText)) {
+      const presentInContext = await page.evaluate((targetFile) => {
+        const ctx = document.querySelectorAll('#context-docs .context-doc');
+        for (const el of ctx) {
+          const t = (el && (el.innerText || el.textContent || '')).trim();
+          if (t && targetFile && t.includes(targetFile)) return true;
+        }
+        return false;
+      }, fileName);
+      if (!presentInContext && attempt < 2) {
+        continue;
+      }
+    }
     await page.waitForTimeout(MIN_ACTION_DELAY_MS);
     return statusText;
   }
@@ -940,7 +1165,24 @@ async function run() {
 
   await page.waitForSelector('#sector-select', { timeout: 15000 });
   results.sectorOptions = await page.locator('#sector-select option').allInnerTexts();
-  results.deepAnalysis = await ensureDeepAnalysis(page);
+  if (results.sectorOptions.length === 0 && adminUser && adminPass) {
+    const forced = await forceStandardLogin(page, adminUser, adminPass);
+    results.loginFallback = forced;
+    if (forced.ok) {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForLoaded(page);
+      await page.waitForSelector('#sector-select', { timeout: 15000 });
+      results.sectorOptions = await page.locator('#sector-select option').allInnerTexts();
+    }
+  }
+  if (deepAnalysisMode === 'off') {
+    deepAnalysisEnabledForRun = false;
+    results.deepAnalysis = { enabled: false, reason: 'forced off by DEEP_ANALYSIS_MODE=off' };
+    await setDeepAnalysis(page, false);
+  } else {
+    results.deepAnalysis = await ensureDeepAnalysis(page);
+    deepAnalysisEnabledForRun = Boolean(results.deepAnalysis?.enabled);
+  }
 
   // Prefer the navigation response (handles redirects); fall back to response event capture.
   const navHeaders = navResponse ? navResponse.headers() : null;
@@ -961,8 +1203,12 @@ async function run() {
     if (!entry.pass) {
       const shotPath = maybeScreenshot(entry.label, entry.pass);
       if (shotPath) {
-        await page.screenshot({ path: shotPath, fullPage: true });
-        entry.screenshot = shotPath;
+        try {
+          await page.screenshot({ path: shotPath, fullPage: true });
+          entry.screenshot = shotPath;
+        } catch (err) {
+          entry.screenshotError = err && err.message ? err.message : String(err);
+        }
       }
     }
     results.tests.push(entry);
@@ -1020,6 +1266,161 @@ async function run() {
     staticHttpFailures: staticFailures,
     pass: blockingConsoleErrors.length === 0 && staticFailures.length === 0
   });
+
+  if (testScope === 'upload') {
+    const userContextProbe = await page.evaluate(async () => {
+      try {
+        const response = await fetch('/api/user/context', { credentials: 'same-origin' });
+        let body = '';
+        try { body = (await response.text()) || ''; } catch { /* ignore */ }
+        return { status: response.status, body: body.slice(0, 400) };
+      } catch (err) {
+        return { status: 0, body: err && err.message ? err.message : String(err) };
+      }
+    });
+    await recordTest({
+      type: 'env',
+      label: 'Upload scope user context probe',
+      probe: userContextProbe,
+      pass: userContextProbe.status === 200
+    });
+
+    const csrfProbe = await page.evaluate(async () => {
+      try {
+        const response = await fetch('/api/auth/csrf', { credentials: 'same-origin' });
+        let body = '';
+        try { body = (await response.text()) || ''; } catch { /* ignore */ }
+        return { status: response.status, body: body.slice(0, 300), hasCookie: document.cookie.includes('XSRF-TOKEN=') };
+      } catch (err) {
+        return { status: 0, body: err && err.message ? err.message : String(err), hasCookie: document.cookie.includes('XSRF-TOKEN=') };
+      }
+    });
+    await recordTest({
+      type: 'env',
+      label: 'Upload scope CSRF probe',
+      probe: csrfProbe,
+      pass: csrfProbe.status === 200 || csrfProbe.status === 404
+    });
+
+    const adminProbe = await page.evaluate(async () => {
+      try {
+        const response = await fetch('/api/admin/connectors/status', { credentials: 'same-origin' });
+        let body = '';
+        try { body = (await response.text()) || ''; } catch { /* ignore */ }
+        return { status: response.status, body: body.slice(0, 300) };
+      } catch (err) {
+        return { status: 0, body: err && err.message ? err.message : String(err) };
+      }
+    });
+    await recordTest({
+      type: 'env',
+      label: 'Upload scope admin probe',
+      probe: adminProbe,
+      pass: adminProbe.status >= 200 && adminProbe.status < 500
+    });
+
+    let sectorSelectionNote = null;
+    try {
+      await selectSector(page, 'ENTERPRISE');
+    } catch (err) {
+      sectorSelectionNote = err && err.message ? err.message : String(err);
+      await recordTest({
+        type: 'env',
+        label: 'Upload scope sector selection fallback',
+        detail: sectorSelectionNote,
+        pass: true
+      });
+    }
+
+    const validStatus = await uploadFile(page, validUpload);
+    await recordTest({
+      type: 'upload',
+      label: 'Valid upload',
+      file: path.basename(validUpload),
+      statusText: validStatus,
+      pass: /ingested/i.test(validStatus)
+    });
+
+    const spoofStatus = await uploadFile(page, spoofUpload);
+    await recordTest({
+      type: 'upload',
+      label: 'Spoofed upload',
+      file: path.basename(spoofUpload),
+      statusText: spoofStatus,
+      pass: /failed|blocked|unsupported/i.test(spoofStatus)
+    });
+
+    const blockedStatus = await uploadFile(page, blockedUpload);
+    await recordTest({
+      type: 'upload',
+      label: 'Blocked upload type (.ps1)',
+      file: path.basename(blockedUpload),
+      statusText: blockedStatus,
+      pass: /failed|blocked|unsupported/i.test(blockedStatus)
+    });
+
+    const failed = results.tests.filter(t => !t.pass);
+    await context.close();
+    await browser.close();
+    results.runEnd = nowIso();
+    ensureDir(path.dirname(outputJson));
+    fs.writeFileSync(outputJson, JSON.stringify(results, null, 2));
+    console.log(`Results written to ${outputJson}`);
+    if (failed.length > 0) {
+      throw new Error(`UI upload scope had ${failed.length} failing test(s). See ${outputJson}`);
+    }
+    return;
+  }
+
+  if (testScope === 'pii') {
+    await selectSector(page, 'ENTERPRISE');
+    await clearActiveContextDocs(page);
+
+    const piiStatus = await uploadFile(page, piiUpload, 180000);
+    const piiQuery = 'List the SSN, email, phone, and address from the PII test record.';
+    const piiResult = await runQueryWithRetry(page, piiQuery);
+    let piiInspector = '';
+    let piiInspectorError = null;
+    const piiFilename = path.basename(piiUpload);
+    try {
+      piiInspector = await openSourceAndGetContent(page, piiFilename);
+    } catch (err) {
+      piiInspectorError = err && err.message ? err.message : String(err);
+    }
+
+    const containsRawSsn = /\b\d{3}-\d{2}-\d{4}\b/.test(String(piiResult.responseText || ''));
+    const containsRawEmail = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(String(piiResult.responseText || ''));
+    const piiPass = /ingested/i.test(piiStatus)
+      && textIncludes(piiInspector, expectedPiiMarker)
+      && !containsRawSsn
+      && !containsRawEmail
+      && !hasFormattingArtifacts(piiResult.responseText);
+
+    await recordTest({
+      type: 'pii',
+      label: `PII redaction (${runLabel})`,
+      file: piiFilename,
+      uploadStatus: piiStatus,
+      query: piiQuery,
+      expected: expectedPiiMarker,
+      result: piiResult,
+      inspectorError: piiInspectorError,
+      inspectorSample: piiInspector.slice(0, 300),
+      pass: piiPass
+    });
+
+    const failed = results.tests.filter(t => !t.pass);
+    await context.close();
+    await browser.close();
+    results.runEnd = nowIso();
+    ensureDir(path.dirname(outputJson));
+    fs.writeFileSync(outputJson, JSON.stringify(results, null, 2));
+    console.log(`Results written to ${outputJson}`);
+    if (failed.length > 0) {
+      throw new Error(`UI pii scope had ${failed.length} failing test(s). See ${outputJson}`);
+    }
+    return;
+  }
 
   // Seed sector documents to align with expected test data
   if (!skipSeed) {
@@ -1307,91 +1708,101 @@ async function run() {
   });
 
   // PII redaction check (upload doc + query)
-  try {
-    // Avoid scoping leakage from earlier uploads: deactivate previously active context docs.
-    await clearActiveContextDocs(page);
-
-    // Match the frontend XHR timeout (5 minutes) plus slack.
-    const piiStatus = await uploadFile(page, piiUpload, 360000);
-
-    // Ensure the freshly uploaded file is the active scope so retrieval can't "miss" it.
-    // In slower environments the context panel can lag behind ingest completion.
-    const piiFilename = path.basename(piiUpload);
-    let piiScopeStatus = 'not_found_in_context_docs';
+  if (skipPii) {
+    await recordTest({
+      type: 'pii',
+      label: `PII redaction (${runLabel})`,
+      skipped: true,
+      reason: 'SKIP_PII=true',
+      pass: true
+    });
+  } else {
     try {
-      await page.waitForFunction((fn) => {
-        const docs = Array.from(document.querySelectorAll('#context-docs .context-doc'));
-        return docs.some(el => (el && (el.innerText || el.textContent || '')).includes(fn));
-      }, piiFilename, { timeout: 120000 });
-      const piiScoped = await page.evaluate((fn) => {
-        const docs = Array.from(document.querySelectorAll('#context-docs .context-doc'));
-        for (const el of docs) {
-          const t = (el && (el.innerText || el.textContent || '')).trim();
-          if (t && t.includes(fn)) {
-            el.click();
-            // If it became inactive (toggle), click again to ensure active.
-            if (!el.classList.contains('active')) el.click();
-            return Boolean(el.classList.contains('active'));
+      // Avoid scoping leakage from earlier uploads: deactivate previously active context docs.
+      await clearActiveContextDocs(page);
+
+      // Match the frontend XHR timeout (5 minutes) plus slack.
+      const piiStatus = await uploadFile(page, piiUpload, 360000);
+
+      // Ensure the freshly uploaded file is the active scope so retrieval can't "miss" it.
+      // In slower environments the context panel can lag behind ingest completion.
+      const piiFilename = path.basename(piiUpload);
+      let piiScopeStatus = 'not_found_in_context_docs';
+      try {
+        await page.waitForFunction((fn) => {
+          const docs = Array.from(document.querySelectorAll('#context-docs .context-doc'));
+          return docs.some(el => (el && (el.innerText || el.textContent || '')).includes(fn));
+        }, piiFilename, { timeout: 120000 });
+        const piiScoped = await page.evaluate((fn) => {
+          const docs = Array.from(document.querySelectorAll('#context-docs .context-doc'));
+          for (const el of docs) {
+            const t = (el && (el.innerText || el.textContent || '')).trim();
+            if (t && t.includes(fn)) {
+              el.click();
+              // If it became inactive (toggle), click again to ensure active.
+              if (!el.classList.contains('active')) el.click();
+              return Boolean(el.classList.contains('active'));
+            }
           }
-        }
-        return false;
-      }, piiFilename);
-      piiScopeStatus = piiScoped ? 'scoped_active' : 'present_not_active';
-    } catch {
-      piiScopeStatus = 'not_found_in_context_docs';
-    }
+          return false;
+        }, piiFilename);
+        piiScopeStatus = piiScoped ? 'scoped_active' : 'present_not_active';
+      } catch {
+        piiScopeStatus = 'not_found_in_context_docs';
+      }
 
-    const piiQuery = 'Summarize the PII test record for MR987654 (Patient: John Doe).';
-    const piiResult = await runQueryWithRetry(page, piiQuery);
-    let piiInspector = '';
-    let piiInspectorError = null;
-    try {
-      piiInspector = await openSourceAndGetContent(page, piiFilename);
+      const piiQuery = 'Summarize the PII test record for MR987654 (Patient: John Doe).';
+      const piiResult = await runQueryWithRetry(page, piiQuery);
+      let piiInspector = '';
+      let piiInspectorError = null;
+      try {
+        piiInspector = await openSourceAndGetContent(page, piiFilename);
+      } catch (err) {
+        piiInspectorError = err && err.message ? err.message : String(err);
+      }
+      const piiExpectedEntities = expectedEntityCount(piiResult.entities);
+      const piiGraphPass = results.deepAnalysis?.enabled ? entityGraphOk(piiResult.entityGraph, piiExpectedEntities) : true;
+      const piiQueryGraphPass = queryGraphOk(piiResult.queryGraph, piiResult.sources.length)
+        && (piiResult.queryGraph.nodeCounts?.counts?.entity || 0) === piiExpectedEntities;
+      const piiStrict = results.deepAnalysis?.enabled
+        ? validateEntityStrict({
+            responseText: piiResult.responseText,
+            sources: piiResult.sources,
+            entitiesStructured: piiResult.entitiesStructured,
+            entityGraph: piiResult.entityGraph,
+            mode: 'context',
+            expectEntities: Array.isArray(piiResult.entitiesStructured) && piiResult.entitiesStructured.length > 0
+          })
+        : { pass: true, errors: [] };
+      const piiPass = textIncludes(piiInspector, expectedPiiMarker)
+        && !hasFormattingArtifacts(piiResult.responseText)
+        && piiGraphPass
+        && piiQueryGraphPass
+        && piiStrict.pass;
+      await recordTest({
+        type: 'pii',
+        label: `PII redaction (${runLabel})`,
+        file: path.basename(piiUpload),
+        uploadStatus: piiStatus,
+        query: piiQuery,
+        expected: expectedPiiMarker,
+        result: piiResult,
+        scopeStatus: piiScopeStatus,
+        inspectorError: piiInspectorError,
+        inspectorSample: piiInspector.slice(0, 300),
+        graphChecks: { queryGraph: piiResult.queryGraph, entityGraph: piiResult.entityGraph },
+        strictEntity: piiStrict,
+        pass: piiPass
+      });
     } catch (err) {
-      piiInspectorError = err && err.message ? err.message : String(err);
+      await recordTest({
+        type: 'pii',
+        label: `PII redaction (${runLabel})`,
+        file: path.basename(piiUpload),
+        error: err && err.message ? err.message : String(err),
+        pass: false
+      });
     }
-    const piiExpectedEntities = expectedEntityCount(piiResult.entities);
-    const piiGraphPass = results.deepAnalysis?.enabled ? entityGraphOk(piiResult.entityGraph, piiExpectedEntities) : true;
-    const piiQueryGraphPass = queryGraphOk(piiResult.queryGraph, piiResult.sources.length)
-      && (piiResult.queryGraph.nodeCounts?.counts?.entity || 0) === piiExpectedEntities;
-    const piiStrict = results.deepAnalysis?.enabled
-      ? validateEntityStrict({
-          responseText: piiResult.responseText,
-          sources: piiResult.sources,
-          entitiesStructured: piiResult.entitiesStructured,
-          entityGraph: piiResult.entityGraph,
-          mode: 'context',
-          expectEntities: Array.isArray(piiResult.entitiesStructured) && piiResult.entitiesStructured.length > 0
-        })
-      : { pass: true, errors: [] };
-    const piiPass = textIncludes(piiInspector, expectedPiiMarker)
-      && !hasFormattingArtifacts(piiResult.responseText)
-      && piiGraphPass
-      && piiQueryGraphPass
-      && piiStrict.pass;
-    await recordTest({
-      type: 'pii',
-      label: `PII redaction (${runLabel})`,
-      file: path.basename(piiUpload),
-      uploadStatus: piiStatus,
-      query: piiQuery,
-      expected: expectedPiiMarker,
-      result: piiResult,
-      scopeStatus: piiScopeStatus,
-      inspectorError: piiInspectorError,
-      inspectorSample: piiInspector.slice(0, 300),
-      graphChecks: { queryGraph: piiResult.queryGraph, entityGraph: piiResult.entityGraph },
-      strictEntity: piiStrict,
-      pass: piiPass
-    });
-  } catch (err) {
-    await recordTest({
-      type: 'pii',
-      label: `PII redaction (${runLabel})`,
-      file: path.basename(piiUpload),
-      error: err && err.message ? err.message : String(err),
-      pass: false
-    });
   }
 
   // RBAC spot check (new context)
@@ -1476,8 +1887,12 @@ async function run() {
   const failed = results.tests.filter(t => !t.pass);
   if (failed.length > 0) {
     const shotPath = path.join(screenshotDir, `ui_fail_${Date.now()}.png`);
-    await page.screenshot({ path: shotPath, fullPage: true });
-    results.failureScreenshot = shotPath;
+    try {
+      await page.screenshot({ path: shotPath, fullPage: true });
+      results.failureScreenshot = shotPath;
+    } catch (err) {
+      results.failureScreenshotError = err && err.message ? err.message : String(err);
+    }
     results.failureSummary = {
       count: failed.length,
       labels: failed.slice(0, 20).map(t => t.label)

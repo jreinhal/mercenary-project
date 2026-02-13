@@ -203,17 +203,27 @@
             return '';
         }
 
+        function resetCsrfTokenState() {
+            csrfTokenCache = '';
+            csrfTokenUnavailable = false;
+        }
+
         function getCsrfToken() {
             return csrfTokenCache || getCookieValue('XSRF-TOKEN');
         }
 
-        async function ensureCsrfToken() {
-            const existing = getCsrfToken();
-            if (existing) {
-                csrfTokenCache = existing;
-                return existing;
+        async function ensureCsrfToken(forceRefresh = false) {
+            if (forceRefresh) {
+                resetCsrfTokenState();
             }
-            if (csrfTokenUnavailable) {
+            if (!forceRefresh) {
+                const existing = getCsrfToken();
+                if (existing) {
+                    csrfTokenCache = existing;
+                    return existing;
+                }
+            }
+            if (csrfTokenUnavailable && !forceRefresh) {
                 return '';
             }
 
@@ -225,6 +235,11 @@
                     const data = await response.json();
                     if (data && data.token) {
                         csrfTokenCache = data.token;
+                        return csrfTokenCache;
+                    }
+                    const cookieToken = getCookieValue('XSRF-TOKEN');
+                    if (cookieToken) {
+                        csrfTokenCache = cookieToken;
                         return csrfTokenCache;
                     }
                 } else if (response.status === 404) {
@@ -359,6 +374,9 @@
                 }
 
                 authState.authenticated = true;
+                // Login rotates server session; refresh CSRF token cache for subsequent POST/XHR calls.
+                resetCsrfTokenState();
+                await ensureCsrfToken(true);
                 if (passwordInput) passwordInput.value = '';
                 hideAuthModal();
                 await initSectorsFromAPI();

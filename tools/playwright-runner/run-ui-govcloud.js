@@ -293,30 +293,52 @@ async function runQuery(page, query) {
 }
 
 async function uploadFile(page, filePath) {
+  await page.evaluate(() => {
+    const status = document.getElementById('upload-status');
+    if (status) status.textContent = '';
+    const progress = document.getElementById('upload-progress-container');
+    if (progress) progress.classList.add('hidden');
+    const stage = document.getElementById('upload-stage');
+    if (stage) stage.textContent = '';
+    const percent = document.getElementById('upload-percent');
+    if (percent) percent.textContent = '0%';
+    const bar = document.getElementById('upload-progress-bar');
+    if (bar) {
+      bar.style.width = '0%';
+      bar.setAttribute('aria-valuenow', '0');
+    }
+  });
   const responsePromise = page.waitForResponse(resp => {
     return resp.url().includes('/api/ingest/file') && resp.request().method() === 'POST';
-  }, { timeout: 120000 }).catch(() => null);
+  }, { timeout: 240000 }).catch(() => null);
   await page.setInputFiles('#file-input', filePath);
   const ingestResponse = await responsePromise;
+  let responseText = '';
+  const responseInfo = ingestResponse ? {
+    status: ingestResponse.status(),
+    url: ingestResponse.url()
+  } : null;
+  if (ingestResponse) {
+    try {
+      responseText = (await ingestResponse.text()) || '';
+    } catch {
+      responseText = '';
+    }
+  }
   try {
     await page.waitForFunction(() => {
       const el = document.getElementById('upload-status');
       if (!el) return false;
       const text = el.innerText || '';
-      return /ingested|Upload failed|files ingested|failed/i.test(text);
-    }, { timeout: 120000 });
+      return /ingested|upload failed|files ingested|failed|blocked|unsupported|not allowed|security/i.test(text);
+    }, { timeout: 240000 });
   } catch (err) {
-    const responseInfo = ingestResponse ? {
-      status: ingestResponse.status(),
-      url: ingestResponse.url()
-    } : null;
     return { statusText: '', error: 'Upload status timeout', response: responseInfo };
   }
   const statusText = (await page.locator('#upload-status').innerText()).trim();
-  const responseInfo = ingestResponse ? {
-    status: ingestResponse.status(),
-    url: ingestResponse.url()
-  } : null;
+  if (responseInfo && responseInfo.status >= 400) {
+    return { statusText: `HTTP ${responseInfo.status}: ${responseText}`.trim(), error: null, response: responseInfo };
+  }
   return { statusText, error: null, response: responseInfo };
 }
 

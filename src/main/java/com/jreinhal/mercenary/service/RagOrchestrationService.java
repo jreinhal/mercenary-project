@@ -2596,26 +2596,47 @@ public class RagOrchestrationService {
         }
 
         if (textDocs.isEmpty() && this.miARagService != null && this.miARagService.isEnabled() && advancedNeeded) {
-            MiARagService.MindscapeRetrievalResult mindscapeResult = this.miARagService.retrieve(query, dept);
-            textDocs.addAll(mindscapeResult.localDocs());
-            globalContext = mindscapeResult.globalContext();
-            if (!mindscapeResult.mindscapes().isEmpty()) {
-                strategies.add("MiA-RAG");
+            try {
+                MiARagService.MindscapeRetrievalResult mindscapeResult = this.miARagService.retrieve(query, dept);
+                textDocs.addAll(mindscapeResult.localDocs());
+                globalContext = mindscapeResult.globalContext();
+                if (!mindscapeResult.mindscapes().isEmpty()) {
+                    strategies.add("MiA-RAG");
+                }
+            }
+            catch (Exception e) {
+                if (log.isWarnEnabled()) {
+                    log.warn("MiA-RAG retrieval failed, continuing with fallback retrieval: {}", e.getMessage());
+                }
             }
         }
 
         if (textDocs.isEmpty() && this.hiFiRagService != null && this.hiFiRagService.isEnabled() && advancedNeeded) {
-            textDocs.addAll(this.hiFiRagService.retrieve(query, dept));
-            if (!textDocs.isEmpty()) {
-                strategies.add("HiFi-RAG");
+            try {
+                textDocs.addAll(this.hiFiRagService.retrieve(query, dept));
+                if (!textDocs.isEmpty()) {
+                    strategies.add("HiFi-RAG");
+                }
+            }
+            catch (Exception e) {
+                if (log.isWarnEnabled()) {
+                    log.warn("HiFi-RAG retrieval failed, continuing with fallback retrieval: {}", e.getMessage());
+                }
             }
         }
 
         if (textDocs.isEmpty() && this.hybridRagService != null && this.hybridRagService.isEnabled()) {
-            HybridRagService.HybridRetrievalResult hybridResult = this.hybridRagService.retrieve(query, dept);
-            textDocs.addAll(hybridResult.documents());
-            if (!textDocs.isEmpty()) {
-                strategies.add("HybridRAG");
+            try {
+                HybridRagService.HybridRetrievalResult hybridResult = this.hybridRagService.retrieve(query, dept);
+                textDocs.addAll(hybridResult.documents());
+                if (!textDocs.isEmpty()) {
+                    strategies.add("HybridRAG");
+                }
+            }
+            catch (Exception e) {
+                if (log.isWarnEnabled()) {
+                    log.warn("HybridRAG retrieval failed in retrieveContext, continuing with fallback retrieval: {}", e.getMessage());
+                }
             }
         }
 
@@ -2629,30 +2650,51 @@ public class RagOrchestrationService {
         // HGMem (GraphRAG): use deepAnalysis param or fallback to advancedNeeded heuristic
         // Fix #9: respect per-request graphRagAllowed override from frontend toggle
         if (graphRagAllowed && this.hgMemQueryEngine != null && (deepAnalysis || advancedNeeded)) {
-            HGMemQueryEngine.HGMemResult hgResult = this.hgMemQueryEngine.query(query, dept, deepAnalysis);
-            if (!hgResult.documents().isEmpty()) {
-                textDocs.addAll(hgResult.documents());
-                strategies.add(deepAnalysis ? "HGMem-Deep" : "HGMem");
+            try {
+                HGMemQueryEngine.HGMemResult hgResult = this.hgMemQueryEngine.query(query, dept, deepAnalysis);
+                if (!hgResult.documents().isEmpty()) {
+                    textDocs.addAll(hgResult.documents());
+                    strategies.add(deepAnalysis ? "HGMem-Deep" : "HGMem");
+                }
+            }
+            catch (Exception e) {
+                if (log.isWarnEnabled()) {
+                    log.warn("HGMem retrieval failed, continuing with fallback retrieval: {}", e.getMessage());
+                }
             }
         }
 
         if (this.agenticRagOrchestrator != null && this.agenticRagOrchestrator.isEnabled() && advancedNeeded) {
-            AgenticRagOrchestrator.AgenticResult agenticResult = this.agenticRagOrchestrator.process(query, dept, hydeAllowed);
-            if (agenticResult.sources() != null && !agenticResult.sources().isEmpty()) {
-                textDocs.addAll(agenticResult.sources());
-                strategies.add("Agentic");
+            try {
+                AgenticRagOrchestrator.AgenticResult agenticResult = this.agenticRagOrchestrator.process(query, dept, hydeAllowed);
+                if (agenticResult.sources() != null && !agenticResult.sources().isEmpty()) {
+                    textDocs.addAll(agenticResult.sources());
+                    strategies.add("Agentic");
+                }
+            }
+            catch (Exception e) {
+                if (log.isWarnEnabled()) {
+                    log.warn("Agentic retrieval failed, continuing with fallback retrieval: {}", e.getMessage());
+                }
             }
         }
 
         ArrayList<Document> visualDocs = new ArrayList<>();
         ArrayList<MegaRagService.CrossModalEdge> edges = new ArrayList<>();
         if (allowVisual && this.megaRagService != null && this.megaRagService.isEnabled() && (modalities.contains(ModalityRouter.ModalityTarget.VISUAL) || modalities.contains(ModalityRouter.ModalityTarget.CROSS_MODAL))) {
-            MegaRagService.CrossModalRetrievalResult crossModal = this.megaRagService.retrieve(query, dept);
-            edges.addAll(crossModal.crossModalEdges());
-            visualDocs.addAll(crossModal.visualDocs());
-            List<Document> mergedText = crossModal.mergedResults().stream().filter(doc -> !this.isVisualDoc(doc)).toList();
-            textDocs.addAll(mergedText);
-            strategies.add("MegaRAG");
+            try {
+                MegaRagService.CrossModalRetrievalResult crossModal = this.megaRagService.retrieve(query, dept);
+                edges.addAll(crossModal.crossModalEdges());
+                visualDocs.addAll(crossModal.visualDocs());
+                List<Document> mergedText = crossModal.mergedResults().stream().filter(doc -> !this.isVisualDoc(doc)).toList();
+                textDocs.addAll(mergedText);
+                strategies.add("MegaRAG");
+            }
+            catch (Exception e) {
+                if (log.isWarnEnabled()) {
+                    log.warn("MegaRAG retrieval failed, continuing with text fallback retrieval: {}", e.getMessage());
+                }
+            }
         }
 
         if (ragPartResult != null && ragPartResult.hasSuspiciousDocuments()) {
