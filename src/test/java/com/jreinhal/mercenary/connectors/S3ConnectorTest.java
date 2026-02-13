@@ -317,4 +317,126 @@ class S3ConnectorTest {
                 AbortableInputStream.create(new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)))
         );
     }
+
+    @Test
+    void syncFailsWhenPolicyDisallowsConnectors() {
+        ConnectorPolicy policy = Mockito.mock(ConnectorPolicy.class);
+        when(policy.allowConnectors()).thenReturn(false);
+
+        S3Connector testConnector = new S3Connector(policy, Mockito.mock(SecureIngestionService.class));
+        ReflectionTestUtils.setField(testConnector, "enabled", true);
+
+        ConnectorSyncResult result = testConnector.sync();
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("disabled by policy"));
+    }
+
+    @Test
+    void syncFailsWhenConnectorDisabled() {
+        ConnectorPolicy policy = Mockito.mock(ConnectorPolicy.class);
+        when(policy.allowConnectors()).thenReturn(true);
+
+        S3Connector testConnector = new S3Connector(policy, Mockito.mock(SecureIngestionService.class));
+        ReflectionTestUtils.setField(testConnector, "enabled", false);
+
+        ConnectorSyncResult result = testConnector.sync();
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("Connector disabled"));
+    }
+
+    @Test
+    void syncFailsWhenBucketMissing() {
+        ConnectorPolicy policy = Mockito.mock(ConnectorPolicy.class);
+        when(policy.allowConnectors()).thenReturn(true);
+
+        S3Connector testConnector = new S3Connector(policy, Mockito.mock(SecureIngestionService.class));
+        ReflectionTestUtils.setField(testConnector, "enabled", true);
+        ReflectionTestUtils.setField(testConnector, "bucket", "");
+
+        ConnectorSyncResult result = testConnector.sync();
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("Missing S3 bucket configuration"));
+    }
+
+    @Test
+    void syncFailsWhenEndpointIsUntrusted() {
+        ConnectorPolicy policy = Mockito.mock(ConnectorPolicy.class);
+        when(policy.allowConnectors()).thenReturn(true);
+
+        S3Connector testConnector = new S3Connector(policy, Mockito.mock(SecureIngestionService.class));
+        ReflectionTestUtils.setField(testConnector, "enabled", true);
+        ReflectionTestUtils.setField(testConnector, "bucket", "bucket");
+        ReflectionTestUtils.setField(testConnector, "endpoint", "https://127.0.0.1:9000");
+
+        ConnectorSyncResult result = testConnector.sync();
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("allowlist"));
+    }
+
+    @Test
+    void syncPrunesRemovedSourcesWhenListingIsComplete() {
+        ConnectorPolicy policy = Mockito.mock(ConnectorPolicy.class);
+        SecureIngestionService ingestionService = Mockito.mock(SecureIngestionService.class);
+        ConnectorSyncStateService syncStateService = Mockito.mock(ConnectorSyncStateService.class);
+        S3Client s3Client = Mockito.mock(S3Client.class);
+        when(policy.allowConnectors()).thenReturn(true);
+        when(syncStateService.currentWorkspaceId()).thenReturn("ws");
+        when(syncStateService.isEnabled()).thenReturn(true);
+        when(syncStateService.getState(eq("S3"), eq(Department.ENTERPRISE), eq("ws"), eq("folder/a.txt")))
+                .thenReturn(new ConnectorSyncStateService.SourceState("folder/a.txt", "a.txt", "old", "old-hash", 0L));
+        when(syncStateService.pruneRemovedSources(eq("S3"), eq(Department.ENTERPRISE), eq("ws"), anyLong())).thenReturn(2);
+
+        S3Connector testConnector = new S3Connector(policy, ingestionService) {
+            @Override
+            S3Client buildClient() {
+                return s3Client;
+            }
+        };
+        ReflectionTestUtils.setField(testConnector, "syncStateService", syncStateService);
+        ReflectionTestUtils.setField(testConnector, "enabled", true);
+        ReflectionTestUtils.setField(testConnector, "bucket", "bucket");
+        ReflectionTestUtils.setField(testConnector, "maxFiles", 10);
+        ReflectionTestUtils.setField(testConnector, "prefix", "");
+
+        ListObjectsV2Response listResponse = ListObjectsV2Response.builder()
+                .contents(S3Object.builder().key("folder/a.txt").size(12L).lastModified(Instant.now()).build())
+                .isTruncated(false)
+                .build();
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(listResponse);
+        when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(streamFor("new payload"));
+
+        ConnectorSyncResult result = testConnector.sync();
+
+        assertTrue(result.success());
+        assertEquals(2, result.skipped());
+        verify(syncStateService).pruneRemovedSources(eq("S3"), eq(Department.ENTERPRISE), eq("ws"), anyLong());
+    }
+
+    @Test
+    void syncFailsWhenS3ListingThrows() {
+        ConnectorPolicy policy = Mockito.mock(ConnectorPolicy.class);
+        SecureIngestionService ingestionService = Mockito.mock(SecureIngestionService.class);
+        S3Client s3Client = Mockito.mock(S3Client.class);
+        when(policy.allowConnectors()).thenReturn(true);
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class))).thenThrow(new RuntimeException("boom"));
+
+        S3Connector testConnector = new S3Connector(policy, ingestionService) {
+            @Override
+            S3Client buildClient() {
+                return s3Client;
+            }
+        };
+        ReflectionTestUtils.setField(testConnector, "enabled", true);
+        ReflectionTestUtils.setField(testConnector, "bucket", "bucket");
+        ReflectionTestUtils.setField(testConnector, "prefix", "");
+
+        ConnectorSyncResult result = testConnector.sync();
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("failed"));
+    }
 }
