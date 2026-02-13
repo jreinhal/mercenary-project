@@ -107,69 +107,96 @@ public class S3Connector implements Connector {
         int skipped = 0;
         int removed = 0;
         try (S3Client client = buildClient()) {
-            ListObjectsV2Request.Builder listBuilder = ListObjectsV2Request.builder()
-                .bucket(bucket)
-                .maxKeys(maxFiles);
-            if (prefix != null && !prefix.isBlank()) {
-                listBuilder.prefix(prefix);
-            }
-            ListObjectsV2Response listResponse = client.listObjectsV2(listBuilder.build());
             Department dept = resolveDepartment();
             String workspaceId = this.syncStateService != null ? this.syncStateService.currentWorkspaceId() : "";
             long runStartedAtEpochMs = System.currentTimeMillis();
+            String syncRunId = Long.toString(runStartedAtEpochMs);
             boolean incremental = this.syncStateService != null && this.syncStateService.isEnabled();
-            for (S3Object obj : listResponse.contents()) {
-                if (loaded >= maxFiles) break;
-                if (obj.size() == null || obj.size() <= 0) {
-                    skipped++;
+            boolean listingComplete = true;
+            String continuationToken = null;
+            while (true) {
+                ListObjectsV2Request.Builder listBuilder = ListObjectsV2Request.builder()
+                        .bucket(bucket)
+                        .maxKeys(Math.max(1, Math.min(maxFiles, 1000)));
+                if (prefix != null && !prefix.isBlank()) {
+                    listBuilder.prefix(prefix);
+                }
+                if (continuationToken != null && !continuationToken.isBlank()) {
+                    listBuilder.continuationToken(continuationToken);
+                }
+                ListObjectsV2Response listResponse = client.listObjectsV2(listBuilder.build());
+                for (S3Object obj : listResponse.contents()) {
+                    if (loaded >= maxFiles) {
+                        listingComplete = false;
+                        break;
+                    }
+                    if (obj.size() == null || obj.size() <= 0) {
+                        skipped++;
+                        continue;
+                    }
+                    String key = obj.key();
+                    String sourceKey = key;
+                    String sourceName = key.contains("/") ? key.substring(key.lastIndexOf('/') + 1) : key;
+                    String fingerprint = incremental ? this.buildObjectFingerprint(obj) : "";
+                    ConnectorSyncStateService.SourceState state = null;
+                    if (incremental) {
+                        state = this.syncStateService.getState(getName(), dept, workspaceId, sourceKey);
+                        this.syncStateService.markSeen(
+                                getName(), dept, workspaceId, sourceKey, sourceName, fingerprint, runStartedAtEpochMs);
+                        if (this.syncStateService.matchesFingerprint(state, fingerprint)) {
+                            skipped++;
+                            continue;
+                        }
+                    }
+                    try (ResponseInputStream<?> stream =
+                                 client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
+                        byte[] bytes = stream.readAllBytes();
+                        if (bytes == null || bytes.length == 0) {
+                            skipped++;
+                            continue;
+                        }
+                        String contentHash = incremental ? this.syncStateService.sha256(bytes) : "";
+                        if (incremental && this.syncStateService.matchesContentHash(state, contentHash)) {
+                            this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, sourceName,
+                                    fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
+                            skipped++;
+                            continue;
+                        }
+                        ingestionService.ingestBytes(bytes, sourceName, dept,
+                                this.buildConnectorMetadata(sourceKey, fingerprint, syncRunId));
+                        if (incremental) {
+                            this.syncStateService.pruneSupersededSourceDocuments(
+                                    getName(), dept, workspaceId, sourceKey, syncRunId, sourceName);
+                            this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, sourceName,
+                                    fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
+                        }
+                        loaded++;
+                    } catch (Exception e) {
+                        skipped++;
+                        if (log.isWarnEnabled()) {
+                            log.warn("S3 ingestion failed for {}: {}", key, e.getMessage());
+                        }
+                    }
+                }
+
+                if (loaded >= maxFiles) {
+                    if (Boolean.TRUE.equals(listResponse.isTruncated())) {
+                        listingComplete = false;
+                    }
+                    break;
+                }
+                if (Boolean.TRUE.equals(listResponse.isTruncated())
+                        && listResponse.nextContinuationToken() != null
+                        && !listResponse.nextContinuationToken().isBlank()) {
+                    continuationToken = listResponse.nextContinuationToken();
                     continue;
                 }
-                String key = obj.key();
-                String sourceKey = key;
-                String sourceName = key.contains("/") ? key.substring(key.lastIndexOf('/') + 1) : key;
-                String fingerprint = incremental ? this.buildObjectFingerprint(obj) : "";
-                ConnectorSyncStateService.SourceState state = null;
-                if (incremental) {
-                    state = this.syncStateService.getState(getName(), dept, workspaceId, sourceKey);
-                    this.syncStateService.markSeen(
-                            getName(), dept, workspaceId, sourceKey, sourceName, fingerprint, runStartedAtEpochMs);
-                    if (this.syncStateService.matchesFingerprint(state, fingerprint)) {
-                        skipped++;
-                        continue;
-                    }
-                }
-                try (ResponseInputStream<?> stream = client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
-                    byte[] bytes = stream.readAllBytes();
-                    if (bytes == null || bytes.length == 0) {
-                        skipped++;
-                        continue;
-                    }
-                    String contentHash = incremental ? this.syncStateService.sha256(bytes) : "";
-                    if (incremental && this.syncStateService.matchesContentHash(state, contentHash)) {
-                        this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, sourceName,
-                                fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
-                        skipped++;
-                        continue;
-                    }
-                    if (incremental) {
-                        this.syncStateService.pruneSourceDocuments(getName(), dept, workspaceId, sourceKey, sourceName);
-                    }
-                    ingestionService.ingestBytes(bytes, sourceName, dept,
-                            this.buildConnectorMetadata(sourceKey, fingerprint));
-                    if (incremental) {
-                        this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, sourceName,
-                                fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
-                    }
-                    loaded++;
-                } catch (Exception e) {
-                    skipped++;
-                    if (log.isWarnEnabled()) {
-                        log.warn("S3 ingestion failed for {}: {}", key, e.getMessage());
-                    }
-                }
+                break;
             }
-            if (incremental) {
+            if (incremental && listingComplete) {
                 removed = this.syncStateService.pruneRemovedSources(getName(), dept, workspaceId, runStartedAtEpochMs);
+            } else if (incremental && log.isInfoEnabled()) {
+                log.info("S3 sync skipped removed-source pruning because listing was incomplete.");
             }
             String message = removed > 0 ? "S3 sync complete (pruned " + removed + " removed sources)" : "S3 sync complete";
             return new ConnectorSyncResult(getName(), true, loaded, skipped + removed, message);
@@ -293,17 +320,20 @@ public class S3Connector implements Connector {
         return this.syncStateService.stableFingerprint(etag, size, lastModified);
     }
 
-    private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint) {
+    private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint, String runId) {
         HashMap<String, Object> metadata = new HashMap<>();
         metadata.put("connectorName", getName());
         metadata.put("connectorSourceKey", sourceKey);
         if (fingerprint != null && !fingerprint.isBlank()) {
             metadata.put("connectorFingerprint", fingerprint);
         }
+        if (runId != null && !runId.isBlank()) {
+            metadata.put("connectorSyncRunId", runId);
+        }
         return metadata;
     }
 
-    private S3Client buildClient() {
+    S3Client buildClient() {
         S3ClientBuilder builder = S3Client.builder().region(Region.of(region));
         if (endpoint != null && !endpoint.isBlank()) {
             // Endpoint already validated in sync() before reaching here

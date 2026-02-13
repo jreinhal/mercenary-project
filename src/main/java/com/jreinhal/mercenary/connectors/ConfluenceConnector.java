@@ -74,10 +74,15 @@ public class ConfluenceConnector implements Connector {
     @Value("${sentinel.connectors.confluence.department:ENTERPRISE}")
     private String department;
 
+    @Autowired
     public ConfluenceConnector(ConnectorPolicy policy, SecureIngestionService ingestionService) {
+        this(policy, ingestionService, createNoRedirectRestTemplate());
+    }
+
+    ConfluenceConnector(ConnectorPolicy policy, SecureIngestionService ingestionService, RestTemplate restTemplate) {
         this.policy = policy;
         this.ingestionService = ingestionService;
-        this.restTemplate = createNoRedirectRestTemplate();
+        this.restTemplate = restTemplate;
     }
 
     @Override
@@ -116,7 +121,9 @@ public class ConfluenceConnector implements Connector {
             Department dept = resolveDepartment();
             String workspaceId = this.syncStateService != null ? this.syncStateService.currentWorkspaceId() : "";
             long runStartedAtEpochMs = System.currentTimeMillis();
+            String syncRunId = Long.toString(runStartedAtEpochMs);
             boolean incremental = this.syncStateService != null && this.syncStateService.isEnabled();
+            boolean listingComplete = true;
             String auth = email + ":" + apiToken;
             String basic = java.util.Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
             HttpHeaders headers = new HttpHeaders();
@@ -164,20 +171,29 @@ public class ConfluenceConnector implements Connector {
                         skipped++;
                         continue;
                     }
+                    ingestionService.ingestBytes(
+                            payload,
+                            filename,
+                            dept,
+                            this.buildConnectorMetadata(sourceKey, fingerprint, syncRunId));
                     if (incremental) {
-                        this.syncStateService.pruneSourceDocuments(getName(), dept, workspaceId, sourceKey, filename);
-                    }
-                    ingestionService.ingestBytes(payload, filename, dept, this.buildConnectorMetadata(sourceKey, fingerprint));
-                    if (incremental) {
+                        this.syncStateService.pruneSupersededSourceDocuments(
+                                getName(), dept, workspaceId, sourceKey, syncRunId, filename);
                         this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, filename,
                                 fingerprint, contentHash, payload.length, runStartedAtEpochMs);
                     }
                     loaded++;
                 }
+                boolean hasMore = StringUtils.hasText(root.path("_links").path("next").asText(""));
+                if (hasMore && page + 1 >= maxPages) {
+                    listingComplete = false;
+                }
                 start.addAndGet(limit);
             }
-            if (incremental) {
+            if (incremental && listingComplete) {
                 removed = this.syncStateService.pruneRemovedSources(getName(), dept, workspaceId, runStartedAtEpochMs);
+            } else if (incremental && log.isInfoEnabled()) {
+                log.info("Confluence sync skipped removed-source pruning because listing was incomplete.");
             }
             String message = removed > 0
                     ? "Confluence sync complete (pruned " + removed + " removed sources)"
@@ -214,12 +230,15 @@ public class ConfluenceConnector implements Connector {
         return title.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]+", "_");
     }
 
-    private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint) {
+    private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint, String runId) {
         HashMap<String, Object> metadata = new HashMap<>();
         metadata.put("connectorName", getName());
         metadata.put("connectorSourceKey", sourceKey);
         if (fingerprint != null && !fingerprint.isBlank()) {
             metadata.put("connectorFingerprint", fingerprint);
+        }
+        if (runId != null && !runId.isBlank()) {
+            metadata.put("connectorSyncRunId", runId);
         }
         return metadata;
     }

@@ -61,10 +61,15 @@ public class SharePointConnector implements Connector {
     @Value("${sentinel.connectors.sharepoint.department:ENTERPRISE}")
     private String department;
 
+    @Autowired
     public SharePointConnector(ConnectorPolicy policy, SecureIngestionService ingestionService) {
+        this(policy, ingestionService, createNoRedirectRestTemplate());
+    }
+
+    SharePointConnector(ConnectorPolicy policy, SecureIngestionService ingestionService, RestTemplate restTemplate) {
         this.policy = policy;
         this.ingestionService = ingestionService;
-        this.restTemplate = createNoRedirectRestTemplate();
+        this.restTemplate = restTemplate;
     }
 
     @Override
@@ -96,7 +101,9 @@ public class SharePointConnector implements Connector {
             Department dept = resolveDepartment();
             String workspaceId = this.syncStateService != null ? this.syncStateService.currentWorkspaceId() : "";
             long runStartedAtEpochMs = System.currentTimeMillis();
+            String syncRunId = Long.toString(runStartedAtEpochMs);
             boolean incremental = this.syncStateService != null && this.syncStateService.isEnabled();
+            boolean listingComplete = true;
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + bearerToken);
 
@@ -106,78 +113,101 @@ public class SharePointConnector implements Connector {
             } else {
                 path = String.format("/drives/%s/root/children", driveId);
             }
-            String url = graphBase.replaceAll("/$", "") + path;
+            int pageSize = Math.max(1, Math.min(maxFiles, 200));
+            String nextUrl = graphBase.replaceAll("/$", "") + path + "?$top=" + pageSize;
+            while (StringUtils.hasText(nextUrl)) {
+                ResponseEntity<String> response =
+                        restTemplate.exchange(nextUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+                if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                    return new ConnectorSyncResult(getName(), false, 0, 0, "SharePoint query failed");
+                }
+                JsonNode root = mapper.readTree(response.getBody());
+                JsonNode items = root.path("value");
+                if (!items.isArray()) {
+                    return new ConnectorSyncResult(getName(), false, 0, 0, "SharePoint response missing items");
+                }
 
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                return new ConnectorSyncResult(getName(), false, 0, 0, "SharePoint query failed");
-            }
-            JsonNode root = mapper.readTree(response.getBody());
-            JsonNode items = root.path("value");
-            if (!items.isArray()) {
-                return new ConnectorSyncResult(getName(), false, 0, 0, "SharePoint response missing items");
+                for (JsonNode item : items) {
+                    if (loaded >= maxFiles) {
+                        listingComplete = false;
+                        break;
+                    }
+                    if (item.has("folder")) {
+                        skipped++;
+                        continue;
+                    }
+                    String downloadUrl = item.path("@microsoft.graph.downloadUrl").asText();
+                    String name = item.path("name").asText("sharepoint_file");
+                    String sourceKey = item.path("id").asText(name);
+                    String fingerprint = incremental ? this.buildFingerprint(item) : "";
+                    ConnectorSyncStateService.SourceState state = null;
+                    if (incremental) {
+                        state = this.syncStateService.getState(getName(), dept, workspaceId, sourceKey);
+                        this.syncStateService.markSeen(
+                                getName(), dept, workspaceId, sourceKey, name, fingerprint, runStartedAtEpochMs);
+                        if (this.syncStateService.matchesFingerprint(state, fingerprint)) {
+                            skipped++;
+                            continue;
+                        }
+                    }
+                    if (!StringUtils.hasText(downloadUrl)) {
+                        skipped++;
+                        continue;
+                    }
+                    // H-08: Validate download URL points to a trusted Microsoft domain (SSRF prevention)
+                    if (!isTrustedDownloadUrl(downloadUrl)) {
+                        if (log.isWarnEnabled()) {
+                            log.warn("SharePoint download URL blocked (untrusted domain) for file: {}", name);
+                        }
+                        skipped++;
+                        continue;
+                    }
+                    try {
+                        byte[] bytes = restTemplate.getForObject(downloadUrl, byte[].class);
+                        if (bytes == null || bytes.length == 0) {
+                            skipped++;
+                            continue;
+                        }
+                        String contentHash = incremental ? this.syncStateService.sha256(bytes) : "";
+                        if (incremental && this.syncStateService.matchesContentHash(state, contentHash)) {
+                            this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, name,
+                                    fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
+                            skipped++;
+                            continue;
+                        }
+                        ingestionService.ingestBytes(
+                                bytes,
+                                name,
+                                dept,
+                                this.buildConnectorMetadata(sourceKey, fingerprint, syncRunId));
+                        if (incremental) {
+                            this.syncStateService.pruneSupersededSourceDocuments(
+                                    getName(), dept, workspaceId, sourceKey, syncRunId, name);
+                            this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, name,
+                                    fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
+                        }
+                        loaded++;
+                    } catch (Exception e) {
+                        skipped++;
+                        log.warn("SharePoint ingestion failed for {}: {}", name, e.getMessage());
+                    }
+                }
+
+                String resolvedNext = root.path("@odata.nextLink").asText("");
+                if (!StringUtils.hasText(resolvedNext)) {
+                    break;
+                }
+                if (loaded >= maxFiles) {
+                    listingComplete = false;
+                    break;
+                }
+                nextUrl = resolvedNext;
             }
 
-            for (JsonNode item : items) {
-                if (loaded >= maxFiles) break;
-                if (item.has("folder")) {
-                    skipped++;
-                    continue;
-                }
-                String downloadUrl = item.path("@microsoft.graph.downloadUrl").asText();
-                String name = item.path("name").asText("sharepoint_file");
-                String sourceKey = item.path("id").asText(name);
-                String fingerprint = incremental ? this.buildFingerprint(item) : "";
-                ConnectorSyncStateService.SourceState state = null;
-                if (incremental) {
-                    state = this.syncStateService.getState(getName(), dept, workspaceId, sourceKey);
-                    this.syncStateService.markSeen(getName(), dept, workspaceId, sourceKey, name, fingerprint, runStartedAtEpochMs);
-                    if (this.syncStateService.matchesFingerprint(state, fingerprint)) {
-                        skipped++;
-                        continue;
-                    }
-                }
-                if (!StringUtils.hasText(downloadUrl)) {
-                    skipped++;
-                    continue;
-                }
-                // H-08: Validate download URL points to a trusted Microsoft domain (SSRF prevention)
-                if (!isTrustedDownloadUrl(downloadUrl)) {
-                    if (log.isWarnEnabled()) {
-                        log.warn("SharePoint download URL blocked (untrusted domain) for file: {}", name);
-                    }
-                    skipped++;
-                    continue;
-                }
-                try {
-                    byte[] bytes = restTemplate.getForObject(downloadUrl, byte[].class);
-                    if (bytes == null || bytes.length == 0) {
-                        skipped++;
-                        continue;
-                    }
-                    String contentHash = incremental ? this.syncStateService.sha256(bytes) : "";
-                    if (incremental && this.syncStateService.matchesContentHash(state, contentHash)) {
-                        this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, name,
-                                fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
-                        skipped++;
-                        continue;
-                    }
-                    if (incremental) {
-                        this.syncStateService.pruneSourceDocuments(getName(), dept, workspaceId, sourceKey, name);
-                    }
-                    ingestionService.ingestBytes(bytes, name, dept, this.buildConnectorMetadata(sourceKey, fingerprint));
-                    if (incremental) {
-                        this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, name,
-                                fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
-                    }
-                    loaded++;
-                } catch (Exception e) {
-                    skipped++;
-                    log.warn("SharePoint ingestion failed for {}: {}", name, e.getMessage());
-                }
-            }
-            if (incremental) {
+            if (incremental && listingComplete) {
                 removed = this.syncStateService.pruneRemovedSources(getName(), dept, workspaceId, runStartedAtEpochMs);
+            } else if (incremental && log.isInfoEnabled()) {
+                log.info("SharePoint sync skipped removed-source pruning because listing was incomplete.");
             }
             String message = removed > 0
                     ? "SharePoint sync complete (pruned " + removed + " removed sources)"
@@ -238,12 +268,15 @@ public class SharePointConnector implements Connector {
         );
     }
 
-    private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint) {
+    private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint, String runId) {
         HashMap<String, Object> metadata = new HashMap<>();
         metadata.put("connectorName", getName());
         metadata.put("connectorSourceKey", sourceKey);
         if (fingerprint != null && !fingerprint.isBlank()) {
             metadata.put("connectorFingerprint", fingerprint);
+        }
+        if (runId != null && !runId.isBlank()) {
+            metadata.put("connectorSyncRunId", runId);
         }
         return metadata;
     }

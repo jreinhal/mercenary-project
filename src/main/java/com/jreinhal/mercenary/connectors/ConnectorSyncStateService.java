@@ -82,10 +82,33 @@ public class ConnectorSyncStateService {
                 .set("lastSeenAtEpochMs", seenAtEpochMs)
                 .set("updatedAtEpochMs", System.currentTimeMillis())
                 .setOnInsert("createdAtEpochMs", System.currentTimeMillis());
-        if (StringUtils.hasText(fingerprint)) {
-            update.set("fingerprint", fingerprint);
-        }
         this.mongoTemplate.upsert(query, update, STATE_COLLECTION);
+    }
+
+    public long pruneSupersededSourceDocuments(String connectorName, Department department, String workspaceId,
+                                               String sourceKey, String currentRunId, String sourceName) {
+        if (!StringUtils.hasText(connectorName) || department == null || !StringUtils.hasText(workspaceId)
+                || !StringUtils.hasText(sourceKey) || !StringUtils.hasText(currentRunId)) {
+            return 0L;
+        }
+        Criteria sameSource = new Criteria().andOperator(
+                Criteria.where("metadata.workspaceId").is(workspaceId),
+                Criteria.where("metadata.dept").is(department.name()),
+                Criteria.where("metadata.connectorName").is(connectorName),
+                Criteria.where("metadata.connectorSourceKey").is(sourceKey)
+        );
+        Criteria staleRun = new Criteria().orOperator(
+                Criteria.where("metadata.connectorSyncRunId").exists(false),
+                Criteria.where("metadata.connectorSyncRunId").is(null),
+                Criteria.where("metadata.connectorSyncRunId").is(""),
+                Criteria.where("metadata.connectorSyncRunId").ne(currentRunId)
+        );
+        Query query = new Query(new Criteria().andOperator(sameSource, staleRun));
+        long deleted = this.mongoTemplate.remove(query, VECTOR_COLLECTION).getDeletedCount();
+        if (deleted > 0) {
+            this.sourceDocumentService.removePdfSource(workspaceId, department, sourceName);
+        }
+        return deleted;
     }
 
     public void recordIngested(String connectorName, Department department, String workspaceId, String sourceKey,
