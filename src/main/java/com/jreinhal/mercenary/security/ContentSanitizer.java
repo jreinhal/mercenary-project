@@ -81,7 +81,7 @@ public final class ContentSanitizer {
         cleaned = CONTROL_CHAR_PATTERN.matcher(cleaned).replaceAll(" ");
         cleaned = REPLACEMENT_CHAR_PATTERN.matcher(cleaned).replaceAll("");
         // Strip common binary signature noise when it leaks into text-oriented responses.
-        cleaned = cleaned.replaceAll("(?i)^(\\d+\\.\\s*)?PK\\s+(?=(this is a zip|test zip|zip archive))", "$1");
+        cleaned = cleaned.replaceAll("(?i)^(\\d+\\.\\s*)?PK\\s*(?=(this is a zip|test zip|zip archive))", "$1");
         cleaned = cleaned.replaceAll("(?i)^(\\d+\\.\\s*)?Rar!\\s*", "$1");
         cleaned = cleaned.replaceAll("(?i)^(\\d+\\.\\s*)?\\d+\\s*(?=Fake\\s+Java\\s+class\\b)", "$1");
         cleaned = MULTI_SPACE_PATTERN.matcher(cleaned).replaceAll(" ");

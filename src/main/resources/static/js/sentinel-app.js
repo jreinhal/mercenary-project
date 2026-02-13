@@ -7559,7 +7559,7 @@
                 .replace(/\uFFFD+/g, '');
 
             cleaned = cleaned
-                .replace(/(^|\n)(\s*\d+\.\s*)?PK\s+(?=(this is a zip|test zip|zip archive))/gim, '$1$2')
+                .replace(/(^|\n)(\s*\d+\.\s*)?PK\s*(?=(this is a zip|test zip|zip archive))/gim, '$1$2')
                 .replace(/(^|\n)(\s*\d+\.\s*)?Rar!\s*/gim, '$1$2')
                 .replace(/(^|\n)(\s*\d+\.\s*)?\d+\s*(?=Fake\s+Java\s+class\b)/gim, '$1$2');
 

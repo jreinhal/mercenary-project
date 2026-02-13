@@ -512,7 +512,7 @@ function hasFormattingArtifacts(text) {
     || /\"name\"\s*:\s*\"calculator\"/i.test(t);
   const hasFormattingIssueFallback = /encountered a formatting issue/i.test(t);
   const hasMojibake = /\uFFFD/.test(t) || /�{2,}/.test(t);
-  const hasBinarySignatureNoise = /(^|\n)\s*(\d+\.\s*)?(PK\s+(this is a zip|test zip|zip archive)|Rar!|(?:\d+\s*)?Fake Java class)/i.test(t);
+  const hasBinarySignatureNoise = /(^|\n)\s*(\d+\.\s*)?(PK\s*(this is a zip|test zip|zip archive)|Rar!|(?:\d+\s*)?Fake Java class)/i.test(t);
   return hasToolJson
     || hasFormattingIssueFallback
     || hasMojibake

@@ -365,7 +365,7 @@ function hasFormattingArtifacts(text) {
   if (!text) return false;
   const t = String(text);
   const hasMojibake = /\uFFFD/.test(t) || /�{2,}/.test(t);
-  const hasBinarySignatureNoise = /(^|\n)\s*(\d+\.\s*)?(PK\s+(this is a zip|test zip|zip archive)|Rar!|(?:\d+\s*)?Fake Java class)/i.test(t);
+  const hasBinarySignatureNoise = /(^|\n)\s*(\d+\.\s*)?(PK\s*(this is a zip|test zip|zip archive)|Rar!|(?:\d+\s*)?Fake Java class)/i.test(t);
   return hasMojibake
     || hasBinarySignatureNoise
     || hasMirroredDuplicateClause(t)
