@@ -23,7 +23,7 @@
                     </div>
                     <div>
                         <div class="sidebar-logo-text">SENTINEL</div>
-                        <div class="sidebar-version">Documentation v2.2</div>
+                        <div class="sidebar-version">Documentation v2.3</div>
                     </div>
                 </a>
             </div>
@@ -261,6 +261,19 @@
                         <li><strong>Processing:</strong> System parses, chunks, vectorizes, and indexes content</li>
                         <li><strong>Confirmation:</strong> Document appears in Sources panel when ready</li>
                     </ol>
+
+                    <h3>Connector Sync (Admin)</h3>
+                    <p>
+                        Enterprise connector ingestion (S3, SharePoint, Confluence) supports incremental sync behavior.
+                        For recurring sync jobs, unchanged sources are skipped, changed sources are re-ingested, and
+                        removed sources are pruned from the vector store.
+                    </p>
+                    <ul>
+                        <li><strong>Manual Admin Sync:</strong> <code>POST /api/admin/connectors/sync</code></li>
+                        <li><strong>Scheduled Sync:</strong> enable <code>SENTINEL_CONNECTORS_SYNC_ENABLED=true</code></li>
+                        <li><strong>Incremental Mode:</strong> <code>SENTINEL_CONNECTORS_INCREMENTAL_SYNC_ENABLED=true</code></li>
+                        <li><strong>Legacy Backfill:</strong> one-time migration via <code>SENTINEL_CONNECTORS_LEGACY_MIGRATION_ENABLED=true</code> (run one connector sync first, then run dry-run)</li>
+                    </ul>
 
                     <div class="callout warning">
                         <div class="callout-title">
@@ -594,6 +607,16 @@
                                 <td>File >50MB or protected</td>
                                 <td>Split file or remove protection</td>
                             </tr>
+                            <tr>
+                                <td>Connector sync reprocesses unchanged files</td>
+                                <td>Incremental sync disabled</td>
+                                <td>Set <code>SENTINEL_CONNECTORS_INCREMENTAL_SYNC_ENABLED=true</code></td>
+                            </tr>
+                            <tr>
+                                <td>Legacy connector sources are not pruned</td>
+                                <td>Pre-existing chunks missing connector metadata</td>
+                                <td>Run legacy migration: enable <code>SENTINEL_CONNECTORS_LEGACY_MIGRATION_ENABLED=true</code> (dry-run first)</td>
+                            </tr>
                         </tbody>
                     </table>
 
@@ -623,7 +646,7 @@
                 <!-- FOOTER -->
                 <div class="docs-footer">
                     <p class="docs-footer-text">
-                        SENTINEL Intelligence Platform v2.2.0 | Build 2026.01<br>
+                        SENTINEL Intelligence Platform v2.3.0 | Build 2026.02<br>
                         Powered by 9 Research-Backed RAG Engines
                     </p>
                 </div>

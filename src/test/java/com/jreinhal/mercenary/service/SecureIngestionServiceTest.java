@@ -438,6 +438,43 @@ class SecureIngestionServiceTest {
     }
 
     @Test
+    @DisplayName("Should merge caller-provided metadata into ingested chunks")
+    void shouldMergeAdditionalMetadata() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "connector.txt",
+                "text/plain",
+                "connector test content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        AtomicReference<List<Document>> captured = new AtomicReference<>();
+        doAnswer(invocation -> {
+            captured.set(invocation.getArgument(0));
+            return null;
+        }).when(vectorStore).add(anyList());
+
+        ingestionService.ingest(file, Department.ENTERPRISE, Map.of(
+                "connectorName", "S3",
+                "connectorSourceKey", "folder/object.txt",
+                "connectorFingerprint", "abc123"
+        ));
+
+        List<Document> added = captured.get();
+        assertNotNull(added);
+        assertFalse(added.isEmpty());
+        Document first = added.get(0);
+        assertEquals("S3", first.getMetadata().get("connectorName"));
+        assertEquals("folder/object.txt", first.getMetadata().get("connectorSourceKey"));
+        assertEquals("abc123", first.getMetadata().get("connectorFingerprint"));
+    }
+
+    @Test
     @DisplayName("Should assign chunk indices to ingested documents")
     void shouldAssignChunkIndices() {
         StringBuilder sb = new StringBuilder();

@@ -2,6 +2,8 @@ package com.jreinhal.mercenary.connectors;
 
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import java.time.Instant;
+import java.util.HashMap;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -10,6 +12,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -41,6 +44,8 @@ public class S3Connector implements Connector {
 
     private final ConnectorPolicy policy;
     private final SecureIngestionService ingestionService;
+    @Autowired(required = false)
+    private ConnectorSyncStateService syncStateService;
 
     @Value("${sentinel.connectors.s3.enabled:false}")
     private boolean enabled;
@@ -100,6 +105,7 @@ public class S3Connector implements Connector {
 
         int loaded = 0;
         int skipped = 0;
+        int removed = 0;
         try (S3Client client = buildClient()) {
             ListObjectsV2Request.Builder listBuilder = ListObjectsV2Request.builder()
                 .bucket(bucket)
@@ -109,6 +115,9 @@ public class S3Connector implements Connector {
             }
             ListObjectsV2Response listResponse = client.listObjectsV2(listBuilder.build());
             Department dept = resolveDepartment();
+            String workspaceId = this.syncStateService != null ? this.syncStateService.currentWorkspaceId() : "";
+            long runStartedAtEpochMs = System.currentTimeMillis();
+            boolean incremental = this.syncStateService != null && this.syncStateService.isEnabled();
             for (S3Object obj : listResponse.contents()) {
                 if (loaded >= maxFiles) break;
                 if (obj.size() == null || obj.size() <= 0) {
@@ -116,10 +125,41 @@ public class S3Connector implements Connector {
                     continue;
                 }
                 String key = obj.key();
+                String sourceKey = key;
+                String sourceName = key.contains("/") ? key.substring(key.lastIndexOf('/') + 1) : key;
+                String fingerprint = incremental ? this.buildObjectFingerprint(obj) : "";
+                ConnectorSyncStateService.SourceState state = null;
+                if (incremental) {
+                    state = this.syncStateService.getState(getName(), dept, workspaceId, sourceKey);
+                    this.syncStateService.markSeen(
+                            getName(), dept, workspaceId, sourceKey, sourceName, fingerprint, runStartedAtEpochMs);
+                    if (this.syncStateService.matchesFingerprint(state, fingerprint)) {
+                        skipped++;
+                        continue;
+                    }
+                }
                 try (ResponseInputStream<?> stream = client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
                     byte[] bytes = stream.readAllBytes();
-                    String filename = key.contains("/") ? key.substring(key.lastIndexOf('/') + 1) : key;
-                    ingestionService.ingestBytes(bytes, filename, dept);
+                    if (bytes == null || bytes.length == 0) {
+                        skipped++;
+                        continue;
+                    }
+                    String contentHash = incremental ? this.syncStateService.sha256(bytes) : "";
+                    if (incremental && this.syncStateService.matchesContentHash(state, contentHash)) {
+                        this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, sourceName,
+                                fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
+                        skipped++;
+                        continue;
+                    }
+                    if (incremental) {
+                        this.syncStateService.pruneSourceDocuments(getName(), dept, workspaceId, sourceKey, sourceName);
+                    }
+                    ingestionService.ingestBytes(bytes, sourceName, dept,
+                            this.buildConnectorMetadata(sourceKey, fingerprint));
+                    if (incremental) {
+                        this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, sourceName,
+                                fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
+                    }
                     loaded++;
                 } catch (Exception e) {
                     skipped++;
@@ -128,7 +168,11 @@ public class S3Connector implements Connector {
                     }
                 }
             }
-            return new ConnectorSyncResult(getName(), true, loaded, skipped, "S3 sync complete");
+            if (incremental) {
+                removed = this.syncStateService.pruneRemovedSources(getName(), dept, workspaceId, runStartedAtEpochMs);
+            }
+            String message = removed > 0 ? "S3 sync complete (pruned " + removed + " removed sources)" : "S3 sync complete";
+            return new ConnectorSyncResult(getName(), true, loaded, skipped + removed, message);
         } catch (Exception e) {
             if (log.isWarnEnabled()) {
                 log.warn("S3 connector failed: {}", e.getMessage());
@@ -237,6 +281,26 @@ public class S3Connector implements Connector {
         } catch (Exception e) {
             return Department.ENTERPRISE;
         }
+    }
+
+    private String buildObjectFingerprint(S3Object obj) {
+        if (this.syncStateService == null) {
+            return "";
+        }
+        String etag = obj.eTag() != null ? obj.eTag().replace("\"", "") : "";
+        Long size = obj.size();
+        Instant lastModified = obj.lastModified();
+        return this.syncStateService.stableFingerprint(etag, size, lastModified);
+    }
+
+    private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint) {
+        HashMap<String, Object> metadata = new HashMap<>();
+        metadata.put("connectorName", getName());
+        metadata.put("connectorSourceKey", sourceKey);
+        if (fingerprint != null && !fingerprint.isBlank()) {
+            metadata.put("connectorFingerprint", fingerprint);
+        }
+        return metadata;
     }
 
     private S3Client buildClient() {

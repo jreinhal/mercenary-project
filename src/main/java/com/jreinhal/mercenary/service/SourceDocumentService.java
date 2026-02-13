@@ -54,6 +54,15 @@ public class SourceDocumentService {
         return Optional.of(bytes.clone());
     }
 
+    public void removePdfSource(String workspaceId, Department department, String filename) {
+        String safeFilename = this.sanitizeFilenameForCache(filename);
+        if (workspaceId == null || workspaceId.isBlank() || department == null
+                || safeFilename == null || safeFilename.isBlank()) {
+            return;
+        }
+        this.sourcePdfCache.invalidate(this.buildCacheKey(workspaceId, department.name(), safeFilename));
+    }
+
     private String buildCacheKey(String workspaceId, String department, String filename) {
         return workspaceId + ":" + department.trim().toUpperCase(Locale.ROOT) + ":" + filename;
     }

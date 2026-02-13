@@ -160,16 +160,21 @@ public class SecureIngestionService {
     }
 
     public void ingest(MultipartFile file, Department dept) {
+        this.ingest(file, dept, Map.of());
+    }
+
+    public void ingest(MultipartFile file, Department dept, Map<String, Object> additionalMetadata) {
         if (file == null) {
             throw new SecureIngestionException("No file provided for ingestion.", null);
         }
         this.enforceFailureThreshold();
         int maxAttempts = this.resilienceEnabled ? Math.max(1, this.ingestMaxRetries + 1) : 1;
         String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "unknown";
+        Map<String, Object> safeAdditionalMetadata = this.normalizeAdditionalMetadata(additionalMetadata);
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             boolean fallbackMode = attempt > 1;
             try {
-                this.ingestInternal(file, dept, fallbackMode);
+                this.ingestInternal(file, dept, fallbackMode, safeAdditionalMetadata);
                 this.recordIngestionOutcome(filename, true);
                 return;
             } catch (SecurityException e) {
@@ -200,7 +205,8 @@ public class SecureIngestionService {
                 || message.contains("transient");
     }
 
-    private void ingestInternal(MultipartFile file, Department dept, boolean fallbackMode) {
+    private void ingestInternal(MultipartFile file, Department dept, boolean fallbackMode,
+                                Map<String, Object> additionalMetadata) {
         try {
             List<Document> rawDocuments;
             String filename = file.getOriginalFilename();
@@ -274,6 +280,9 @@ public class SecureIngestionService {
                 Map<String, Object> mergedMeta = new HashMap<>();
                 if (doc.getMetadata() != null) {
                     mergedMeta.putAll(doc.getMetadata());
+                }
+                if (additionalMetadata != null && !additionalMetadata.isEmpty()) {
+                    mergedMeta.putAll(additionalMetadata);
                 }
                 mergedMeta.put("source", filename);
                 mergedMeta.put("dept", dept.name());
@@ -477,11 +486,29 @@ public class SecureIngestionService {
     }
 
     public void ingestBytes(byte[] fileBytes, String filename, Department dept) {
+        this.ingestBytes(fileBytes, filename, dept, Map.of());
+    }
+
+    public void ingestBytes(byte[] fileBytes, String filename, Department dept, Map<String, Object> additionalMetadata) {
         if (fileBytes == null || fileBytes.length == 0) {
             throw new SecureIngestionException("Empty file payload provided for ingestion.", null);
         }
         String safeName = (filename == null || filename.isBlank()) ? "uploaded.bin" : filename;
-        ingest(new InMemoryMultipartFile(safeName, fileBytes), dept);
+        ingest(new InMemoryMultipartFile(safeName, fileBytes), dept, additionalMetadata);
+    }
+
+    private Map<String, Object> normalizeAdditionalMetadata(Map<String, Object> additionalMetadata) {
+        if (additionalMetadata == null || additionalMetadata.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> normalized = new HashMap<>();
+        for (Map.Entry<String, Object> entry : additionalMetadata.entrySet()) {
+            if (entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null) {
+                continue;
+            }
+            normalized.put(entry.getKey().trim(), entry.getValue());
+        }
+        return normalized;
     }
 
     private static final class InMemoryMultipartFile implements MultipartFile {

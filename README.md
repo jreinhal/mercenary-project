@@ -29,6 +29,8 @@ Note: Capabilities are edition/profile dependent; some features are optional or 
 - **Table-Aware Extraction Pipeline** — Ingestion includes table extraction paths and table-specific chunk handling to preserve tabular evidence fidelity.
 - **Multimodal Visual Analysis** — MegaRAG classifies images into common visual types (charts/diagrams/tables/etc) and extracts text, entities, and descriptions for retrieval.
 - **Ingestion Resilience** — Checkpoint/resume state, bounded retries, and failure thresholds help long-running ingestion complete reliably.
+- **Incremental Connector Sync** — S3/SharePoint/Confluence connector syncs track per-source fingerprints/hashes, skip unchanged sources, and prune removed sources instead of re-ingesting entire connector corpora each run.
+- **Legacy Connector Metadata Migration** — Optional one-time startup migration can backfill connector metadata on existing vector chunks so incremental sync cleanup can safely manage pre-existing connector data (run at least one connector sync first to seed connector state records).
 
 ### Citations & Trust
 - **Evidence Metadata** — Retrieved chunks carry `source` and (when available) `page_number` metadata to support page-level traceability and audits.
@@ -105,6 +107,10 @@ Feature flags and tuning knobs commonly adjusted in production:
 - INGEST_RESILIENCE_ENABLED
 - INGEST_MAX_RETRIES
 - SOURCE_RETENTION_PDF_ENABLED
+- SENTINEL_CONNECTORS_SYNC_ENABLED
+- SENTINEL_CONNECTORS_INCREMENTAL_SYNC_ENABLED
+- SENTINEL_CONNECTORS_LEGACY_MIGRATION_ENABLED
+- SENTINEL_CONNECTORS_LEGACY_MIGRATION_DRY_RUN
 
 STANDARD profile bootstrap:
 - SENTINEL_BOOTSTRAP_ENABLED=true

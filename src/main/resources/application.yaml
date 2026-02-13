@@ -299,6 +299,11 @@ sentinel:
   connectors:
     enabled: ${SENTINEL_CONNECTORS_ENABLED:true}
     allow-regulated: ${SENTINEL_CONNECTORS_ALLOW_REGULATED:false}
+    incremental-sync-enabled: ${SENTINEL_CONNECTORS_INCREMENTAL_SYNC_ENABLED:true}
+    legacy-metadata-migration:
+      enabled: ${SENTINEL_CONNECTORS_LEGACY_MIGRATION_ENABLED:false}
+      dry-run: ${SENTINEL_CONNECTORS_LEGACY_MIGRATION_DRY_RUN:true}
+      force: ${SENTINEL_CONNECTORS_LEGACY_MIGRATION_FORCE:false}
     sync-enabled: ${SENTINEL_CONNECTORS_SYNC_ENABLED:false}
     sync-cron: ${SENTINEL_CONNECTORS_SYNC_CRON:0 0 2 * * ?}
     sharepoint:

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.SecureIngestionService;
+import java.util.HashMap;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -11,6 +12,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -29,6 +31,8 @@ public class SharePointConnector implements Connector {
     private final SecureIngestionService ingestionService;
     private final RestTemplate restTemplate;
     private final ObjectMapper mapper = new ObjectMapper();
+    @Autowired(required = false)
+    private ConnectorSyncStateService syncStateService;
 
     private static RestTemplate createNoRedirectRestTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
@@ -87,8 +91,12 @@ public class SharePointConnector implements Connector {
 
         int loaded = 0;
         int skipped = 0;
+        int removed = 0;
         try {
             Department dept = resolveDepartment();
+            String workspaceId = this.syncStateService != null ? this.syncStateService.currentWorkspaceId() : "";
+            long runStartedAtEpochMs = System.currentTimeMillis();
+            boolean incremental = this.syncStateService != null && this.syncStateService.isEnabled();
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + bearerToken);
 
@@ -118,6 +126,17 @@ public class SharePointConnector implements Connector {
                 }
                 String downloadUrl = item.path("@microsoft.graph.downloadUrl").asText();
                 String name = item.path("name").asText("sharepoint_file");
+                String sourceKey = item.path("id").asText(name);
+                String fingerprint = incremental ? this.buildFingerprint(item) : "";
+                ConnectorSyncStateService.SourceState state = null;
+                if (incremental) {
+                    state = this.syncStateService.getState(getName(), dept, workspaceId, sourceKey);
+                    this.syncStateService.markSeen(getName(), dept, workspaceId, sourceKey, name, fingerprint, runStartedAtEpochMs);
+                    if (this.syncStateService.matchesFingerprint(state, fingerprint)) {
+                        skipped++;
+                        continue;
+                    }
+                }
                 if (!StringUtils.hasText(downloadUrl)) {
                     skipped++;
                     continue;
@@ -136,14 +155,34 @@ public class SharePointConnector implements Connector {
                         skipped++;
                         continue;
                     }
-                    ingestionService.ingestBytes(bytes, name, dept);
+                    String contentHash = incremental ? this.syncStateService.sha256(bytes) : "";
+                    if (incremental && this.syncStateService.matchesContentHash(state, contentHash)) {
+                        this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, name,
+                                fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
+                        skipped++;
+                        continue;
+                    }
+                    if (incremental) {
+                        this.syncStateService.pruneSourceDocuments(getName(), dept, workspaceId, sourceKey, name);
+                    }
+                    ingestionService.ingestBytes(bytes, name, dept, this.buildConnectorMetadata(sourceKey, fingerprint));
+                    if (incremental) {
+                        this.syncStateService.recordIngested(getName(), dept, workspaceId, sourceKey, name,
+                                fingerprint, contentHash, bytes.length, runStartedAtEpochMs);
+                    }
                     loaded++;
                 } catch (Exception e) {
                     skipped++;
                     log.warn("SharePoint ingestion failed for {}: {}", name, e.getMessage());
                 }
             }
-            return new ConnectorSyncResult(getName(), true, loaded, skipped, "SharePoint sync complete");
+            if (incremental) {
+                removed = this.syncStateService.pruneRemovedSources(getName(), dept, workspaceId, runStartedAtEpochMs);
+            }
+            String message = removed > 0
+                    ? "SharePoint sync complete (pruned " + removed + " removed sources)"
+                    : "SharePoint sync complete";
+            return new ConnectorSyncResult(getName(), true, loaded, skipped + removed, message);
         } catch (Exception e) {
             log.warn("SharePoint connector failed: {}", e.getMessage());
             return new ConnectorSyncResult(getName(), false, loaded, skipped, "SharePoint sync failed: " + e.getMessage());
@@ -185,5 +224,27 @@ public class SharePointConnector implements Connector {
         } catch (Exception e) {
             return Department.ENTERPRISE;
         }
+    }
+
+    private String buildFingerprint(JsonNode item) {
+        if (this.syncStateService == null || item == null) {
+            return "";
+        }
+        return this.syncStateService.stableFingerprint(
+                item.path("eTag").asText(""),
+                item.path("cTag").asText(""),
+                item.path("lastModifiedDateTime").asText(""),
+                item.path("size").asLong(-1L)
+        );
+    }
+
+    private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint) {
+        HashMap<String, Object> metadata = new HashMap<>();
+        metadata.put("connectorName", getName());
+        metadata.put("connectorSourceKey", sourceKey);
+        if (fingerprint != null && !fingerprint.isBlank()) {
+            metadata.put("connectorFingerprint", fingerprint);
+        }
+        return metadata;
     }
 }
