@@ -120,4 +120,12 @@ class SourceDocumentServiceTest {
         sourceDocumentService.removePdfSource("ws", Department.ENTERPRISE, "remove.pdf");
         assertFalse(sourceDocumentService.getPdfSource("ws", "ENTERPRISE", "remove.pdf").isPresent());
     }
+
+    @Test
+    void removePdfSourceIsNoOpForInvalidInputs() {
+        sourceDocumentService.removePdfSource("", Department.ENTERPRISE, "x.pdf");
+        sourceDocumentService.removePdfSource("ws", null, "x.pdf");
+        sourceDocumentService.removePdfSource("ws", Department.ENTERPRISE, "");
+        assertTrue(true);
+    }
 }

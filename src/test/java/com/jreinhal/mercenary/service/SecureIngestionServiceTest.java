@@ -475,6 +475,50 @@ class SecureIngestionServiceTest {
     }
 
     @Test
+    @DisplayName("Should ignore invalid additional metadata and preserve reserved fields")
+    void shouldIgnoreInvalidAdditionalMetadata() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "connector.txt",
+                "text/plain",
+                "connector test content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(piiRedactionService.redact(anyString(), any()))
+                .thenAnswer(invocation -> new PiiRedactionService.RedactionResult(
+                        invocation.getArgument(0),
+                        java.util.Collections.emptyMap()
+                ));
+
+        AtomicReference<List<Document>> captured = new AtomicReference<>();
+        doAnswer(invocation -> {
+            captured.set(invocation.getArgument(0));
+            return null;
+        }).when(vectorStore).add(anyList());
+
+        java.util.Map<String, Object> metadata = new java.util.HashMap<>();
+        metadata.put("connectorName", "S3");
+        metadata.put("source", "should-not-override");
+        metadata.put("dept", "should-not-override");
+        metadata.put("workspaceId", "should-not-override");
+        metadata.put(" ", "blank-key");
+        metadata.put("nullValue", null);
+
+        ingestionService.ingest(file, Department.ENTERPRISE, metadata);
+
+        List<Document> added = captured.get();
+        assertNotNull(added);
+        assertFalse(added.isEmpty());
+        Document first = added.get(0);
+        assertEquals("S3", first.getMetadata().get("connectorName"));
+        assertEquals("connector.txt", first.getMetadata().get("source"));
+        assertEquals("ENTERPRISE", first.getMetadata().get("dept"));
+        assertNotEquals("should-not-override", first.getMetadata().get("workspaceId"));
+        assertFalse(first.getMetadata().containsKey(" "));
+        assertFalse(first.getMetadata().containsKey("nullValue"));
+    }
+
+    @Test
     @DisplayName("Should assign chunk indices to ingested documents")
     void shouldAssignChunkIndices() {
         StringBuilder sb = new StringBuilder();

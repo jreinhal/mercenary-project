@@ -3,14 +3,17 @@ package com.jreinhal.mercenary.connectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.service.SourceDocumentService;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import com.mongodb.client.result.DeleteResult;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -160,5 +163,73 @@ class ConnectorSyncStateServiceTest {
         assertFalse(service.isEnabled());
         ReflectionTestUtils.setField(service, "incrementalSyncEnabled", true);
         assertTrue(service.isEnabled());
+    }
+
+    @Test
+    void currentWorkspaceIdUsesWorkspaceContext() {
+        MongoTemplate mongoTemplate = org.mockito.Mockito.mock(MongoTemplate.class);
+        SourceDocumentService sourceDocumentService = org.mockito.Mockito.mock(SourceDocumentService.class);
+        ConnectorSyncStateService service = new ConnectorSyncStateService(mongoTemplate, sourceDocumentService);
+        WorkspaceContext.setCurrentWorkspaceId("workspace_test");
+
+        assertEquals("workspace_test", service.currentWorkspaceId());
+
+        WorkspaceContext.clear();
+    }
+
+    @Test
+    void guardClausesShortCircuitInvalidInput() {
+        MongoTemplate mongoTemplate = org.mockito.Mockito.mock(MongoTemplate.class);
+        SourceDocumentService sourceDocumentService = org.mockito.Mockito.mock(SourceDocumentService.class);
+        ConnectorSyncStateService service = new ConnectorSyncStateService(mongoTemplate, sourceDocumentService);
+
+        assertNull(service.getState("", Department.ENTERPRISE, "ws", "key"));
+        service.markSeen("", Department.ENTERPRISE, "ws", "key", "name", "fp", 1L);
+        service.recordIngested("", Department.ENTERPRISE, "ws", "key", "name", "fp", "hash", 1L, 1L);
+        assertEquals(0L, service.pruneSourceDocuments("", Department.ENTERPRISE, "ws", "key", "name"));
+        assertEquals(0L, service.pruneSupersededSourceDocuments("", Department.ENTERPRISE, "ws", "key", "run", "name"));
+        assertEquals(0, service.pruneRemovedSources("", Department.ENTERPRISE, "ws", 1L));
+
+        verify(mongoTemplate, never()).upsert(any(Query.class), any(Update.class), eq("connector_sync_state"));
+    }
+
+    @Test
+    void helperMethodsHandleNullAndMalformedValues() {
+        MongoTemplate mongoTemplate = org.mockito.Mockito.mock(MongoTemplate.class);
+        SourceDocumentService sourceDocumentService = org.mockito.Mockito.mock(SourceDocumentService.class);
+        ConnectorSyncStateService service = new ConnectorSyncStateService(mongoTemplate, sourceDocumentService);
+
+        assertFalse(service.matchesFingerprint(null, "fp"));
+        assertFalse(service.matchesFingerprint(new ConnectorSyncStateService.SourceState("k", "n", "fp", "h", 0L), ""));
+        assertFalse(service.matchesContentHash(null, "hash"));
+        assertFalse(service.matchesContentHash(new ConnectorSyncStateService.SourceState("k", "n", "fp", "hash", 0L), ""));
+        assertEquals("", service.sha256(null));
+        assertEquals("", service.sha256(new byte[0]));
+        assertEquals("", service.stableFingerprint((String[]) null));
+        assertEquals("", service.stableFingerprint((Object[]) null));
+        assertEquals("a|_b_", service.stableFingerprint("a", "|b|"));
+        assertEquals("", service.stableFingerprint());
+        assertEquals("", service.stableFingerprint(new Object[0]));
+        assertEquals("unknown", ReflectionTestUtils.invokeMethod(service, "safeSourceName", ""));
+        assertEquals(0L, (long) ReflectionTestUtils.invokeMethod(service, "asLong", "not-a-long"));
+        assertEquals(0L, (long) ReflectionTestUtils.invokeMethod(service, "asLong", (Object) null));
+        assertEquals("", ReflectionTestUtils.invokeMethod(service, "asString", (Object) null));
+    }
+
+    @Test
+    void pruneRemovedSourcesSkipsEntriesWithMissingSourceKey() {
+        MongoTemplate mongoTemplate = org.mockito.Mockito.mock(MongoTemplate.class);
+        SourceDocumentService sourceDocumentService = org.mockito.Mockito.mock(SourceDocumentService.class);
+        ConnectorSyncStateService service = new ConnectorSyncStateService(mongoTemplate, sourceDocumentService);
+
+        List<Document> staleStates = List.of(
+                new Document().append("_id", "state1").append("sourceKey", "").append("sourceName", "missing.txt")
+        );
+        when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("connector_sync_state"))).thenReturn(staleStates);
+
+        int pruned = service.pruneRemovedSources("S3", Department.ENTERPRISE, "ws", 9999L);
+
+        assertEquals(0, pruned);
+        verify(mongoTemplate, never()).remove(any(Query.class), eq("connector_sync_state"));
     }
 }
