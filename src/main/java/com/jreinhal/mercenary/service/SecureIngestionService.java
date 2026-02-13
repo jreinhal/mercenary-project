@@ -282,7 +282,7 @@ public class SecureIngestionService {
                     mergedMeta.putAll(doc.getMetadata());
                 }
                 if (additionalMetadata != null && !additionalMetadata.isEmpty()) {
-                    mergedMeta.putAll(additionalMetadata);
+                    additionalMetadata.forEach(mergedMeta::putIfAbsent);
                 }
                 mergedMeta.put("source", filename);
                 mergedMeta.put("dept", dept.name());

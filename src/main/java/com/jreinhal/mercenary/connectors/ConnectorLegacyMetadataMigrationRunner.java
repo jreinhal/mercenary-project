@@ -48,6 +48,13 @@ public class ConnectorLegacyMetadataMigrationRunner implements CommandLineRunner
             );
             return;
         }
+        if (result.ambiguousSources() > 0) {
+            log.warn(
+                    "Connector legacy metadata migration encountered ambiguous source mappings; " +
+                            "skipping completion marker. Resolve ambiguities and rerun migration."
+            );
+            return;
+        }
 
         this.migrationService.markCompleted(result);
         log.info("Connector legacy metadata migration completed and marked: {}", result);

@@ -200,7 +200,9 @@ public class ConfluenceConnector implements Connector {
                     : "Confluence sync complete";
             return new ConnectorSyncResult(getName(), true, loaded, skipped + removed, message);
         } catch (Exception e) {
-            log.warn("Confluence connector failed: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Confluence connector failed: {}", e.getMessage());
+            }
             return new ConnectorSyncResult(getName(), false, loaded, skipped, "Confluence sync failed: " + e.getMessage());
         }
     }
@@ -226,12 +228,14 @@ public class ConfluenceConnector implements Connector {
     }
 
     private String sanitizeTitle(String title) {
-        if (title == null || title.isBlank()) return "page";
+        if (title == null || title.isBlank()) {
+            return "page";
+        }
         return title.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]+", "_");
     }
 
     private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint, String runId) {
-        HashMap<String, Object> metadata = new HashMap<>();
+        java.util.Map<String, Object> metadata = new HashMap<>();
         metadata.put("connectorName", getName());
         metadata.put("connectorSourceKey", sourceKey);
         if (fingerprint != null && !fingerprint.isBlank()) {

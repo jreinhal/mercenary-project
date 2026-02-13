@@ -214,7 +214,9 @@ public class SharePointConnector implements Connector {
                     : "SharePoint sync complete";
             return new ConnectorSyncResult(getName(), true, loaded, skipped + removed, message);
         } catch (Exception e) {
-            log.warn("SharePoint connector failed: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("SharePoint connector failed: {}", e.getMessage());
+            }
             return new ConnectorSyncResult(getName(), false, loaded, skipped, "SharePoint sync failed: " + e.getMessage());
         }
     }
@@ -269,7 +271,7 @@ public class SharePointConnector implements Connector {
     }
 
     private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint, String runId) {
-        HashMap<String, Object> metadata = new HashMap<>();
+        java.util.Map<String, Object> metadata = new HashMap<>();
         metadata.put("connectorName", getName());
         metadata.put("connectorSourceKey", sourceKey);
         if (fingerprint != null && !fingerprint.isBlank()) {

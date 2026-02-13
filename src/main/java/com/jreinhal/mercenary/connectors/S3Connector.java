@@ -321,7 +321,7 @@ public class S3Connector implements Connector {
     }
 
     private java.util.Map<String, Object> buildConnectorMetadata(String sourceKey, String fingerprint, String runId) {
-        HashMap<String, Object> metadata = new HashMap<>();
+        java.util.Map<String, Object> metadata = new HashMap<>();
         metadata.put("connectorName", getName());
         metadata.put("connectorSourceKey", sourceKey);
         if (fingerprint != null && !fingerprint.isBlank()) {

@@ -85,4 +85,24 @@ class ConnectorLegacyMetadataMigrationRunnerTest {
         verify(migrationService).migrateLegacyMetadata(false);
         verify(migrationService).markCompleted(result);
     }
+
+    @Test
+    void applyModeWithAmbiguousSourcesDoesNotMarkCompleted() {
+        ConnectorLegacyMetadataMigrationService migrationService =
+                org.mockito.Mockito.mock(ConnectorLegacyMetadataMigrationService.class);
+        when(migrationService.isCompleted()).thenReturn(false);
+        ConnectorLegacyMetadataMigrationService.MigrationResult result =
+                new ConnectorLegacyMetadataMigrationService.MigrationResult(2, 1, 1, 10L, 1, 10L, false);
+        when(migrationService.migrateLegacyMetadata(false)).thenReturn(result);
+
+        ConnectorLegacyMetadataMigrationRunner runner = new ConnectorLegacyMetadataMigrationRunner(migrationService);
+        ReflectionTestUtils.setField(runner, "enabled", true);
+        ReflectionTestUtils.setField(runner, "dryRun", false);
+        ReflectionTestUtils.setField(runner, "force", false);
+
+        runner.run();
+
+        verify(migrationService).migrateLegacyMetadata(false);
+        verify(migrationService, never()).markCompleted(result);
+    }
 }
