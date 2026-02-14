@@ -2813,18 +2813,18 @@
         }
 
         .confidence-high {
-            background: rgba(5, 150, 105, 0.15);
-            color: #059669;
+            background: var(--success-muted);
+            color: var(--success);
         }
 
         .confidence-medium {
             background: rgba(37, 99, 235, 0.12);
-            color: #2563eb;
+            color: var(--accent-primary);
         }
 
         .confidence-low {
-            background: rgba(217, 119, 6, 0.12);
-            color: #d97706;
+            background: var(--warning-muted);
+            color: var(--warning);
         }
 
         @keyframes fadeIn {
