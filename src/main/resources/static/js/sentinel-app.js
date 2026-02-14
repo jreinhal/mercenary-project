@@ -4651,7 +4651,7 @@
             infoSections.forEach(section => setHidden(section, isNoInfo));
         }
 
-        function updateRightPanel(responseText, sources, confidence, metrics) {
+        function updateRightPanel(responseText, sources, metrics) {
             const noInfoPatterns = [
                 /couldn'?t find any information/i,
                 /no information (?:available |found )?(?:on|about|regarding)/i,
@@ -4693,9 +4693,7 @@
             setRightPanelNoInfo(false);
 
             let score = null;
-            if (metrics?.evidenceMatch != null) {
-                score = parseFloat(metrics.evidenceMatch).toFixed(2);
-            } else if (metrics?.routingConfidence != null) {
+            if (metrics?.routingConfidence != null) {
                 score = parseFloat(metrics.routingConfidence).toFixed(2);
             }
 
@@ -7446,11 +7444,6 @@
             div.id = msgId;
 
             const processedText = processCitations(text);
-            const bracketCitations = (text.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || []);
-            const backtickCitations = (text.match(/`([^`]+\.(pdf|txt|md))`/gi) || []);
-            const citationCount = bracketCitations.length + backtickCitations.length;
-            const confidence = metrics?.routingConfidence != null ? Math.round(metrics.routingConfidence * 100) : null;
-            const confClass = confidence != null ? (confidence >= 85 ? 'high' : confidence >= 70 ? 'medium' : 'low') : 'unavailable';
 
             const totalDuration = reasoningSteps.reduce((sum, step) => sum + (step.durationMs || 0), 0);
             const hasRealTiming = reasoningSteps.some(s => s.durationMs !== undefined);
@@ -7531,7 +7524,7 @@
                 metrics: metrics || {}
             });
 
-            updateRightPanel(text, sources, confidence, metrics);
+            updateRightPanel(text, sources, metrics);
         }
 
         function normalizeFilename(filename) {
