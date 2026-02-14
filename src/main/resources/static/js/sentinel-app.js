@@ -4436,8 +4436,8 @@
                     const targetNode = typeof link.target === 'object' ? link.target :
                         graphData.nodes.find(n => n.id === link.target);
                     const maxVal = Math.max(sourceNode?.val || 1, targetNode?.val || 1);
-                    // More space for important nodes — creates natural hierarchy
-                    // Increased base distance to prevent label stacking
+                    // Increased base distance from 140→180 and multiplier from 20→25
+                    // to prevent label stacking on dense entity graphs
                     return 180 + (maxVal * 25);
                 })
                 .strength(0.25);

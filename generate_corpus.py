@@ -1010,7 +1010,7 @@ def write_log(path: Path, content: str) -> None:
     now = datetime.now(timezone.utc)
     with path.open("w", encoding="utf-8") as f:
         for i, line in enumerate(lines):
-            ts = (now + timedelta(seconds=i)).replace(microsecond=0).isoformat() + "Z"
+            ts = (now + timedelta(seconds=i)).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
             level = random.choice(["INFO", "INFO", "INFO", "WARN", "DEBUG"])
             f.write(f"{ts} {level} {line}\n")
 
@@ -1210,7 +1210,9 @@ def main():
         print("--golden-only specified, skipping randomized corpus generation.")
         return
 
-    per_sector = args.count // len(SECTOR_TEMPLATES)
+    num_sectors = len(SECTOR_TEMPLATES)
+    per_sector = args.count // num_sectors
+    remainder = args.count % num_sectors
 
     print(f"Generating {args.count} randomized documents ({per_sector} per sector) to {base}")
     print(f"PDF support: {'YES' if HAS_PDF else 'NO (install fpdf2 for PDF output)'}")
@@ -1222,13 +1224,15 @@ def main():
     total = 0
     format_counts: dict[str, int] = {}
 
-    for sector, templates in SECTOR_TEMPLATES.items():
+    for idx, (sector, templates) in enumerate(SECTOR_TEMPLATES.items()):
         sector_dir = base / SECTOR_DIRS[sector]
         sector_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"  {sector}: generating {per_sector} documents...")
+        # Distribute remainder docs across first N sectors so total is exact
+        sector_count = per_sector + (1 if idx < remainder else 0)
+        print(f"  {sector}: generating {sector_count} documents...")
 
-        for i in range(1, per_sector + 1):
+        for i in range(1, sector_count + 1):
             template_fn = random.choice(templates)
             category, title, content = template_fn()
 

@@ -5,6 +5,9 @@
          * ============================================ */
 
         :root {
+            /* === Layout Constants === */
+            --command-bar-height: 28px;
+
             /* === MODERN LIGHT MODE (Palantir/Enterprise Style) === */
             /* Clean, professional palette with WCAG 2.1 AA compliance */
 
