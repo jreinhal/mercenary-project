@@ -26,7 +26,11 @@ public class WorkspaceFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         User user = SecurityContext.getCurrentUser();
+        // Check header first, fall back to query param for SSE (EventSource cannot send headers)
         String requested = request.getHeader(WORKSPACE_HEADER);
+        if (requested == null || requested.isBlank()) {
+            requested = request.getParameter("workspaceId");
+        }
         String workspaceId = workspacePolicy.resolveWorkspace(user, requested);
         WorkspaceContext.setCurrentWorkspaceId(workspaceId);
         request.setAttribute("workspaceId", workspaceId);

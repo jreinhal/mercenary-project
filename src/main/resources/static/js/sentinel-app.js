@@ -7860,7 +7860,10 @@
             let isGenerating = false;
 
             try {
-                const eventSource = new EventSource(`${API_BASE}/ask/stream?${params.toString()}`);
+                // EventSource cannot send custom headers, so pass workspace ID as query param
+                const streamParams = new URLSearchParams(params);
+                streamParams.set('workspaceId', getWorkspaceId());
+                const eventSource = new EventSource(`${API_BASE}/ask/stream?${streamParams.toString()}`);
 
                 eventSource.addEventListener('connected', (e) => {
                     statusText.textContent = 'Processing...';
@@ -7980,13 +7983,6 @@
                     removeElement(loadingId);
                     executeQueryFallback(query, sector, activeFiles, params);
                 });
-
-                eventSource.onerror = () => {
-                    eventSource.close();
-                    removeElement(loadingId);
-                    // Fall back to regular endpoint
-                    executeQueryFallback(query, sector, activeFiles, params);
-                };
 
             } catch (error) {
                 console.error('SSE error:', error);
