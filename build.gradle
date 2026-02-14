@@ -221,3 +221,10 @@ tasks.register('ciEnterpriseE2eTest', Test) {
     useJUnitPlatform()
     include '**/EnterprisePipelineE2eTest.class'
 }
+
+tasks.register('ciCrossTenantE2eTest', Test) {
+    description = 'Run cross-tenant isolation E2E tests verifying zero data leakage across sectors.'
+    group = 'verification'
+    useJUnitPlatform()
+    include '**/CrossTenantIsolationE2eTest.class'
+}
