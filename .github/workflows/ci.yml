@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  # ── Tier 1: Unit Tests ────────────────────────────────────────────
+  # ── Tier 1: Unit tests with lint ─────────────────────────────────────
   unit-tests:
     runs-on: ubuntu-latest
     steps:
@@ -28,18 +28,19 @@ jobs:
       - name: Unit tests with lint warnings as errors
         run: ./gradlew clean test -Plint -PlintWerror
 
-      - name: Upload unit test artifacts
+      - name: Upload test results and coverage
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-test-artifacts
+          name: unit-test-reports
           path: |
             build/reports/tests
             build/test-results
             build/reports/jacoco
+            build/jacoco
           if-no-files-found: ignore
 
-  # ── Tier 2: Integration & E2E ─────────────────────────────────────
+  # ── Tier 2: Integration & E2E tests ──────────────────────────────────
   integration-e2e:
     needs: unit-tests
     runs-on: ubuntu-latest
@@ -54,28 +55,28 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: CI-lite pipeline E2E
+      - name: Pipeline E2E
         run: ./gradlew ciE2eTest
 
-      - name: CI-lite OIDC enterprise E2E
+      - name: OIDC enterprise E2E
         run: ./gradlew ciOidcE2eTest
 
       - name: Cross-tenant isolation E2E
         run: ./gradlew ciCrossTenantE2eTest
 
-      - name: Upload E2E artifacts
+      - name: Upload E2E results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-artifacts
+          name: e2e-test-reports
           path: |
             build/reports/tests
             build/test-results
             build/e2e-results
           if-no-files-found: ignore
 
-  # ── Tier 3: Enterprise Realism ─────────────────────────────────────
-  enterprise-e2e:
+  # ── Tier 3: Enterprise realism (advanced strategies enabled) ─────────
+  enterprise-realism:
     needs: integration-e2e
     runs-on: ubuntu-latest
     steps:
@@ -89,23 +90,22 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Enterprise pipeline E2E (advanced RAG strategies)
+      - name: Enterprise pipeline E2E
         run: ./gradlew ciEnterpriseE2eTest
 
-      - name: Upload enterprise E2E artifacts
+      - name: Upload enterprise E2E results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: enterprise-e2e-artifacts
+          name: enterprise-test-reports
           path: |
             build/reports/tests
             build/test-results
           if-no-files-found: ignore
 
-  # ── Tier 4: Packaging & Analysis ───────────────────────────────────
-  # Named "build" to satisfy existing branch protection status check.
+  # ── Tier 4: Packaging + SonarCloud (final gate) ─────────────────────
   build:
-    needs: [unit-tests, integration-e2e, enterprise-e2e]
+    needs: enterprise-realism
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -125,9 +125,25 @@ jobs:
       - name: Verify enterprise packaging build
         run: ./gradlew -Pedition=enterprise build -x test
 
+      - name: Download unit test coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-test-reports
+          path: build
+
       - name: SonarCloud analysis
         if: ${{ env.SONAR_TOKEN != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: ./gradlew sonar --info
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            build/libs
+            build/reports
+          if-no-files-found: ignore
