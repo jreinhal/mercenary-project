@@ -1,0 +1,58 @@
+# CI-lite profile for enterprise pipeline E2E (advanced RAG strategies enabled)
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+      - org.springframework.ai.autoconfigure.vectorstore.mongo.MongoDBAtlasVectorStoreAutoConfiguration
+      - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
+      - org.springframework.ai.autoconfigure.azure.openai.AzureOpenAiAutoConfiguration
+      - org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration
+      - org.springframework.ai.autoconfigure.vertexai.palm2.VertexAiPalm2AutoConfiguration
+      - org.springframework.ai.autoconfigure.anthropic.AnthropicAutoConfiguration
+  data:
+    mongodb:
+      repositories:
+        enabled: false
+      uri: mongodb://localhost:27017/mercenary
+  ai:
+    model:
+      chat: none
+      embedding: none
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
+app:
+  auth-mode: DEV
+  guardrails:
+    llm-enabled: false
+
+ALLOW_DEV_AUTH: true
+
+sentinel:
+  adaptiverag:
+    semantic-router-enabled: false
+  # Enterprise strategies enabled
+  hybridrag:
+    enabled: true
+  ragpart:
+    enabled: true
+  miarag:
+    enabled: true
+  hifirag:
+    enabled: true
+  # These require real embeddings/tools — keep disabled
+  megarag:
+    enabled: false
+  agentic:
+    enabled: false
+  hgmem:
+    indexing-enabled: false
+    query-enabled: false
