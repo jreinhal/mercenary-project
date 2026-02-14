@@ -1,0 +1,468 @@
+ENTERPRISE ORGANIZATION STRUCTURE AND LEADERSHIP DIRECTORY
+Classification: INTERNAL
+Document ID: GOLDEN-ORG-001
+Date: 2025-04-01
+Sector: ENTERPRISE
+
+EXECUTIVE LEADERSHIP TEAM
+
+Chief Executive Officer: James Rivera
+- Reports to: Board of Directors (7 members)
+- Direct reports: 8 (C-suite and SVPs)
+- Tenure: 5 years (appointed January 2020)
+- Background: Former COO at Northstar Systems (2015-2019); MBA Wharton, BS Computer Science MIT
+- Focus: Strategic growth, M&A, investor relations
+- Key Achievement: Revenue growth from $680M (2020) to $1.14B (2025) = 68% growth in 5 years
+- Compensation: $1.2M base + $2.4M bonus target + $5M equity (4-year vest)
+- Board Assessment (2024): "Strong strategic vision; concern over dual CEO/CFO role duration"
+- Succession Risk: LOW — 2 internal candidates identified (COO Linda Nakamura, CIO Dr. Robert Chen)
+- Also serving as: Interim CFO (since October 2024, when former CFO Margaret Walsh departed)
+  CFO Search Status: Executive recruiter Russell Reynolds engaged; shortlist of 4 candidates
+  under NDA; target hire by Q3 2025. Board wants external hire with public company experience.
+
+Chief Information Officer: Dr. Robert Chen
+- Reports to: CEO James Rivera
+- Direct reports: 6 (VP Engineering, Director Data Science, CISO, 3 Senior Directors)
+- Tenure: 3 years (appointed March 2022)
+- Background: PhD Computer Science Stanford; former VP Engineering at CloudScale Inc (2018-2022);
+  3 patents in distributed systems; published 12 papers on enterprise architecture
+- Focus: Digital transformation, technology strategy, innovation
+- Key Initiative: $150M Enterprise Transformation Program (Executive Sponsor)
+- Decision Style: Data-driven; requires quantitative justification for all investment decisions
+- Compensation: $850K base + $1.7M bonus target + $3M equity (4-year vest)
+- Board Assessment (2024): "Exceptional technical leader; transformation program well-conceived"
+- Succession Risk: MEDIUM — No clear internal successor at CIO level; Marcus Thompson
+  (VP Eng) is 2-3 years away from CIO readiness; Jennifer Park is technically capable but
+  lacks infrastructure background
+- Flight Risk: LOW — Dr. Chen holds significant unvested equity ($2.1M remaining) and is
+  deeply invested in transformation outcome. Potential risk: If transformation fails to deliver
+  projected $52M savings, board pressure could lead to departure.
+- Key Relationships: Monthly 1:1 with Board member Dr. Amara Okafor (Technology Committee chair);
+  weekly 1:1 with CEO James Rivera; bi-weekly architecture reviews with Marcus Thompson
+
+Chief Operating Officer: Linda Nakamura
+- Reports to: CEO James Rivera
+- Direct reports: 5 (SVP Operations, VP Global Services, VP Customer Success, 2 Directors)
+- Tenure: 4 years (appointed July 2021)
+- Background: Former SVP Operations at GlobalTech Partners (2016-2021); Six Sigma Black Belt;
+  MBA Columbia
+- Focus: Operational excellence, process optimization, global operations
+- Key Achievement: Improved operational efficiency by 22% since appointment (measured by
+  revenue-per-employee: $980K/FTE in 2021 → $1.14M/FTE in 2025)
+- Compensation: $780K base + $1.56M bonus target + $2.5M equity
+- Succession Risk: LOW — Strong internal bench (Patricia Anderson ready for COO in 2-3 years)
+- Key Relationship: Chairs weekly Operations Review with all department heads
+- Quarterly Business Review Owner: Prepares and presents QBR to executive team
+
+General Counsel: Elena Vasquez
+- Reports to: CEO James Rivera
+- Direct reports: 4 (Associate GC Litigation, Associate GC Commercial, IP Counsel, Compliance)
+- Tenure: 6 years (appointed August 2019)
+- Background: JD Harvard Law; former partner at Morrison & Foerster (2008-2019); specialty
+  in technology transactions and IP law
+- Focus: Corporate governance, IP protection, regulatory compliance, M&A legal
+- Key Responsibilities:
+  - Oversees 342 active contracts ($312M total annual value)
+  - Manages 3 active litigation matters ($4.2M-$10.7M exposure)
+  - Serves as interim Data Protection Officer (GDPR) pending DPO hire
+  - Reviews all vendor contracts >$100K (signing authority: up to $500K; above requires CEO)
+- Legal Team: 25 FTEs (12 attorneys, 8 paralegals, 5 administrative)
+- Outside Counsel Budget: $1.8M annually (Morrison & Foerster, Ogletree Deakins, Latham & Watkins)
+- Succession Risk: MEDIUM — Associate GC Angela Torres (Commercial) is 3-4 years from GC readiness;
+  no IP law specialist internally (relies on outside counsel for patent prosecution)
+
+SVP Operations: Patricia Anderson
+- Reports to: COO Linda Nakamura
+- Direct reports: 4 (Director Process Engineering, Director Vendor Ops, Director Global Ops, PMO Lead)
+- Tenure: 8 years (joined 2017 as Director; promoted to SVP in 2021)
+- Background: BS Industrial Engineering Georgia Tech; PMP certified; former Operations Director
+  at Meridian Consulting (2012-2017)
+- Focus: Process automation, vendor management oversight, operational transformation
+- Role in Transformation: Program Director, Enterprise Transformation (reports dotted-line to Dr. Chen)
+- Budget Authority: $22M (process automation workstream) + $18.5M Apex contract oversight
+- Key Achievement: Automated 8 of 15 core processes, delivering $2.225M annual savings
+- Decision Style: Consensus-builder; prefers structured decision frameworks and risk matrices
+- Compensation: $420K base + $210K bonus target + $800K equity
+- Succession Risk: LOW — Director of Process Engineering Mark Sullivan (5 years tenure)
+  is a strong internal candidate for SVP if Anderson is promoted
+- Flight Risk: LOW — Deep institutional knowledge; strong relationship with CEO and COO
+- Key Relationships: Manages Apex relationship (operational); weekly sync with Raj Patel
+  (Apex Lead Architect); monthly vendor governance board chair
+
+VP Engineering: Marcus Thompson
+- Reports to: CIO Dr. Robert Chen
+- Direct reports: 8 (engineering managers across Platform, Cloud, DevOps, QA, SRE, Frontend,
+  Backend, and Infrastructure teams)
+- Tenure: 2 years (appointed August 2023)
+- Background: MS Computer Science UC Berkeley; former Principal Engineer at Netflix (2019-2023);
+  15 years experience in distributed systems and cloud architecture
+- Focus: Cloud migration, platform engineering, DevOps, site reliability
+- Key Initiative: Cloud Migration workstream lead ($42M budget, all phases)
+- Engineering Organization: 180 FTEs
+  - Platform Engineering: 35 engineers (Kubernetes, service mesh, CI/CD)
+  - Cloud Infrastructure: 28 engineers (AWS, networking, security)
+  - DevOps/SRE: 22 engineers (monitoring, incident response, automation)
+  - Quality Assurance: 18 engineers (automated testing, performance testing)
+  - Frontend Engineering: 25 engineers (React, TypeScript, design system)
+  - Backend Engineering: 32 engineers (Java, Kotlin, Python microservices)
+  - Infrastructure: 12 engineers (database, storage, CDN)
+  - Engineering Managers: 8 (one per team)
+- Key Metrics:
+  - Deployment frequency: 49 deployments/week across 8 microservices (3.2x avg per service)
+  - System uptime: 99.7% (target: 99.9%)
+  - MTTR: 18 minutes (down from 4 hours pre-transformation)
+  - Cloud migration: 23 of 47 apps migrated (49%)
+  - Engineering satisfaction: 72% (below company average of 78%)
+- Attrition: 12% annualized (22 departures in 12 months)
+  - Departures by level: 8 Senior Engineers, 7 Mid-Level Engineers, 5 Junior Engineers, 2 Managers
+  - Primary exit reasons (from exit interviews conducted by Sarah Mitchell):
+    1. Compensation below market (35% of departures cited)
+    2. Workload from transformation + BAU demands (30% cited)
+    3. Limited career growth for senior ICs (20% cited)
+    4. Remote work policy too restrictive (15% cited)
+  - Cost of attrition: $4.4M annually (average $200K per departure: $50K recruiting +
+    $30K onboarding + $120K productivity loss during ramp)
+  - Engineering attrition by team:
+    Cloud Infrastructure: 18% (5 of 28 — CRITICAL concern)
+    Backend Engineering: 14% (4-5 of 32)
+    Platform Engineering: 11% (4 of 35)
+    DevOps/SRE: 9% (2 of 22)
+    Frontend, QA, Infrastructure: 5-7% (at or below industry average)
+  - Retention actions (Sarah Mitchell + Marcus Thompson):
+    1. $15K retention bonuses for 45 critical cloud/platform engineers (April 2025)
+    2. Technical Fellow career track introduced (IC equivalent to VP, comp $300K+)
+    3. Flexible work policy expanded: 3 days remote for engineering (from 2 days)
+    4. Skills-based pay adjustment: 12% increase for AWS/Kubernetes certified engineers
+- Hiring Pipeline: 40 open positions for FY2026 (offset attrition + transformation growth)
+  Current pipeline: 180 candidates in process; 28 offers extended; 15 accepted (53% offer acceptance)
+  Target: All 40 positions filled by March 2026
+  Recruiting partners: Hired (external recruiter, $480K retainer), LinkedIn Recruiter ($95K/year)
+- Compensation: $380K base + $190K bonus target + $600K equity
+- Succession Risk: HIGH — No deputy VP; 2 senior engineering managers (Sarah Jennings
+  for Platform, Dmitri Volkov for Cloud) are potential successors but need 2-3 years of
+  leadership development. If Marcus leaves, cloud migration workstream would be severely impacted.
+- Flight Risk: MEDIUM — Marcus has strong market value (Netflix alumni, cloud expertise).
+  Unvested equity ($420K) provides retention, but competitor offers could exceed $500K base.
+  Dr. Chen conducts quarterly retention check-ins.
+
+Director of Data Science: Jennifer Park
+- Reports to: CIO Dr. Robert Chen
+- Direct reports: 3 (data engineering manager, ML ops manager, analytics manager)
+- Tenure: 1.5 years (appointed January 2024)
+- Background: MS Statistics MIT; PhD candidate (ABD) in Machine Learning; former Senior
+  Data Scientist at Palantir (2020-2023); 2 published papers on federated learning
+- Focus: Data platform, ML/AI, vendor strategy
+- Key Initiative: Data & Analytics workstream lead ($28M budget)
+- Additional Role: Director of Vendor Strategy (oversees 142 vendor relationships, $78.5M spend)
+- Data Science Organization: 45 FTEs
+  - Data Engineering: 18 engineers (Spark, Airflow, Databricks, data pipelines)
+  - ML Operations: 12 engineers (MLflow, model deployment, monitoring, GPU infrastructure)
+  - Analytics: 10 analysts (Tableau, SQL, business analytics, executive dashboards)
+  - Data Governance: 5 specialists (data quality, lineage, privacy, classification)
+- Key Achievements:
+  - 3 production ML models deployed (churn predictor, demand forecaster, document classifier)
+  - Self-service analytics platform launched (beta, 50 pilot users)
+  - Data quality score improved from 58% to 73% (target: 95%)
+  - 342 features in feature store (12 feature groups)
+  - Vendor savings of $8.7M YTD through strategic negotiations
+- Dual Role Risk Assessment (conducted by Linda Nakamura, March 2025):
+  "Jennifer is exceptional at both roles but is stretched. The Data Science work is strategic
+  and requires deep technical focus. The Vendor Strategy work is operational and requires
+  relationship management. Recommendation: Hire a Director of Procurement to take vendor
+  operations off Jennifer's plate by Q4 2025, while she retains strategic vendor decisions
+  on technology platforms."
+  Action: Job req for Director of Procurement posted May 2025; 42 applicants received.
+- Compensation: $340K base + $170K bonus target + $500K equity
+- Succession Risk: HIGH — Dual role means no single successor. Data Science: ML Ops Manager
+  Priya Sharma is strong technically but lacks leadership experience. Vendor Strategy:
+  No internal successor; would need external hire.
+- Flight Risk: MEDIUM-HIGH — Jennifer's Palantir network creates frequent recruiter interest.
+  Dual-role burnout is a concern. Dr. Chen approved a $50K spot bonus (May 2025) for
+  successful ML platform launch.
+
+VP Human Resources: Sarah Mitchell
+- Reports to: COO Linda Nakamura
+- Direct reports: 4 (Director Talent Acquisition, Director Compensation & Benefits,
+  Director Learning & Development, HR Business Partner Lead)
+- Tenure: 7 years (appointed June 2018)
+- Background: MA Organizational Psychology Columbia; SHRM-SCP certified; former HR Director
+  at Harborview Financial (2013-2018)
+- Focus: Talent acquisition, workforce development, change management
+- Key Initiative: Workforce Transformation workstream lead ($18M budget)
+- HR Organization: 40 FTEs
+  - Talent Acquisition: 12 recruiters + 3 coordinators
+  - Compensation & Benefits: 5 analysts
+  - Learning & Development: 8 trainers + 2 content developers
+  - HR Business Partners: 6 (1 per major division)
+  - HR Operations: 4 (payroll, compliance, systems)
+- Key Metrics:
+  - Time to hire: 42 days average (industry: 44 days)
+  - Offer acceptance rate: 68% overall; 53% for engineering (below target of 70%)
+  - Employee satisfaction: 78% (target: 80%)
+  - Voluntary attrition: 9.5% overall; 12% engineering (target: <8% and <10% respectively)
+  - Training completion: 1,200 of 3,500 employees (34%) completed at least 1 certification
+  - Change Resistance Index: 23% (down from 41% in January 2025)
+  - Cost per hire: $12,800 average; $28,000 for engineering roles
+  - Internal promotion rate: 22% of open roles filled internally (target: 30%)
+- Compensation: $320K base + $128K bonus target + $400K equity
+- Succession Risk: LOW — Director L&D (Michelle Torres, 4 years tenure) is a strong
+  internal successor. HR Business Partner Lead (Karen Choi, 3 years) also developing.
+- Flight Risk: LOW — Deep institutional knowledge; long tenure; strong relationships across org
+
+CISO: David Kowalski
+- Reports to: CIO Dr. Robert Chen
+- Direct reports: 5 (Director SecOps, Security Architect Lead, Compliance Manager,
+  Incident Response Lead, Identity & Access Manager)
+- Tenure: 2 years (appointed September 2023)
+- Background: MS Cybersecurity Johns Hopkins; CISSP, CISM, CEH certified; former Security
+  Director at Booz Allen Hamilton (2018-2023); 8 years military intelligence (US Army, Captain)
+- Focus: Security operations, compliance, risk management, zero-trust implementation
+- Key Initiative: Security & Governance workstream lead ($25M budget)
+- Security Organization: 35 FTEs
+  - Security Operations: 12 analysts (24/7 coverage via Secureworks augmentation)
+  - Security Architecture: 6 architects (zero-trust design, cloud security)
+  - Compliance: 5 specialists (SOC 2, SOX, PCI-DSS, GDPR, ISO 27001)
+  - Incident Response: 4 engineers (CSIRT team)
+  - Identity & Access Management: 4 engineers (Okta, CrowdStrike Identity)
+  - Threat Intelligence: 4 analysts (CTI feeds, dark web monitoring)
+- Key Metrics:
+  - CSPM Score: 87/100 (target: 95 by Phase 3)
+  - Mean time to detect (MTTD): 2.3 minutes
+  - Mean time to respond (MTTR): 8.7 minutes
+  - Critical vulnerability remediation: 48 hours average (SLA: 72 hours)
+  - Security incidents (P1): 0 in last 6 months
+  - Phishing simulation failure rate: 4.2% (down from 12% in 2023)
+  - Security awareness training completion: 97%
+- Key Relationships:
+  - Monthly threat briefing to executive team
+  - Quarterly Board Technology Committee presentation
+  - Direct line to FBI Cyber Division (via InfraGard membership)
+  - Manages Secureworks (SOC) and CrowdStrike (endpoint) relationships
+- Compensation: $360K base + $180K bonus target + $550K equity
+- Succession Risk: MEDIUM — Security Architect Lead (Alex Park, 1.5 years) shows promise
+  but needs 3-4 years development. No internal CISO-ready candidate.
+- Flight Risk: LOW — Military background creates strong organizational loyalty; competitive
+  compensation for government-adjacent role; significant unvested equity ($380K remaining)
+
+DEPARTMENT STRUCTURE AND FTE ALLOCATION
+
+Technology Division (CIO: Dr. Robert Chen) — 345 FTEs
+  Engineering (VP: Marcus Thompson): 180 FTEs
+    - Platform Engineering: 35
+    - Cloud Infrastructure: 28
+    - DevOps/SRE: 22
+    - Quality Assurance: 18
+    - Frontend Engineering: 25
+    - Backend Engineering: 32
+    - Infrastructure: 12
+    - Engineering Managers: 8
+  Data Science (Director: Jennifer Park): 45 FTEs
+    - Data Engineering: 18
+    - ML Operations: 12
+    - Analytics: 10
+    - Data Governance: 5
+  IT Operations (Director: TBD, interim Marcus Thompson): 85 FTEs
+    - Help Desk: 25
+    - System Administration: 20
+    - Network Operations: 15
+    - Database Administration: 10
+    - Application Support: 15
+  Security (CISO: David Kowalski): 35 FTEs
+    - Security Operations: 12
+    - Security Architecture: 6
+    - Compliance: 5
+    - Incident Response: 4
+    - Identity & Access Management: 4
+    - Threat Intelligence: 4
+
+Operations Division (COO: Linda Nakamura) — 455 FTEs
+  Business Operations (SVP: Patricia Anderson): 120 FTEs
+    - Process Engineering: 25
+    - Vendor Operations: 15
+    - Global Operations: 40
+    - PMO: 10
+    - Transformation Program Office: 30 (dedicated to $150M program)
+  Global Services: 250 FTEs
+    - Professional Services Delivery: 150
+    - Consulting: 50
+    - Implementation Services: 50
+  Customer Success: 85 FTEs
+    - Customer Support: 40
+    - Customer Success Managers: 25
+    - Technical Account Managers: 20
+
+Corporate Functions — 200 FTEs
+  Finance (Interim CFO: James Rivera): 60 FTEs
+    - Accounting: 20
+    - Financial Planning & Analysis (FP&A): 12
+    - Treasury: 5
+    - Tax: 5
+    - Internal Audit: 8
+    - Procurement: 10
+  Legal (GC: Elena Vasquez): 25 FTEs
+    - Attorneys: 12
+    - Paralegals: 8
+    - Administrative: 5
+  Human Resources (VP: Sarah Mitchell): 40 FTEs
+    - Talent Acquisition: 15
+    - Compensation & Benefits: 5
+    - Learning & Development: 10
+    - HR Business Partners: 6
+    - HR Operations: 4
+  Marketing (VP: Rachel Gutierrez): 75 FTEs
+    - Product Marketing: 20
+    - Demand Generation: 18
+    - Content & Brand: 15
+    - Events: 8
+    - Marketing Operations: 14
+
+TOTAL HEADCOUNT: 1,000 FTEs
+
+TRANSFORMATION PROGRAM FTE ALLOCATION (of 1,000 total)
+
+| Workstream              | Full-Time Dedicated | Part-Time (50%+) | Apex Consultants | Total Effective |
+|-------------------------|--------------------|--------------------|------------------|-----------------|
+| Cloud Migration         | 28 engineers       | 12 engineers       | 15 consultants   | 49 FTEs         |
+| Data & Analytics        | 18 data eng        | 10 ML/analytics    | 8 consultants    | 31 FTEs         |
+| Process Automation      | 10 process eng     | 8 operations       | 12 consultants   | 24 FTEs         |
+| Workforce Transformation| 8 L&D              | 6 HR BPs           | 2 consultants    | 13 FTEs         |
+| Security & Governance   | 6 security         | 4 compliance       | 5 consultants    | 12.5 FTEs       |
+| Program Management      | 8 PMO              | 4 admin            | 3 consultants    | 13.5 FTEs       |
+| TOTAL                   | 78 internal        | 44 internal (50%)  | 45 Apex          | 143 FTEs        |
+
+Impact on BAU (Business as Usual):
+- 78 FTEs fully dedicated to transformation (7.8% of headcount)
+- 44 FTEs split between transformation and BAU
+- Remaining 878 FTEs on BAU operations
+- Risk: BAU engineering capacity reduced by ~25% in Cloud Infrastructure team
+  (10 of 28 engineers fully dedicated to migration; 8 split between migration and BAU)
+- Mitigation: 10 contract engineers hired through staffing agency ($1.8M, 12-month terms)
+  to backfill BAU infrastructure work
+- Marcus Thompson's assessment: "We're managing, but any additional attrition in Cloud Infra
+  would force a hard choice between slowing migration or accepting BAU risk."
+
+HEADCOUNT HISTORY AND PROJECTIONS
+
+| Year | Total FTEs | Engineering | Revenue    | Revenue/FTE | YoY Growth |
+|------|-----------|-------------|-----------|-------------|------------|
+| 2020 | 720       | 110         | $680M     | $944K       | —          |
+| 2021 | 780       | 125         | $780M     | $1,000K     | +14.7%     |
+| 2022 | 840       | 145         | $880M     | $1,048K     | +12.8%     |
+| 2023 | 900       | 160         | $1.01B    | $1,122K     | +14.8%     |
+| 2024 | 960       | 170         | $1.01B    | $1,052K     | +0%*       |
+| 2025 | 1,000     | 180         | $1.14B    | $1,140K     | +12.9%     |
+| 2026P| 1,120     | 220         | $1.30B    | $1,161K     | +14.0%     |
+
+*FY2024 revenue flat due to one-time customer contract restructuring; adjusted organic growth was +8%
+
+ATTRITION ANALYSIS (DETAILED)
+
+Overall Voluntary Attrition by Department (12-Month Trailing, as of April 2025):
+| Department           | Headcount | Departures | Attrition Rate | Trend vs. Prior Year |
+|----------------------|-----------|-----------|----------------|---------------------|
+| Cloud Infrastructure | 28        | 5         | 17.9%          | UP from 10%         |
+| Backend Engineering  | 32        | 4         | 12.5%          | UP from 8%          |
+| Platform Engineering | 35        | 4         | 11.4%          | UP from 7%          |
+| DevOps/SRE          | 22        | 2         | 9.1%           | FLAT                |
+| Data Engineering     | 18        | 2         | 11.1%          | UP from 6%          |
+| ML Operations        | 12        | 1         | 8.3%           | FLAT                |
+| Frontend Engineering | 25        | 2         | 8.0%           | FLAT                |
+| QA                   | 18        | 1         | 5.6%           | FLAT                |
+| All Engineering      | 180       | 22        | 12.2%          | UP from 8%          |
+| Operations           | 455       | 27        | 5.9%           | DOWN from 7%        |
+| Corporate Functions  | 200       | 12        | 6.0%           | FLAT                |
+| Data Science         | 45        | 3         | 6.7%           | FLAT                |
+| Security             | 35        | 1         | 2.9%           | DOWN from 5%        |
+| TOTAL ORGANIZATION   | 1,000     | 65        | 6.5% overall   | UP from 5.8%        |
+
+Departure Destinations (Engineering, last 12 months):
+| Destination Company  | Departures | Average Comp Increase |
+|----------------------|------------|----------------------|
+| Amazon (AWS)         | 4          | +35%                 |
+| Google               | 3          | +40%                 |
+| Netflix              | 2          | +45%                 |
+| Stripe               | 2          | +30%                 |
+| Startups             | 5          | +20% (with equity)   |
+| Competitors          | 3          | +25%                 |
+| Other                | 3          | +15%                 |
+
+Key Insight (Sarah Mitchell, March 2025): "Engineering attrition is concentrated in
+cloud-specialized roles. The transformation program is actually creating market-ready
+talent that competitors are poaching. Our retention strategy must focus on the 45
+engineers with AWS/Kubernetes certifications — they are our highest flight risk."
+
+GOVERNANCE COMMITTEES
+
+1. Executive Committee
+   - Frequency: Weekly (Monday 9:00 AM)
+   - Chair: CEO James Rivera
+   - Members: Dr. Robert Chen, Linda Nakamura, Elena Vasquez, James Rivera (as interim CFO)
+   - Purpose: Strategic decisions, major issues, Board prep
+   - Recent Key Decision: Approved $1.14B FY2025 budget (January 2025)
+
+2. Transformation Steering Committee
+   - Frequency: Monthly (second Thursday, 2:00 PM)
+   - Chair: Dr. Robert Chen (CIO)
+   - Members: Patricia Anderson, Marcus Thompson, Jennifer Park, Sarah Mitchell,
+     David Kowalski, James Rivera, Linda Nakamura, Elena Vasquez
+   - Purpose: Transformation program oversight, budget, risk, decisions
+   - Recent Key Decision: Approved $2.3M ERP emergency recovery budget (March 2025)
+   - Decision Velocity: Average 3.2 decisions per meeting; 89% decisions made within meeting
+     (11% deferred to email vote or special session)
+   - Concern: 8-person committee may be too large for rapid decision-making on technical issues.
+     Dr. Chen considering a 4-person Technical Sub-Committee (Marcus, Jennifer, David, Patricia)
+     for decisions requiring deep technical evaluation.
+
+3. Risk & Compliance Committee
+   - Frequency: Quarterly (first Monday of quarter)
+   - Chair: Elena Vasquez (General Counsel)
+   - Members: David Kowalski, James Rivera (as CFO), Internal Audit Director
+   - Purpose: Risk register review, compliance status, audit findings
+   - Recent Key Decision: Approved ISO 27001 certification timeline (Q1 2025)
+
+4. Technology Review Board
+   - Frequency: Bi-weekly (alternate Wednesdays, 10:00 AM)
+   - Chair: Marcus Thompson (VP Engineering)
+   - Members: Senior engineering managers, architecture leads, QA lead
+   - Purpose: Architecture decisions, technology standards, deployment approvals
+   - Recent Key Decision: Approved Kubernetes over ECS for container orchestration (January 2025)
+
+5. Vendor Governance Board
+   - Frequency: Monthly (third Tuesday, 3:00 PM)
+   - Chair: Patricia Anderson (SVP Operations)
+   - Members: Jennifer Park, procurement leads, department representatives
+   - Purpose: Vendor performance review, contract approvals, consolidation planning
+   - Recent Key Decision: Approved secondary integration partner RFI process (April 2025)
+
+OFFICE LOCATIONS AND WORKFORCE DISTRIBUTION
+
+| Location              | FTEs | Primary Functions                    | Remote Policy      |
+|-----------------------|------|--------------------------------------|-------------------|
+| Headquarters (NYC)    | 580  | All C-suite, engineering, corporate  | Hybrid (3 office/2 remote) |
+| Austin, TX            | 180  | Engineering, customer success        | Hybrid (2 office/3 remote) |
+| San Francisco, CA     | 120  | Data science, ML operations          | Hybrid (2 office/3 remote) |
+| London, UK            | 65   | EMEA sales, professional services    | Hybrid (3 office/2 remote) |
+| Singapore             | 35   | APAC sales, support                  | Hybrid (3 office/2 remote) |
+| Remote (US)           | 20   | Various (approved exceptions)        | Fully remote       |
+
+Note: Remote work policy was expanded in April 2025 (Marcus Thompson request for engineering
+retention). Engineering teams moved from 2 remote days to 3 remote days. Early results:
+Engineering satisfaction increased from 68% to 72% in May pulse survey.
+
+ORGANIZATIONAL HEALTH METRICS
+
+| Metric                          | Current | Target | Trend    | Owner              |
+|---------------------------------|---------|--------|----------|--------------------|
+| Employee Net Promoter Score     | 32      | 45     | UP (+8)  | Sarah Mitchell     |
+| Manager Effectiveness Score     | 3.8/5.0 | 4.2    | FLAT     | Sarah Mitchell     |
+| Diversity (leadership)          | 38% URM | 40%    | UP (+3%) | Sarah Mitchell     |
+| Gender balance (engineering)    | 28% F   | 35%    | UP (+2%) | Marcus Thompson    |
+| Span of control (avg)           | 7.2     | 6-8    | OK       | Linda Nakamura     |
+| Internal mobility rate          | 22%     | 30%    | FLAT     | Sarah Mitchell     |
+| Time in role (median)           | 2.8 yr  | 2-3 yr | OK       | HR                 |
+
+Document prepared by: HR Business Partner Lead Karen Choi
+Reviewed by: Sarah Mitchell, VP Human Resources
+Approved by: Linda Nakamura, COO
+Last updated: April 1, 2025
+Next update: July 1, 2025

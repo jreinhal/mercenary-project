@@ -4769,9 +4769,9 @@
         .sidebar {
             position: fixed;
             right: -320px;
-            top: 0;
+            top: var(--command-bar-height, 28px);
             width: 320px;
-            height: 100vh;
+            height: calc(100vh - var(--command-bar-height, 28px));
             background: var(--bg-secondary);
             border-left: 1px solid var(--border-subtle);
             transition: right 0.3s ease;

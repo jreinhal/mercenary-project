@@ -4193,7 +4193,7 @@
                     const labelWidth = labelMetrics.width + 6;  // Tighter padding
                     const labelHeight = fontSize + 4;  // Tighter vertical
                     const labelX = node.x;
-                    const labelY = node.y + nodeSize/2 + 3;  // Closer to node
+                    const labelY = node.y + nodeSize/2 + 5;  // Below node with breathing room
 
                     // Semantic zoom: only show labels at reasonable zoom levels
                     if (showLabel) {
@@ -4213,9 +4213,9 @@
                         ctx.restore();
                     }
 
-                    // Store dimensions for collision detection - tighter for compact layout
-                    node.__bWidth = Math.max(nodeSize, showLabel ? labelWidth : nodeSize);
-                    node.__bHeight = nodeSize + (showLabel ? labelHeight + 4 : 0);
+                    // Store dimensions for collision detection - include full label area
+                    node.__bWidth = Math.max(nodeSize, showLabel ? labelWidth + 8 : nodeSize);
+                    node.__bHeight = nodeSize + (showLabel ? labelHeight + 8 : 0);
                 })
                 .nodeCanvasObjectMode(() => 'replace')
                 // Links: visible by default with source-tinted color, prominent on highlight
@@ -4419,16 +4419,16 @@
             // Force configuration: clean spacing, importance-based hierarchy
             const nodeCount = graphData.nodes.length;
 
-            // Charge: adaptive repulsion — stronger with fewer nodes for breathing room
+            // Charge: adaptive repulsion — stronger to prevent label stacking
             const chargeStrength = nodeCount <= 15
-                ? Math.max(-2500, -800 - (nodeCount * 50))
-                : Math.max(-3500, -600 - (nodeCount * 30));
+                ? Math.max(-3500, -1200 - (nodeCount * 80))
+                : Math.max(-5000, -900 - (nodeCount * 40));
             entity2DGraph.d3Force('charge')
                 .strength(chargeStrength)
-                .distanceMax(500)
-                .distanceMin(20);
+                .distanceMax(600)
+                .distanceMin(30);
 
-            // Links: hub nodes get longer spokes for radial clarity
+            // Links: hub nodes get longer spokes for radial clarity and label readability
             entity2DGraph.d3Force('link')
                 .distance(link => {
                     const sourceNode = typeof link.source === 'object' ? link.source :
@@ -4437,7 +4437,8 @@
                         graphData.nodes.find(n => n.id === link.target);
                     const maxVal = Math.max(sourceNode?.val || 1, targetNode?.val || 1);
                     // More space for important nodes — creates natural hierarchy
-                    return 140 + (maxVal * 20);
+                    // Increased base distance to prevent label stacking
+                    return 180 + (maxVal * 25);
                 })
                 .strength(0.25);
 
@@ -4446,15 +4447,19 @@
             entity2DGraph.d3Force('x', d3.forceX(width / 2).strength(0.02));
             entity2DGraph.d3Force('y', d3.forceY(height / 2).strength(0.02));
 
-            // Collision: prevent label overlap
+            // Collision: prevent label overlap — use label-aware elliptical radius
+            // Labels are wider than tall, so we need the collision radius to account
+            // for the full label width to prevent horizontal text stacking
             entity2DGraph.d3Force('collide', d3.forceCollide()
                 .radius(node => {
                     const w = node.__bWidth || 30;
                     const h = node.__bHeight || 20;
-                    return Math.max(w, h) / 2 + 10;
+                    // Use the larger of width/2 or height/2, plus generous buffer
+                    // This prevents labels from overlapping when nodes are at similar Y positions
+                    return Math.max(w, h) / 2 + 18;
                 })
-                .strength(0.85)
-                .iterations(3)
+                .strength(1.0)
+                .iterations(5)
             );
 
             // Zoom to fit after layout converges — smooth entrance
