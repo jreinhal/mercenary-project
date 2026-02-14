@@ -7945,16 +7945,17 @@
                         // Remove streaming UI
                         removeElement(loadingId);
 
-                        // Show final response with sources and real metrics
+                        // SSE complete payload contains answer, sources, citationCount
+                        // (traceId and metrics are not included in the streaming endpoint)
                         const sources = (result.sources || []).map(s =>
                             typeof s === 'string' ? { filename: s } : s
                         ).filter(s => s.filename || s.source || s.name);
-                        const responseMetrics = { ...(result.metrics || {}), activeFileCount: activeFiles.length, streamed: true };
+                        const responseMetrics = { activeFileCount: activeFiles.length, streamed: true };
                         appendAssistantResponse(
                             result.answer,
                             reasoningSteps,
                             sources,
-                            result.traceId || null,
+                            null,
                             responseMetrics
                         );
                         fetchSystemStatus();
@@ -8004,7 +8005,12 @@
                     durationMs: step.durationMs
                 }));
                 const sources = (data.sources || []).map(s => typeof s === 'string' ? { filename: s } : s);
-                appendAssistantResponse(data.answer, reasoningSteps, sources, data.traceId, data.metrics);
+                const responseMetrics = { ...(data.metrics || {}), activeFileCount: activeFiles.length };
+                appendAssistantResponse(data.answer, reasoningSteps, sources, data.traceId, responseMetrics);
+                fetchSystemStatus();
+                if (state.deepAnalysisEnabled) {
+                    refreshEntityGraph();
+                }
             } catch (err) {
                 removeElement(loadingId);
                 appendAssistantResponse('Error: ' + err.message, [], [], null, null);
