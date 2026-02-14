@@ -122,29 +122,34 @@ class CrossTenantIsolationE2eTest {
     }
 
     private void seedDocuments(InMemoryVectorStore store) {
-        // ENTERPRISE sector documents
+        // ENTERPRISE sector documents — split across workspaces
         store.add(List.of(
-                doc("Enterprise Q3 revenue was $42M.", "ENTERPRISE", "enterprise_finance.txt"),
-                doc("Enterprise security audit passed in December.", "ENTERPRISE", "enterprise_audit.txt")
+                doc("Enterprise Q3 revenue was $42M.", "ENTERPRISE", "enterprise_finance.txt", WS_ALPHA),
+                doc("Enterprise security audit passed in December.", "ENTERPRISE", "enterprise_audit.txt", WS_BETA)
         ));
 
         // GOVERNMENT sector documents
         store.add(List.of(
-                doc("Government classified satellite budget is $890M.", "GOVERNMENT", "gov_budget.txt"),
-                doc("Government facility clearance requires SECRET minimum.", "GOVERNMENT", "gov_clearance.txt")
+                doc("Government classified satellite budget is $890M.", "GOVERNMENT", "gov_budget.txt", WS_ALPHA),
+                doc("Government facility clearance requires SECRET minimum.", "GOVERNMENT", "gov_clearance.txt", WS_ALPHA)
         ));
 
         // MEDICAL sector documents
         store.add(List.of(
-                doc("Medical patient readmission rate is 12.5%.", "MEDICAL", "med_stats.txt"),
-                doc("Medical HIPAA compliance audit passed March 2025.", "MEDICAL", "med_hipaa.txt")
+                doc("Medical patient readmission rate is 12.5%.", "MEDICAL", "med_stats.txt", WS_BETA),
+                doc("Medical HIPAA compliance audit passed March 2025.", "MEDICAL", "med_hipaa.txt", WS_BETA)
         ));
     }
 
     private Document doc(String content, String dept, String source) {
+        return doc(content, dept, source, "workspace_default");
+    }
+
+    private Document doc(String content, String dept, String source, String workspaceId) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("dept", dept);
         metadata.put("source", source);
+        metadata.put("workspaceId", workspaceId);
         return new Document(content, metadata);
     }
 
