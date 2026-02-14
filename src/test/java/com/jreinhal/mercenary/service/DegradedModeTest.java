@@ -90,7 +90,7 @@ class DegradedModeTest {
 
     @BeforeEach
     void setup() {
-        Workspace defaultWorkspace = new Workspace("workspace_default", "Default Workspace", "Default",
+        Workspace defaultWorkspace = new Workspace("workspace_default", "Default Workspace", "Default workspace",
                 "system", java.time.Instant.now(), java.time.Instant.now(), WorkspaceQuota.unlimited(), true);
         when(mongoTemplate.getCollection(anyString()).countDocuments()).thenReturn(0L);
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
@@ -148,11 +148,11 @@ class DegradedModeTest {
         @Test
         @DisplayName("Query succeeds without HIPAA audit service (null in non-medical edition)")
         void querySucceedsWithoutHipaaAudit() throws Exception {
-            // Even with a MEDICAL dept parameter, the pipeline should not NPE
-            // when hipaaAuditService is null — it simply skips audit logging
+            // Use MEDICAL dept to exercise the hipaaStrict branch where
+            // hipaaAuditService.logPhiQuery() would be called if non-null
             mockMvc.perform(get("/api/ask/enhanced")
                             .param("q", "What is the modernization budget?")
-                            .param("dept", "ENTERPRISE"))
+                            .param("dept", "MEDICAL"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.answer").isNotEmpty());
         }
@@ -194,13 +194,14 @@ class DegradedModeTest {
     class SessionErrorContainment {
 
         @Test
-        @DisplayName("Query still returns answer even with invalid session ID format")
-        void querySucceedsWithInvalidSessionId() throws Exception {
-            // Even if session operations fail internally, the query should proceed
+        @DisplayName("Query still returns answer even with session error path exercised")
+        void querySucceedsWithSessionErrorPath() throws Exception {
+            // Non-blank sessionId enters session handling; with null memory/persistence
+            // services, the session code path logs "unavailable" and continues
             mockMvc.perform(get("/api/ask/enhanced")
                             .param("q", "What is the modernization budget?")
                             .param("dept", "ENTERPRISE")
-                            .param("sessionId", ""))
+                            .param("sessionId", "test-error-session-789"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.answer").isNotEmpty());
         }

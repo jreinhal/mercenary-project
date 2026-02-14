@@ -93,7 +93,7 @@ class LlmResilienceTest {
 
     @BeforeEach
     void setup() {
-        Workspace defaultWorkspace = new Workspace("workspace_default", "Default Workspace", "Default",
+        Workspace defaultWorkspace = new Workspace("workspace_default", "Default Workspace", "Default workspace",
                 "system", java.time.Instant.now(), java.time.Instant.now(), WorkspaceQuota.unlimited(), true);
         when(mongoTemplate.getCollection(anyString()).countDocuments()).thenReturn(0L);
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
@@ -276,8 +276,8 @@ class LlmResilienceTest {
                     throw new RuntimeException("LLM connection refused — model unavailable");
                 case TIMEOUT:
                     try {
-                        // Block well past the 2s test timeout (set via properties)
-                        Thread.sleep(30_000);
+                        // Block slightly past the 2s test timeout (set via properties)
+                        Thread.sleep(4_000);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }

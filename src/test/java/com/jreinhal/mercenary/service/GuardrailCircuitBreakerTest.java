@@ -71,7 +71,7 @@ class GuardrailCircuitBreakerTest {
         void transitionsToHalfOpenAfterDuration() throws InterruptedException {
             tripCircuit();
             // Wait for openDuration (1s) to expire
-            Thread.sleep(1100);
+            Thread.sleep(1500);
             assertTrue(breaker.allowRequest(), "Should allow request after open duration expires");
             assertEquals(SimpleCircuitBreaker.State.HALF_OPEN, breaker.getState());
         }
@@ -80,7 +80,7 @@ class GuardrailCircuitBreakerTest {
         @DisplayName("HALF_OPEN limits requests to halfOpenMaxCalls")
         void halfOpenLimitsRequests() throws InterruptedException {
             tripCircuit();
-            Thread.sleep(1100);
+            Thread.sleep(1500);
             // First call transitions to HALF_OPEN and is allowed (halfOpenMaxCalls=1)
             assertTrue(breaker.allowRequest());
             // Second call exceeds limit
@@ -91,7 +91,7 @@ class GuardrailCircuitBreakerTest {
         @DisplayName("Success in HALF_OPEN transitions to CLOSED")
         void successInHalfOpenCloses() throws InterruptedException {
             tripCircuit();
-            Thread.sleep(1100);
+            Thread.sleep(1500);
             breaker.allowRequest(); // transition to HALF_OPEN
             breaker.recordSuccess();
             assertEquals(SimpleCircuitBreaker.State.CLOSED, breaker.getState());
@@ -102,7 +102,7 @@ class GuardrailCircuitBreakerTest {
         @DisplayName("Failure in HALF_OPEN transitions back to OPEN")
         void failureInHalfOpenReopens() throws InterruptedException {
             tripCircuit();
-            Thread.sleep(1100);
+            Thread.sleep(1500);
             breaker.allowRequest(); // transition to HALF_OPEN
             assertEquals(SimpleCircuitBreaker.State.HALF_OPEN, breaker.getState());
 
@@ -153,7 +153,7 @@ class GuardrailCircuitBreakerTest {
             AtomicInteger allowedCount = new AtomicInteger(0);
 
             tripCircuit();
-            Thread.sleep(1100); // Let open duration expire
+            Thread.sleep(1500); // Let open duration expire
 
             for (int i = 0; i < threadCount; i++) {
                 new Thread(() -> {
@@ -197,17 +197,57 @@ class GuardrailCircuitBreakerTest {
             ChatClient mockClient = mock(ChatClient.class);
             when(mockBuilder.build()).thenReturn(mockClient);
 
-            guardrailService = new PromptGuardrailService(mockBuilder, new ObjectMapper());
-            ReflectionTestUtils.setField(guardrailService, "enabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmSchemaEnabled", false);
-            ReflectionTestUtils.setField(guardrailService, "strictMode", false);
-            ReflectionTestUtils.setField(guardrailService, "llmTimeoutMs", 100L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerFailureThreshold", 3);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerOpenSeconds", 30L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerHalfOpenCalls", 1);
-            guardrailService.init();
+            guardrailService = buildGuardrailService(mockBuilder, 100L, 30L);
+        }
+
+        /** Builds a PromptGuardrailService with circuit breaker enabled and configurable timeouts. */
+        private PromptGuardrailService buildGuardrailService(ChatClient.Builder builder,
+                                                             long llmTimeoutMs,
+                                                             long cbOpenSeconds) {
+            PromptGuardrailService svc = new PromptGuardrailService(builder, new ObjectMapper());
+            ReflectionTestUtils.setField(svc, "enabled", true);
+            ReflectionTestUtils.setField(svc, "llmEnabled", true);
+            ReflectionTestUtils.setField(svc, "llmSchemaEnabled", false);
+            ReflectionTestUtils.setField(svc, "strictMode", false);
+            ReflectionTestUtils.setField(svc, "llmTimeoutMs", llmTimeoutMs);
+            ReflectionTestUtils.setField(svc, "llmCircuitBreakerEnabled", true);
+            ReflectionTestUtils.setField(svc, "llmCircuitBreakerFailureThreshold", 3);
+            ReflectionTestUtils.setField(svc, "llmCircuitBreakerOpenSeconds", cbOpenSeconds);
+            ReflectionTestUtils.setField(svc, "llmCircuitBreakerHalfOpenCalls", 1);
+            svc.init();
+            return svc;
+        }
+
+        /** Creates a mock ChatClient.Builder with a full call chain returning the given content. */
+        private ChatClient.Builder mockChatClientBuilder(String responseContent) {
+            ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
+            ChatClient mockChatClient = mock(ChatClient.class);
+            ChatClient.ChatClientRequestSpec mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
+            ChatClient.CallResponseSpec mockCallResponse = mock(ChatClient.CallResponseSpec.class);
+
+            when(mockBuilder.build()).thenReturn(mockChatClient);
+            when(mockChatClient.prompt()).thenReturn(mockRequest);
+            when(mockRequest.system(anyString())).thenReturn(mockRequest);
+            when(mockRequest.user(anyString())).thenReturn(mockRequest);
+            when(mockRequest.options(any())).thenReturn(mockRequest);
+            when(mockRequest.call()).thenReturn(mockCallResponse);
+            when(mockCallResponse.content()).thenReturn(responseContent);
+            return mockBuilder;
+        }
+
+        /** Creates a mock ChatClient.Builder whose call() throws the given exception. */
+        private ChatClient.Builder mockChatClientBuilderThrowing(RuntimeException ex) {
+            ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
+            ChatClient mockChatClient = mock(ChatClient.class);
+            ChatClient.ChatClientRequestSpec mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
+
+            when(mockBuilder.build()).thenReturn(mockChatClient);
+            when(mockChatClient.prompt()).thenReturn(mockRequest);
+            when(mockRequest.system(anyString())).thenReturn(mockRequest);
+            when(mockRequest.user(anyString())).thenReturn(mockRequest);
+            when(mockRequest.options(any())).thenReturn(mockRequest);
+            when(mockRequest.call()).thenThrow(ex);
+            return mockBuilder;
         }
 
         @Test
@@ -219,7 +259,6 @@ class GuardrailCircuitBreakerTest {
             assertEquals(SimpleCircuitBreaker.State.OPEN, breaker.getState());
             ReflectionTestUtils.setField(guardrailService, "llmCircuitBreaker", breaker);
 
-            // A query that passes pattern+semantic layers should be blocked by circuit breaker
             PromptGuardrailService.GuardrailResult result =
                     guardrailService.analyze("What is the budget for Q3?");
 
@@ -233,31 +272,8 @@ class GuardrailCircuitBreakerTest {
         @Test
         @DisplayName("Passes queries when circuit breaker is CLOSED and LLM succeeds")
         void passesWhenClosedAndLlmSucceeds() {
-            // Set up mock chain for successful LLM call
-            ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
-            ChatClient mockChatClient = mock(ChatClient.class);
-            ChatClient.ChatClientRequestSpec mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
-            ChatClient.CallResponseSpec mockCallResponse = mock(ChatClient.CallResponseSpec.class);
-
-            when(mockBuilder.build()).thenReturn(mockChatClient);
-            when(mockChatClient.prompt()).thenReturn(mockRequest);
-            when(mockRequest.system(anyString())).thenReturn(mockRequest);
-            when(mockRequest.user(anyString())).thenReturn(mockRequest);
-            when(mockRequest.options(any())).thenReturn(mockRequest);
-            when(mockRequest.call()).thenReturn(mockCallResponse);
-            when(mockCallResponse.content()).thenReturn("{\"classification\":\"SAFE\"}");
-
-            guardrailService = new PromptGuardrailService(mockBuilder, new ObjectMapper());
-            ReflectionTestUtils.setField(guardrailService, "enabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmSchemaEnabled", false);
-            ReflectionTestUtils.setField(guardrailService, "strictMode", false);
-            ReflectionTestUtils.setField(guardrailService, "llmTimeoutMs", 5000L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerFailureThreshold", 3);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerOpenSeconds", 30L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerHalfOpenCalls", 1);
-            guardrailService.init();
+            guardrailService = buildGuardrailService(
+                    mockChatClientBuilder("{\"classification\":\"SAFE\"}"), 5000L, 30L);
 
             PromptGuardrailService.GuardrailResult result =
                     guardrailService.analyze("What is the budget for Q3?");
@@ -268,34 +284,16 @@ class GuardrailCircuitBreakerTest {
         @Test
         @DisplayName("LLM timeout records failure and fails closed")
         void timeoutRecordsFailureAndFailsClosed() {
-            // ChatClient that blocks forever — will exceed 100ms timeout
-            ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
-            ChatClient mockChatClient = mock(ChatClient.class);
-            ChatClient.ChatClientRequestSpec mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
-            ChatClient.CallResponseSpec mockCallResponse = mock(ChatClient.CallResponseSpec.class);
-
-            when(mockBuilder.build()).thenReturn(mockChatClient);
-            when(mockChatClient.prompt()).thenReturn(mockRequest);
-            when(mockRequest.system(anyString())).thenReturn(mockRequest);
-            when(mockRequest.user(anyString())).thenReturn(mockRequest);
-            when(mockRequest.options(any())).thenReturn(mockRequest);
-            when(mockRequest.call()).thenReturn(mockCallResponse);
+            ChatClient.Builder mockBuilder = mockChatClientBuilder("{\"classification\":\"SAFE\"}");
+            // Override content() to block well past the 100ms timeout
+            ChatClient.CallResponseSpec mockCallResponse =
+                    mockBuilder.build().prompt().system("x").user("x").options(null).call();
             when(mockCallResponse.content()).thenAnswer(invocation -> {
-                Thread.sleep(5000); // block well past 100ms timeout
+                Thread.sleep(5000);
                 return "{\"classification\":\"SAFE\"}";
             });
 
-            guardrailService = new PromptGuardrailService(mockBuilder, new ObjectMapper());
-            ReflectionTestUtils.setField(guardrailService, "enabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmSchemaEnabled", false);
-            ReflectionTestUtils.setField(guardrailService, "strictMode", false);
-            ReflectionTestUtils.setField(guardrailService, "llmTimeoutMs", 100L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerFailureThreshold", 3);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerOpenSeconds", 30L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerHalfOpenCalls", 1);
-            guardrailService.init();
+            guardrailService = buildGuardrailService(mockBuilder, 100L, 30L);
 
             PromptGuardrailService.GuardrailResult result =
                     guardrailService.analyze("What is the budget for Q3?");
@@ -308,28 +306,9 @@ class GuardrailCircuitBreakerTest {
         @Test
         @DisplayName("LLM exception records failure and fails closed")
         void exceptionRecordsFailureAndFailsClosed() {
-            ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
-            ChatClient mockChatClient = mock(ChatClient.class);
-            ChatClient.ChatClientRequestSpec mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
-
-            when(mockBuilder.build()).thenReturn(mockChatClient);
-            when(mockChatClient.prompt()).thenReturn(mockRequest);
-            when(mockRequest.system(anyString())).thenReturn(mockRequest);
-            when(mockRequest.user(anyString())).thenReturn(mockRequest);
-            when(mockRequest.options(any())).thenReturn(mockRequest);
-            when(mockRequest.call()).thenThrow(new RuntimeException("LLM connection refused"));
-
-            guardrailService = new PromptGuardrailService(mockBuilder, new ObjectMapper());
-            ReflectionTestUtils.setField(guardrailService, "enabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmSchemaEnabled", false);
-            ReflectionTestUtils.setField(guardrailService, "strictMode", false);
-            ReflectionTestUtils.setField(guardrailService, "llmTimeoutMs", 5000L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerFailureThreshold", 3);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerOpenSeconds", 30L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerHalfOpenCalls", 1);
-            guardrailService.init();
+            guardrailService = buildGuardrailService(
+                    mockChatClientBuilderThrowing(new RuntimeException("LLM connection refused")),
+                    5000L, 30L);
 
             PromptGuardrailService.GuardrailResult result =
                     guardrailService.analyze("What is the budget for Q3?");
@@ -342,28 +321,9 @@ class GuardrailCircuitBreakerTest {
         @Test
         @DisplayName("Consecutive LLM failures trip circuit breaker to OPEN")
         void consecutiveFailuresTripCircuit() {
-            ChatClient.Builder mockBuilder = mock(ChatClient.Builder.class);
-            ChatClient mockChatClient = mock(ChatClient.class);
-            ChatClient.ChatClientRequestSpec mockRequest = mock(ChatClient.ChatClientRequestSpec.class);
-
-            when(mockBuilder.build()).thenReturn(mockChatClient);
-            when(mockChatClient.prompt()).thenReturn(mockRequest);
-            when(mockRequest.system(anyString())).thenReturn(mockRequest);
-            when(mockRequest.user(anyString())).thenReturn(mockRequest);
-            when(mockRequest.options(any())).thenReturn(mockRequest);
-            when(mockRequest.call()).thenThrow(new RuntimeException("LLM unavailable"));
-
-            guardrailService = new PromptGuardrailService(mockBuilder, new ObjectMapper());
-            ReflectionTestUtils.setField(guardrailService, "enabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmSchemaEnabled", false);
-            ReflectionTestUtils.setField(guardrailService, "strictMode", false);
-            ReflectionTestUtils.setField(guardrailService, "llmTimeoutMs", 5000L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerEnabled", true);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerFailureThreshold", 3);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerOpenSeconds", 300L);
-            ReflectionTestUtils.setField(guardrailService, "llmCircuitBreakerHalfOpenCalls", 1);
-            guardrailService.init();
+            guardrailService = buildGuardrailService(
+                    mockChatClientBuilderThrowing(new RuntimeException("LLM unavailable")),
+                    5000L, 300L);
 
             // 3 failures should trip the circuit
             for (int i = 0; i < 3; i++) {
