@@ -240,6 +240,31 @@ class AdminDashboardServiceTest {
         }
 
         @Test
+        @DisplayName("getAllUsers should handle null clearance and sectors in legacy documents")
+        void shouldHandleNullClearanceAndSectors() {
+            User legacyUser = new User();
+            legacyUser.setId("legacy-1");
+            legacyUser.setUsername("legacy");
+            legacyUser.setDisplayName("Legacy User");
+            legacyUser.setRoles(Set.of(UserRole.VIEWER));
+            legacyUser.setActive(true);
+            legacyUser.setPendingApproval(false);
+            legacyUser.setCreatedAt(Instant.now());
+            // Simulate legacy document: clearance and sectors not set (null)
+            legacyUser.setClearance(null);
+            legacyUser.setAllowedSectors(null);
+
+            when(userRepository.findAll()).thenReturn(List.of(legacyUser));
+
+            List<AdminDashboardService.UserSummary> users = service.getAllUsers();
+
+            assertThat(users).hasSize(1);
+            AdminDashboardService.UserSummary summary = users.get(0);
+            assertThat(summary.clearance()).isEqualTo("UNCLASSIFIED");
+            assertThat(summary.allowedSectors()).isEmpty();
+        }
+
+        @Test
         @DisplayName("approveUser should set active=true and pendingApproval=false")
         void shouldApproveUser() {
             testUser.setPendingApproval(true);
