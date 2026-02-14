@@ -143,7 +143,7 @@
 
     function loadSectionData(sectionId) {
         switch (sectionId) {
-            case 'overview': loadOverview(); break;
+            case 'overview': loadOverview(); startOverviewPolling(); break;
             case 'users': loadUsers(); break;
             case 'workspaces': loadWorkspaces(); break;
             case 'sectors': loadSectors(); break;
@@ -173,9 +173,6 @@
             if (!response.ok) throw new Error('Dashboard load failed');
             const data = await response.json();
             renderOverview(data);
-            if (!document.getElementById('section-overview')?.classList.contains('hidden')) {
-                startOverviewPolling();
-            }
         } catch (error) {
             if (error.code === 'auth') return;
             setText(document.getElementById('health-body'), 'Unable to load dashboard.');
