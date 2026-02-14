@@ -218,7 +218,7 @@
                 </div>
                 <div class="admin-stat-row">
                     <span class="admin-stat-label">Avg Query Time</span>
-                    <span>${usage.avgQueryTime != null ? usage.avgQueryTime.toFixed(1) + 's' : 'N/A'}</span>
+                    <span>${usage.avgQueryTime != null ? usage.avgQueryTime.toFixed(0) + 'ms' : 'N/A'}</span>
                 </div>`;
         }
 
