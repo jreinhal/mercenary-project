@@ -14,6 +14,7 @@
     let csrfTokenCache = '';
     let csrfTokenUnavailable = false;
     const sectionLoaded = {};
+    let overviewRefreshInterval = null;
 
     // ── Utility Functions ──────────────────────────────────
 
@@ -121,6 +122,7 @@
     // ── Navigation ─────────────────────────────────────────
 
     function switchSection(sectionId) {
+        stopOverviewPolling();
         document.querySelectorAll('.admin-section').forEach(el => el.classList.add('hidden'));
         document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
 
@@ -134,12 +136,14 @@
         if (!sectionLoaded[sectionId]) {
             sectionLoaded[sectionId] = true;
             loadSectionData(sectionId);
+        } else if (sectionId === 'overview') {
+            startOverviewPolling();
         }
     }
 
     function loadSectionData(sectionId) {
         switch (sectionId) {
-            case 'overview': loadOverview(); break;
+            case 'overview': loadOverview(); startOverviewPolling(); break;
             case 'users': loadUsers(); break;
             case 'workspaces': loadWorkspaces(); break;
             case 'sectors': loadSectors(); break;
@@ -150,6 +154,18 @@
     }
 
     // ── Section: Overview ──────────────────────────────────
+
+    function startOverviewPolling() {
+        stopOverviewPolling();
+        overviewRefreshInterval = setInterval(() => loadOverview(), 15000);
+    }
+
+    function stopOverviewPolling() {
+        if (overviewRefreshInterval) {
+            clearInterval(overviewRefreshInterval);
+            overviewRefreshInterval = null;
+        }
+    }
 
     async function loadOverview() {
         try {
