@@ -4692,19 +4692,31 @@
             }
             setRightPanelNoInfo(false);
 
-            let score = '-';
-            if (sources && sources.length > 0) {
-                score = Math.min(0.95, 0.7 + (sources.length * 0.05)).toFixed(1);
+            let score = null;
+            if (metrics?.evidenceMatch != null) {
+                score = parseFloat(metrics.evidenceMatch).toFixed(2);
+            } else if (metrics?.routingConfidence != null) {
+                score = parseFloat(metrics.routingConfidence).toFixed(2);
             }
 
             const sourceScoreBadge = document.getElementById('source-score-badge');
             if (sourceScoreBadge) {
-                sourceScoreBadge.textContent = `[score: ${score}]`;
+                if (score != null) {
+                    sourceScoreBadge.textContent = `[score: ${score}]`;
+                    sourceScoreBadge.classList.remove('hidden');
+                } else {
+                    sourceScoreBadge.classList.add('hidden');
+                }
             }
 
             const entityScoreBadge = document.getElementById('entity-score-badge');
             if (entityScoreBadge) {
-                entityScoreBadge.textContent = `[score: ${score}]`;
+                if (score != null) {
+                    entityScoreBadge.textContent = `[score: ${score}]`;
+                    entityScoreBadge.classList.remove('hidden');
+                } else {
+                    entityScoreBadge.classList.add('hidden');
+                }
             }
 
             const sourcesList = document.getElementById('info-sources-list');
@@ -7437,8 +7449,8 @@
             const bracketCitations = (text.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || []);
             const backtickCitations = (text.match(/`([^`]+\.(pdf|txt|md))`/gi) || []);
             const citationCount = bracketCitations.length + backtickCitations.length;
-            const confidence = Math.floor(75 + Math.random() * 20);
-            const confClass = confidence >= 85 ? 'high' : confidence >= 70 ? 'medium' : 'low';
+            const confidence = metrics?.routingConfidence != null ? Math.round(metrics.routingConfidence * 100) : null;
+            const confClass = confidence != null ? (confidence >= 85 ? 'high' : confidence >= 70 ? 'medium' : 'low') : 'unavailable';
 
             const totalDuration = reasoningSteps.reduce((sum, step) => sum + (step.durationMs || 0), 0);
             const hasRealTiming = reasoningSteps.some(s => s.durationMs !== undefined);
@@ -7858,10 +7870,9 @@
                 try {
                     const fallbackResponse = await guardedFetch(`${API_BASE}/ask?${params.toString()}`);
                     const answer = await fallbackResponse.text();
-                    const reasoningSteps = generateReasoningSteps(query, answer);
                     const sourceMatches = answer.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || [];
                     const sources = sourceMatches.map(m => ({ filename: m.replace(/[\[\]]/g, '') }));
-                    appendAssistantResponse(answer, reasoningSteps, sources, null, { activeFileCount: activeFiles.length });
+                    appendAssistantResponse(answer, [], sources, null, { activeFileCount: activeFiles.length });
                 } catch (fallbackError) {
                     appendAssistantResponse(`Error: ${error.message}`, [], [], null, null);
                 }
@@ -8066,46 +8077,6 @@
                 'error': 'search'
             };
             return typeMap[backendType] || 'search';
-        }
-
-        function generateReasoningSteps(query, answer) {
-            const steps = [];
-            const hasResults = answer.includes('[') && (answer.includes('.pdf') || answer.includes('.txt') || answer.includes('.md'));
-
-            steps.push({
-                type: 'search',
-                label: 'Query Analysis',
-                detail: `Parsed query: "${query.substring(0, 50)}${query.length > 50 ? '...' : ''}"`
-            });
-
-            steps.push({
-                type: 'search',
-                label: 'Vector Search',
-                detail: `Searching ${sectorSelect.value} sector with similarity threshold 0.7`
-            });
-
-            if (hasResults) {
-                const matches = answer.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || [];
-                steps.push({
-                    type: 'retrieve',
-                    label: 'Document Retrieval',
-                    detail: `Found ${matches.length} relevant document(s) via HiFi-RAG`
-                });
-
-                steps.push({
-                    type: 'synthesize',
-                    label: 'Response Synthesis',
-                    detail: 'Applied ANALYZE → VERIFY → CITE protocol'
-                });
-            } else {
-                steps.push({
-                    type: 'retrieve',
-                    label: 'No Matches',
-                    detail: 'No documents matched the similarity threshold'
-                });
-            }
-
-            return steps;
         }
 
         async function openSource(filename, switchTab = true) {
