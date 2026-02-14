@@ -29,36 +29,43 @@ class OutputSanitizationTest {
         }
 
         @Test
-        @DisplayName("Should redact event handler attributes")
-        void shouldRedactEventHandlers() {
+        @DisplayName("Should pass through event handlers (XSS handled by CSP, not content sanitizer)")
+        void shouldPassThroughEventHandlers() {
+            // ContentSanitizer targets prompt injection, not HTML sanitization.
+            // XSS prevention is handled by CSP headers at the response layer.
             String content = "Normal line.\n<img onerror=\"alert('xss')\" src=x>\nSafe line.";
             String result = ContentSanitizer.sanitize(content);
-            // ContentSanitizer works on injection patterns, not HTML — the img tag may pass
-            assertNotNull(result);
+            assertTrue(result.contains("Normal line."));
+            assertTrue(result.contains("Safe line."));
+            assertFalse(result.contains(ContentSanitizer.REDACTION_MARKER),
+                    "HTML event handlers are not prompt injection — should not be redacted");
         }
 
         @Test
-        @DisplayName("Should redact javascript: URL scheme")
-        void shouldRedactJavascriptUrls() {
+        @DisplayName("Should pass through javascript: URLs (XSS handled by CSP)")
+        void shouldPassThroughJavascriptUrls() {
             String content = "Click here.\njavascript:alert(document.cookie)\nEnd.";
             String result = ContentSanitizer.sanitize(content);
-            assertNotNull(result, "javascript: URL should be handled without crashing");
+            assertTrue(result.contains("Click here."));
+            assertTrue(result.contains("End."));
         }
 
         @Test
-        @DisplayName("Should redact SVG onload injection")
-        void shouldRedactSvgOnload() {
+        @DisplayName("Should pass through SVG onload (XSS handled by CSP)")
+        void shouldPassThroughSvgOnload() {
             String content = "Text.\n<svg onload=\"alert('xss')\">\nMore text.";
             String result = ContentSanitizer.sanitize(content);
-            assertNotNull(result, "SVG onload should be handled");
+            assertTrue(result.contains("Text."));
+            assertTrue(result.contains("More text."));
         }
 
         @Test
-        @DisplayName("Should redact data URI with script")
-        void shouldRedactDataUri() {
+        @DisplayName("Should pass through data URIs (XSS handled by CSP)")
+        void shouldPassThroughDataUri() {
             String content = "Normal.\n<a href=\"data:text/html,<script>alert(1)</script>\">Click</a>\nEnd.";
             String result = ContentSanitizer.sanitize(content);
-            assertNotNull(result);
+            assertTrue(result.contains("Normal."));
+            assertTrue(result.contains("End."));
         }
     }
 
