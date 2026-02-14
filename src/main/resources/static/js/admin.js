@@ -136,6 +136,8 @@
         if (!sectionLoaded[sectionId]) {
             sectionLoaded[sectionId] = true;
             loadSectionData(sectionId);
+        } else if (sectionId === 'overview') {
+            startOverviewPolling();
         }
     }
 
@@ -171,7 +173,9 @@
             if (!response.ok) throw new Error('Dashboard load failed');
             const data = await response.json();
             renderOverview(data);
-            startOverviewPolling();
+            if (!document.getElementById('section-overview')?.classList.contains('hidden')) {
+                startOverviewPolling();
+            }
         } catch (error) {
             if (error.code === 'auth') return;
             setText(document.getElementById('health-body'), 'Unable to load dashboard.');
