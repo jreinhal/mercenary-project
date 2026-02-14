@@ -62,9 +62,12 @@ public class AdminDashboardService {
     }
 
     private UserSummary toUserSummary(User u) {
-        Set<String> sectors = u.getAllowedSectors().stream().map(Enum::name).collect(Collectors.toSet());
+        Set<String> sectors = u.getAllowedSectors() != null
+                ? u.getAllowedSectors().stream().map(Enum::name).collect(Collectors.toSet())
+                : Set.of();
+        String clearance = u.getClearance() != null ? u.getClearance().name() : "UNCLASSIFIED";
         return new UserSummary(u.getId(), u.getUsername(), u.getDisplayName(), u.getRoles(), u.isActive(),
-                u.getLastLoginAt(), u.getCreatedAt(), u.getClearance().name(), sectors, u.isPendingApproval());
+                u.getLastLoginAt(), u.getCreatedAt(), clearance, sectors, u.isPendingApproval());
     }
 
     public boolean approveUser(String userId) {
