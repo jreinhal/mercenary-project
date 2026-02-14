@@ -19,6 +19,7 @@ public final class ContentSanitizer {
     private static final Pattern CONTROL_CHAR_PATTERN = Pattern.compile("[\\p{Cntrl}&&[^\\r\\n\\t]]");
     private static final Pattern REPLACEMENT_CHAR_PATTERN = Pattern.compile("\uFFFD+");
     private static final Pattern MULTI_SPACE_PATTERN = Pattern.compile("[ \\t]{2,}");
+    private static final Pattern DECORATIVE_SEPARATOR_PATTERN = Pattern.compile("([=\\-~*_])\\1{2,}");
     private static final Pattern NON_WORD_PATTERN = Pattern.compile("[^\\p{IsAlphabetic}\\p{IsDigit}]+");
 
     private ContentSanitizer() {
@@ -84,6 +85,9 @@ public final class ContentSanitizer {
         cleaned = cleaned.replaceAll("(?i)^(\\d+\\.\\s*)?PK\\s*(?=(this is a zip|test zip|zip archive))", "$1");
         cleaned = cleaned.replaceAll("(?i)^(\\d+\\.\\s*)?Rar!\\s*", "$1");
         cleaned = cleaned.replaceAll("(?i)^(\\d+\\.\\s*)?\\d+\\s*(?=Fake\\s+Java\\s+class\\b)", "$1");
+        // Collapse decorative separators (e.g. "========", "------") to empty string.
+        // If the entire line is just separators (after trimming), it becomes blank and is dropped.
+        cleaned = DECORATIVE_SEPARATOR_PATTERN.matcher(cleaned).replaceAll("");
         cleaned = MULTI_SPACE_PATTERN.matcher(cleaned).replaceAll(" ");
         return cleaned.trim();
     }

@@ -34,7 +34,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew build -Pedition=government    # government|medical|enterprise|trial
 
 # Run locally (dev profile, no auth required)
-APP_PROFILE=dev MONGODB_URI=mongodb://localhost:27017/mercenary OLLAMA_URL=http://localhost:11434 ./gradlew bootRun
+# MONGODB_URI and OLLAMA_URL are expected as system env vars — do NOT override them inline
+APP_PROFILE=dev ./gradlew bootRun
 
 # Tests
 ./gradlew test                          # All unit + integration tests
@@ -185,13 +186,45 @@ For EVERY `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`:
 
 ---
 
-## Testing Patterns
+## Testing Tiers
 
-- **Unit tests:** `src/test/java/.../service/`, `controller/`, `filter/`, `config/` — mocked dependencies
-- **Integration tests:** `enterprise/admin/`, `rag/` subdirectories — wired Spring context
-- **E2E tests:** `e2e/PipelineE2eTest` (full RAG pipeline), `e2e/OidcPipelineE2eTest` (OIDC flow) — use `InMemoryVectorStore` + stubbed chat/embedding models
-- **CI runs:** `./gradlew clean test -Plint -PlintWerror` then `ciE2eTest` then `ciOidcE2eTest`
-- **Quality gates:** No mojibake (`U+FFFD`), no binary-signature noise (`PK...`, `Rar!...`), no mirrored duplicate clauses
+### Tier 1 — CI (GitHub Actions, every PR)
+The `CI / build` job runs these gates **sequentially** — a failure in any step blocks the rest:
+
+1. `./gradlew clean test -Plint -PlintWerror` — all unit + integration tests with lint warnings as errors
+2. `./gradlew -Pedition=enterprise build -x test` — verify enterprise edition packaging
+3. `./gradlew ciE2eTest` — RAG pipeline E2E (`PipelineE2eTest`, in-memory vector store, stubbed models)
+4. `./gradlew ciOidcE2eTest` — OIDC enterprise auth E2E (`OidcPipelineE2eTest`)
+5. `./gradlew sonar` — SonarCloud analysis (when `SONAR_TOKEN` is set)
+
+### Tier 2 — Local multi-profile E2E (requires MongoDB + Ollama)
+```powershell
+# Runs all 4 profiles (dev, standard, enterprise, govcloud) sequentially:
+pwsh tools/run_e2e_profiles.ps1 -MongoUri mongodb://localhost:27017/mercenary -AdminPassword '<pw>'
+```
+Each profile boots the app on an isolated port (18080/18081/18082/18443), ingests test docs per sector (GOVERNMENT/MEDICAL/ENTERPRISE), and exercises `/api/ingest/file`, `/api/ask`, `/api/ask/enhanced`, `/api/inspect`. Govcloud profile auto-generates a TLS keystore and uses CAC auth headers. Results written to `build/e2e-results/`.
+
+### Tier 3 — UAT (Playwright, headed browser, bounded timeouts)
+```powershell
+# Core UI suite (15 min timeout)
+pwsh tools/playwright-runner/run-ui-suite.ps1 -Profile enterprise -AuthMode STANDARD -UiTimeoutSec 900
+
+# Ops sign-off (10 min) — boots app, verifies auth gates, endpoint access controls
+pwsh tools/playwright-runner/run-ops-signoff.ps1 -Profile enterprise -AuthMode STANDARD
+
+# Additional specialized suites:
+pwsh tools/playwright-runner/run-flag-matrix.ps1    # Feature flag combinations
+pwsh tools/playwright-runner/run-govcloud-ui.ps1    # Govcloud profile UI
+```
+The UAT suite (`run-ui-tests.js`) runs in Edge via Playwright. The ops sign-off runner verifies endpoint auth gates (health public, status/telemetry/admin require auth, login flow, connector/dashboard access).
+
+### Test categories
+- **Unit tests:** `service/`, `controller/`, `filter/`, `config/`, `util/`, `security/` — mocked dependencies
+- **Integration tests:** `enterprise/admin/`, `rag/`, `connectors/`, `vector/` — wired Spring context
+- **E2E tests:** `e2e/PipelineE2eTest`, `e2e/OidcPipelineE2eTest` — `InMemoryVectorStore` + stubbed chat/embedding models (profile: `ci-e2e`)
+
+### Quality gates
+- No mojibake (`U+FFFD`), no binary-signature noise (`PK...`, `Rar!...`), no mirrored duplicate clauses
 
 ---
 
@@ -202,7 +235,7 @@ For EVERY `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`:
 - No direct pushes to `master`
 - Security fixes: prefix commit with `security:`
 - Edition-specific features: note which package (e.g., `government: add X`)
-- Always include `Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>` when Claude assists
+- Always include `Co-Authored-By: Claude <noreply@anthropic.com>` when Claude assists
 
 ## Authentication & Login Credentials
 
@@ -224,6 +257,3 @@ When running with `AUTH_MODE=STANDARD`:
 | OIDC | enterprise | External IdP, Bearer JWT required |
 | CAC | govcloud | X.509 client certificate (PIV/CAC smart card) |
 
-## Manual UI Testing
-
-Playwright in headed browser mode via `tools/playwright-runner/`. Use for real UI interaction testing when requested.

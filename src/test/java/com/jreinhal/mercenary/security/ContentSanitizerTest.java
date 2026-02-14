@@ -89,6 +89,35 @@ class ContentSanitizerTest {
     }
 
     @Test
+    void shouldCollapseDecorativeSeparatorsInSanitize() {
+        String content = "VENDOR PLANNING FOR 2026\n============================\nThe transformation program has established partnerships.";
+        String result = ContentSanitizer.sanitize(content);
+
+        assertTrue(result.contains("VENDOR PLANNING FOR 2026"));
+        assertTrue(result.contains("The transformation program has established partnerships."));
+        assertFalse(result.contains("===="), "Decorative separators should be collapsed");
+    }
+
+    @Test
+    void shouldCollapseDecorativeSeparatorsInResponseText() {
+        String text = "HEADER\n==============================\n------------------------------\nContent here.";
+        String result = ContentSanitizer.sanitizeResponseText(text);
+
+        assertTrue(result.contains("HEADER"));
+        assertTrue(result.contains("Content here."));
+        assertFalse(result.contains("===="), "Equals separators should be collapsed");
+        assertFalse(result.contains("----"), "Dash separators should be collapsed");
+    }
+
+    @Test
+    void shouldPreserveShortRepeatedChars() {
+        String text = "item -- value";
+        String result = ContentSanitizer.sanitizeResponseText(text);
+
+        assertTrue(result.contains("--"), "Short runs (2 chars) should be preserved");
+    }
+
+    @Test
     void shouldSanitizeResponseTextAndCollapseMirroredClause() {
         String response = "2. Valid TEST2 - This is a valid test document about project security testing. - This is a valid test document about project security testing.\n3. PK\uFFFD\uFFFDtest zip content";
         String sanitized = ContentSanitizer.sanitizeResponseText(response);

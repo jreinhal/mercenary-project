@@ -353,7 +353,10 @@ public class MercenaryController {
                     ++matches;
                 }
                 if (matches < 1) continue;
-                highlights.add(p.trim());
+                String cleaned = ContentSanitizer.sanitizeResponseText(p.trim());
+                if (!cleaned.isBlank()) {
+                    highlights.add(cleaned);
+                }
                 if (highlights.size() >= 3) break;
             }
         }
