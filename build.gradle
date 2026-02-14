@@ -214,3 +214,10 @@ tasks.register('ciOidcE2eTest', Test) {
     useJUnitPlatform()
     include '**/OidcPipelineE2eTest.class'
 }
+
+tasks.register('ciEnterpriseE2eTest', Test) {
+    description = 'Run enterprise pipeline E2E tests with advanced RAG strategies enabled.'
+    group = 'verification'
+    useJUnitPlatform()
+    include '**/EnterprisePipelineE2eTest.class'
+}
