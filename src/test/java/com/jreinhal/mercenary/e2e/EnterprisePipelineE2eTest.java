@@ -107,11 +107,13 @@ class EnterprisePipelineE2eTest {
             enterpriseMeta.put("source", "enterprise_budget.txt");
             enterpriseMeta.put("dept", "ENTERPRISE");
             enterpriseMeta.put("workspaceId", "workspace_default");
+            enterpriseMeta.put("partition_id", "budget_partition");
 
             Map<String, Object> docMeta = new HashMap<>();
             docMeta.put("source", "enterprise_strategy.txt");
             docMeta.put("dept", "ENTERPRISE");
             docMeta.put("workspaceId", "workspace_default");
+            docMeta.put("partition_id", "strategy_partition");
 
             vectorStore.add(List.of(
                     new Document("The total program budget is $150M allocated across 5 divisions.", enterpriseMeta),
@@ -170,7 +172,7 @@ class EnterprisePipelineE2eTest {
         }
     }
 
-    private static class StubChatModel implements ChatModel {
+    private static final class StubChatModel implements ChatModel {
         @Override
         public ChatResponse call(Prompt prompt) {
             return new ChatResponse(List.of(new Generation(new AssistantMessage("Stub response"))));
