@@ -8,6 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.jreinhal.mercenary.Department;
+import com.jreinhal.mercenary.model.ClearanceLevel;
 import com.jreinhal.mercenary.model.User;
 import com.jreinhal.mercenary.model.UserRole;
 import com.jreinhal.mercenary.repository.UserRepository;
@@ -187,32 +189,40 @@ class AdminDashboardServiceTest {
             testUser.setUsername("testuser");
             testUser.setDisplayName("Test User");
             testUser.setRoles(Set.of(UserRole.ANALYST));
+            testUser.setClearance(ClearanceLevel.SECRET);
+            testUser.setAllowedSectors(Set.of(Department.GOVERNMENT, Department.ENTERPRISE));
             testUser.setActive(true);
             testUser.setPendingApproval(false);
             testUser.setCreatedAt(Instant.now());
         }
 
         @Test
-        @DisplayName("getAllUsers should return mapped user summaries")
+        @DisplayName("getAllUsers should return mapped user summaries with all fields")
         void shouldReturnMappedUserSummaries() {
             when(userRepository.findAll()).thenReturn(List.of(testUser));
 
             List<AdminDashboardService.UserSummary> users = service.getAllUsers();
 
             assertThat(users).hasSize(1);
-            assertThat(users.get(0).username()).isEqualTo("testuser");
-            assertThat(users.get(0).displayName()).isEqualTo("Test User");
-            assertThat(users.get(0).active()).isTrue();
+            AdminDashboardService.UserSummary summary = users.get(0);
+            assertThat(summary.username()).isEqualTo("testuser");
+            assertThat(summary.displayName()).isEqualTo("Test User");
+            assertThat(summary.active()).isTrue();
+            assertThat(summary.clearance()).isEqualTo("SECRET");
+            assertThat(summary.allowedSectors()).containsExactlyInAnyOrder("GOVERNMENT", "ENTERPRISE");
+            assertThat(summary.pendingApproval()).isFalse();
         }
 
         @Test
-        @DisplayName("getPendingApprovals should filter pending users")
+        @DisplayName("getPendingApprovals should filter pending users and map all fields")
         void shouldReturnOnlyPendingUsers() {
             User pendingUser = new User();
             pendingUser.setId("pending-1");
             pendingUser.setUsername("pending");
             pendingUser.setDisplayName("Pending User");
             pendingUser.setRoles(Set.of(UserRole.ANALYST));
+            pendingUser.setClearance(ClearanceLevel.UNCLASSIFIED);
+            pendingUser.setAllowedSectors(Set.of(Department.MEDICAL));
             pendingUser.setPendingApproval(true);
             pendingUser.setActive(false);
             pendingUser.setCreatedAt(Instant.now());
@@ -222,7 +232,11 @@ class AdminDashboardServiceTest {
             List<AdminDashboardService.UserSummary> pending = service.getPendingApprovals();
 
             assertThat(pending).hasSize(1);
-            assertThat(pending.get(0).username()).isEqualTo("pending");
+            AdminDashboardService.UserSummary summary = pending.get(0);
+            assertThat(summary.username()).isEqualTo("pending");
+            assertThat(summary.pendingApproval()).isTrue();
+            assertThat(summary.clearance()).isEqualTo("UNCLASSIFIED");
+            assertThat(summary.allowedSectors()).containsExactly("MEDICAL");
         }
 
         @Test

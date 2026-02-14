@@ -171,23 +171,33 @@
 
         const healthBody = document.getElementById('health-body');
         if (healthBody) {
-            const statusClass = health.ollamaReachable ? 'admin-badge-success' : 'admin-badge-error';
-            const statusText = health.ollamaReachable ? 'HEALTHY' : 'DEGRADED';
+            const allHealthy = health.ollamaConnected && health.mongoConnected;
+            const statusClass = allHealthy ? 'admin-badge-success' : 'admin-badge-error';
+            const statusText = allHealthy ? 'HEALTHY' : 'DEGRADED';
+            const memPercent = health.memoryMaxMb ? Math.round((health.memoryUsedMb / health.memoryMaxMb) * 100) : 0;
             healthBody.innerHTML = `
                 <div class="admin-stat">
                     <div class="admin-stat-value"><span class="admin-badge ${statusClass}">${statusText}</span></div>
                 </div>
                 <div class="admin-stat-row">
                     <span class="admin-stat-label">Ollama</span>
-                    <span class="admin-badge ${health.ollamaReachable ? 'admin-badge-success' : 'admin-badge-error'}">${health.ollamaReachable ? 'Connected' : 'Unreachable'}</span>
+                    <span class="admin-badge ${health.ollamaConnected ? 'admin-badge-success' : 'admin-badge-error'}">${health.ollamaConnected ? 'Connected' : 'Unreachable'}</span>
                 </div>
                 <div class="admin-stat-row">
                     <span class="admin-stat-label">MongoDB</span>
-                    <span class="admin-badge ${health.mongoReachable ? 'admin-badge-success' : 'admin-badge-error'}">${health.mongoReachable ? 'Connected' : 'Unreachable'}</span>
+                    <span class="admin-badge ${health.mongoConnected ? 'admin-badge-success' : 'admin-badge-error'}">${health.mongoConnected ? 'Connected' : 'Unreachable'}</span>
                 </div>
                 <div class="admin-stat-row">
-                    <span class="admin-stat-label">Model</span>
-                    <span>${escapeHtml(health.ollamaModel || 'N/A')}</span>
+                    <span class="admin-stat-label">Memory</span>
+                    <span>${health.memoryUsedMb ?? 0} / ${health.memoryMaxMb ?? 0} MB (${memPercent}%)</span>
+                </div>
+                <div class="admin-stat-row">
+                    <span class="admin-stat-label">CPU</span>
+                    <span>${health.cpuUsage != null ? (health.cpuUsage * 100).toFixed(1) + '%' : 'N/A'}</span>
+                </div>
+                <div class="admin-stat-row">
+                    <span class="admin-stat-label">Uptime</span>
+                    <span>${escapeHtml(health.uptime || 'N/A')}</span>
                 </div>`;
         }
 
@@ -199,26 +209,35 @@
                     <div class="admin-stat-label">Total Queries</div>
                 </div>
                 <div class="admin-stat-row">
-                    <span class="admin-stat-label">Active Users</span>
-                    <span>${usage.activeUsers ?? 0}</span>
+                    <span class="admin-stat-label">Last 24h</span>
+                    <span>${usage.queriesLast24h ?? 0}</span>
                 </div>
                 <div class="admin-stat-row">
-                    <span class="admin-stat-label">Ingestions</span>
-                    <span>${usage.totalIngestions ?? 0}</span>
+                    <span class="admin-stat-label">Active Users</span>
+                    <span>${usage.activeUsers ?? 0} / ${usage.totalUsers ?? 0}</span>
+                </div>
+                <div class="admin-stat-row">
+                    <span class="admin-stat-label">Avg Query Time</span>
+                    <span>${usage.avgQueryTime != null ? usage.avgQueryTime.toFixed(1) + 's' : 'N/A'}</span>
                 </div>`;
         }
 
         const docsBody = document.getElementById('docs-body');
         if (docsBody) {
+            const sectorEntries = docs.documentsBySector ? Object.entries(docs.documentsBySector) : [];
+            const sectorRows = sectorEntries.map(([sector, count]) =>
+                `<div class="admin-stat-row"><span class="admin-stat-label">${escapeHtml(sector)}</span><span>${count}</span></div>`
+            ).join('');
             docsBody.innerHTML = `
                 <div class="admin-stat">
                     <div class="admin-stat-value">${docs.totalDocuments ?? 0}</div>
                     <div class="admin-stat-label">Documents</div>
                 </div>
                 <div class="admin-stat-row">
-                    <span class="admin-stat-label">Chunks</span>
-                    <span>${docs.totalChunks ?? 0}</span>
-                </div>`;
+                    <span class="admin-stat-label">Last 24h</span>
+                    <span>${docs.documentsLast24h ?? 0}</span>
+                </div>
+                ${sectorRows}`;
         }
 
         const pendingBody = document.getElementById('pending-body');
@@ -262,15 +281,15 @@
             const sectors = (user.allowedSectors || []).map(s =>
                 `<span class="sector-tag">${escapeHtml(s)}</span>`
             ).join(' ');
-            const statusBadge = user.active
-                ? '<span class="admin-badge admin-badge-success">Active</span>'
-                : (user.approved === false
-                    ? '<span class="admin-badge admin-badge-warning">Pending</span>'
+            const statusBadge = user.pendingApproval
+                ? '<span class="admin-badge admin-badge-warning">Pending</span>'
+                : (user.active
+                    ? '<span class="admin-badge admin-badge-success">Active</span>'
                     : '<span class="admin-badge admin-badge-neutral">Inactive</span>');
             const lastLogin = formatTimestamp(user.lastLogin);
 
             let actions = '';
-            if (user.approved === false) {
+            if (user.pendingApproval) {
                 actions += `<button class="btn btn-primary btn-xs" data-action="approveUser" data-user-id="${escapeHtml(user.id)}">Approve</button> `;
             }
             if (!user.active) {

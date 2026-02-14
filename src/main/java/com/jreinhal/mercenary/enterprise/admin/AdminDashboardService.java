@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -53,11 +54,17 @@ public class AdminDashboardService {
     }
 
     public List<UserSummary> getAllUsers() {
-        return this.userRepository.findAll().stream().map(u -> new UserSummary(u.getId(), u.getUsername(), u.getDisplayName(), u.getRoles(), u.isActive(), u.getLastLoginAt(), u.getCreatedAt())).toList();
+        return this.userRepository.findAll().stream().map(this::toUserSummary).toList();
     }
 
     public List<UserSummary> getPendingApprovals() {
-        return this.userRepository.findAll().stream().filter(User::isPendingApproval).map(u -> new UserSummary(u.getId(), u.getUsername(), u.getDisplayName(), u.getRoles(), u.isActive(), u.getLastLoginAt(), u.getCreatedAt())).toList();
+        return this.userRepository.findAll().stream().filter(User::isPendingApproval).map(this::toUserSummary).toList();
+    }
+
+    private UserSummary toUserSummary(User u) {
+        Set<String> sectors = u.getAllowedSectors().stream().map(Enum::name).collect(Collectors.toSet());
+        return new UserSummary(u.getId(), u.getUsername(), u.getDisplayName(), u.getRoles(), u.isActive(),
+                u.getLastLoginAt(), u.getCreatedAt(), u.getClearance().name(), sectors, u.isPendingApproval());
     }
 
     public boolean approveUser(String userId) {
@@ -281,6 +288,7 @@ public class AdminDashboardService {
     public record DocumentStats(long totalDocuments, long documentsLast24h, Map<String, Long> documentsByType, Map<String, Long> documentsBySector) {
     }
 
-    public record UserSummary(String id, String username, String displayName, Set<UserRole> roles, boolean active, Instant lastLogin, Instant createdAt) {
+    public record UserSummary(String id, String username, String displayName, Set<UserRole> roles, boolean active,
+            Instant lastLogin, Instant createdAt, String clearance, Set<String> allowedSectors, boolean pendingApproval) {
     }
 }
