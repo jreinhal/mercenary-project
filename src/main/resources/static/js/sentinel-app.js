@@ -4724,7 +4724,7 @@
                 if (!sources || sources.length === 0) {
                     sourcesList.innerHTML = `<div class="info-empty-state">No sources referenced</div>`;
                 } else {
-                    if (sourceScoreBadge) {
+                    if (sourceScoreBadge && score != null) {
                         sourceScoreBadge.classList.remove('hidden');
                     }
                     const uniqueSources = [...new Set(sources.map(s => {
@@ -4766,7 +4766,7 @@
                 if (entities.length === 0) {
                     entitiesList.innerHTML = `<div class="info-empty-state">No entities extracted</div>`;
                 } else {
-                    if (entityScoreBadge) {
+                    if (entityScoreBadge && score != null) {
                         entityScoreBadge.classList.remove('hidden');
                     }
                     entitiesList.innerHTML = entities.map(entity => `
