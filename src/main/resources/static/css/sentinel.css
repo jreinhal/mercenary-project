@@ -2802,6 +2802,31 @@
             opacity: 0.7;
         }
 
+        .confidence-badge {
+            font-family: var(--font-mono);
+            font-size: 9px;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 3px;
+            margin-left: 6px;
+            letter-spacing: 0.02em;
+        }
+
+        .confidence-high {
+            background: rgba(5, 150, 105, 0.15);
+            color: #059669;
+        }
+
+        .confidence-medium {
+            background: rgba(37, 99, 235, 0.12);
+            color: #2563eb;
+        }
+
+        .confidence-low {
+            background: rgba(217, 119, 6, 0.12);
+            color: #d97706;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
