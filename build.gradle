@@ -196,8 +196,8 @@ sonar {
         property 'sonar.organization', 'jreinhal'
         property 'sonar.host.url', 'https://sonarcloud.io'
         property 'sonar.coverage.jacoco.xmlReportPaths', "${buildDir}/reports/jacoco/test/jacocoTestReport.xml"
-        property 'sonar.exclusions', 'src/main/resources/static/vendor/**,src/main/resources/static/js/sentinel-app.js'
-        property 'sonar.cpd.exclusions', 'src/main/resources/static/vendor/**,src/main/resources/static/js/sentinel-app.js'
+        property 'sonar.exclusions', 'src/main/resources/static/vendor/**,src/main/resources/static/js/sentinel-app.js,src/main/resources/static/js/admin.js'
+        property 'sonar.cpd.exclusions', 'src/main/resources/static/vendor/**,src/main/resources/static/js/sentinel-app.js,src/main/resources/static/js/admin.js'
     }
 }
 
