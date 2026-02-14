@@ -7820,61 +7820,12 @@
             appendUserMessage(query);
             queryInput.value = '';
 
-            // SSE streaming disabled - using standard endpoint for consistent response quality
-            // Re-enable after LLM response quality is improved
-
-            const loadingId = appendLoadingIndicator(query);
-
+            // Try SSE streaming first for real-time token output, fall back to standard endpoint
             try {
-                const startTime = Date.now();
-                const response = await guardedFetch(`${API_BASE}/ask/enhanced?${params.toString()}`);
-                const data = await response.json();
-                const latency = Date.now() - startTime;
-
-                removeElement(loadingId);
-
-                console.log('Enhanced response:', { sources: data.sources, reasoning: data.reasoning?.length, answer: data.answer?.substring(0, 100) });
-
-                const reasoningSteps = (data.reasoning || []).map(step => ({
-                    type: mapStepType(step.type),
-                    label: step.label,
-                    detail: step.detail,
-                    durationMs: step.durationMs
-                }));
-
-                let sources = (data.sources || []).map(s => {
-                    if (typeof s === 'string') return { filename: s };
-                    if (s && typeof s === 'object') return s;
-                    return { filename: String(s || '') };
-                }).filter(s => s.filename || s.source || s.name);
-                console.log('Backend sources:', data.sources, '-> Mapped:', sources);
-
-                if (sources.length === 0 && data.answer) {
-                    sources = extractSourcesFromText(data.answer);
-                    console.log('Fallback extracted sources:', sources);
-                }
-
-                const responseMetrics = { ...(data.metrics || {}), activeFileCount: activeFiles.length };
-                appendAssistantResponse(data.answer, reasoningSteps, sources, data.traceId, responseMetrics);
-                fetchSystemStatus();
-                if (state.deepAnalysisEnabled) {
-                    refreshEntityGraph();
-                }
-
-            } catch (error) {
-                removeElement(loadingId);
-                if (error && error.code === 'auth') {
-                    return;
-                }
-                try {
-                    const fallbackResponse = await guardedFetch(`${API_BASE}/ask?${params.toString()}`);
-                    const answer = await fallbackResponse.text();
-                    const sourceMatches = answer.match(/\[([^\]]+\.(pdf|txt|md))\]/gi) || [];
-                    const sources = sourceMatches.map(m => ({ filename: m.replace(/[\[\]]/g, '') }));
-                    appendAssistantResponse(answer, [], sources, null, { activeFileCount: activeFiles.length });
-                } catch (fallbackError) {
-                    appendAssistantResponse(`Error: ${error.message}`, [], [], null, null);
-                }
+                await executeQueryWithStreaming(query, sector, activeFiles, params);
+            } catch (streamErr) {
+                console.warn('SSE streaming unavailable, using standard endpoint:', streamErr);
+                await executeQueryFallback(query, sector, activeFiles, params);
             }
         }
 
@@ -7991,16 +7942,22 @@
                         // Remove streaming UI
                         removeElement(loadingId);
 
-                        // Show final response with sources
-                        const sources = (result.sources || []).map(s => ({ filename: s }));
+                        // Show final response with sources and real metrics
+                        const sources = (result.sources || []).map(s =>
+                            typeof s === 'string' ? { filename: s } : s
+                        ).filter(s => s.filename || s.source || s.name);
+                        const responseMetrics = { ...(result.metrics || {}), activeFileCount: activeFiles.length, streamed: true };
                         appendAssistantResponse(
                             result.answer,
                             reasoningSteps,
                             sources,
-                            null,
-                            { activeFileCount: activeFiles.length, streamed: true }
+                            result.traceId || null,
+                            responseMetrics
                         );
                         fetchSystemStatus();
+                        if (state.deepAnalysisEnabled) {
+                            refreshEntityGraph();
+                        }
                     } catch (err) {
                         console.error('Error parsing complete:', err);
                         removeElement(loadingId);
@@ -8019,11 +7976,9 @@
                     }
                     eventSource.close();
 
-                    // Fall back to non-streaming after a delay
-                    setTimeout(() => {
-                        removeElement(loadingId);
-                        appendAssistantResponse('Streaming failed. Please try again.', [], [], null, null);
-                    }, 2000);
+                    // Fall back to non-streaming endpoint
+                    removeElement(loadingId);
+                    executeQueryFallback(query, sector, activeFiles, params);
                 });
 
                 eventSource.onerror = () => {
