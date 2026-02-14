@@ -1146,3 +1146,27 @@ select:focus-visible {
 .admin-empty-text {
     font-size: 13px;
 }
+
+/* ── Auto-refresh indicator ─────────────────────────── */
+
+.auto-refresh-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-right: 8px;
+}
+
+.auto-refresh-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}

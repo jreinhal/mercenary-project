@@ -14,6 +14,7 @@
     let csrfTokenCache = '';
     let csrfTokenUnavailable = false;
     const sectionLoaded = {};
+    let overviewRefreshInterval = null;
 
     // ── Utility Functions ──────────────────────────────────
 
@@ -121,6 +122,7 @@
     // ── Navigation ─────────────────────────────────────────
 
     function switchSection(sectionId) {
+        stopOverviewPolling();
         document.querySelectorAll('.admin-section').forEach(el => el.classList.add('hidden'));
         document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
 
@@ -151,12 +153,25 @@
 
     // ── Section: Overview ──────────────────────────────────
 
+    function startOverviewPolling() {
+        stopOverviewPolling();
+        overviewRefreshInterval = setInterval(() => loadOverview(), 15000);
+    }
+
+    function stopOverviewPolling() {
+        if (overviewRefreshInterval) {
+            clearInterval(overviewRefreshInterval);
+            overviewRefreshInterval = null;
+        }
+    }
+
     async function loadOverview() {
         try {
             const response = await guardedFetch(`${API_BASE}/admin/dashboard`);
             if (!response.ok) throw new Error('Dashboard load failed');
             const data = await response.json();
             renderOverview(data);
+            startOverviewPolling();
         } catch (error) {
             if (error.code === 'auth') return;
             setText(document.getElementById('health-body'), 'Unable to load dashboard.');
