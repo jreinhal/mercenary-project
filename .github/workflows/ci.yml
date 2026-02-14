@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  # ── Tier 1: Unit tests with lint ─────────────────────────────────────
+  # ── Tier 1: Unit Tests ────────────────────────────────────────────
   unit-tests:
     runs-on: ubuntu-latest
     steps:
@@ -40,7 +40,7 @@ jobs:
             build/jacoco
           if-no-files-found: ignore
 
-  # ── Tier 2: Integration & E2E tests ──────────────────────────────────
+  # ── Tier 2: Integration & E2E ─────────────────────────────────────
   integration-e2e:
     needs: unit-tests
     runs-on: ubuntu-latest
@@ -75,7 +75,7 @@ jobs:
             build/e2e-results
           if-no-files-found: ignore
 
-  # ── Tier 3: Enterprise realism (advanced strategies enabled) ─────────
+  # ── Tier 3: Enterprise Realism ─────────────────────────────────────
   enterprise-realism:
     needs: integration-e2e
     runs-on: ubuntu-latest
@@ -90,7 +90,7 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Enterprise pipeline E2E
+      - name: Enterprise pipeline E2E (advanced RAG strategies)
         run: ./gradlew ciEnterpriseE2eTest
 
       - name: Upload enterprise E2E results
@@ -103,13 +103,29 @@ jobs:
             build/test-results
           if-no-files-found: ignore
 
-  # ── Tier 4: Packaging + SonarCloud (final gate) ─────────────────────
+  # ── Tier 4: Packaging & Analysis (final gate) ─────────────────────
+  # Named "build" to satisfy existing branch protection status check.
+  # Uses if: always() so it runs even when upstream tiers fail,
+  # preventing a skipped required check from being treated as passing.
   build:
-    needs: enterprise-realism
+    needs: [unit-tests, integration-e2e, enterprise-realism]
+    if: always()
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
+      - name: Gate — fail if any upstream tier failed
+        if: >-
+          needs.unit-tests.result != 'success' ||
+          needs.integration-e2e.result != 'success' ||
+          needs.enterprise-realism.result != 'success'
+        run: |
+          echo "::error::Upstream tier failed or was cancelled"
+          echo "  unit-tests: ${{ needs.unit-tests.result }}"
+          echo "  integration-e2e: ${{ needs.integration-e2e.result }}"
+          echo "  enterprise-realism: ${{ needs.enterprise-realism.result }}"
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -125,11 +141,11 @@ jobs:
       - name: Verify enterprise packaging build
         run: ./gradlew -Pedition=enterprise build -x test
 
-      - name: Download unit test coverage
+      - name: Download unit test coverage for SonarCloud
         uses: actions/download-artifact@v4
         with:
           name: unit-test-reports
-          path: build
+          path: .
 
       - name: SonarCloud analysis
         if: ${{ env.SONAR_TOKEN != '' }}
@@ -137,13 +153,3 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: ./gradlew sonar --info
-
-      - name: Upload build artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: |
-            build/libs
-            build/reports
-          if-no-files-found: ignore
