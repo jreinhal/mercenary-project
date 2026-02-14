@@ -7444,6 +7444,8 @@
             div.id = msgId;
 
             const processedText = processCitations(text);
+            const confidence = metrics?.routingConfidence != null ? Math.round(metrics.routingConfidence * 100) : null;
+            const confClass = confidence != null ? (confidence >= 85 ? 'high' : confidence >= 70 ? 'medium' : 'low') : null;
 
             const totalDuration = reasoningSteps.reduce((sum, step) => sum + (step.durationMs || 0), 0);
             const hasRealTiming = reasoningSteps.some(s => s.durationMs !== undefined);
@@ -7479,8 +7481,12 @@
             `;
             }
 
+            const confidenceBadgeHtml = confidence != null
+                ? `<span class="confidence-badge confidence-${confClass}" title="Routing confidence: ${confidence}%">${confidence}%</span>`
+                : '';
+
             div.innerHTML = `
-            <div class="message-sender"><span class="message-timestamp">${getTimestamp()}</span> SENTINEL</div>
+            <div class="message-sender"><span class="message-timestamp">${getTimestamp()}</span> SENTINEL ${confidenceBadgeHtml}</div>
             ${reasoningHtml}
             <div class="message-bubble">
                 ${processedText}
