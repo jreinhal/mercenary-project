@@ -31,6 +31,16 @@ QUCORAG_INFINI_GRAM=false
 
 Note: AUTH_MODE is optional when APP_PROFILE=govcloud, but set it explicitly if you override profiles.
 
+## Optional: Sparse Embedding Sidecar
+For enhanced lexical retrieval, deploy the FlagEmbedding sidecar alongside Ollama.
+On a connected machine, pre-download the BGE-M3 model for FlagEmbedding:
+```
+pip install FlagEmbedding
+python -c "from FlagEmbedding import BGEM3FlagModel; BGEM3FlagModel('BAAI/bge-m3')"
+```
+Copy the cached model directory (~/.cache/huggingface/) to the SCIF system.
+Set `SPARSE_EMBEDDING_ENABLED=true` to activate.
+
 ## Hardening checklist
 - Bind MongoDB to localhost only
 - Disable outbound network egress

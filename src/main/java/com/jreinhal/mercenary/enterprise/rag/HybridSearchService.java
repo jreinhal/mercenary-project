@@ -1,6 +1,8 @@
 package com.jreinhal.mercenary.enterprise.rag;
 
+import com.jreinhal.mercenary.enterprise.rag.sparse.SparseEmbeddingService;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.vector.LocalMongoVectorStore;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -14,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,6 +26,12 @@ public class HybridSearchService {
     private static final int RRF_K = 60;
     private static final double DEFAULT_VECTOR_WEIGHT = 0.6;
     private static final double DEFAULT_BM25_WEIGHT = 0.4;
+
+    @Autowired(required = false)
+    private SparseEmbeddingService sparseEmbeddingService;
+
+    @Autowired(required = false)
+    private LocalMongoVectorStore localMongoVectorStore;
 
     public HybridSearchService(VectorStore vectorStore) {
         this.vectorStore = vectorStore;
@@ -52,6 +61,12 @@ public class HybridSearchService {
     }
 
     private List<Document> performBm25Search(String query, int limit) {
+        // Try sparse retrieval first (learned lexical weights from BGE-M3 sidecar)
+        List<Document> sparseResults = this.performSparseSearch(query, limit);
+        if (!sparseResults.isEmpty()) {
+            return sparseResults;
+        }
+        // Fallback: hand-coded BM25
         try {
             List<Document> candidates = this.performVectorSearch(query, limit * 3);
             ArrayList<Map.Entry<Document, Double>> scored = new ArrayList<Map.Entry<Document, Double>>();
@@ -64,6 +79,31 @@ public class HybridSearchService {
         }
         catch (Exception e) {
             log.error("BM25 search failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Sparse retrieval using learned lexical weights from the FlagEmbedding sidecar.
+     * Returns empty list if the sidecar is unavailable, allowing fallback to BM25.
+     */
+    private List<Document> performSparseSearch(String query, int limit) {
+        if (this.sparseEmbeddingService == null || !this.sparseEmbeddingService.isEnabled()
+                || this.localMongoVectorStore == null) {
+            return List.of();
+        }
+        try {
+            Map<String, Float> queryWeights = this.sparseEmbeddingService.embedQuery(query);
+            if (queryWeights.isEmpty()) {
+                return List.of();
+            }
+            List<Document> results = this.localMongoVectorStore.sparseSearch(queryWeights, null, limit, 0.01);
+            if (log.isDebugEnabled()) {
+                log.debug("Sparse search returned {} results (replacing BM25)", results.size());
+            }
+            return results;
+        } catch (Exception e) {
+            log.warn("Sparse search failed, falling back to BM25: {}", e.getMessage());
             return List.of();
         }
     }

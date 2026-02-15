@@ -242,6 +242,14 @@ sentinel:
     target-dimensions: ${EMBEDDING_TARGET_DIMENSIONS:0}
     # Enables Document(media+text) embedding attempts for visual assets (falls back to text if unsupported).
     multimodal-enabled: ${EMBEDDING_MULTIMODAL_ENABLED:false}
+  # FlagEmbedding sidecar for BGE-M3 learned sparse (lexical) retrieval.
+  # Replaces hand-coded BM25 with model-learned term weights.
+  # Requires the sparse-embedding-sidecar container (tools/sparse-embedding-sidecar/).
+  sparse-embedding:
+    enabled: ${SPARSE_EMBEDDING_ENABLED:false}
+    service-url: ${SPARSE_EMBEDDING_URL:http://localhost:8091}
+    timeout-seconds: ${SPARSE_EMBEDDING_TIMEOUT:30}
+    batch-size: ${SPARSE_EMBEDDING_BATCH_SIZE:64}
 
 # ============================================
 # SENTINEL Advanced RAG Configuration

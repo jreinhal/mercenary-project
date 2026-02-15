@@ -1,6 +1,7 @@
 package com.jreinhal.mercenary.service;
 
 import com.jreinhal.mercenary.Department;
+import com.jreinhal.mercenary.enterprise.rag.sparse.SparseEmbeddingService;
 import com.jreinhal.mercenary.service.PiiRedactionService;
 import com.jreinhal.mercenary.util.LogSanitizer;
 import com.jreinhal.mercenary.rag.megarag.MegaRagService;
@@ -58,6 +59,7 @@ import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -81,6 +83,8 @@ public class SecureIngestionService {
     private final HipaaPolicy hipaaPolicy;
     private final com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService;
     private final Tika tika;
+    @Autowired(required = false)
+    private SparseEmbeddingService sparseEmbeddingService;
     private static final String PDF_MIME_TYPE = "application/pdf";
     private static final Set<String> BLOCKED_MIME_TYPES = Set.of(
         "application/x-executable", "application/x-msdos-program", "application/x-msdownload",
@@ -338,6 +342,14 @@ public class SecureIngestionService {
                 this.partitionAssigner.assignBatch(finalDocuments);
                 this.vectorStore.add(finalDocuments);
                 vectorStoreWritten = true;
+                // Compute and store sparse (lexical) weights from BGE-M3 sidecar if available
+                if (this.sparseEmbeddingService != null && this.sparseEmbeddingService.isEnabled()) {
+                    try {
+                        this.sparseEmbeddingService.computeAndStoreSparseWeights(finalDocuments);
+                    } catch (Exception sparseEx) {
+                        log.warn("Sparse embedding failed (non-fatal): {}", sparseEx.getMessage());
+                    }
+                }
                 if (this.hyperGraphMemory != null && this.hyperGraphMemory.isIndexingEnabled()) {
                     for (Document doc : finalDocuments) {
                         this.hyperGraphMemory.indexDocument(doc, dept.name());

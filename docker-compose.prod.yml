@@ -20,6 +20,7 @@ services:
       - AUTH_MODE=${AUTH_MODE:-STANDARD}
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sentinel
       - SPRING_AI_OLLAMA_BASE_URL=http://ollama:11434
+      - SPARSE_EMBEDDING_URL=http://sparse-embedding:8091
       - JAVA_OPTS=-Xms1g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
     depends_on:
       mongo:
@@ -100,6 +101,42 @@ services:
         reservations:
           cpus: '2.0'
           memory: 4G
+
+  # FlagEmbedding Sparse Embedding Sidecar (Optional)
+  # Provides BGE-M3 learned sparse (lexical) weights for hybrid retrieval.
+  # Enable via SPARSE_EMBEDDING_ENABLED=true on the sentinel service.
+  sparse-embedding:
+    build:
+      context: ./tools/sparse-embedding-sidecar
+      dockerfile: Dockerfile
+    container_name: sentinel-sparse-embedding
+    restart: always
+    ports:
+      - "127.0.0.1:8091:8091"
+    environment:
+      - DEVICE=cpu
+      - MODEL_NAME=BAAI/bge-m3
+    networks:
+      - sentinel-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 6G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=500M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
 
 networks:
   sentinel-network:

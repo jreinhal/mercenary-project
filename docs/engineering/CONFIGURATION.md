@@ -37,6 +37,17 @@ Notes:
 - LLM_NUM_CTX
 - LLM_TIMEOUT_SECONDS
 
+## Sparse Embedding Sidecar (Optional)
+Provides BGE-M3 learned sparse (lexical) weights for hybrid retrieval,
+replacing the built-in BM25 scoring with model-learned term weights.
+- SPARSE_EMBEDDING_ENABLED (default: false)
+- SPARSE_EMBEDDING_URL (default: http://localhost:8091)
+- SPARSE_EMBEDDING_TIMEOUT (default: 30 seconds)
+- SPARSE_EMBEDDING_BATCH_SIZE (default: 64)
+
+Requires the FlagEmbedding sidecar container (see `tools/sparse-embedding-sidecar/`).
+When disabled, the system falls back to built-in BM25/keyword matching.
+
 ## Swagger
 - SWAGGER_ENABLED (default false, true in dev profile)
 
