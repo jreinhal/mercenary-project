@@ -138,14 +138,14 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Verify enterprise packaging build
-        run: ./gradlew -Pedition=enterprise build -x test
-
       - name: Download unit test coverage for SonarCloud
         uses: actions/download-artifact@v4
         with:
           name: unit-test-reports
-          path: .
+          path: build
+
+      - name: Verify enterprise packaging build
+        run: ./gradlew -Pedition=enterprise build -x test -x jacocoTestReport
 
       - name: SonarCloud analysis
         if: ${{ env.SONAR_TOKEN != '' }}

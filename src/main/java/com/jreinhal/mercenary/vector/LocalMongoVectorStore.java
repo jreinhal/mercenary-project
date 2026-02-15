@@ -25,7 +25,8 @@ import org.springframework.data.mongodb.core.query.Query;
 public class LocalMongoVectorStore
 implements VectorStore {
     private static final Logger log = LoggerFactory.getLogger(LocalMongoVectorStore.class);
-    private static final String COLLECTION_NAME = "vector_store";
+    /** MongoDB collection name for vector documents. Referenced by SparseEmbeddingService. */
+    public static final String COLLECTION_NAME = "vector_store";
     private static final Set<String> PREFILTER_KEYS = Set.of(
             "dept", "workspaceId", "type", "partition_id", "source", "filename", "mimeType",
             "documentYear", "documentDateEpoch");
@@ -175,6 +176,69 @@ implements VectorStore {
             return 0.0;
         }
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(docNorm));
+    }
+
+    /**
+     * Compute dot product between two sparse weight maps.
+     * Only tokens present in both maps contribute to the score.
+     */
+    private double calculateSparseDotProduct(Map<String, Float> queryWeights, Map<String, Float> docWeights) {
+        if (queryWeights == null || queryWeights.isEmpty() || docWeights == null || docWeights.isEmpty()) {
+            return 0.0;
+        }
+        // Iterate over the smaller map for efficiency
+        Map<String, Float> smaller = queryWeights.size() <= docWeights.size() ? queryWeights : docWeights;
+        Map<String, Float> larger = smaller == queryWeights ? docWeights : queryWeights;
+        double score = 0.0;
+        for (Map.Entry<String, Float> entry : smaller.entrySet()) {
+            Float otherWeight = larger.get(entry.getKey());
+            if (otherWeight != null) {
+                score += (double) entry.getValue() * (double) otherWeight;
+            }
+        }
+        return score;
+    }
+
+    /**
+     * Perform sparse retrieval using learned lexical weights from BGE-M3.
+     *
+     * Uses the same prefilter and in-memory scoring pattern as {@link #similaritySearch(SearchRequest)},
+     * but scores documents via sparse dot product instead of dense cosine similarity.
+     *
+     * @param queryWeights sparse weight map for the query (token -> weight)
+     * @param filterExpression filter expression string (same format as similarity search)
+     * @param topK maximum number of results
+     * @param threshold minimum sparse score threshold
+     * @return ranked list of documents with sparse scores in metadata
+     */
+    public List<Document> sparseSearch(Map<String, Float> queryWeights, Object filterExpression, int topK, double threshold) {
+        if (queryWeights == null || queryWeights.isEmpty()) {
+            return List.of();
+        }
+        FilterExpressionParser.ParsedFilter parsed = FilterExpressionParser.parse(filterExpression);
+        Query prefilterQuery = this.buildPrefilterQuery(parsed);
+        List<MongoDocument> allDocs = prefilterQuery != null
+                ? this.mongoTemplate.find(prefilterQuery, MongoDocument.class, COLLECTION_NAME)
+                : this.mongoTemplate.findAll(MongoDocument.class, COLLECTION_NAME);
+        FilterEvaluator evaluator = this.buildFilterEvaluator(parsed);
+        return allDocs.stream()
+                .filter(md -> evaluator.matches(md.getMetadata()))
+                .filter(md -> md.getSparseWeights() != null && !md.getSparseWeights().isEmpty())
+                .map(md -> {
+                    Map<String, Object> metadata = md.getMetadata() != null
+                            ? new HashMap<String, Object>(md.getMetadata()) : new HashMap<>();
+                    Document doc = new Document(md.getId(), md.getContent(), metadata);
+                    double score = this.calculateSparseDotProduct(queryWeights, md.getSparseWeights());
+                    return new ScoredDocument(doc, score);
+                })
+                .filter(scored -> scored.score >= threshold)
+                .sorted((a, b) -> Double.compare(b.score, a.score))
+                .limit(topK)
+                .map(scored -> {
+                    scored.document.getMetadata().put("sparseScore", scored.score);
+                    return scored.getDocument();
+                })
+                .collect(Collectors.toList());
     }
 
     private double computeNorm(float[] embedding) {
@@ -396,6 +460,7 @@ implements VectorStore {
         private List<Double> embedding;
         private Double embeddingNorm;
         private Integer embeddingDimensions;
+        private Map<String, Float> sparseWeights;
 
         public String getId() {
             return this.id;
@@ -443,6 +508,14 @@ implements VectorStore {
 
         public void setEmbeddingDimensions(Integer embeddingDimensions) {
             this.embeddingDimensions = embeddingDimensions;
+        }
+
+        public Map<String, Float> getSparseWeights() {
+            return this.sparseWeights;
+        }
+
+        public void setSparseWeights(Map<String, Float> sparseWeights) {
+            this.sparseWeights = sparseWeights;
         }
     }
 

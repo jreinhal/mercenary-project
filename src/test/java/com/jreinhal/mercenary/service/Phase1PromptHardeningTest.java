@@ -307,7 +307,8 @@ class Phase1PromptHardeningTest {
                 mock(WorkspaceQuotaService.class),
                 "llama3.1:8b",
                 0.0,
-                256
+                256,
+                4096
         );
     }
 }

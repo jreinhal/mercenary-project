@@ -1,11 +1,13 @@
 package com.jreinhal.mercenary.rag.hybridrag;
 
 import com.jreinhal.mercenary.constant.StopWords;
+import com.jreinhal.mercenary.enterprise.rag.sparse.SparseEmbeddingService;
 import com.jreinhal.mercenary.rag.hybridrag.QueryExpander;
 import com.jreinhal.mercenary.util.FilterExpressionBuilder;
 import com.jreinhal.mercenary.util.TemporalQueryConstraints;
 import com.jreinhal.mercenary.reasoning.ReasoningStep;
 import com.jreinhal.mercenary.reasoning.ReasoningTracer;
+import com.jreinhal.mercenary.vector.LocalMongoVectorStore;
 import com.jreinhal.mercenary.Department;
 import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
@@ -28,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -41,6 +44,10 @@ public class HybridRagService {
     private final QueryExpander queryExpander;
     private final ReasoningTracer reasoningTracer;
     private final ExecutorService ragExecutor;
+    @Autowired(required = false)
+    private SparseEmbeddingService sparseEmbeddingService;
+    @Autowired(required = false)
+    private LocalMongoVectorStore localMongoVectorStore;
     @Value(value="${sentinel.hybridrag.enabled:true}")
     private boolean enabled;
     @Value(value="${sentinel.hybridrag.rrf-k:60}")
@@ -152,6 +159,12 @@ public class HybridRagService {
     }
 
     private List<RankedDoc> performKeywordRetrieval(String query, String filterExpression) {
+        // Try sparse retrieval first (learned lexical weights from BGE-M3 sidecar)
+        List<RankedDoc> sparseResults = this.performSparseRetrieval(query, filterExpression);
+        if (!sparseResults.isEmpty()) {
+            return sparseResults;
+        }
+        // Fallback: substring keyword matching
         Set<String> keywords = this.extractKeywords(query);
         if (keywords.isEmpty()) {
             return List.of();
@@ -170,6 +183,35 @@ public class HybridRagService {
             result.add(new RankedDoc(rd.document, i + 1, "keyword", rd.keywordScore));
         }
         return result;
+    }
+
+    /**
+     * Sparse retrieval using learned lexical weights from the FlagEmbedding sidecar.
+     * Returns empty list if the sidecar is unavailable, allowing fallback to keyword matching.
+     */
+    private List<RankedDoc> performSparseRetrieval(String query, String filterExpression) {
+        if (this.sparseEmbeddingService == null || !this.sparseEmbeddingService.isEnabled()
+                || this.localMongoVectorStore == null) {
+            return List.of();
+        }
+        try {
+            Map<String, Float> queryWeights = this.sparseEmbeddingService.embedQuery(query);
+            if (queryWeights.isEmpty()) {
+                return List.of();
+            }
+            List<Document> results = this.localMongoVectorStore.sparseSearch(queryWeights, filterExpression, 50, 0.01);
+            ArrayList<RankedDoc> ranked = new ArrayList<>();
+            for (int i = 0; i < results.size(); i++) {
+                ranked.add(new RankedDoc(results.get(i), i + 1, "sparse"));
+            }
+            if (log.isDebugEnabled()) {
+                log.debug("Sparse retrieval returned {} results", ranked.size());
+            }
+            return ranked;
+        } catch (Exception e) {
+            log.warn("Sparse retrieval failed, falling back to keyword matching: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private List<RankedDoc> applyOcrTolerance(List<RankedDoc> results, String query) {

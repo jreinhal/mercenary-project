@@ -104,6 +104,7 @@ Feature flags and tuning knobs commonly adjusted in production:
 - HIFIRAG_RERANKER_MODE (`dedicated`, `auto`, `llm`, `keyword`)
 - EMBEDDING_BATCH_SIZE
 - EMBEDDING_MULTIMODAL_ENABLED
+- SPARSE_EMBEDDING_ENABLED (opt-in BGE-M3 learned sparse retrieval via sidecar)
 - INGEST_RESILIENCE_ENABLED
 - INGEST_MAX_RETRIES
 - SOURCE_RETENTION_PDF_ENABLED

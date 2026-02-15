@@ -1,6 +1,8 @@
 package com.jreinhal.mercenary.enterprise.rag;
 
+import com.jreinhal.mercenary.enterprise.rag.sparse.SparseEmbeddingService;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.vector.LocalMongoVectorStore;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -14,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -22,21 +25,37 @@ public class HybridSearchService {
     private final VectorStore vectorStore;
     private static final int RRF_K = 60;
     private static final double DEFAULT_VECTOR_WEIGHT = 0.6;
-    private static final double DEFAULT_BM25_WEIGHT = 0.4;
+    private static final double DEFAULT_LEXICAL_WEIGHT = 0.4;
+
+    @Autowired(required = false)
+    private SparseEmbeddingService sparseEmbeddingService;
+
+    @Autowired(required = false)
+    private LocalMongoVectorStore localMongoVectorStore;
 
     public HybridSearchService(VectorStore vectorStore) {
         this.vectorStore = vectorStore;
     }
 
     public List<HybridResult> search(String query, int topK) {
-        return this.search(query, topK, 0.6, 0.4);
+        return this.search(query, topK, 0.6, 0.4, null);
     }
 
-    public List<HybridResult> search(String query, int topK, double vectorWeight, double bm25Weight) {
-        log.debug("Hybrid search: query={}, topK={}, weights=[vector={}, bm25={}]", LogSanitizer.querySummary(query), topK, vectorWeight, bm25Weight);
+    public List<HybridResult> search(String query, int topK, double vectorWeight, double lexicalWeight) {
+        return this.search(query, topK, vectorWeight, lexicalWeight, null);
+    }
+
+    /**
+     * Hybrid search combining vector (dense) and lexical (sparse/BM25) retrieval via RRF fusion.
+     *
+     * @param filterExpression optional metadata filter expression forwarded to sparse search
+     *                         (same format as {@link LocalMongoVectorStore#sparseSearch})
+     */
+    public List<HybridResult> search(String query, int topK, double vectorWeight, double lexicalWeight, Object filterExpression) {
+        log.debug("Hybrid search: query={}, topK={}, weights=[vector={}, lexical={}]", LogSanitizer.querySummary(query), topK, vectorWeight, lexicalWeight);
         List<Document> vectorResults = this.performVectorSearch(query, topK * 2);
-        List<Document> bm25Results = this.performBm25Search(query, topK * 2);
-        List<HybridResult> fusedResults = this.fuseResults(vectorResults, bm25Results, vectorWeight, bm25Weight);
+        List<Document> lexicalResults = this.performBm25Search(query, topK * 2, filterExpression);
+        List<HybridResult> fusedResults = this.fuseResults(vectorResults, lexicalResults, vectorWeight, lexicalWeight);
         return fusedResults.stream().limit(topK).toList();
     }
 
@@ -51,7 +70,13 @@ public class HybridSearchService {
         }
     }
 
-    private List<Document> performBm25Search(String query, int limit) {
+    private List<Document> performBm25Search(String query, int limit, Object filterExpression) {
+        // Try sparse retrieval first (learned lexical weights from BGE-M3 sidecar)
+        List<Document> sparseResults = this.performSparseSearch(query, limit, filterExpression);
+        if (!sparseResults.isEmpty()) {
+            return sparseResults;
+        }
+        // Fallback: hand-coded BM25
         try {
             List<Document> candidates = this.performVectorSearch(query, limit * 3);
             ArrayList<Map.Entry<Document, Double>> scored = new ArrayList<Map.Entry<Document, Double>>();
@@ -64,6 +89,33 @@ public class HybridSearchService {
         }
         catch (Exception e) {
             log.error("BM25 search failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * Sparse retrieval using learned lexical weights from the FlagEmbedding sidecar.
+     * Returns empty list if the sidecar is unavailable, allowing fallback to BM25.
+     *
+     * @param filterExpression metadata filter expression forwarded to the vector store prefilter
+     */
+    private List<Document> performSparseSearch(String query, int limit, Object filterExpression) {
+        if (this.sparseEmbeddingService == null || !this.sparseEmbeddingService.isEnabled()
+                || this.localMongoVectorStore == null) {
+            return List.of();
+        }
+        try {
+            Map<String, Float> queryWeights = this.sparseEmbeddingService.embedQuery(query);
+            if (queryWeights.isEmpty()) {
+                return List.of();
+            }
+            List<Document> results = this.localMongoVectorStore.sparseSearch(queryWeights, filterExpression, limit, 0.01);
+            if (log.isDebugEnabled()) {
+                log.debug("Sparse search returned {} results (replacing BM25)", results.size());
+            }
+            return results;
+        } catch (Exception e) {
+            log.warn("Sparse search failed, falling back to BM25: {}", e.getMessage());
             return List.of();
         }
     }
@@ -94,7 +146,7 @@ public class HybridSearchService {
         return Arrays.stream(text.toLowerCase().replaceAll("[^a-z0-9\\s]", " ").split("\\s+")).filter(t -> t.length() > 2).collect(Collectors.toSet());
     }
 
-    private List<HybridResult> fuseResults(List<Document> vectorResults, List<Document> bm25Results, double vectorWeight, double bm25Weight) {
+    private List<HybridResult> fuseResults(List<Document> vectorResults, List<Document> lexicalResults, double vectorWeight, double lexicalWeight) {
         HashMap<String, Integer> vectorRanks = new HashMap<String, Integer>();
         HashMap<String, Double> vectorScores = new HashMap<String, Double>();
         for (int i = 0; i < vectorResults.size(); ++i) {
@@ -102,18 +154,18 @@ public class HybridSearchService {
             vectorRanks.put(docId, i + 1);
             vectorScores.put(docId, 1.0 / (double)(i + 1));
         }
-        HashMap<String, Integer> bm25Ranks = new HashMap<String, Integer>();
-        HashMap<String, Double> bm25Scores = new HashMap<String, Double>();
-        for (int i = 0; i < bm25Results.size(); ++i) {
-            String docId = this.getDocumentId(bm25Results.get(i));
-            bm25Ranks.put(docId, i + 1);
-            bm25Scores.put(docId, 1.0 / (double)(i + 1));
+        HashMap<String, Integer> lexicalRanks = new HashMap<String, Integer>();
+        HashMap<String, Double> lexicalScores = new HashMap<String, Double>();
+        for (int i = 0; i < lexicalResults.size(); ++i) {
+            String docId = this.getDocumentId(lexicalResults.get(i));
+            lexicalRanks.put(docId, i + 1);
+            lexicalScores.put(docId, 1.0 / (double)(i + 1));
         }
         HashMap<String, Document> allDocs = new HashMap<String, Document>();
         for (Document doc : vectorResults) {
             allDocs.put(this.getDocumentId(doc), doc);
         }
-        for (Document doc : bm25Results) {
+        for (Document doc : lexicalResults) {
             allDocs.put(this.getDocumentId(doc), doc);
         }
         ArrayList<HybridResult> results = new ArrayList<HybridResult>();
@@ -121,13 +173,13 @@ public class HybridSearchService {
             String docId = entry.getKey();
             Document doc = entry.getValue();
             int vRank = vectorRanks.getOrDefault(docId, Integer.MAX_VALUE);
-            int bRank = bm25Ranks.getOrDefault(docId, Integer.MAX_VALUE);
+            int lRank = lexicalRanks.getOrDefault(docId, Integer.MAX_VALUE);
             double vScore = vectorScores.getOrDefault(docId, 0.0);
-            double bScore = bm25Scores.getOrDefault(docId, 0.0);
+            double lScore = lexicalScores.getOrDefault(docId, 0.0);
             double rrfVector = vRank < Integer.MAX_VALUE ? 1.0 / (double)(60 + vRank) : 0.0;
-            double rrfBm25 = bRank < Integer.MAX_VALUE ? 1.0 / (double)(60 + bRank) : 0.0;
-            double combinedScore = vectorWeight * rrfVector + bm25Weight * rrfBm25;
-            results.add(new HybridResult(doc, combinedScore, vScore, bScore, vRank, bRank));
+            double rrfLexical = lRank < Integer.MAX_VALUE ? 1.0 / (double)(60 + lRank) : 0.0;
+            double combinedScore = vectorWeight * rrfVector + lexicalWeight * rrfLexical;
+            results.add(new HybridResult(doc, combinedScore, vScore, lScore, vRank, lRank));
         }
         results.sort((a, b) -> Double.compare(b.combinedScore(), a.combinedScore()));
         return results;
@@ -145,31 +197,31 @@ public class HybridSearchService {
 
     public double[] suggestWeights(String query) {
         double vectorWeight = 0.6;
-        double bm25Weight = 0.4;
+        double lexicalWeight = 0.4;
         if (query.length() < 30) {
-            bm25Weight += 0.1;
+            lexicalWeight += 0.1;
             vectorWeight -= 0.1;
         }
         if (query.matches(".*\\b[A-Z]{2,}\\b.*")) {
-            bm25Weight += 0.15;
+            lexicalWeight += 0.15;
             vectorWeight -= 0.15;
         }
         if (query.contains("\"")) {
-            bm25Weight += 0.2;
+            lexicalWeight += 0.2;
             vectorWeight -= 0.2;
         }
         if (query.length() > 100) {
             vectorWeight += 0.1;
-            bm25Weight -= 0.1;
+            lexicalWeight -= 0.1;
         }
         if (query.contains("?") || query.toLowerCase().startsWith("how") || query.toLowerCase().startsWith("what") || query.toLowerCase().startsWith("why")) {
             vectorWeight += 0.1;
-            bm25Weight -= 0.1;
+            lexicalWeight -= 0.1;
         }
-        double total = vectorWeight + bm25Weight;
-        return new double[]{vectorWeight / total, bm25Weight / total};
+        double total = vectorWeight + lexicalWeight;
+        return new double[]{vectorWeight / total, lexicalWeight / total};
     }
 
-    public record HybridResult(Document document, double combinedScore, double vectorScore, double bm25Score, int vectorRank, int bm25Rank) {
+    public record HybridResult(Document document, double combinedScore, double vectorScore, double lexicalScore, int vectorRank, int lexicalRank) {
     }
 }

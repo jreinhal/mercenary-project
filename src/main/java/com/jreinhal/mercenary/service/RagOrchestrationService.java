@@ -103,6 +103,7 @@ public class RagOrchestrationService {
     private final String llmModel;
     private final double llmTemperature;
     private final int llmNumPredict;
+    private final int llmNumCtx;
     private final OllamaOptions llmOptions;
     private static final String NO_RELEVANT_RECORDS = "No relevant records found.";
     private static final Pattern STRICT_CITATION_PATTERN = Pattern.compile("\\[(?:Citation:\\s*)?(?:IMAGE:\\s*)?[^\\]]+\\.(pdf|txt|md|csv|xlsx|xls|doc|docx|pptx|html?|json|ndjson|log|png|jpg|jpeg|gif|tif|tiff|bmp)\\]", 2);
@@ -146,11 +147,20 @@ public class RagOrchestrationService {
     private int documentsPerQueryCeiling;
     @Value(value="${sentinel.rag.temporal-filtering.enabled:true}")
     private boolean temporalFilteringEnabled;
+    @Value("${sentinel.token-budget.no-retrieval.num-predict:128}")
+    private int noRetrievalMaxTokens;
+    @Value("${sentinel.token-budget.no-retrieval.num-ctx:2048}")
+    private int noRetrievalNumCtx;
+    @Value("${sentinel.token-budget.chunk.num-predict:256}")
+    private int chunkMaxTokens;
+    @Value("${sentinel.token-budget.chunk.num-ctx:4096}")
+    private int chunkNumCtx;
 
     public RagOrchestrationService(ChatClient.Builder builder, VectorStore vectorStore, AuditService auditService, QueryDecompositionService queryDecompositionService, ReasoningTracer reasoningTracer, QuCoRagService quCoRagService, AdaptiveRagService adaptiveRagService, RewriteService rewriteService, RagPartService ragPartService, HybridRagService hybridRagService, HiFiRagService hiFiRagService, MiARagService miARagService, MegaRagService megaRagService, HGMemQueryEngine hgMemQueryEngine, AgenticRagOrchestrator agenticRagOrchestrator, BidirectionalRagService bidirectionalRagService, ModalityRouter modalityRouter, SectorConfig sectorConfig, PromptGuardrailService guardrailService, @org.springframework.lang.Nullable ConversationMemoryProvider conversationMemoryService, @org.springframework.lang.Nullable SessionPersistenceProvider sessionPersistenceService, LicenseService licenseService, PiiRedactionService piiRedactionService, HipaaPolicy hipaaPolicy, @org.springframework.lang.Nullable HipaaAuditProvider hipaaAuditService, Cache<String, String> secureDocCache, com.jreinhal.mercenary.workspace.WorkspaceQuotaService workspaceQuotaService,
                                   @Value(value="${spring.ai.ollama.chat.options.model:llama3.1:8b}") String llmModel,
                                   @Value(value="${spring.ai.ollama.chat.options.temperature:0.0}") double llmTemperature,
-                                  @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict) {
+                                  @Value(value="${spring.ai.ollama.chat.options.num-predict:256}") int llmNumPredict,
+                                  @Value(value="${spring.ai.ollama.chat.options.num-ctx:4096}") int llmNumCtx) {
         // Avoid tool/function-call JSON leaking into end-user responses. (Ollama doesn't reliably execute tool calls.)
         this.chatClient = builder.build();
         this.vectorStore = vectorStore;
@@ -182,6 +192,7 @@ public class RagOrchestrationService {
         this.llmModel = llmModel;
         this.llmTemperature = llmTemperature;
         this.llmNumPredict = llmNumPredict;
+        this.llmNumCtx = llmNumCtx;
         this.llmOptions = OllamaOptions.create()
                 .withModel(llmModel)
                 .withTemperature(llmTemperature)
@@ -274,6 +285,7 @@ public class RagOrchestrationService {
                 log.info("QuCo-RAG: High uncertainty detected ({}), expanding retrieval", String.format("%.3f", uncertaintyResult.uncertaintyScore()));
             }
             AdaptiveRagService.RoutingResult routing = this.adaptiveRagService.route(query);
+            responsePolicy = adjustForComplexity(responsePolicy, routing.decision());
             boolean bl = isCompoundQuery = (subQueries = this.queryDecompositionService.decompose(query)).size() > 1;
             if (isCompoundQuery) {
                 log.info("Compound query detected. Decomposed into {} sub-queries.", subQueries.size());
@@ -615,6 +627,7 @@ public class RagOrchestrationService {
             stepStart = System.currentTimeMillis();
             AdaptiveRagService.RoutingResult routingResult = this.adaptiveRagService.route(query);
             AdaptiveRagService.RoutingDecision routingDecision = routingResult.decision();
+            responsePolicy = adjustForComplexity(responsePolicy, routingDecision);
             if (this.adaptiveRagService.shouldSkipRetrieval(routingDecision)) {
                 String directResponse;
                 log.info("AdaptiveRAG: ZeroHop path - skipping retrieval for conversational query");
@@ -939,6 +952,7 @@ public class RagOrchestrationService {
             if (responsePolicy != null) {
                 metrics.put("editionPolicy", responsePolicy.edition().name());
                 metrics.put("editionMaxTokens", responsePolicy.maxTokens());
+                metrics.put("editionNumCtx", responsePolicy.numCtx());
                 metrics.put("editionEnforceCitations", responsePolicy.enforceCitations());
                 metrics.put("editionAppendEvidenceAlways", responsePolicy.appendEvidenceAlways());
                 metrics.put("editionAppendEvidenceOnNoCitations", responsePolicy.appendEvidenceWhenNoCitations());
@@ -970,40 +984,67 @@ public class RagOrchestrationService {
         }
     }
 
-    private record ResponsePolicy(LicenseService.Edition edition,
-                                  int maxTokens,
-                                  boolean enforceCitations,
-                                  boolean appendEvidenceAlways,
-                                  boolean appendEvidenceWhenNoCitations) {
+    record ResponsePolicy(LicenseService.Edition edition,
+                          int maxTokens,
+                          int numCtx,
+                          boolean enforceCitations,
+                          boolean appendEvidenceAlways,
+                          boolean appendEvidenceWhenNoCitations) {
     }
 
-    private ResponsePolicy responsePolicyForEdition(LicenseService.Edition edition) {
+    ResponsePolicy responsePolicyForEdition(LicenseService.Edition edition) {
         LicenseService.Edition resolved = edition != null ? edition : LicenseService.Edition.TRIAL;
         int baseTokens = Math.max(128, this.llmNumPredict);
+        int baseCtx = this.llmNumCtx;
         return switch (resolved) {
-            case GOVERNMENT -> new ResponsePolicy(resolved, Math.max(baseTokens, 768), true, true, false);
-            case MEDICAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 768), true, true, false);
-            case ENTERPRISE -> new ResponsePolicy(resolved, Math.max(baseTokens, 640), false, false, true);
-            case TRIAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 512), false, false, true);
+            case GOVERNMENT -> new ResponsePolicy(resolved, Math.max(baseTokens, 768), baseCtx, true, true, false);
+            case MEDICAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 768), baseCtx, true, true, false);
+            case ENTERPRISE -> new ResponsePolicy(resolved, Math.max(baseTokens, 640), baseCtx, false, false, true);
+            case TRIAL -> new ResponsePolicy(resolved, Math.max(baseTokens, 512), baseCtx, false, false, true);
+        };
+    }
+
+    ResponsePolicy adjustForComplexity(ResponsePolicy base,
+                                      AdaptiveRagService.RoutingDecision decision) {
+        if (base == null || decision == null) return base;
+        return switch (decision) {
+            case NO_RETRIEVAL -> new ResponsePolicy(
+                    base.edition(),
+                    Math.min(base.maxTokens(), this.noRetrievalMaxTokens),
+                    this.noRetrievalNumCtx,
+                    base.enforceCitations(), base.appendEvidenceAlways(),
+                    base.appendEvidenceWhenNoCitations());
+            case CHUNK -> new ResponsePolicy(
+                    base.edition(),
+                    Math.min(base.maxTokens(), this.chunkMaxTokens),
+                    this.chunkNumCtx,
+                    base.enforceCitations(), base.appendEvidenceAlways(),
+                    base.appendEvidenceWhenNoCitations());
+            case DOCUMENT -> base;
         };
     }
 
     private ChatOptions optionsForPolicy(ResponsePolicy policy) {
-        int tokens = policy != null ? policy.maxTokens : this.llmNumPredict;
+        int tokens = policy != null ? policy.maxTokens() : this.llmNumPredict;
+        int ctx = policy != null ? policy.numCtx() : this.llmNumCtx;
         return OllamaOptions.create()
                 .withModel(this.llmModel)
                 .withTemperature(this.llmTemperature)
-                .withNumPredict(Integer.valueOf(tokens));
+                .withNumPredict(Integer.valueOf(tokens))
+                .withNumCtx(Integer.valueOf(ctx));
     }
 
     private ChatOptions optionsForCitationRepair(ResponsePolicy policy) {
-        int tokens = policy != null ? Math.max(256, policy.maxTokens) : this.llmNumPredict;
+        int tokens = policy != null ? Math.max(256, policy.maxTokens()) : this.llmNumPredict;
+        // Citation repair needs full context window regardless of complexity tier.
+        int ctx = this.llmNumCtx;
         // Citation repair should be as deterministic as possible to maximize adherence to format.
         double temperature = Math.min(this.llmTemperature, 0.2);
         return OllamaOptions.create()
                 .withModel(this.llmModel)
                 .withTemperature(temperature)
-                .withNumPredict(Integer.valueOf(tokens));
+                .withNumPredict(Integer.valueOf(tokens))
+                .withNumCtx(Integer.valueOf(ctx));
     }
 
     private String repairCitationsIfNeeded(String draft,

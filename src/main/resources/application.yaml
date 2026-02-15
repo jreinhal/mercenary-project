@@ -168,6 +168,17 @@ sentinel:
       # Apply documentYear prefilters when the user query expresses a year constraint (e.g. "between 2020 and 2022").
       enabled: ${RAG_TEMPORAL_FILTERING_ENABLED:false}
 
+  # Adaptive token budgets per query complexity tier (from AdaptiveRAG routing).
+  # Simple queries get smaller num_predict / num_ctx to reduce inference cost.
+  # DOCUMENT tier uses the edition-level defaults (no override needed).
+  token-budget:
+    no-retrieval:
+      num-predict: ${TOKEN_BUDGET_NO_RETRIEVAL_PREDICT:128}
+      num-ctx: ${TOKEN_BUDGET_NO_RETRIEVAL_CTX:2048}
+    chunk:
+      num-predict: ${TOKEN_BUDGET_CHUNK_PREDICT:256}
+      num-ctx: ${TOKEN_BUDGET_CHUNK_CTX:4096}
+
   # Domain thesaurus: configurable acronym/synonym expansion (Phase 3)
   thesaurus:
     enabled: ${THESAURUS_ENABLED:true}
@@ -242,6 +253,14 @@ sentinel:
     target-dimensions: ${EMBEDDING_TARGET_DIMENSIONS:0}
     # Enables Document(media+text) embedding attempts for visual assets (falls back to text if unsupported).
     multimodal-enabled: ${EMBEDDING_MULTIMODAL_ENABLED:false}
+  # FlagEmbedding sidecar for BGE-M3 learned sparse (lexical) retrieval.
+  # Replaces hand-coded BM25 with model-learned term weights.
+  # Requires the sparse-embedding-sidecar container (tools/sparse-embedding-sidecar/).
+  sparse-embedding:
+    enabled: ${SPARSE_EMBEDDING_ENABLED:false}
+    service-url: ${SPARSE_EMBEDDING_URL:http://localhost:8091}
+    timeout-seconds: ${SPARSE_EMBEDDING_TIMEOUT:30}
+    batch-size: ${SPARSE_EMBEDDING_BATCH_SIZE:64}
 
 # ============================================
 # SENTINEL Advanced RAG Configuration
