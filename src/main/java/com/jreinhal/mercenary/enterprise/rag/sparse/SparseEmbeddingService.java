@@ -1,13 +1,16 @@
 package com.jreinhal.mercenary.enterprise.rag.sparse;
 
+import com.jreinhal.mercenary.vector.LocalMongoVectorStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -28,7 +31,6 @@ import java.util.Map;
 @Service
 public class SparseEmbeddingService {
     private static final Logger log = LoggerFactory.getLogger(SparseEmbeddingService.class);
-    private static final String COLLECTION_NAME = "vector_store";
 
     private final SparseEmbeddingClient client;
     private final MongoTemplate mongoTemplate;
@@ -82,6 +84,10 @@ public class SparseEmbeddingService {
                     continue;
                 }
 
+                // Use BulkOperations for efficient batch updates instead of one-by-one
+                BulkOperations bulkOps = mongoTemplate.bulkOps(
+                        BulkOperations.BulkMode.UNORDERED, LocalMongoVectorStore.COLLECTION_NAME);
+                int opsAdded = 0;
                 for (int j = 0; j < sparseWeights.size() && j < docIds.size(); j++) {
                     Map<String, Float> weights = sparseWeights.get(j);
                     if (weights.isEmpty()) {
@@ -89,8 +95,12 @@ public class SparseEmbeddingService {
                     }
                     Query query = Query.query(Criteria.where("_id").is(docIds.get(j)));
                     Update update = new Update().set("sparseWeights", weights);
-                    mongoTemplate.updateFirst(query, update, COLLECTION_NAME);
-                    totalStored++;
+                    bulkOps.updateOne(query, update);
+                    opsAdded++;
+                }
+                if (opsAdded > 0) {
+                    bulkOps.execute();
+                    totalStored += opsAdded;
                 }
             }
 

@@ -8,19 +8,20 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.jreinhal.mercenary.vector.LocalMongoVectorStore;
+import com.mongodb.bulk.BulkWriteResult;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.document.Document;
+import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -77,19 +78,26 @@ class SparseEmbeddingServiceTest {
     }
 
     @Test
-    void computeAndStoreSparseWeightsStoresWeights() {
+    void computeAndStoreSparseWeightsStoresWeightsViaBulkOps() {
         when(client.isEnabled()).thenReturn(true);
 
         Map<String, Float> weights1 = Map.of("intelligence", 0.85f, "report", 0.42f);
         Map<String, Float> weights2 = Map.of("security", 0.91f, "threat", 0.67f);
         when(client.embedSparse(any())).thenReturn(List.of(weights1, weights2));
 
+        BulkOperations bulkOps = mock(BulkOperations.class);
+        when(mongoTemplate.bulkOps(any(BulkOperations.BulkMode.class), eq(LocalMongoVectorStore.COLLECTION_NAME)))
+                .thenReturn(bulkOps);
+        when(bulkOps.updateOne(any(Query.class), any(Update.class))).thenReturn(bulkOps);
+        when(bulkOps.execute()).thenReturn(mock(BulkWriteResult.class));
+
         Document d1 = new Document("doc1", "intelligence report content", new HashMap<>());
         Document d2 = new Document("doc2", "security threat assessment", new HashMap<>());
 
         service.computeAndStoreSparseWeights(List.of(d1, d2));
 
-        verify(mongoTemplate, times(2)).updateFirst(any(Query.class), any(Update.class), eq("vector_store"));
+        verify(mongoTemplate).bulkOps(eq(BulkOperations.BulkMode.UNORDERED), eq(LocalMongoVectorStore.COLLECTION_NAME));
+        verify(bulkOps).execute();
     }
 
     @Test
@@ -100,7 +108,7 @@ class SparseEmbeddingServiceTest {
         Document d1 = new Document("d1", "test", new HashMap<>());
         service.computeAndStoreSparseWeights(List.of(d1));
 
-        verify(mongoTemplate, never()).updateFirst(any(), any(), anyString());
+        verify(mongoTemplate, never()).bulkOps(any(), anyString());
     }
 
     @Test

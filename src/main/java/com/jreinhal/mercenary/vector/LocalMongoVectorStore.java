@@ -25,7 +25,8 @@ import org.springframework.data.mongodb.core.query.Query;
 public class LocalMongoVectorStore
 implements VectorStore {
     private static final Logger log = LoggerFactory.getLogger(LocalMongoVectorStore.class);
-    private static final String COLLECTION_NAME = "vector_store";
+    /** MongoDB collection name for vector documents. Referenced by SparseEmbeddingService. */
+    public static final String COLLECTION_NAME = "vector_store";
     private static final Set<String> PREFILTER_KEYS = Set.of(
             "dept", "workspaceId", "type", "partition_id", "source", "filename", "mimeType",
             "documentYear", "documentDateEpoch");

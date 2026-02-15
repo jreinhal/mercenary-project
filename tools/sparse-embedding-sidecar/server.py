@@ -111,15 +111,24 @@ def embed_sparse(req: EmbedSparseRequest):
     )
 
     # output["lexical_weights"] is a list of dicts: [{token_id: weight}, ...]
-    # Convert integer token IDs to string keys for JSON serialization
+    # Convert integer token IDs to BSON-safe string keys for JSON serialization.
+    # MongoDB map keys must not contain '.' or start with '$' (BSON restrictions).
     results = []
     tokenizer = model.tokenizer
     for weights_dict in output["lexical_weights"]:
         token_weights = {}
         for token_id, weight in weights_dict.items():
             token_str = tokenizer.decode([int(token_id)]).strip()
-            if token_str and weight > 0.0:
-                token_weights[token_str] = round(float(weight), 4)
+            if not token_str or weight <= 0.0:
+                continue
+            # Skip whitespace-only or control-char-only tokens
+            if not token_str.strip():
+                continue
+            # Sanitize for BSON: replace '.' with unicode dot, strip leading '$'
+            safe_key = token_str.replace(".", "\uff0e")
+            if safe_key.startswith("$"):
+                safe_key = "\uff04" + safe_key[1:]
+            token_weights[safe_key] = round(float(weight), 4)
         results.append(TokenWeights(token_weights=token_weights))
 
     elapsed_ms = (time.time() - start) * 1000

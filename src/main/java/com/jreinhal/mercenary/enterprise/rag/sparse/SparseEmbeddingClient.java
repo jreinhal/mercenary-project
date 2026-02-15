@@ -2,6 +2,7 @@ package com.jreinhal.mercenary.enterprise.rag.sparse;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +36,7 @@ import java.util.Map;
 public class SparseEmbeddingClient {
     private static final Logger log = LoggerFactory.getLogger(SparseEmbeddingClient.class);
 
-    private final org.springframework.web.client.RestTemplate restTemplate;
+    private org.springframework.web.client.RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
     @Value("${sentinel.sparse-embedding.enabled:false}")
@@ -47,8 +48,24 @@ public class SparseEmbeddingClient {
     @Value("${sentinel.sparse-embedding.timeout-seconds:30}")
     private int timeoutSeconds;
 
+    public SparseEmbeddingClient() {
+        this.objectMapper = new ObjectMapper();
+    }
+
+    /**
+     * Build the RestTemplate after Spring injects @Value fields so that
+     * the configured timeout-seconds value is actually applied.
+     */
+    @PostConstruct
+    void init() {
+        this.restTemplate = createNoRedirectRestTemplate(timeoutSeconds);
+        log.info("Sparse embedding client initialised (enabled={}, url={}, timeout={}s)",
+                enabled, serviceUrl, timeoutSeconds);
+    }
+
     // R-04: Disable automatic redirect following to prevent SSRF bypass via 3xx redirects
-    private static org.springframework.web.client.RestTemplate createNoRedirectRestTemplate() {
+    private static org.springframework.web.client.RestTemplate createNoRedirectRestTemplate(int timeoutSecs) {
+        int timeoutMs = timeoutSecs * 1000;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory() {
             @Override
             protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
@@ -56,12 +73,9 @@ public class SparseEmbeddingClient {
                 connection.setInstanceFollowRedirects(false);
             }
         };
+        factory.setConnectTimeout(timeoutMs);
+        factory.setReadTimeout(timeoutMs);
         return new org.springframework.web.client.RestTemplate(factory);
-    }
-
-    public SparseEmbeddingClient() {
-        this.restTemplate = createNoRedirectRestTemplate();
-        this.objectMapper = new ObjectMapper();
     }
 
     public boolean isEnabled() {

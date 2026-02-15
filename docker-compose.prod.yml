@@ -128,6 +128,8 @@ services:
           memory: 2G
     security_opt:
       - no-new-privileges:true
+    # Model is baked into the image at build time (see Dockerfile).
+    # read_only is safe because no runtime downloads are needed.
     read_only: true
     tmpfs:
       - /tmp:size=500M

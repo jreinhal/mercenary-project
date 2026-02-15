@@ -1,6 +1,5 @@
 package com.jreinhal.mercenary.enterprise.rag.sparse;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,6 +16,8 @@ class SparseEmbeddingClientTest {
     @BeforeEach
     void setUp() {
         client = new SparseEmbeddingClient();
+        // Simulate Spring @PostConstruct to initialise RestTemplate with default timeout
+        client.init();
     }
 
     @Test
@@ -33,6 +34,7 @@ class SparseEmbeddingClientTest {
     void isAvailableReturnsFalseWhenSidecarNotRunning() {
         ReflectionTestUtils.setField(client, "enabled", true);
         ReflectionTestUtils.setField(client, "serviceUrl", "http://localhost:9999");
+        client.init(); // re-init with new settings
         assertFalse(client.isAvailable());
     }
 
@@ -60,6 +62,7 @@ class SparseEmbeddingClientTest {
     void embedSparseGracefullyHandlesConnectionFailure() {
         ReflectionTestUtils.setField(client, "enabled", true);
         ReflectionTestUtils.setField(client, "serviceUrl", "http://localhost:9999");
+        client.init(); // re-init with new settings
         List<Map<String, Float>> result = client.embedSparse(List.of("test query"));
         assertTrue(result.isEmpty());
     }
