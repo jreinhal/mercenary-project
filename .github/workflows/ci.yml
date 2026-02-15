@@ -142,7 +142,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: unit-test-reports
-          path: .
+          path: build
 
       - name: Verify enterprise packaging build
         run: ./gradlew -Pedition=enterprise build -x test -x jacocoTestReport
