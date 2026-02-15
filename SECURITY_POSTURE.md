@@ -132,16 +132,6 @@ Your codebase demonstrates patterns aligned with:
 
 ---
 
-## 📊 Comparison to Industry Standards
-
-| Metric | Your App | Industry Average | Status |
-|--------|----------|------------------|--------|
-| Auth checks per endpoint | 100% | 60-70% | ✅ Above average |
-| Hardcoded secrets | 0 | 5-10 found | ✅ Best practice |
-| Input validation | 95% | 70-80% | ✅ Above average |
-| Audit logging coverage | 100% | 40-60% | ✅ Exceptional |
-| Multi-tenant isolation | Defense-in-depth | Basic | ✅ Advanced |
-
 ---
 
 ## 🔍 Security Review Details
