@@ -1,0 +1,17 @@
+# SENTINEL CODEOWNERS — require owner review on security-critical paths
+#
+# Default — all changes require owner review
+* @jreinhal
+
+# Security-critical paths
+/src/main/java/com/jreinhal/mercenary/filter/     @jreinhal
+/src/main/java/com/jreinhal/mercenary/security/   @jreinhal
+/src/main/java/com/jreinhal/mercenary/government/ @jreinhal
+
+# CI pipeline changes
+/.github/                                          @jreinhal
+
+# Configuration
+/src/main/resources/application*.yaml              @jreinhal
+/docker-compose*.yml                               @jreinhal
+/Dockerfile                                        @jreinhal

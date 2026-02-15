@@ -1,0 +1,11 @@
+# gitleaks configuration for SENTINEL
+# https://github.com/gitleaks/gitleaks
+
+title = "SENTINEL gitleaks config"
+
+[allowlist]
+  description = "Allow test resources and documentation"
+  paths = [
+    '''src/test/resources/.*''',
+    '''\.github/.*\.md''',
+  ]
