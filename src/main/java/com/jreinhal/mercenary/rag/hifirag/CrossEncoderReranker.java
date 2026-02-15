@@ -334,10 +334,12 @@ public class CrossEncoderReranker {
     private String buildCacheKey(String query, Document doc) {
         Object dept = doc.getMetadata().get("dept");
         String deptValue = dept != null ? dept.toString() : "UNKNOWN";
+        Object wsId = doc.getMetadata().get("workspaceId");
+        String wsValue = wsId != null ? wsId.toString() : "UNKNOWN";
         Object source = doc.getMetadata().get("source");
         String sourceStr = source != null ? source.toString() : "";
         String content = doc.getContent() != null ? doc.getContent() : "";
-        return deptValue + "|" + query + "|" + sourceStr + "|" + content.hashCode();
+        return deptValue + "|" + wsValue + "|" + query + "|" + sourceStr + "|" + content.hashCode();
     }
 
     private enum RerankerMode {

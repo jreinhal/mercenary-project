@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.jreinhal.mercenary.rag.thesaurus.DomainThesaurus;
 import com.jreinhal.mercenary.util.LogSanitizer;
+import com.jreinhal.mercenary.workspace.WorkspaceContext;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -61,7 +62,8 @@ public class QueryExpander {
         }
         String normalizedKey = query.trim().toLowerCase();
         String deptKey = department != null && !department.isBlank() ? department.trim().toUpperCase() : "GLOBAL";
-        String cacheKey = deptKey + "|" + normalizedKey + "|" + count;
+        String wsKey = WorkspaceContext.getCurrentWorkspaceId();
+        String cacheKey = deptKey + "|" + wsKey + "|" + normalizedKey + "|" + count;
         if (this.expansionCache != null) {
             List<String> cached = this.expansionCache.getIfPresent(cacheKey);
             if (cached != null) {

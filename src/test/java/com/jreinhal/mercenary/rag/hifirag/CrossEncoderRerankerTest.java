@@ -65,6 +65,31 @@ class CrossEncoderRerankerTest {
     }
 
     @Test
+    void cacheShouldBeIsolatedByWorkspace() {
+        this.reranker = this.newReranker(null, false, "keyword");
+        String query = "system metrics";
+        Document wsAlphaDoc = new Document("Metrics content",
+                Map.of("dept", "ENTERPRISE", "workspaceId", "ws_alpha", "source", "report.pdf"));
+        Document wsBetaDoc = new Document("Metrics content",
+                Map.of("dept", "ENTERPRISE", "workspaceId", "ws_beta", "source", "report.pdf"));
+
+        this.reranker.rerank(query, List.of(wsAlphaDoc, wsBetaDoc));
+
+        @SuppressWarnings("unchecked")
+        Cache<String, Double> cache = (Cache<String, Double>) ReflectionTestUtils.getField(this.reranker, "scoreCache");
+        assertNotNull(cache);
+
+        String alphaKey = ReflectionTestUtils.invokeMethod(this.reranker, "buildCacheKey", query, wsAlphaDoc);
+        String betaKey = ReflectionTestUtils.invokeMethod(this.reranker, "buildCacheKey", query, wsBetaDoc);
+
+        assertNotEquals(alphaKey, betaKey, "Cache keys must differ by workspaceId");
+        assertTrue(alphaKey.contains("ws_alpha"));
+        assertTrue(betaKey.contains("ws_beta"));
+        assertNotNull(cache.getIfPresent(alphaKey));
+        assertNotNull(cache.getIfPresent(betaKey));
+    }
+
+    @Test
     void dedicatedModeShouldUseEmbeddingScoring() {
         EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
         when(embeddingModel.embed(anyString())).thenAnswer(invocation -> {
