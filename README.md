@@ -84,7 +84,7 @@ $env:APP_PROFILE="dev"
 $env:MONGODB_URI="mongodb://localhost:27017/mercenary"
 $env:OLLAMA_URL="http://localhost:11434"
 $env:LLM_MODEL="llama3.1:8b"
-$env:EMBEDDING_MODEL="nomic-embed-text"
+$env:EMBEDDING_MODEL="bge-m3"
 .\gradlew bootRun
 ```
 

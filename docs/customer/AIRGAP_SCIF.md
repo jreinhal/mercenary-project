@@ -11,7 +11,7 @@ This guide is for disconnected environments where all dependencies must be local
 On a connected machine:
 ```
 ollama pull llama3.1:8b
-ollama pull nomic-embed-text
+ollama pull bge-m3
 ```
 Copy the Ollama model directory to the SCIF system:
 - Windows: %USERPROFILE%\.ollama
@@ -25,7 +25,7 @@ AUTH_MODE=CAC
 MONGODB_URI=mongodb://localhost:27017/mercenary
 OLLAMA_URL=http://localhost:11434
 LLM_MODEL=llama3.1:8b
-EMBEDDING_MODEL=nomic-embed-text
+EMBEDDING_MODEL=bge-m3
 QUCORAG_INFINI_GRAM=false
 ```
 

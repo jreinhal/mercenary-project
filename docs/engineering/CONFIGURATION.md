@@ -31,7 +31,7 @@ Notes:
 ## Ollama
 - OLLAMA_URL (default: http://localhost:11434)
 - LLM_MODEL (default: llama3.1:8b)
-- EMBEDDING_MODEL (default: nomic-embed-text)
+- EMBEDDING_MODEL (default: bge-m3)
 - LLM_TEMPERATURE
 - LLM_NUM_PREDICT
 - LLM_NUM_CTX

@@ -62,7 +62,7 @@ spring:
             - "\n\nNote:"
             - "\n\nAdditional"
       embedding:
-        model: ${EMBEDDING_MODEL:nomic-embed-text}
+        model: ${EMBEDDING_MODEL:bge-m3}
     vectorstore:
       mongodb:
         atlas:
