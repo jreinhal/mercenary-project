@@ -104,8 +104,11 @@ services:
 
   # FlagEmbedding Sparse Embedding Sidecar (Optional)
   # Provides BGE-M3 learned sparse (lexical) weights for hybrid retrieval.
+  # Start with: docker compose --profile sparse -f docker-compose.prod.yml up
   # Enable via SPARSE_EMBEDDING_ENABLED=true on the sentinel service.
   sparse-embedding:
+    profiles:
+      - sparse
     build:
       context: ./tools/sparse-embedding-sidecar
       dockerfile: Dockerfile

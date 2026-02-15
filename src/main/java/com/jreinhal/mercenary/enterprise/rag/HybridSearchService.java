@@ -38,13 +38,23 @@ public class HybridSearchService {
     }
 
     public List<HybridResult> search(String query, int topK) {
-        return this.search(query, topK, 0.6, 0.4);
+        return this.search(query, topK, 0.6, 0.4, null);
     }
 
     public List<HybridResult> search(String query, int topK, double vectorWeight, double lexicalWeight) {
+        return this.search(query, topK, vectorWeight, lexicalWeight, null);
+    }
+
+    /**
+     * Hybrid search combining vector (dense) and lexical (sparse/BM25) retrieval via RRF fusion.
+     *
+     * @param filterExpression optional metadata filter expression forwarded to sparse search
+     *                         (same format as {@link LocalMongoVectorStore#sparseSearch})
+     */
+    public List<HybridResult> search(String query, int topK, double vectorWeight, double lexicalWeight, Object filterExpression) {
         log.debug("Hybrid search: query={}, topK={}, weights=[vector={}, lexical={}]", LogSanitizer.querySummary(query), topK, vectorWeight, lexicalWeight);
         List<Document> vectorResults = this.performVectorSearch(query, topK * 2);
-        List<Document> lexicalResults = this.performBm25Search(query, topK * 2);
+        List<Document> lexicalResults = this.performBm25Search(query, topK * 2, filterExpression);
         List<HybridResult> fusedResults = this.fuseResults(vectorResults, lexicalResults, vectorWeight, lexicalWeight);
         return fusedResults.stream().limit(topK).toList();
     }
@@ -60,9 +70,9 @@ public class HybridSearchService {
         }
     }
 
-    private List<Document> performBm25Search(String query, int limit) {
+    private List<Document> performBm25Search(String query, int limit, Object filterExpression) {
         // Try sparse retrieval first (learned lexical weights from BGE-M3 sidecar)
-        List<Document> sparseResults = this.performSparseSearch(query, limit);
+        List<Document> sparseResults = this.performSparseSearch(query, limit, filterExpression);
         if (!sparseResults.isEmpty()) {
             return sparseResults;
         }
@@ -86,8 +96,10 @@ public class HybridSearchService {
     /**
      * Sparse retrieval using learned lexical weights from the FlagEmbedding sidecar.
      * Returns empty list if the sidecar is unavailable, allowing fallback to BM25.
+     *
+     * @param filterExpression metadata filter expression forwarded to the vector store prefilter
      */
-    private List<Document> performSparseSearch(String query, int limit) {
+    private List<Document> performSparseSearch(String query, int limit, Object filterExpression) {
         if (this.sparseEmbeddingService == null || !this.sparseEmbeddingService.isEnabled()
                 || this.localMongoVectorStore == null) {
             return List.of();
@@ -97,7 +109,7 @@ public class HybridSearchService {
             if (queryWeights.isEmpty()) {
                 return List.of();
             }
-            List<Document> results = this.localMongoVectorStore.sparseSearch(queryWeights, null, limit, 0.01);
+            List<Document> results = this.localMongoVectorStore.sparseSearch(queryWeights, filterExpression, limit, 0.01);
             if (log.isDebugEnabled()) {
                 log.debug("Sparse search returned {} results (replacing BM25)", results.size());
             }
