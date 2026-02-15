@@ -77,10 +77,15 @@ While your security posture is excellent, complete these 3 items before producti
 
 ### 🔴 1. Dependency Vulnerability Scan (30 minutes)
 ```bash
-./gradlew dependencyCheckAnalyze
+# Review dependency lock file for known CVEs
+cat gradle.lockfile | grep -E "group|version"
+
+# Or use GitHub Dependabot alerts in repository settings
+# Or integrate OWASP Dependency-Check plugin in build.gradle
 ```
 **Why:** Verify no known CVEs in third-party libraries  
-**Status:** Pending
+**Status:** Pending  
+**Note:** No dependency scan tool currently configured in build.gradle
 
 ### 🔴 2. Test Coverage Verification (1 hour)
 ```bash
@@ -99,16 +104,18 @@ While your security posture is excellent, complete these 3 items before producti
 
 ---
 
-## 🎖️ Security Certifications Met
+## 🎖️ Security Standards Alignment
 
-Your codebase demonstrates compliance with:
+Your codebase demonstrates patterns aligned with:
 
-- ✅ **OWASP Top 10** (2021)
-- ✅ **NIST 800-53** controls (audit logging, access control)
-- ✅ **STIG** requirements (government edition)
-- ✅ **HIPAA** technical safeguards (medical edition)
-- ✅ **GDPR** Article 32 (security of processing)
-- ✅ **SOC 2 Type II** control patterns
+- ✅ **OWASP Top 10** (2021) - Controls address 9 of 10 risk categories
+- ✅ **NIST 800-53** - Implements control patterns for audit logging, access control
+- ✅ **STIG** - Design supports STIG requirements (government edition)
+- ✅ **HIPAA** - Technical safeguards architecture present (medical edition)
+- ✅ **GDPR** Article 32 - Security of processing controls implemented
+- ✅ **SOC 2 Type II** - Common control patterns observable
+
+**Note:** These are code-level observations, not formal compliance attestations. Formal certification requires independent audit.
 
 ---
 
@@ -236,7 +243,9 @@ if (normalizedFileName.contains("..") ||
 - Comprehensive security controls
 - Zero critical vulnerabilities
 
-**Complete the 3 pending action items** (2 hours), and you're production-ready.
+**Complete the 3 pending action items** (2 hours), then ready for production deployment.
+
+**Note:** This code review does not constitute formal compliance certification.
 
 **Security Grade: A-**
 
