@@ -17,7 +17,7 @@ $env:APP_PROFILE="dev"
 $env:MONGODB_URI="mongodb://localhost:27017/mercenary"
 $env:OLLAMA_URL="http://localhost:11434"
 $env:LLM_MODEL="llama3.1:8b"
-$env:EMBEDDING_MODEL="nomic-embed-text"
+$env:EMBEDDING_MODEL="bge-m3"
 .\gradlew bootRun
 ```
 
@@ -45,7 +45,7 @@ You can override with AUTH_MODE if needed.
 | MONGODB_URI | mongodb://localhost:27017/mercenary | MongoDB connection |
 | OLLAMA_URL | http://localhost:11434 | Ollama endpoint |
 | LLM_MODEL | llama3.1:8b | Chat model |
-| EMBEDDING_MODEL | nomic-embed-text | Embedding model |
+| EMBEDDING_MODEL | bge-m3 | Embedding model |
 | SWAGGER_ENABLED | false | Swagger UI toggle |
 
 ---
