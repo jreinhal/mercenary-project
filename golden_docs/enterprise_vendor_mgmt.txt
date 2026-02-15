@@ -1,0 +1,512 @@
+STRATEGIC VENDOR MANAGEMENT REPORT
+Classification: CONFIDENTIAL - BUSINESS
+Document ID: GOLDEN-VENDOR-001
+Date: 2025-05-30
+Sector: ENTERPRISE
+
+EXECUTIVE SUMMARY
+This report provides a comprehensive overview of the organization's strategic vendor
+portfolio, performance metrics, optimization initiatives, and renewal strategy. The
+vendor management program is overseen by Jennifer Park, Director of Vendor Strategy,
+reporting to Patricia Anderson, SVP Operations. Total annual vendor spend is $78.5M
+across 142 active vendors, with the top 3 vendors representing 89% of total spend.
+
+Year-to-date vendor optimization has delivered $8.7M in savings, and we project $12.4M
+in FY2026 savings through Reserved Instance optimization, contract renegotiation, and
+Tier 3 vendor consolidation. Three major contract renewals occur in 2026: Microsoft EA
+($85.5M, June 2026), AWS EDP ($66.9M, December 2026), and Apex Technologies ($18.5M,
+December 2026), with a combined renewal value exceeding $170M annually.
+
+VENDOR PORTFOLIO OVERVIEW
+Total Active Vendors: 142
+Strategic Vendor Relationships (Tier 1): 6
+Preferred Vendors (Tier 2): 18
+Approved Vendors (Tier 3): 118
+Total Annual Vendor Spend: $78.5M
+
+Vendor Spend by Category:
+  Cloud Infrastructure: $66.9M (85.2%) — AWS
+  Software Licensing: $85.5M (EA cost; amortized across business units)
+  Systems Integration: $18.5M (23.6%) — Apex Technologies
+  Data & Analytics: $4.2M (5.4%) — Snowflake
+  IT Service Management: $3.8M (4.8%) — ServiceNow
+  Security: $2.1M (2.7%) — CrowdStrike
+  Other Tier 2/3: $8.5M (10.8%) — 136 vendors
+
+Vendor Spend Concentration Analysis:
+  Top 3 vendors (Microsoft, AWS, Apex): $170.9M = 89% of addressable spend
+  Top 6 vendors (Tier 1): $180.1M = 94% of addressable spend
+  Remaining 136 vendors: $8.5M = 6% of addressable spend
+  Average Tier 3 spend: $52K per vendor (range: $8K - $340K)
+
+TIER 1 STRATEGIC VENDORS — DETAILED PROFILES
+
+1. APEX TECHNOLOGIES
+   Service: Systems Integration & Custom Development
+   Annual Contract Value: $18.5M (Time & Materials with caps)
+   Contract Term: January 1, 2024 - December 31, 2026 (3-year)
+   Contract ID: CTR-2024-APEX-001
+   Relationship Manager: Marcus Thompson (technical), Patricia Anderson (executive)
+   On-Site Team: 45 consultants (12 architects, 18 developers, 8 QA, 4 project managers, 3 data engineers)
+   Apex Account Executive: Raj Patel (reports to Patricia Anderson operationally)
+   Performance Rating: 4.2/5.0 (trending down from 4.5 at contract inception)
+
+   SLA Performance (Last 12 Months):
+   | SLA Metric                    | Target   | Actual   | Breaches | Credits  |
+   |-------------------------------|----------|----------|----------|----------|
+   | Response Time (P1 incidents)  | 30 min   | 42 min   | 3        | $85K     |
+   | Staffing Commitment           | 45 FTEs  | 41 FTEs  | 2        | $120K    |
+   | Deliverable Quality (defects) | <5%      | 4.8%     | 0        | $0       |
+   | Knowledge Transfer            | Monthly  | Monthly  | 0        | $0       |
+   Total SLA Credits Received: $205K
+
+   SLA Breach Detail:
+   Breach 1 (January 2025): P1 Response Time — SAP integration failure during ERP
+   pre-migration testing. Apex team took 2.5 hours to respond (SLA: 30 min). Root cause:
+   On-call engineer was not available; backup engineer unfamiliar with SAP CPI adapter.
+   Impact: 4-hour outage of development environment; no production impact.
+   Remediation: Apex implemented dedicated SAP on-call rotation.
+
+   Breach 2 (March 2025): Staffing — Team dropped to 38 FTEs for 3 weeks due to Apex
+   reassigning 7 consultants to another client without notice. Patricia Anderson escalated
+   to Apex SVP William Chang. Resolution: 4 replacement consultants onboarded within 2
+   weeks; 3 original consultants returned within 4 weeks. $120K credit applied.
+   Impact: 2-week delay on ERP Track 2 (custom code remediation). Contributed to 6-week
+   overall ERP delay.
+
+   Breach 3 (May 2025): P1 Response Time — Data pipeline failure in Databricks integration.
+   Apex architect took 1.5 hours to respond. Impact: 6-hour delay in nightly data refresh;
+   downstream analytics dashboards stale for morning users.
+   Remediation: Apex deployed PagerDuty integration for their on-call engineers.
+
+   Dependency Assessment (Critical):
+   - 4 of 5 transformation workstreams depend on Apex resources
+   - Apex has institutional knowledge of 23 legacy applications
+   - IP Transfer: All custom code developed by Apex is assigned to client (contract clause 7.3)
+   - IP Risk: Clause ambiguity on "derivative works" — if Apex reuses patterns from our
+     engagement at other clients, we have limited recourse. Elena Vasquez flagged for amendment.
+   - Non-compete: 12 months post-termination; covers all Apex employees who worked on our account
+   - Single-source risk: If Apex contract terminated, estimated 6-9 month replacement timeline
+     and $4.5M transition cost (knowledge transfer, onboarding new partner, productivity ramp)
+
+   Succession Planning:
+   Patricia Anderson initiated secondary integration partner evaluation (April 2025):
+   - RFI issued to: Accenture, Deloitte Digital, Cognizant, Infosys
+   - Responses received: Accenture ($22M/year estimate), Deloitte Digital ($19.5M/year estimate)
+   - Cognizant and Infosys proposals expected by July 15, 2025
+   - Evaluation criteria: SAP migration experience, AWS expertise, team continuity commitment,
+     IP assignment terms, cultural fit assessment
+   - Decision timeline: Shortlist by August 2025; pilot engagement by October 2025
+   - Dr. Robert Chen: "We need a credible alternative before we negotiate Apex renewal in Q3.
+     Even if we renew with Apex, having a secondary partner reduces concentration risk."
+
+   Renewal Strategy (December 2026):
+   - Option A: Renew at reduced scope ($12M, Phase 3 optimization only; transition
+     cloud/data workstreams to secondary partner)
+   - Option B: Full renewal with amended terms ($16M, address IP clause, add staffing
+     guarantees with financial penalties, require dedicated on-call team)
+   - Option C: Transition off Apex entirely (risk: 6-9 month disruption; cost: $4.5M transition)
+   - Preferred: Option A (Patricia Anderson recommendation, pending Dr. Chen approval)
+   - Decision required by: September 2025 (to allow transition planning if Option A or C selected)
+
+2. MICROSOFT CORPORATION
+   Service: Enterprise Agreement (Office 365 E5, Azure AD P2, Power Platform, Intune)
+   Annual Contract Value: $85.5M (3-year Enterprise Agreement, fixed price)
+   Contract Term: July 1, 2023 - June 30, 2026
+   Contract ID: CTR-2023-MSFT-EA
+   Relationship Manager: Dr. Robert Chen (executive), Jennifer Park (commercial)
+   Microsoft Account Team: Sarah Lindberg (Account Executive), Tom Nguyen (Technical Architect)
+   Performance Rating: 4.7/5.0
+
+   License Utilization Analysis:
+   | Product              | Licenses | Active Users | Utilization | Cost/User/Month |
+   |----------------------|----------|-------------|-------------|-----------------|
+   | Office 365 E5        | 1,200    | 1,080       | 90%         | $57             |
+   | Azure AD P2          | 1,200    | 1,200       | 100%        | $9              |
+   | Power Platform       | 500      | 312         | 62%         | $40             |
+   | Intune               | 1,200    | 1,150       | 96%         | $8              |
+   | Azure Credits        | 500/mo   | 420/mo      | 84%         | N/A             |
+
+   Cost Optimization Opportunities:
+   - Power Platform: 62% utilization — 188 unused licenses = $90K/year savings opportunity
+   - Office 365 E5 to E3 downgrade for 200 non-technical users: $182K/year savings
+     (E5: $57/user/month; E3: $36/user/month; delta: $21 × 200 × 12 = $50.4K)
+     Note: E3 lacks advanced compliance features; Elena Vasquez reviewing impact
+   - Azure credit optimization: Reserved Instance commitment for Azure workloads (not yet
+     done; AWS is primary cloud, Azure used for AD sync and M365 integration only)
+
+   Renewal Negotiation Strategy (June 2026):
+   - Current annual value: $85.5M
+   - Microsoft's expected ask: $90M-$94M (5-10% increase based on CPI and new AI features)
+   - Our target: $87M (2% increase, justified by under-utilization and E3 migration)
+   - Walk-away price: $92M maximum
+   - Negotiation team: Jennifer Park (lead), Dr. Robert Chen (executive sponsor),
+     Elena Vasquez (contract terms), Microsoft AE Sarah Lindberg
+   - Leverage points:
+     1. Under-utilization of Power Platform (62%) — demand credits or removal
+     2. E3 downgrade for 200 users — reduces per-seat economics
+     3. Competitive pressure: Google Workspace evaluation as backup (no actual plan to switch,
+        but creates negotiation leverage)
+     4. Early renewal: Offer to sign by March 2026 (3 months early) in exchange for price lock
+   - Timeline:
+     October 2025: Internal pricing model finalized (Jennifer Park)
+     January 2026: Initial meeting with Microsoft AE Sarah Lindberg
+     February 2026: Formal proposal exchange
+     March 2026: Negotiation rounds (target 2-3 sessions)
+     April 2026: Legal review of terms (Elena Vasquez)
+     May 2026: Executive approval (Dr. Chen → Board if >$90M)
+     June 2026: Signature
+
+3. AMAZON WEB SERVICES (AWS)
+   Service: Cloud Infrastructure (Enterprise Discount Program)
+   Annual Committed Spend: $66.9M
+   Contract Term: January 1, 2024 - December 31, 2026
+   Contract ID: CTR-2024-AWS-EDP
+   Relationship Manager: Marcus Thompson
+   AWS Account Team: Lisa Hernandez (Technical Account Manager), Mike Chandra (Solutions Architect)
+   Performance Rating: 4.5/5.0
+
+   Infrastructure Utilization (Q2 2025):
+   | Service Category        | Monthly Spend | % of Total | YoY Growth |
+   |-------------------------|---------------|-----------|------------|
+   | EC2 (Compute)           | $2.8M         | 50.2%     | +28%       |
+   | S3 (Storage)            | $780K         | 14.0%     | +45%       |
+   | RDS (Database)          | $620K         | 11.1%     | +15%       |
+   | EKS (Kubernetes)        | $540K         | 9.7%      | +120%      |
+   | Lambda (Serverless)     | $290K         | 5.2%      | +85%       |
+   | SageMaker (ML)          | $180K         | 3.2%      | +200%      |
+   | Other (CloudFront, etc.)| $365K         | 6.5%      | +22%       |
+   Total Monthly: $5.575M × 12 = $66.9M annual
+
+   Cost Optimization Achievements:
+   - Reserved Instance Coverage: 68% of EC2 fleet (target: 80%)
+   - Savings Plans: $3.2M saved YTD through 1-year and 3-year commitments
+   - Spot Instance usage: 15% of non-production workloads
+   - S3 Intelligent Tiering: $180K saved by auto-tiering infrequently accessed data
+   - Right-sizing: 127 instances downsized in Q1 2025, saving $420K annually
+
+   Remaining Optimization Opportunities:
+   - Increase RI coverage from 68% to 80%: additional $1.8M annual savings
+   - GP3 volume migration (from GP2): $240K annual savings (Marcus Thompson approved, target Q3)
+   - EKS Fargate migration for batch workloads: $360K annual savings potential
+   - Graviton migration (ARM instances): 20% cost reduction on applicable workloads = $840K
+   Total remaining opportunity: $3.24M additional annual savings
+
+   Security & Compliance:
+   - Data residency: US-only (us-east-1 primary, us-west-2 disaster recovery)
+   - Encryption: AES-256 (S3, RDS, EBS); customer-managed KMS keys
+   - VPC architecture: 14 accounts, 28 VPCs, 56 subnets; transit gateway hub-and-spoke
+   - AWS Config: 47 compliance rules active; 98.7% compliance score
+   - GuardDuty: Enabled all regions; 3 medium-severity findings in Q2 (all remediated)
+
+   Renewal Strategy (December 2026):
+   - Current annual committed spend: $66.9M
+   - Expected renewal ask: $72M-$78M (8-16% increase driven by usage growth)
+   - Our target: $70M (5% increase, justified by higher RI commitment and Graviton migration)
+   - Walk-away price: $75M maximum
+   - Negotiation team: Marcus Thompson (lead), Jennifer Park (data/analytics spend review),
+     AWS TAM Lisa Hernandez
+   - Leverage points:
+     1. Higher RI commitment (68% → 85%): Demonstrates long-term AWS commitment
+     2. Graviton migration: Shows willingness to adopt AWS-native technologies
+     3. Multi-cloud threat: Existing Azure AD + Snowflake presence creates optionality
+     4. Volume growth: Our spend is growing 25%+ YoY — AWS should reward growth
+   - Timeline:
+     July 2026: Usage projections finalized (Marcus Thompson + AWS TAM Lisa Hernandez)
+     August 2026: Commercial discussion with AWS
+     September 2026: Formal proposal
+     October-November 2026: Negotiation
+     December 2026: Signature (must complete before EDP expiration)
+
+4. SNOWFLAKE INC
+   Service: Data Cloud Platform (Data Warehousing, Data Sharing, Marketplace)
+   Annual Contract Value: $4.2M (credit-based consumption model)
+   Contract Term: April 1, 2024 - March 31, 2027 (3-year)
+   Contract ID: CTR-2024-SNOW-001
+   Relationship Manager: Jennifer Park
+   Snowflake Account Team: Derek Wong (Account Executive)
+   Performance Rating: 4.5/5.0
+
+   Usage Analytics:
+   - Storage: 380 TB of 500 TB allocated (76% utilization)
+   - Compute Credits: 72,000 of 100,000 annual credits consumed (72%, on pace)
+   - Concurrent Users: 145 average daily (peak: 312 during month-end)
+   - Query Performance: P50 = 1.2s, P95 = 4.8s, P99 = 12.3s
+   - Data Sharing: 3 active shares with external partners (audit firm, consulting partner)
+
+   Integration Points:
+   - Databricks → Snowflake: Delta Lake connector for ML feature serving
+   - Tableau → Snowflake: Live connection for 23 executive dashboards
+   - Self-service analytics: Snowflake SQL Warehouse backend for pilot platform
+   - SAP data replication: Real-time CDC (Change Data Capture) via Fivetran ($340K/year add-on)
+
+   Performance vs. Legacy Oracle Data Warehouse:
+   | Metric                  | Oracle DW (2023) | Snowflake (2025) | Improvement |
+   |-------------------------|------------------|------------------|-------------|
+   | Average query time      | 18.5 seconds     | 4.8 seconds      | 3.9x faster |
+   | Concurrent query limit  | 15               | 50+              | 3.3x more   |
+   | Storage cost per TB     | $2,400/year      | $552/year        | 77% cheaper |
+   | Admin FTEs required     | 3                | 0.5              | 83% reduction |
+   | Monthly maintenance     | 16 hours         | 2 hours          | 87% reduction |
+
+5. SERVICENOW
+   Service: IT Service Management (ITSM), IT Operations Management (ITOM),
+            HR Service Delivery (HRSD)
+   Annual Contract Value: $3.8M
+   Contract Term: July 1, 2024 - June 30, 2027 (3-year)
+   Contract ID: CTR-2024-SNOW-002
+   Relationship Manager: Patricia Anderson (ITSM/ITOM), Sarah Mitchell (HRSD)
+   ServiceNow Account Team: Rachel Kim (Account Executive)
+   Performance Rating: 4.1/5.0
+
+   Module Utilization:
+   | Module | Users | Tickets/Month | SLA Met | Satisfaction |
+   |--------|-------|---------------|---------|--------------|
+   | ITSM   | 350   | 2,800         | 94%     | 4.0/5.0      |
+   | ITOM   | 45    | N/A (monitoring)| 97%   | 4.2/5.0      |
+   | HRSD   | 1,000 | 1,200         | 91%     | 3.8/5.0      |
+
+   Process Automations Built on ServiceNow:
+   - IT Ticket Routing (auto-assignment based on category + priority): 90% automation rate
+   - Employee Onboarding (multi-step workflow across IT, HR, Facilities): 85% automated
+   - Purchase Order Approval (multi-level approval chain): 95% automated
+   - Change Advisory Board (CAB) workflow: 70% automated (manual review for P1/P2 changes)
+   - Asset provisioning (laptop, phone, badge): 80% automated
+   - Knowledge article suggestion (ML-based): 65% accuracy, improving
+
+   Improvement Areas:
+   - HRSD satisfaction (3.8/5.0) driven by slow case resolution for complex HR queries
+   - Sarah Mitchell's feedback: "The HRSD module handles standard cases well but struggles
+     with policy interpretation queries. We're exploring GenAI integration for HR knowledge base."
+   - Integration with SAP HR module pending ERP migration completion
+
+6. CROWDSTRIKE
+   Service: Endpoint Security — Falcon XDR, Identity Protection, Threat Intelligence
+   Annual Contract Value: $2.1M
+   Contract Term: October 1, 2024 - September 30, 2027 (3-year)
+   Contract ID: CTR-2024-CS-001
+   Relationship Manager: David Kowalski
+   CrowdStrike Account Team: James Ortiz (Security Advisor)
+   Performance Rating: 4.6/5.0
+
+   Deployment Coverage:
+   - Endpoints protected: 1,450 (1,000 employee devices + 350 servers + 100 cloud instances)
+   - Detection coverage: 100% of managed endpoints
+   - Response automation: 78% of detections auto-remediated (up from 45% at deployment)
+   - Zero missed detections in MITRE ATT&CK Eval (April 2025 internal test)
+
+   Threat Intelligence Metrics (Last 6 Months):
+   - Malware blocked: 2,847 samples (892 unique families)
+   - Phishing attempts blocked: 12,400 (via identity protection module)
+   - Lateral movement attempts: 3 detected, all contained within 4 minutes
+   - Mean time to detect (MTTD): 2.3 minutes (SLA: <5 minutes)
+   - Mean time to respond (MTTR): 8.7 minutes (SLA: <15 minutes)
+   - False positive rate: 0.3% (excellent)
+
+   Notable Security Incidents:
+   Incident 1 (February 2025): Credential stuffing attack against VPN gateway.
+   CrowdStrike Identity Protection detected 847 failed login attempts from 12 IP ranges
+   in Eastern Europe. Automatic blocking triggered within 3 minutes. David Kowalski
+   escalated to SOC (Secureworks) for investigation. No credential compromise confirmed.
+
+   Incident 2 (April 2025): Supply chain concern — third-party npm package used in
+   Customer Portal (APP-007) found to contain telemetry exfiltration code. CrowdStrike
+   Falcon detected suspicious outbound connections during integration testing. Marcus
+   Thompson quarantined the package within 15 minutes. Replacement library deployed
+   within 24 hours. No production data exposed.
+
+TIER 2 PREFERRED VENDORS (18 vendors, $6.8M combined annual spend)
+
+| # | Vendor              | Service                    | Annual Spend | Rating | Contract End | Notes                          |
+|---|---------------------|----------------------------|-------------|--------|-------------|-------------------------------|
+| 1 | Databricks          | ML Platform & Data Eng     | $1.2M       | 4.4    | Dec 2026    | Critical for ML pipeline      |
+| 2 | Okta                | Identity & Access (SSO)    | $840K       | 4.3    | Mar 2027    | Zero-trust identity layer     |
+| 3 | Splunk              | SIEM & Log Analytics       | $720K       | 4.0    | Jun 2026    | Evaluate AWS-native option    |
+| 4 | Palo Alto (Prisma)  | Cloud Security (CSPM)      | $580K       | 4.2    | Sep 2026    | Cloud security posture mgmt   |
+| 5 | Fivetran            | Data Integration (CDC)     | $340K       | 4.1    | Dec 2025    | SAP-Snowflake replication     |
+| 6 | Tableau             | Business Intelligence      | $310K       | 4.0    | Jun 2026    | 23 executive dashboards       |
+| 7 | UiPath              | Robotic Process Automation | $290K       | 3.9    | Mar 2026    | 4 production bots (finance)   |
+| 8 | Secureworks         | Managed SOC (24/7)         | $480K       | 4.1    | Dec 2025    | Outsourced security ops       |
+| 9 | Coursera for Biz    | Corporate Training         | $280K       | 4.2    | Dec 2025    | 3,500 seat license            |
+| 10| NCC Group           | Penetration Testing        | $180K       | 4.5    | Per-engagement | Semi-annual pen test       |
+| 11| Coalfire            | Compliance Audit            | $150K       | 4.3    | Per-engagement | SOC 2, PCI-DSS assistance |
+| 12| PagerDuty           | Incident Management        | $120K       | 4.0    | Jun 2026    | On-call rotation management   |
+| 13| Jira (Atlassian)    | Project Management         | $95K        | 3.8    | Annual      | 200 users                     |
+| 14| HubSpot             | Marketing Automation       | $85K        | 4.1    | Dec 2025    | Integrated after migration    |
+| 15| DocuSign            | Electronic Signatures      | $72K        | 4.2    | Annual      | Contract lifecycle support    |
+| 16| Informatica         | Master Data Management     | $380K       | 3.7    | Jun 2026    | MDM for customer data quality |
+| 17| HashiCorp           | Infrastructure as Code     | $240K       | 4.4    | Dec 2026    | Terraform + Vault             |
+| 18| Datadog             | Application Monitoring     | $265K       | 4.3    | Sep 2026    | APM + Infrastructure monitoring|
+
+TIER 3 VENDOR CONSOLIDATION
+
+Current Tier 3: 118 vendors ($8.5M combined annual spend)
+Consolidation Target: Reduce to <85 vendors by December 2026
+
+Consolidation Analysis:
+  Redundant vendors identified: 22 vendors with overlapping capabilities
+  Categories with multiple vendors:
+  - Cloud Storage: 5 vendors (consolidate to AWS S3 + Snowflake only) — saves $340K
+  - Email Marketing: 3 vendors (consolidate to HubSpot only) — saves $95K
+  - Project Management: 4 vendors (consolidate to Jira only) — saves $120K
+  - File Sharing: 3 vendors (consolidate to SharePoint/OneDrive only) — saves $85K
+  - Video Conferencing: 2 vendors (consolidate to Teams only) — saves $42K
+
+  Already Eliminated (FY2025 YTD): 14 redundant vendors eliminated
+  - Savings realized: $1.5M (annualized)
+  - Example: Eliminated separate Dropbox Business ($65K), Box Enterprise ($55K), and
+    custom file server hosting ($120K) by migrating to SharePoint Online (included in EA)
+
+  Remaining Consolidation Opportunities: 8 additional vendors targetable in FY2026
+  - Projected savings: $680K annually
+  - Requires: Migration planning for each vendor exit (data portability assessment,
+    contract termination clause review by Elena Vasquez)
+
+VENDOR PERFORMANCE SCORECARD METHODOLOGY
+
+Quarterly review process (implemented Q2 2025 per Patricia Anderson initiative):
+
+Evaluation Dimensions:
+1. SLA Compliance (30% weight): Contractual service level adherence
+2. Quality of Deliverables (25% weight): Defect rate, rework, audit findings
+3. Innovation & Proactivity (15% weight): New ideas, proactive issue identification
+4. Communication & Responsiveness (15% weight): Response times, reporting quality
+5. Cost Effectiveness (15% weight): Value for money, optimization suggestions
+
+Rating Scale: 1.0 (Critical) - 2.0 (Below Expectations) - 3.0 (Meets Expectations) -
+              4.0 (Exceeds Expectations) - 5.0 (Exceptional)
+
+Vendor Scorecard Results (Q2 2025):
+
+| Vendor        | SLA   | Quality | Innovation | Communication | Cost    | Weighted |
+|---------------|-------|---------|------------|---------------|---------|----------|
+| Microsoft     | 4.9   | 4.8     | 4.5        | 4.3           | 4.2     | 4.56     |
+| CrowdStrike   | 4.8   | 4.7     | 4.5        | 4.4           | 4.3     | 4.56     |
+| AWS           | 4.7   | 4.5     | 4.6        | 4.2           | 4.0     | 4.44     |
+| Snowflake     | 4.6   | 4.5     | 4.3        | 4.1           | 3.9     | 4.32     |
+| ServiceNow    | 4.2   | 4.0     | 3.8        | 3.9           | 3.7     | 3.96     |
+| Apex Tech     | 3.8   | 4.0     | 3.5        | 3.2           | 3.6     | 3.66     |
+
+Action Items from Q2 Scorecard Review:
+- Apex Technologies: Formal performance improvement plan (PIP) if Q3 score <3.8.
+  Patricia Anderson to meet with Apex SVP William Chang by July 15, 2025.
+- ServiceNow HRSD: Sarah Mitchell to conduct user satisfaction deep-dive and
+  present improvement roadmap to Steering Committee by August 2025.
+- Microsoft Power Platform: Jennifer Park to evaluate utilization improvement plan
+  or license reduction by October 2025.
+
+COST OPTIMIZATION INITIATIVES — DETAILED BREAKDOWN
+
+Year-to-Date Savings: $8.7M
+
+1. AWS Reserved Instance Optimization: $3.2M
+   - Increased RI coverage from 52% to 68% of EC2 fleet
+   - 1-year RI purchases: $1.4M savings (standard, no-upfront)
+   - 3-year RI purchases: $1.8M savings (convertible, partial upfront)
+   - Managed by: Marcus Thompson + AWS TAM Lisa Hernandez
+   - Methodology: CloudHealth by VMware for RI recommendation engine
+
+2. Microsoft EA True-Up Negotiation: $2.8M
+   - Renegotiated annual true-up based on actual utilization data
+   - Removed 200 unused Power Platform licenses from true-up calculation
+   - Secured $1.2M credit for Azure AD P1 to P2 migration timing
+   - Managed by: Jennifer Park + Microsoft AE Sarah Lindberg
+
+3. Tier 3 Vendor Consolidation: $1.5M
+   - 14 vendors eliminated through consolidation (see above)
+   - Key wins: File sharing ($240K), marketing tools ($180K), reporting ($150K)
+   - Managed by: Jennifer Park (vendor strategy) + department leads
+
+4. SaaS License Renegotiation: $1.2M
+   - Splunk: Renegotiated from per-GB to per-device pricing — $420K savings
+   - UiPath: Switched from named to concurrent licensing — $180K savings
+   - Tableau: Volume discount for enterprise deployment — $95K savings
+   - Other SaaS: Aggregate negotiations across 8 vendors — $505K savings
+   - Managed by: Jennifer Park + procurement team
+
+Projected Annual Savings (FY2026): $12.4M
+  AWS RI optimization (68% → 85%): $1.8M additional
+  AWS Graviton migration: $840K
+  AWS GP3 volume migration: $240K
+  Tier 3 consolidation (8 more vendors): $680K
+  Microsoft EA renewal negotiation: $3.5M (target vs. expected ask)
+  Process automation vendor reduction: $420K
+  Data integration optimization (Fivetran → native CDC): $340K
+  Continued SaaS renegotiation: $600K
+  Total projected: $8.42M from specific initiatives + $3.98M from renewal negotiations
+
+VENDOR DATA SOVEREIGNTY COMPLIANCE
+
+| Vendor        | Data Storage Regions | US Data Only? | GDPR Impact | Notes                          |
+|---------------|---------------------|--------------|-------------|-------------------------------|
+| AWS           | us-east-1, us-west-2| YES          | N/A         | US-only policy enforced       |
+| Microsoft     | US + EU (M365)      | NO           | YES         | EU data for 28% intl revenue  |
+| Snowflake     | US (AWS us-east-1)  | YES          | N/A         | Single-region deployment      |
+| Apex Tech     | US (on-site)        | YES          | N/A         | On-site consultants only      |
+| CrowdStrike   | US + EU (telemetry) | PARTIAL      | YES         | Falcon cloud telemetry in EU  |
+| ServiceNow    | US (Washington DC)  | YES          | N/A         | FedRAMP-ready instance        |
+| Databricks    | US (AWS us-east-1)  | YES          | N/A         | Hosted on our AWS account     |
+| Okta          | US                  | YES          | N/A         | US data center                |
+| Splunk        | US + EU             | NO           | YES         | EU log forwarding for intl ops|
+
+Non-US Data Vendors Requiring Action:
+1. Microsoft: EU data residency review needed for GDPR compliance (Elena Vasquez leading)
+2. CrowdStrike: EU telemetry data — assess if PII is included in threat intelligence feeds
+3. Splunk: EU log forwarding — verify no PII in log streams sent to EU cluster
+
+VENDOR RISK MATRIX
+
+| Risk Category              | Vendors Affected      | Impact   | Likelihood | Score | Mitigation                              |
+|----------------------------|-----------------------|----------|-----------|-------|-----------------------------------------|
+| Single-source dependency   | Apex Technologies     | HIGH     | HIGH      | 9     | Secondary partner evaluation (in progress)|
+| Spend concentration (89%)  | Microsoft, AWS, Apex  | HIGH     | MEDIUM    | 6     | Diversification roadmap; not actionable near-term |
+| Renewal pricing pressure   | Microsoft, AWS        | MEDIUM   | HIGH      | 6     | Early negotiation; competitive leverage  |
+| SLA non-compliance         | Apex Technologies     | MEDIUM   | MEDIUM    | 4     | Performance improvement plan; escalation |
+| Data sovereignty gap       | Microsoft, Splunk, CS | MEDIUM   | LOW       | 2     | Legal review; data localization options  |
+| Vendor financial stability | Tier 3 vendors        | LOW      | LOW       | 1     | Annual financial health checks           |
+| Shadow IT / rogue vendors  | Unknown               | MEDIUM   | MEDIUM    | 4     | Procurement policy enforcement; spend analytics |
+
+RECOMMENDATIONS
+
+1. Begin Microsoft EA renewal negotiations by October 2025 (moved up from January 2026
+   to allow more negotiation cycles). Jennifer Park to lead.
+2. Complete secondary integration partner evaluation by August 2025 and initiate pilot
+   engagement by October 2025. Patricia Anderson to lead.
+3. Achieve 80% AWS Reserved Instance coverage by September 2025 for additional $1.8M
+   annual savings. Marcus Thompson to lead with AWS TAM Lisa Hernandez.
+4. Complete Tier 3 vendor consolidation (8 additional vendors) by March 2026. Jennifer Park
+   to coordinate with department leads.
+5. Establish quarterly vendor scorecard reviews for all Tier 1 and Tier 2 vendors.
+   First full review completed Q2 2025; next: Q3 2025 (August).
+6. Implement vendor data sovereignty requirements in all new and renewed contracts.
+   Elena Vasquez to draft standard clause by September 2025.
+7. Target $15M in vendor optimization savings for FY2026 (stretch goal above $12.4M projection).
+
+APPENDIX: VENDOR CONTRACT CALENDAR (2025-2027)
+
+| Vendor        | Contract End   | Annual Value | Action Required By | Owner              | Priority |
+|---------------|----------------|-------------|--------------------|--------------------|----------|
+| Fivetran      | Dec 2025       | $340K       | Oct 2025           | Jennifer Park      | Medium   |
+| Secureworks   | Dec 2025       | $480K       | Oct 2025           | David Kowalski     | High     |
+| Coursera      | Dec 2025       | $280K       | Oct 2025           | Sarah Mitchell     | Medium   |
+| HubSpot       | Dec 2025       | $85K        | Nov 2025           | Marketing Lead     | Low      |
+| UiPath        | Mar 2026       | $290K       | Jan 2026           | Patricia Anderson  | Medium   |
+| Splunk        | Jun 2026       | $720K       | Mar 2026           | David Kowalski     | High     |
+| Microsoft EA  | Jun 2026       | $85.5M      | Oct 2025           | Jennifer Park      | Critical |
+| Tableau       | Jun 2026       | $310K       | Apr 2026           | Jennifer Park      | Medium   |
+| Informatica   | Jun 2026       | $380K       | Apr 2026           | Jennifer Park      | Medium   |
+| PagerDuty     | Jun 2026       | $120K       | May 2026           | Marcus Thompson    | Low      |
+| Palo Alto     | Sep 2026       | $580K       | Jun 2026           | David Kowalski     | High     |
+| Datadog       | Sep 2026       | $265K       | Jul 2026           | Marcus Thompson    | Medium   |
+| AWS EDP       | Dec 2026       | $66.9M      | Jul 2026           | Marcus Thompson    | Critical |
+| Apex Tech     | Dec 2026       | $18.5M      | Sep 2025           | Patricia Anderson  | Critical |
+| Databricks    | Dec 2026       | $1.2M       | Sep 2026           | Jennifer Park      | High     |
+| HashiCorp     | Dec 2026       | $240K       | Oct 2026           | Marcus Thompson    | Medium   |
+| Snowflake     | Mar 2027       | $4.2M       | Dec 2026           | Jennifer Park      | High     |
+| ServiceNow    | Jun 2027       | $3.8M       | Mar 2027           | Patricia Anderson  | High     |
+| CrowdStrike   | Sep 2027       | $2.1M       | Jun 2027           | David Kowalski     | High     |
+| Okta          | Mar 2027       | $840K       | Dec 2026           | David Kowalski     | High     |
+
+Report prepared by: Jennifer Park, Director of Vendor Strategy
+Reviewed by: Patricia Anderson, SVP Operations
+Approved by: Dr. Robert Chen, CIO
