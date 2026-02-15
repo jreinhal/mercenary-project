@@ -79,19 +79,19 @@ Tests produce JaCoCo reports at `build/reports/jacoco/test/html/index.html`. Son
 
 ### High-Level Request Flow
 ```
-User → Thymeleaf SPA (index.html / admin.html)
+User → Static HTML UI (index.html / admin.html)
      → Spring Security filter chain (auth, rate-limit, CSP nonce, correlation ID)
      → MercenaryController (/api/ask, /api/ingest, /api/inspect, etc.)
      → RagOrchestrationService (strategy selection & pipeline coordination)
      → RAG Strategy (HybridRAG, HiFi-RAG, AdaptiveRAG, CRAG, etc.)
      → LocalMongoVectorStore (custom impl replacing Spring AI default)
-     → Ollama (local LLM inference, never external APIs)
+     → LLM provider (Ollama local by default; cloud models only when `foundation` profile is active)
      → Response with citations + evidence metadata
 ```
 
 ### Key Architectural Layers
 
-**Controllers** (`controller/`) — REST endpoints. `MercenaryController` is the main entry point handling `/api/ask`, `/api/ingest`, `/api/inspect`, `/api/documents`. `AuthController` and `OidcBrowserFlowController` handle authentication.
+**Controllers** (`controller/`) — REST endpoints. `MercenaryController` is the main entry point handling `/api/ask`, `/api/ingest`, `/api/inspect`. `AuthController` and `OidcBrowserFlowController` handle authentication.
 
 **Service layer** (`service/`) — Business logic. Central services:
 - `RagOrchestrationService` — coordinates which RAG strategy runs, applies guardrails
@@ -110,7 +110,7 @@ User → Thymeleaf SPA (index.html / admin.html)
 - `qucorag/` — corpus-grounded uncertainty quantification
 - `ragpart/` — corpus poisoning defense
 
-**Security filters** (`filter/`) — ordered filter chain: CORS → rate limiting → CSP nonce → authentication → sector isolation. Check `@Order` annotations when adding filters.
+**Security filters** (`filter/`) — ordered servlet filter chain: CSP nonce → authentication → sector isolation → rate limiting. CORS is configured via `WebMvcConfigurer`, not as a servlet filter. Check `@Order` annotations when adding filters.
 
 **Vector store** (`vector/`) — `LocalMongoVectorStore` is a custom implementation (Spring AI's default MongoDB vector store auto-config is excluded). Includes filter expression parser/evaluator for sector-aware queries.
 
@@ -133,7 +133,7 @@ Security-sensitive code (CAC auth, HIPAA compliance) physically cannot exist in 
 | `standard` | STANDARD | Commercial — username/password with bootstrap |
 | `enterprise` | OIDC | Enterprise — external IdP, Bearer JWT |
 | `govcloud` | CAC | Government — X.509 client certificate (smart card) |
-| `foundation` | (any) | Adds cloud model support (OpenAI/Anthropic/VertexAI) |
+| `foundation` | (any) | Enables cloud model integration points (OpenAI/Anthropic/VertexAI); requires provider credentials and auto-config override |
 
 ### Test Profiles
 
@@ -143,7 +143,7 @@ Security-sensitive code (CAC auth, HIPAA compliance) physically cannot exist in 
 
 ### Frontend
 
-Server-rendered Thymeleaf pages with vanilla JS (no framework). Key files:
+Static HTML pages with vanilla JS (no framework). Key files:
 - `src/main/resources/static/index.html` + `js/sentinel-app.js` — main chat UI
 - `src/main/resources/static/admin.html` + `js/admin.js` — admin dashboard
 - `src/main/resources/static/manual.html` — user manual
