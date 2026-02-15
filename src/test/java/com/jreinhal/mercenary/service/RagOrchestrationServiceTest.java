@@ -1,12 +1,151 @@
 package com.jreinhal.mercenary.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
 
+import com.jreinhal.mercenary.core.license.LicenseService;
+import com.jreinhal.mercenary.rag.adaptiverag.AdaptiveRagService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class RagOrchestrationServiceTest {
+
+    @Nested
+    @DisplayName("Adaptive Token Budget - adjustForComplexity")
+    class AdjustForComplexityTest {
+
+        private RagOrchestrationService createServiceWithBudgetDefaults() {
+            RagOrchestrationService service = mock(RagOrchestrationService.class, CALLS_REAL_METHODS);
+            ReflectionTestUtils.setField(service, "noRetrievalMaxTokens", 128);
+            ReflectionTestUtils.setField(service, "noRetrievalNumCtx", 2048);
+            ReflectionTestUtils.setField(service, "chunkMaxTokens", 256);
+            ReflectionTestUtils.setField(service, "chunkNumCtx", 4096);
+            return service;
+        }
+
+        @Test
+        @DisplayName("NO_RETRIEVAL should cap maxTokens and reduce numCtx")
+        void noRetrievalShouldCapTokensAndCtx() {
+            RagOrchestrationService service = createServiceWithBudgetDefaults();
+            RagOrchestrationService.ResponsePolicy base =
+                    new RagOrchestrationService.ResponsePolicy(
+                            LicenseService.Edition.GOVERNMENT, 768, 8192, true, true, false);
+
+            RagOrchestrationService.ResponsePolicy adjusted =
+                    service.adjustForComplexity(base, AdaptiveRagService.RoutingDecision.NO_RETRIEVAL);
+
+            assertThat(adjusted.maxTokens()).isEqualTo(128);
+            assertThat(adjusted.numCtx()).isEqualTo(2048);
+            assertThat(adjusted.edition()).isEqualTo(LicenseService.Edition.GOVERNMENT);
+            assertThat(adjusted.enforceCitations()).isTrue();
+        }
+
+        @Test
+        @DisplayName("CHUNK should cap maxTokens and reduce numCtx")
+        void chunkShouldCapTokensAndCtx() {
+            RagOrchestrationService service = createServiceWithBudgetDefaults();
+            RagOrchestrationService.ResponsePolicy base =
+                    new RagOrchestrationService.ResponsePolicy(
+                            LicenseService.Edition.ENTERPRISE, 640, 8192, false, false, true);
+
+            RagOrchestrationService.ResponsePolicy adjusted =
+                    service.adjustForComplexity(base, AdaptiveRagService.RoutingDecision.CHUNK);
+
+            assertThat(adjusted.maxTokens()).isEqualTo(256);
+            assertThat(adjusted.numCtx()).isEqualTo(4096);
+            assertThat(adjusted.edition()).isEqualTo(LicenseService.Edition.ENTERPRISE);
+            assertThat(adjusted.enforceCitations()).isFalse();
+        }
+
+        @Test
+        @DisplayName("DOCUMENT should pass through unchanged")
+        void documentShouldPassThrough() {
+            RagOrchestrationService service = createServiceWithBudgetDefaults();
+            RagOrchestrationService.ResponsePolicy base =
+                    new RagOrchestrationService.ResponsePolicy(
+                            LicenseService.Edition.GOVERNMENT, 768, 8192, true, true, false);
+
+            RagOrchestrationService.ResponsePolicy adjusted =
+                    service.adjustForComplexity(base, AdaptiveRagService.RoutingDecision.DOCUMENT);
+
+            assertThat(adjusted).isSameAs(base);
+        }
+
+        @Test
+        @DisplayName("Math.min: edition limit wins when lower than tier cap")
+        void editionLimitWinsWhenLower() {
+            RagOrchestrationService service = createServiceWithBudgetDefaults();
+            // TRIAL with 100 maxTokens — lower than CHUNK tier cap of 256
+            RagOrchestrationService.ResponsePolicy base =
+                    new RagOrchestrationService.ResponsePolicy(
+                            LicenseService.Edition.TRIAL, 100, 4096, false, false, true);
+
+            RagOrchestrationService.ResponsePolicy adjusted =
+                    service.adjustForComplexity(base, AdaptiveRagService.RoutingDecision.CHUNK);
+
+            assertThat(adjusted.maxTokens()).isEqualTo(100);  // edition limit wins
+        }
+
+        @Test
+        @DisplayName("Null decision returns base policy unchanged")
+        void nullDecisionReturnsBase() {
+            RagOrchestrationService service = createServiceWithBudgetDefaults();
+            RagOrchestrationService.ResponsePolicy base =
+                    new RagOrchestrationService.ResponsePolicy(
+                            LicenseService.Edition.TRIAL, 512, 4096, false, false, true);
+
+            RagOrchestrationService.ResponsePolicy result =
+                    service.adjustForComplexity(base, null);
+
+            assertThat(result).isSameAs(base);
+        }
+
+        @Test
+        @DisplayName("Null base returns null")
+        void nullBaseReturnsNull() {
+            RagOrchestrationService service = createServiceWithBudgetDefaults();
+            RagOrchestrationService.ResponsePolicy result =
+                    service.adjustForComplexity(null, AdaptiveRagService.RoutingDecision.CHUNK);
+
+            assertThat(result).isNull();
+        }
+
+        @Test
+        @DisplayName("Preserves citation and evidence settings across all tiers")
+        void preservesCitationSettings() {
+            RagOrchestrationService service = createServiceWithBudgetDefaults();
+            RagOrchestrationService.ResponsePolicy base =
+                    new RagOrchestrationService.ResponsePolicy(
+                            LicenseService.Edition.MEDICAL, 768, 8192, true, true, false);
+
+            for (AdaptiveRagService.RoutingDecision decision : AdaptiveRagService.RoutingDecision.values()) {
+                RagOrchestrationService.ResponsePolicy adjusted =
+                        service.adjustForComplexity(base, decision);
+                assertThat(adjusted.enforceCitations()).isTrue();
+                assertThat(adjusted.appendEvidenceAlways()).isTrue();
+                assertThat(adjusted.appendEvidenceWhenNoCitations()).isFalse();
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("ResponsePolicy record with numCtx")
+    class ResponsePolicyTest {
+
+        @Test
+        @DisplayName("Record should store numCtx field")
+        void shouldStoreNumCtx() {
+            RagOrchestrationService.ResponsePolicy policy =
+                    new RagOrchestrationService.ResponsePolicy(
+                            LicenseService.Edition.GOVERNMENT, 768, 8192, true, true, false);
+
+            assertThat(policy.numCtx()).isEqualTo(8192);
+            assertThat(policy.maxTokens()).isEqualTo(768);
+        }
+    }
 
     @Nested
     @DisplayName("RetrievalOverrides record")
