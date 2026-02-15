@@ -71,7 +71,7 @@ This directory contains comprehensive code review documentation for the SENTINEL
 4. Run security verification:
    ```bash
    ./gradlew test jacocoTestReport
-   ./gradlew dependencyCheckAnalyze
+   # Note: Add OWASP plugin first, then: ./gradlew dependencyCheckAnalyze
    ```
 
 ### For Security Team
